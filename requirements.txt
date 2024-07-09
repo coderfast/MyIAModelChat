@@ -1,0 +1,9 @@
+os
+json
+onnx
+torch
+torchvision
+torchaudio
+torchtext
+numpy==1.26
+python-aiml
