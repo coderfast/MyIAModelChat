@@ -164,8 +164,10 @@ if __name__ == '__main__':
     dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=collate_fn)
     
     # Initialize model
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
     model = ChatModel(tokenizer.vocab_size, embed_size=128, hidden_size=256).to(device)
+    print(f"Using {device} device")
     
     # Define loss and optimizer
     criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.word2idx['<PAD>'])
