@@ -4,6 +4,8 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import aiml
 import os
+import argparse
+import multiprocessing as mp
 
 # AIML Loader
 class AIMLLoader:
@@ -146,6 +148,13 @@ def generate_response(model, tokenizer, input_text, max_length=50):
 
 # Main
 if __name__ == '__main__':
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num_cores", type=int, default=8)
+    parser.add_argument("--num_threads", type=int, default=8)
+    args = parser.parse_args()
+
     # Load AIML files
     aiml_loader = AIMLLoader('aiml')
     
@@ -163,6 +172,24 @@ if __name__ == '__main__':
     # Create DataLoader with custom collate function
     dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=collate_fn)
     
+    # Set the number of CPU threads and cores to use
+    # num_threads = args.num_threads
+    # num_cores = args.num_cores
+    num_threads = 8
+    num_cores = 8
+    os.environ["OMP_NUM_THREADS"] = str(num_threads)
+    torch.set_num_threads(num_threads)
+    os.environ["MKL_NUM_THREADS"] = str(num_cores)
+    torch.set_num_interop_threads(num_cores)
+
+    # Get the number of CPU cores and threads
+    num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
+    num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
+
+    # Print the information
+    print(f"Number of CPU cores: {num_cores}")
+    print(f"Number of CPU threads: {num_threads}")
+
     # Initialize model
     # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
@@ -178,7 +205,7 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         loss = train(model, dataloader, criterion, optimizer, device)
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
-    
+
     # Save the model
     torch.save(model.state_dict(), 'chat_model.pth')
 
