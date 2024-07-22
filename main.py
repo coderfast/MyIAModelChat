@@ -151,7 +151,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters())
 
     # Training loop
-    num_epochs = 15
+    num_epochs = 150
     for epoch in range(num_epochs):
         loss = train(model, dataloader, criterion, optimizer, device)
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
