@@ -93,22 +93,34 @@ if __name__ == '__main__':
     # Load AIML files
     aiml_loader = AIMLLoader('aiml')
 
-    # Create dataset
-    aiml_dataset = ChatDataset(aiml_loader)
-    hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
-    # Merge the datasets
-    merged_dataset = concatenate_datasets([aiml_dataset, hf_dataset])
+    # Create Hugging Face Dataset from AIMLs
+    aiml_hf_dataset = aiml_loader.create_hf_dataset()
+    # Load a Hugging Face Dataset
+    # hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
 
+    # Merge the datasets
+    # merged_dataset = concatenate_datasets([aiml_hf_dataset, hf_dataset])
+    merged_dataset = concatenate_datasets([aiml_hf_dataset])
+    
+    print(f"Length of merged dataset: {len(merged_dataset)}")
+
+    print(f"Tokenizing data")
     # Tokenize data
     tokenizer = SimpleTokenizer()
-    all_texts = [item[0] + ' ' + item[1] for item in merged_dataset]
+    # all_texts = [item[0] + ' ' + item[1] for item in merged_dataset]
+    all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
     tokenizer.fit(all_texts)
+    print(f"Tokenized data")
 
+    print(f"preparing data for pytorch")
     # Prepare data for PyTorch
-    encoded_data = [(tokenizer.encode(item[0]), tokenizer.encode(item[1])) for item in merged_dataset]
+    encoded_data = [(tokenizer.encode(merged_dataset['input'][i]), tokenizer.encode(merged_dataset['output'][i])) for i in range(len(merged_dataset))]
+    print(f"prepared data for pytorch")
 
+    print(f"create dataloader")
     # Create DataLoader with custom collate function
     dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=collate_fn)
+    print(f"created dataloader")
 
     # Set the number of CPU threads and cores to use
     # num_threads = args.num_threads
@@ -131,7 +143,6 @@ if __name__ == '__main__':
     # Initialize model
     # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
-    # model = ChatModel(tokenizer.vocab_size, embed_size=128, hidden_size=256).to(device)
     model = ChatModel(tokenizer, embed_size=128, hidden_size=256).to(device)
     print(f"Using {device} device")
 
@@ -140,7 +151,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters())
 
     # Training loop
-    num_epochs = 150
+    num_epochs = 15
     for epoch in range(num_epochs):
         loss = train(model, dataloader, criterion, optimizer, device)
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
