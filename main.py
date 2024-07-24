@@ -1,5 +1,6 @@
 import os
 import argparse
+import keyboard
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -153,6 +154,10 @@ if __name__ == '__main__':
     # Training loop
     num_epochs = 150
     for epoch in range(num_epochs):
+        
+        if keyboard.is_pressed('esc'):
+            break;
+
         loss = train(model, dataloader, criterion, optimizer, device)
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
 
@@ -160,7 +165,7 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), 'chat_model.pth')
 
     # Test the model
-    while True:
+    while not keyboard.is_pressed('esc'):
         user_input = input("You: ")
         if user_input.lower() == 'quit':
             break
