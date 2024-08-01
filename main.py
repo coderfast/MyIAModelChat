@@ -1,5 +1,7 @@
 import os
 import argparse
+import pickle
+import sys
 import keyboard
 import torch
 import torch.nn as nn
@@ -89,29 +91,74 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_cores", type=int, default=8)
     parser.add_argument("--num_threads", type=int, default=8)
+    parser.add_argument("--aiml", action='store_true')
+    parser.add_argument("--hf", action='store_true')
+    parser.add_argument("--onlytokenize", action='store_true')
     args = parser.parse_args()
+    
+    final_hf_datasets = []
+    # print(f"var_process_aiml: {var_process_aiml}")
+    # if (var_process_aiml == True):
+    #     sys.exit("tokenized")
+    # sys.exit("fin")
 
     # Load AIML files
-    aiml_loader = AIMLLoader('aiml')
+    if args.aiml:
+        aiml_loader = AIMLLoader('aiml')
 
-    # Create Hugging Face Dataset from AIMLs
-    aiml_hf_dataset = aiml_loader.create_hf_dataset()
+        # Create Hugging Face Dataset from AIMLs
+        aiml_hf_dataset = aiml_loader.create_hf_dataset()
+        final_hf_datasets.append( aiml_hf_dataset )
+
+
     # Load a Hugging Face Dataset
-    # hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
+    if args.hf:
+        huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
+        final_hf_datasets.append( huggingface_hf_dataset )
 
     # Merge the datasets
-    # merged_dataset = concatenate_datasets([aiml_hf_dataset, hf_dataset])
-    merged_dataset = concatenate_datasets([aiml_hf_dataset])
+    # merged_dataset = concatenate_datasets([aiml_hf_dataset, huggingface_hf_dataset])
+    # merged_dataset = concatenate_datasets([aiml_hf_dataset])
+    merged_dataset = concatenate_datasets(final_hf_datasets)
     
     print(f"Length of merged dataset: {len(merged_dataset)}")
 
-    print(f"Tokenizing data")
-    # Tokenize data
-    tokenizer = SimpleTokenizer()
-    # all_texts = [item[0] + ' ' + item[1] for item in merged_dataset]
-    all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
-    tokenizer.fit(all_texts)
-    print(f"Tokenized data")
+
+    # Check if the tokenizer and tokenized data files exist
+    if os.path.exists('tokenizer.pkl') and os.path.exists('tokenized_data.pkl'):
+
+        # Load the tokenizer from the file
+        with open('tokenizer.pkl', 'rb') as f:
+            tokenizer = pickle.load(f)
+
+        # Load the tokenized data from the file
+        with open('tokenized_data.pkl', 'rb') as f:
+            tokenized_data = pickle.load(f)
+
+    else:
+        
+        print(f"Tokenizing data")
+        # Tokenize data
+        tokenizer = SimpleTokenizer()
+        # all_texts = [item[0] + ' ' + item[1] for item in merged_dataset]
+        all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
+        tokenizer.fit(all_texts)
+        print(f"Tokenized data")
+        
+        # Save the tokenizer to a file
+        with open('tokenizer.pkl', 'wb') as f:
+            pickle.dump(tokenizer, f)
+
+        # Save the tokenized data to a file
+        tokenized_data = tokenizer.encode_batch(all_texts)
+        with open('tokenized_data.pkl', 'wb') as f:
+            pickle.dump(tokenized_data, f)
+
+        print("Tokenized data saved to files")
+        
+        if args.onlytokenize:
+            sys.exit("only tokenized, all done, exit")
+
 
     print(f"preparing data for pytorch")
     # Prepare data for PyTorch
@@ -124,22 +171,23 @@ if __name__ == '__main__':
     print(f"created dataloader")
 
     # Set the number of CPU threads and cores to use
-    # num_threads = args.num_threads
-    # num_cores = args.num_cores
-    num_threads = 8
-    num_cores = 8
-    os.environ["OMP_NUM_THREADS"] = str(num_threads)
-    torch.set_num_threads(num_threads)
-    os.environ["MKL_NUM_THREADS"] = str(num_cores)
-    torch.set_num_interop_threads(num_cores)
+    # num_threads = 8
+    # num_cores = 8
+    var_num_threads = args.num_threads
+    var_num_cores = args.num_cores
+    
+    os.environ["OMP_NUM_THREADS"] = str(var_num_threads)
+    torch.set_num_threads(var_num_threads)
+    os.environ["MKL_NUM_THREADS"] = str(var_num_cores)
+    torch.set_num_interop_threads(var_num_cores)
 
     # Get the number of CPU cores and threads
-    num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
-    num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
+    var_num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
+    var_num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
 
     # Print the information
-    print(f"Number of CPU cores: {num_cores}")
-    print(f"Number of CPU threads: {num_threads}")
+    print(f"Number of CPU cores: {var_num_cores}")
+    print(f"Number of CPU threads: {var_num_threads}")
 
     # Initialize model
     # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
