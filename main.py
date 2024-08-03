@@ -160,10 +160,10 @@ if __name__ == '__main__':
             sys.exit("only tokenized, all done, exit")
 
 
-    print(f"preparing data for pytorch")
+    print(f"preparing data for pytorch, encoding data")
     # Prepare data for PyTorch
     encoded_data = [(tokenizer.encode(merged_dataset['input'][i]), tokenizer.encode(merged_dataset['output'][i])) for i in range(len(merged_dataset))]
-    print(f"prepared data for pytorch")
+    print(f"prepared data for pytorch, encoded data")
 
     print(f"create dataloader")
     # Create DataLoader with custom collate function
