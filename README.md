@@ -3,6 +3,14 @@ My First IA Chat Model
 ---------------------------
 
 
+The key changes are:
+
+.- Intent Recognition: We've added an intent_classifier to the DialogueManager class, which uses a pre-trained BERT-based text classification model to detect the intent of the user's input. The detected intent is printed to the console.
+    
+.- Sentiment Analysis: We've added a sentiment_analyzer to the DialogueManager class, which uses a pre-trained BERT-based sentiment analysis model to detect the sentiment
+
+
+
 ---------------------------
 TO-DO LIST
 ---------------------------
