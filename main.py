@@ -9,6 +9,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import multiprocessing as mp
 from aimlloder import *
+from simpletokenizer import *
 from chatmodel import *
 from chatdataset import *
 from datasets import concatenate_datasets, load_dataset
@@ -140,7 +141,34 @@ if __name__ == '__main__':
     # Tokenize data
     if tokenizer == None:
         tokenizer = SimpleTokenizer()
-    all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
+
+    # Tokenizing data
+    all_texts = []
+
+    # all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
+    for i in range(len(merged_dataset)):
+        print(f"Input: {merged_dataset['input'][i]}")
+        print(f"Output: {merged_dataset['output'][i]}")
+        print()
+        input_text = merged_dataset['input'][i]
+        output_text = merged_dataset['output'][i]
+        combined_text = input_text + ' ' + output_text
+        all_texts.append(combined_text)
+
+        # save in each loop 
+        tokenizer.fit(all_texts)
+        print(f"Tokenized data")
+
+        # Save the tokenizer to a file
+        with open('tokenizer.pkl', 'wb') as f:
+            pickle.dump(tokenizer, f)
+
+        # Save the tokenized data to a file
+        # tokenized_data = tokenizer.encode_batch(all_texts)
+        tokenized_data = [tokenizer.encode(text) for text in all_texts]
+        with open('tokenized_data.pkl', 'wb') as f:
+            pickle.dump(tokenized_data, f)
+
     tokenizer.fit(all_texts)
     print(f"Tokenized data")
 
