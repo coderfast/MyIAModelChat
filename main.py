@@ -244,7 +244,14 @@ if __name__ == '__main__':
     # Initialize Dialogue Manager
     intent_classifier = pipeline('text-classification', model='nlptown/bert-base-multilingual-uncased-sentiment')
     sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
-    dialogue_manager = DialogueManager(model, tokenizer, intent_classifier, sentiment_analyzer)
+    knowledge_base = {"France": "The capital of France is Paris."}
+    persona = {
+        "name": "Claude",
+        "age": 30,
+        "occupation": "AI assistant",
+        "interests": ["technology", "science", "philosophy"]
+    }
+    dialogue_manager = DialogueManager(model, tokenizer, intent_classifier, sentiment_analyzer, knowledge_base, persona)
 
     # Test the model
     while not keyboard.is_pressed('esc'):

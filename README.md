@@ -10,9 +10,8 @@ The key changes are:
 .- Sentiment Analysis: We've added a sentiment_analyzer to the DialogueManager class, which uses a pre-trained BERT-based sentiment analysis model to detect the sentiment
 
 
-
 ---------------------------
-TO-DO LIST
+Added the TO-DO LIST
 ---------------------------
 1. Context and Coherence: A good chat AI model needs to maintain context and coherence across multiple turns of conversation. It should be able to understand the flow of the conversation, remember relevant details, and provide relevant and coherent responses, not just generate isolated responses.
 
