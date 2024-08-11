@@ -7,3 +7,4 @@ torchaudio
 torchtext
 numpy==1.26
 python-aiml
+transformers

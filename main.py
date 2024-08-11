@@ -6,13 +6,15 @@ import keyboard
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
 import multiprocessing as mp
+from torch.utils.data import Dataset, DataLoader
 from aimlloder import *
+from dialogmanager import DialogueManager
 from simpletokenizer import *
 from chatmodel import *
 from chatdataset import *
 from datasets import concatenate_datasets, load_dataset
+from transformers import pipeline
 
 
 # Training function
@@ -69,20 +71,20 @@ def collate_fn(batch):
 
 
 # Function to generate responses
-def generate_response(model, tokenizer, input_text, max_length=50):
+# def generate_response(model, tokenizer, input_text, max_length=50):
 
-    model.eval()
-    input_ids = torch.tensor(tokenizer.encode(input_text)).unsqueeze(0).to(device)
+#     model.eval()
+#     input_ids = torch.tensor(tokenizer.encode(input_text)).unsqueeze(0).to(device)
 
-    with torch.no_grad():
-        for _ in range(max_length):
-            outputs = model(input_ids)
-            next_token_id = outputs[0, -1, :].argmax().item()
-            if next_token_id == tokenizer.word2idx['<PAD>']:
-                break
-            input_ids = torch.cat([input_ids, torch.tensor([[next_token_id]]).to(device)], dim=1)
+#     with torch.no_grad():
+#         for _ in range(max_length):
+#             outputs = model(input_ids)
+#             next_token_id = outputs[0, -1, :].argmax().item()
+#             if next_token_id == tokenizer.word2idx['<PAD>']:
+#                 break
+#             input_ids = torch.cat([input_ids, torch.tensor([[next_token_id]]).to(device)], dim=1)
 
-    return tokenizer.decode([token for token in input_ids[0].tolist() if token != tokenizer.word2idx['<PAD>']])
+#     return tokenizer.decode([token for token in input_ids[0].tolist() if token != tokenizer.word2idx['<PAD>']])
 
 
 # Main
@@ -237,6 +239,12 @@ if __name__ == '__main__':
 
     # Save the model
     torch.save(model.state_dict(), 'chat_model.pth')
+    
+    
+    # Initialize Dialogue Manager
+    intent_classifier = pipeline('text-classification', model='nlptown/bert-base-multilingual-uncased-sentiment')
+    sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+    dialogue_manager = DialogueManager(model, tokenizer, intent_classifier, sentiment_analyzer)
 
     # Test the model
     while not keyboard.is_pressed('esc'):
@@ -244,5 +252,6 @@ if __name__ == '__main__':
         if user_input.lower() == 'quit':
             break
 
-        response = generate_response(model, tokenizer, user_input)
+        # response = generate_response(model, tokenizer, user_input)
+        response = dialogue_manager.generate_response(user_input)
         print("Bot:", response)
