@@ -99,6 +99,7 @@ if __name__ == '__main__':
     parser.add_argument("--aiml", action='store_true')
     parser.add_argument("--hf", action='store_true')
     parser.add_argument("--onlytokenize", action='store_true')
+    parser.add_argument("--epochs", type=int, default=1)
     args = parser.parse_args()
 
     # print(f"var_process_aiml: {var_process_aiml}")
@@ -228,7 +229,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters())
 
     # Training loop
-    num_epochs = 150
+    num_epochs = args.epochs
     for epoch in range(num_epochs):
         
         if keyboard.is_pressed('esc'):
