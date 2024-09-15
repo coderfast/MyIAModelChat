@@ -145,6 +145,27 @@ if __name__ == '__main__':
             data_list.append(dataset)
 
     dataset_dict = DatasetDict({f'dataset_{i}': dataset for i, dataset in enumerate(data_list)})
+    
+    for dataset_name, dataset in dataset_dict.items():
+        print(f"Dataset Name: {dataset_name}")
+        print(dataset)
+        print()
+
+    dataset_name = 'dataset_0'
+    dataset = dataset_dict[dataset_name]
+    print(f"Dataset Name: {dataset_name}")
+    print(dataset)
+    
+    # Access the first row of the dataset
+    first_row = dataset_dict['dataset_0'][1]
+    print(first_row)
+
+    # Get the 'input_ids' feature from the first row
+    input_ids = first_row['input_ids']
+    print(input_ids)
+
+    sys.exit("edu exit")
+
     final_hf_datasets = concatenate_datasets(dataset_dict.values())
 
     # Load a Hugging Face Dataset
