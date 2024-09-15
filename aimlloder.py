@@ -6,8 +6,6 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 import os
 from xml.etree import ElementTree
 
-
-
 class AIMLLoader:
 
     def __init__(self, aiml_dir, tokenizer):
@@ -31,7 +29,7 @@ class AIMLLoader:
         for file in os.listdir(self.aiml_dir):
             if file.endswith('.aiml'):
 
-                if not os.path.isfile( os.path.join(self.aiml_dir, file) + '.pkl' ):
+                if not os.path.isfile( os.path.join(self.aiml_dir, file) + '.datasets' ):
 
                     tree = ElementTree.parse(os.path.join(self.aiml_dir, file))
                     root = tree.getroot()
@@ -52,34 +50,33 @@ class AIMLLoader:
 
     
     def tokenize_data(self, data_hf_datasets, path):
-        
+
         # Concatenate all the Hugging Face datasets
-        self.finaldata_hf_datasets = []
-        self.finaldata_hf_datasets.append( data_hf_datasets )
-        merged_dataset = concatenate_datasets(self.finaldata_hf_datasets)
+        self.finaldata_hf_datasets = data_hf_datasets
 
         # Tokenizing data
-        all_texts = []
+        # all_texts = []
+        # for dataset in self.finaldata_hf_datasets:
+        #     for i in range(len(dataset)):
+        #         input_text = dataset['input'][i]
+        #         output_text = dataset['output'][i]
+        #         combined_text = input_text + ' ' + output_text
+        #         all_texts.append(combined_text)
 
-        for i in range(len(merged_dataset)):
-            print(f"Input: {merged_dataset['input'][i]}")
-            print(f"Output: {merged_dataset['output'][i]}")
-            print()
-            input_text = merged_dataset['input'][i]
-            output_text = merged_dataset['output'][i]
-            combined_text = input_text + ' ' + output_text
-            all_texts.append(combined_text)
-
-        self.tokenizer.fit(all_texts)
-        print(f"Tokenized data")
+        # self.tokenizer.fit(all_texts)
+        # print(f"Tokenized data")
 
         # Save the tokenizer to a file
-        with open(path + '.pkl', 'wb') as f:
-            pickle.dump(self.tokenizer, f)
+        # with open(path + '.tkz', 'wb') as f:
+        #     pickle.dump(self.tokenizer, f)
 
         # Save the tokenized data to a file
-        tokenized_data = [self.tokenizer.encode(text) for text in all_texts]
-        with open('tokenized_aiml_data.pkl', 'wb') as f:
-            pickle.dump(tokenized_data, f)
+        # tokenized_data = [self.tokenizer.encode(text) for text in all_texts]
+        # with open(path + '.pkl', 'wb') as f:
+        #     pickle.dump(tokenized_data, f)
 
-        return merged_dataset
+        # Save the list of Dataset objects
+        with open(path + '.datasets', 'wb') as f:
+            pickle.dump(self.finaldata_hf_datasets, f)
+
+        return self.finaldata_hf_datasets

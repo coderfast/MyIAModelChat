@@ -13,7 +13,7 @@ from dialogmanager import DialogueManager
 from simpletokenizer import *
 from chatmodel import *
 from chatdataset import *
-from datasets import concatenate_datasets, load_dataset
+from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from transformers import pipeline
 
 
@@ -68,6 +68,12 @@ def collate_fn(batch):
     output_tensor = torch.LongTensor(padded_outputs)
 
     return input_tensor, output_tensor
+
+def encode(self, text):
+    if isinstance(text, str):
+        return [self.word2idx.get(word, self.word2idx['<UNK>']) for word in text.split()]
+    else:
+        return [self.encode(str(item)) for item in text]
 
 
 # Function to generate responses
@@ -124,6 +130,23 @@ if __name__ == '__main__':
         #final_hf_datasets.append( aiml_hf_dataset )
         #aiml_loader.tokenize_data( final_hf_datasets )
 
+    data_dir = 'aiml'
+    data_list = []
+
+    for filename in os.listdir(data_dir):
+        if filename.endswith('.datasets'):
+            file_path = os.path.join(data_dir, filename)
+            with open(file_path, 'rb') as f:
+                tokenized_data = pickle.load(f)
+            
+            # Create a list of dictionaries from the tokenized data
+            data = [{'input_ids': token_ids} for token_ids in tokenized_data]
+            dataset = Dataset.from_list(data)
+            data_list.append(dataset)
+
+    dataset_dict = DatasetDict({f'dataset_{i}': dataset for i, dataset in enumerate(data_list)})
+    final_hf_datasets = concatenate_datasets(dataset_dict.values())
+
     # Load a Hugging Face Dataset
     # if args.hf:
     #     huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
@@ -132,21 +155,22 @@ if __name__ == '__main__':
     # Merge the datasets
     # merged_dataset = concatenate_datasets([aiml_hf_dataset, huggingface_hf_dataset])
     # merged_dataset = concatenate_datasets([aiml_hf_dataset])
-    merged_dataset = concatenate_datasets(final_hf_datasets)
+    # merged_dataset = concatenate_datasets(final_hf_datasets)
+    merged_dataset = final_hf_datasets
 
     print(f"Length of merged dataset: {len(merged_dataset)}")
 
 
     # Check if the tokenizer and tokenized data files exist
-    if os.path.exists('tokenizer.pkl') and os.path.exists('tokenized_data.pkl'):
+    # if os.path.exists('tokenizer.pkl') and os.path.exists('tokenized_data.pkl'):
 
-        # Load the tokenizer from the file
-        with open('tokenizer.pkl', 'rb') as f:
-            tokenizer = pickle.load(f)
+    #     # Load the tokenizer from the file
+    #     with open('tokenizer.pkl', 'rb') as f:
+    #         tokenizer = pickle.load(f)
 
-        # Load the tokenized data from the file
-        with open('tokenized_data.pkl', 'rb') as f:
-            tokenized_data = pickle.load(f)
+    #     # Load the tokenized data from the file
+    #     with open('tokenized_data.pkl', 'rb') as f:
+    #         tokenized_data = pickle.load(f)
 
     # Tokenizing data
 #   all_texts = []
@@ -194,10 +218,21 @@ if __name__ == '__main__':
 #         sys.exit("only tokenized, all done, exit")
    
 
-    print(f"preparing data for pytorch, encoding data")
     # Prepare data for PyTorch
-    encoded_data = [(tokenizer.encode(merged_dataset['input'][i]), tokenizer.encode(merged_dataset['output'][i])) for i in range(len(merged_dataset))]
-    print(f"prepared data for pytorch, encoded data")
+    # print(f"preparing data for pytorch, encoding data")
+    # encoded_data = [(tokenizer.encode(merged_dataset['input'][i]), tokenizer.encode(merged_dataset['output'][i])) for i in range(len(merged_dataset))]
+    # print(f"prepared data for pytorch, encoded data")
+
+    # Prepare data for PyTorch
+    print(f"Preparing data for PyTorch, encoding data")
+    encoded_data = []
+    for i in range(len(merged_dataset)):
+        if 'output' in merged_dataset:
+            encoded_data.append((tokenizer.encode(str(merged_dataset['input_ids'][i])), tokenizer.encode(str(merged_dataset['output'][i]))))
+        else:
+            encoded_data.append((tokenizer.encode(str(merged_dataset['input_ids'][i])),))
+    print(f"Prepared data for PyTorch, encoded data")
+
 
     print(f"create dataloader")
     # Create DataLoader with custom collate function
