@@ -1,13 +1,19 @@
 import os
 import aiml
-from datasets import Dataset
+import pickle
+from datasets import Dataset, concatenate_datasets, load_dataset
 
 import os
 from xml.etree import ElementTree
 
+
+
 class AIMLLoader:
-    def __init__(self, aiml_dir):
+
+    def __init__(self, aiml_dir, tokenizer):
+        self.finaldata_hf_datasets = []
         self.aiml_dir = aiml_dir
+        self.tokenizer = tokenizer
         self.kernel = aiml.Kernel()
         self.load_aiml_files()
 
@@ -15,6 +21,7 @@ class AIMLLoader:
         for file in os.listdir(self.aiml_dir):
             if file.endswith('.aiml'):
                 self.kernel.learn(os.path.join(self.aiml_dir, file))
+                self.create_hf_dataset()
 
     def get_response(self, input_text):
         return self.kernel.respond(input_text)
@@ -23,15 +30,56 @@ class AIMLLoader:
         data = []
         for file in os.listdir(self.aiml_dir):
             if file.endswith('.aiml'):
-                tree = ElementTree.parse(os.path.join(self.aiml_dir, file))
-                root = tree.getroot()
-                for category in root.findall('category'):
-                    pattern = category.find('pattern')
-                    if pattern is not None and pattern.text is not None:
-                        pattern_text = pattern.text.strip()
-                        template = category.find('template')
-                        if template is not None and template.text is not None:
-                            template_text = template.text.strip()
-                            data.append({'input': pattern_text, 'output': template_text})
 
-        return Dataset.from_list(data)
+                if not os.path.isfile( os.path.join(self.aiml_dir, file) + '.pkl' ):
+
+                    tree = ElementTree.parse(os.path.join(self.aiml_dir, file))
+                    root = tree.getroot()
+                    for category in root.findall('category'):
+                        pattern = category.find('pattern')
+                        if pattern is not None and pattern.text is not None:
+                            pattern_text = pattern.text.strip()
+                            template = category.find('template')
+                            if template is not None and template.text is not None:
+                                template_text = template.text.strip()
+                                data.append({'input': pattern_text, 'output': template_text})
+
+                    # Aqui tokenizarlo y guardarlo en un archivo
+                    self.tokenize_data( Dataset.from_list(data), os.path.join(self.aiml_dir, file) )
+
+        # return Dataset.from_list(data)
+        return
+
+    
+    def tokenize_data(self, data_hf_datasets, path):
+        
+        # Concatenate all the Hugging Face datasets
+        self.finaldata_hf_datasets = []
+        self.finaldata_hf_datasets.append( data_hf_datasets )
+        merged_dataset = concatenate_datasets(self.finaldata_hf_datasets)
+
+        # Tokenizing data
+        all_texts = []
+
+        for i in range(len(merged_dataset)):
+            print(f"Input: {merged_dataset['input'][i]}")
+            print(f"Output: {merged_dataset['output'][i]}")
+            print()
+            input_text = merged_dataset['input'][i]
+            output_text = merged_dataset['output'][i]
+            combined_text = input_text + ' ' + output_text
+            all_texts.append(combined_text)
+
+        self.tokenizer.fit(all_texts)
+        print(f"Tokenized data")
+
+        # Save the tokenizer to a file
+        with open(path + '.pkl', 'wb') as f:
+            pickle.dump(self.tokenizer, f)
+
+        # Save the tokenized data to a file
+        tokenized_data = [self.tokenizer.encode(text) for text in all_texts]
+        with open('tokenized_aiml_data.pkl', 'wb') as f:
+            pickle.dump(tokenized_data, f)
+
+        return merged_dataset

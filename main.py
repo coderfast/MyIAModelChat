@@ -90,6 +90,11 @@ def collate_fn(batch):
 # Main
 if __name__ == '__main__':
     
+    # Check if the tokenizer and tokenized data files exist
+    tokenizer = None
+    tokenized_data = None
+    
+    # final Huggin Face datasets merged
     final_hf_datasets = []
 
     # Parse command-line arguments
@@ -106,19 +111,23 @@ if __name__ == '__main__':
     # if (var_process_aiml == True):
     #     sys.exit("tokenized")
     # sys.exit("fin")
+    
+    # Tokenize data
+    print(f"Create Tokenizer")
+    if tokenizer == None:
+        tokenizer = SimpleTokenizer()
 
     # Load AIML files
     if args.aiml:
-        aiml_loader = AIMLLoader('aiml')
-
-        # Create Hugging Face Dataset from AIMLs
-        aiml_hf_dataset = aiml_loader.create_hf_dataset()
-        final_hf_datasets.append( aiml_hf_dataset )
+        aiml_loader = AIMLLoader('aiml', tokenizer)
+        #aiml_hf_dataset = aiml_loader.create_hf_dataset()
+        #final_hf_datasets.append( aiml_hf_dataset )
+        #aiml_loader.tokenize_data( final_hf_datasets )
 
     # Load a Hugging Face Dataset
-    if args.hf:
-        huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
-        final_hf_datasets.append( huggingface_hf_dataset )
+    # if args.hf:
+    #     huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
+    #     final_hf_datasets.append( huggingface_hf_dataset )
 
     # Merge the datasets
     # merged_dataset = concatenate_datasets([aiml_hf_dataset, huggingface_hf_dataset])
@@ -127,9 +136,8 @@ if __name__ == '__main__':
 
     print(f"Length of merged dataset: {len(merged_dataset)}")
 
+
     # Check if the tokenizer and tokenized data files exist
-    tokenizer = None
-    tokenized_data = None
     if os.path.exists('tokenizer.pkl') and os.path.exists('tokenized_data.pkl'):
 
         # Load the tokenizer from the file
@@ -140,54 +148,51 @@ if __name__ == '__main__':
         with open('tokenized_data.pkl', 'rb') as f:
             tokenized_data = pickle.load(f)
 
-    print(f"Tokenizing data")
-    # Tokenize data
-    if tokenizer == None:
-        tokenizer = SimpleTokenizer()
-
     # Tokenizing data
-    all_texts = []
+#   all_texts = []
+    
+#     # all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
+#     for i in range(len(merged_dataset)):
+#         print(f"Input: {merged_dataset['input'][i]}")
+#         print(f"Output: {merged_dataset['output'][i]}")
+#         print()
+#         input_text = merged_dataset['input'][i]
+#         output_text = merged_dataset['output'][i]
+#         combined_text = input_text + ' ' + output_text
+#         all_texts.append(combined_text)
 
-    # all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
-    for i in range(len(merged_dataset)):
-        print(f"Input: {merged_dataset['input'][i]}")
-        print(f"Output: {merged_dataset['output'][i]}")
-        print()
-        input_text = merged_dataset['input'][i]
-        output_text = merged_dataset['output'][i]
-        combined_text = input_text + ' ' + output_text
-        all_texts.append(combined_text)
+#         # save in each loop 
+#         tokenizer.fit(all_texts)
+#         print(f"Tokenized data")
 
-        # save in each loop 
-        tokenizer.fit(all_texts)
-        print(f"Tokenized data")
+#         # Save the tokenizer to a file
+#         with open('tokenizer.pkl', 'wb') as f:
+#             pickle.dump(tokenizer, f)
 
-        # Save the tokenizer to a file
-        with open('tokenizer.pkl', 'wb') as f:
-            pickle.dump(tokenizer, f)
+#         # Save the tokenized data to a file
+#         # tokenized_data = tokenizer.encode_batch(all_texts)
+#         tokenized_data = [tokenizer.encode(text) for text in all_texts]
+#         with open('tokenized_data.pkl', 'wb') as f:
+#             pickle.dump(tokenized_data, f)
 
-        # Save the tokenized data to a file
-        # tokenized_data = tokenizer.encode_batch(all_texts)
-        tokenized_data = [tokenizer.encode(text) for text in all_texts]
-        with open('tokenized_data.pkl', 'wb') as f:
-            pickle.dump(tokenized_data, f)
+#     tokenizer.fit(all_texts)
+#     print(f"Tokenized data")
 
-    tokenizer.fit(all_texts)
-    print(f"Tokenized data")
+#     # Save the tokenizer to a file
+#     with open('tokenizer.pkl', 'wb') as f:
+#         pickle.dump(tokenizer, f)
+#
 
-    # Save the tokenizer to a file
-    with open('tokenizer.pkl', 'wb') as f:
-        pickle.dump(tokenizer, f)
+#    
+#     # Save the tokenized data to a file
+#     # tokenized_data = tokenizer.encode_batch(all_texts)
+#     tokenized_data = [tokenizer.encode(text) for text in all_texts]
+#     with open('tokenized_data.pkl', 'wb') as f:
+#         pickle.dump(tokenized_data, f)
 
-    # Save the tokenized data to a file
-    # tokenized_data = tokenizer.encode_batch(all_texts)
-    tokenized_data = [tokenizer.encode(text) for text in all_texts]
-    with open('tokenized_data.pkl', 'wb') as f:
-        pickle.dump(tokenized_data, f)
-
-    if args.onlytokenize:
-        sys.exit("only tokenized, all done, exit")
-
+#     if args.onlytokenize:
+#         sys.exit("only tokenized, all done, exit")
+   
 
     print(f"preparing data for pytorch, encoding data")
     # Prepare data for PyTorch
