@@ -49,10 +49,10 @@ class AIMLLoader:
         return
 
     
-    def tokenize_data(self, data_hf_datasets, path):
+    def tokenize_data(self, data_hf_dataset, path):
 
         # Concatenate all the Hugging Face datasets
-        self.finaldata_hf_datasets = data_hf_datasets
+        self.finaldata_hf_datasets = data_hf_dataset
 
         # Tokenizing data
         # all_texts = []

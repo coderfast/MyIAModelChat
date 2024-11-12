@@ -130,8 +130,9 @@ if __name__ == '__main__':
         #final_hf_datasets.append( aiml_hf_dataset )
         #aiml_loader.tokenize_data( final_hf_datasets )
 
+    # Create a data list
     data_dir = 'aiml'
-    data_list = []
+    aiml_list_datasets_objects = Dataset.from_list([])
 
     for filename in os.listdir(data_dir):
         if filename.endswith('.datasets'):
@@ -142,32 +143,34 @@ if __name__ == '__main__':
             # Create a list of dictionaries from the tokenized data
             data = [{'input_ids': token_ids} for token_ids in tokenized_data]
             dataset = Dataset.from_list(data)
-            data_list.append(dataset)
+            aiml_list_datasets_objects= concatenate_datasets([aiml_list_datasets_objects, Dataset.from_list(dataset)])
 
-    dataset_dict = DatasetDict({f'dataset_{i}': dataset for i, dataset in enumerate(data_list)})
+    # Create a dataset dictionary
+    # dataset_dict = DatasetDict({f'dataset_{i}': dataset for i, dataset in enumerate(aiml_list_objects_datasets)})
     
-    for dataset_name, dataset in dataset_dict.items():
-        print(f"Dataset Name: {dataset_name}")
-        print(dataset)
-        print()
+    # for dataset_name, dataset in dataset_dict.items():
+        # aiml_hf_dataset.append( dataset )
+        # print(f"Dataset Name: {dataset_name}")
+        # print(dataset)
+        # print()
 
-    dataset_name = 'dataset_0'
-    dataset = dataset_dict[dataset_name]
-    print(f"Dataset Name: {dataset_name}")
-    print(dataset)
+    # dataset_name = 'dataset_0'
+    # dataset = dataset_dict[dataset_name]
+    # print(f"Dataset Name: {dataset_name}")
+    # print(dataset)
     
     # Access the first row of the dataset
-    first_row = dataset_dict['dataset_0'][1]
-    print(first_row)
+    # first_row = dataset_dict['dataset_0'][1]
+    # print("first row: %s" % first_row)
 
     # Get the 'input_ids' feature from the first row
-    input_ids = first_row['input_ids']
-    print(input_ids)
+    # input_ids = first_row['input_ids']
+    # print("input_ids: %s" % input_ids)
 
-    sys.exit("edu exit")
+    # sys.exit("edu exit")
 
-    final_hf_datasets = concatenate_datasets(dataset_dict.values())
-
+    # final_hf_datasets = concatenate_datasets(dataset_dict.values())
+    
     # Load a Hugging Face Dataset
     # if args.hf:
     #     huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
@@ -177,7 +180,8 @@ if __name__ == '__main__':
     # merged_dataset = concatenate_datasets([aiml_hf_dataset, huggingface_hf_dataset])
     # merged_dataset = concatenate_datasets([aiml_hf_dataset])
     # merged_dataset = concatenate_datasets(final_hf_datasets)
-    merged_dataset = final_hf_datasets
+    # merged_dataset = final_hf_datasets
+    merged_dataset = concatenate_datasets([aiml_list_datasets_objects])
 
     print(f"Length of merged dataset: {len(merged_dataset)}")
 
@@ -251,7 +255,7 @@ if __name__ == '__main__':
         if 'output' in merged_dataset:
             encoded_data.append((tokenizer.encode(str(merged_dataset['input_ids'][i])), tokenizer.encode(str(merged_dataset['output'][i]))))
         else:
-            encoded_data.append((tokenizer.encode(str(merged_dataset['input_ids'][i])),))
+            encoded_data.append((tokenizer.encode(str(merged_dataset['input_ids'][i])), tokenizer.encode(str(""))))
     print(f"Prepared data for PyTorch, encoded data")
 
 
@@ -308,10 +312,10 @@ if __name__ == '__main__':
     sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
     knowledge_base = {"France": "The capital of France is Paris."}
     persona = {
-        "name": "Claude",
-        "age": 30,
+        "name": "Eduardo Piñera Aznárez",
+        "age": 51,
         "occupation": "AI assistant",
-        "interests": ["technology", "science", "philosophy"]
+        "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
     }
     dialogue_manager = DialogueManager(model, tokenizer, intent_classifier, sentiment_analyzer, knowledge_base, persona)
 

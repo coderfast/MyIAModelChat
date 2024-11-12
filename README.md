@@ -2,17 +2,17 @@
 My First IA Chat Model
 ---------------------------
 
-
 The key changes are:
 
 .- Intent Recognition: We've added an intent_classifier to the DialogueManager class, which uses a pre-trained BERT-based text classification model to detect the intent of the user's input. The detected intent is printed to the console.
-    
+
 .- Sentiment Analysis: We've added a sentiment_analyzer to the DialogueManager class, which uses a pre-trained BERT-based sentiment analysis model to detect the sentiment
 
 
 ---------------------------
 Added the TO-DO LIST
 ---------------------------
+
 1. Context and Coherence: A good chat AI model needs to maintain context and coherence across multiple turns of conversation. It should be able to understand the flow of the conversation, remember relevant details, and provide relevant and coherent responses, not just generate isolated responses.
 
 2. Knowledge and Reasoning: Humans engage in conversation not just by recombining input and output text, but by drawing upon their knowledge, understanding, and reasoning abilities. A more advanced chat AI model would need to have access to a broad knowledge base and the ability to reason about and understand the conversation in a more human-like way.
