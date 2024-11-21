@@ -8,10 +8,11 @@ from xml.etree import ElementTree
 
 class AIMLLoader:
 
-    def __init__(self, aiml_dir, tokenizer):
+    # def __init__(self, aiml_dir, tokenizer):
+    def __init__(self, aiml_dir):
         self.finaldata_hf_datasets = []
         self.aiml_dir = aiml_dir
-        self.tokenizer = tokenizer
+        # self.tokenizer = tokenizer
         self.kernel = aiml.Kernel()
         self.load_aiml_files()
 

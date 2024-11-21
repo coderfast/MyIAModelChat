@@ -1,11 +1,11 @@
 # Dialogue Manager
 import torch
 from collections import deque
-import json
-import random
+
 
 # Dialogue Manager
 class DialogueManager:
+
     def __init__(self, model, tokenizer, intent_classifier, sentiment_analyzer, knowledge_base, persona, max_history=5):
         self.model = model
         self.tokenizer = tokenizer
@@ -31,14 +31,15 @@ class DialogueManager:
         self.context = " ".join(self.history)
 
         # Knowledge retrieval
-        relevant_knowledge = self.retrieve_relevant_knowledge(user_input)
-        print(f"Relevant knowledge: {relevant_knowledge}")
+        # relevant_knowledge = self.retrieve_relevant_knowledge(user_input)
+        # print(f"Relevant knowledge: {relevant_knowledge}")
 
         # Persona modeling
         persona_response = self.get_persona_response(intent, sentiment)
         print(f"Persona response: {persona_response}")
 
-        input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
+        # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
+        input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
         input_tensor = torch.LongTensor([input_ids]).to(self.model.device)
 
         with torch.no_grad():
