@@ -14,7 +14,7 @@ from simpletokenizer import *
 from chatmodel import *
 from chatdataset import *
 from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
-from transformers import pipeline
+from transformers import pipeline, BertTokenizer
 
 
 class MainChat:
@@ -89,7 +89,7 @@ class MainChat:
             "occupation": "AI assistant",
             "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
         }
-        self.dialogue_manager = DialogueManager(model, self.tokenizer, intent_classifier, sentiment_analyzer, persona)
+        self.dialogue_manager = DialogueManager(model, device, self.tokenizer, intent_classifier, sentiment_analyzer, persona)
 
 
     # Collate function for DataLoader

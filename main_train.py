@@ -122,7 +122,7 @@ class MainTrain:
             optimizer.step()
 
             total_loss += loss.item()
-            print(f"total_loss: {total_loss:.4f}")
+            # print(f"total_loss: {total_loss:.4f}")
 
         return total_loss / len(dataloader)
 
@@ -202,14 +202,14 @@ class MainTrain:
         print(f"Length of merged dataset: {len(merged_dataset)}")
 
         # Imprimir los primeros 5 ejemplos
-        print("Primeros 5 ejemplos de merged_dataset:")
+        # print("Primeros 5 ejemplos de merged_dataset:")
         # print(f"IDs: {self.aiml_list_datasets_objects}")
-        first_5 = merged_dataset.take(5)
-        for example in first_5:
-            print(f"Input IDs: {example['input_ids']}")
-            if 'output' in example:
-                print(f"Output: {example['output']}")
-            print()
+        # first_5 = merged_dataset.take(5)
+        # for example in first_5:
+        #     print(f"Input IDs: {example['input_ids']}")
+        #     if 'output' in example:
+        #         print(f"Output: {example['output']}")
+        #     print()
 
 
         # Check if the tokenizer and tokenized data files exist
@@ -279,19 +279,19 @@ class MainTrain:
         encoded_data = []
         for i in range(len(merged_dataset)):
             if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
-                print(f"input1: {merged_dataset[i]['input']}")
-                print(f"output1: {merged_dataset[i]['output']}")
+                # print(f"input1: {merged_dataset[i]['input']}")
+                # print(f"output1: {merged_dataset[i]['output']}")
                 encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input'])), self.tokenizer.encode(str(merged_dataset[i]['output']))))
             else:
                 # Check the keys in the merged_dataset and access the data accordingly
                 keys = list(merged_dataset[i].keys())
                 if len(keys) == 2 and 'input_ids' in keys and 'output' in keys:
-                    print(f"input2: {merged_dataset[i]['input_ids']['input']}")
-                    print(f"output2: {merged_dataset[i]['input_ids']['output']}")
+                    # print(f"input2: {merged_dataset[i]['input_ids']['input']}")
+                    # print(f"output2: {merged_dataset[i]['input_ids']['output']}")
                     encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input'])), self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))))
                 else:
-                    print(f"input3: {merged_dataset[i]['input_ids']['input']}")
-                    print(f"output3: {merged_dataset[i]['input_ids']['output']}")
+                    # print(f"input3: {merged_dataset[i]['input_ids']['input']}")
+                    # print(f"output3: {merged_dataset[i]['input_ids']['output']}")
                     encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input'])), self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))))
         print(f"Prepared data for PyTorch, encoded data")
 

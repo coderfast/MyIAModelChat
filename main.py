@@ -43,4 +43,4 @@ if __name__ == '__main__':
     # Chat
     if args.chat:
         iMainChat = MainChat(args)
-        # iMainChat.performMainChat()
+        iMainChat.performMainChat()

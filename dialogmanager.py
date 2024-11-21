@@ -6,12 +6,13 @@ from collections import deque
 # Dialogue Manager
 class DialogueManager:
 
-    def __init__(self, model, tokenizer, intent_classifier, sentiment_analyzer, knowledge_base, persona, max_history=5):
+    def __init__(self, model, device, tokenizer, intent_classifier, sentiment_analyzer, persona, max_history=5):
         self.model = model
+        self.device = device
         self.tokenizer = tokenizer
         self.intent_classifier = intent_classifier
         self.sentiment_analyzer = sentiment_analyzer
-        self.knowledge_base = knowledge_base
+        # self.knowledge_base = knowledge_base
         self.persona = persona
         self.history = deque(maxlen=max_history)
         self.context = ""
@@ -30,24 +31,21 @@ class DialogueManager:
         # Update context
         self.context = " ".join(self.history)
 
-        # Knowledge retrieval
-        # relevant_knowledge = self.retrieve_relevant_knowledge(user_input)
-        # print(f"Relevant knowledge: {relevant_knowledge}")
-
         # Persona modeling
         persona_response = self.get_persona_response(intent, sentiment)
         print(f"Persona response: {persona_response}")
 
         # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
-        input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
-        input_tensor = torch.LongTensor([input_ids]).to(self.model.device)
+        # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
+        input_ids = self.tokenizer.encode(self.context + " " + persona_response)
+        input_tensor = torch.LongTensor([input_ids]).to(self.device)
 
         with torch.no_grad():
             output = self.model(input_tensor)
-            output_ids = output[0].argmax(dim=-1).squeeze().tolist()
+            output_id = output[0].argmax().item()
 
-        response_tokens = [self.tokenizer.idx2word[idx] for idx in output_ids if idx != self.tokenizer.word2idx['<PAD>']]
-        response = " ".join(response_tokens)
+        response_token = self.tokenizer.idx2word.get(output_id, "<UNK>")
+        response = response_token
         self.history.append(response)
         self.context = " ".join(self.history)
         return response
