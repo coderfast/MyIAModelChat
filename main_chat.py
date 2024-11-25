@@ -96,15 +96,15 @@ class MainChat:
         input_sequences, output_sequences = zip(*batch)
 
         # Find max lengths
-        max_input_len = max(len(seq) for seq in input_sequences)
-        max_output_len = max(len(seq) for seq in output_sequences)
-        # max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
+        # max_input_len = max(len(seq) for seq in input_sequences)
+        # max_output_len = max(len(seq) for seq in output_sequences)
+        max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
 
         # Pad sequences
-        padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_input_len - len(seq)) for seq in input_sequences]
-        padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_output_len - len(seq)) for seq in output_sequences]
-        # padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in input_sequences]
-        # padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in output_sequences]
+        # padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_input_len - len(seq)) for seq in input_sequences]
+        # padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_output_len - len(seq)) for seq in output_sequences]
+        padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in input_sequences]
+        padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in output_sequences]
 
         # Convert to tensors
         input_tensor = torch.LongTensor(padded_inputs)
