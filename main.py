@@ -1,4 +1,5 @@
 import os
+import gc
 import argparse
 import pickle
 import sys
@@ -34,6 +35,9 @@ if __name__ == '__main__':
     parser.add_argument("--onlytokenize", action='store_true')
     parser.add_argument("--epochs", type=int, default=1)
     args = parser.parse_args()
+
+    # Garbage collector
+    gc.collect()
 
     # Train
     if args.train:
