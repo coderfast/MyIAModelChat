@@ -37,7 +37,8 @@ class DialogueManager:
 
         # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
         # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
-        input_ids = self.tokenizer.encode(self.context + " " + persona_response)
+        print(f"Response: {self.context}")
+        input_ids = self.tokenizer.encode(self.context)
         input_tensor = torch.LongTensor([input_ids]).to(self.device)
 
         with torch.no_grad():
@@ -48,6 +49,9 @@ class DialogueManager:
         response = response_token
         self.history.append(response)
         self.context = " ".join(self.history)
+
+        # Print the response
+        print(f"Response: {response}")
         return response
 
     def get_persona_response(self, intent, sentiment):
