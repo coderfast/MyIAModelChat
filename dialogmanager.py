@@ -33,11 +33,11 @@ class DialogueManager:
 
         # Persona modeling
         persona_response = self.get_persona_response(intent, sentiment)
-        print(f"Persona response: {persona_response}")
+        # print(f"Persona response: {persona_response}")
 
         # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
         # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
-        print(f"Response: {self.context}")
+        # print(f"Response: {self.context}")
         input_ids = self.tokenizer.encode(self.context)
         input_tensor = torch.LongTensor([input_ids]).to(self.device)
 
@@ -51,7 +51,7 @@ class DialogueManager:
         self.context = " ".join(self.history)
 
         # Print the response
-        print(f"Response: {response}")
+        print(f"Bot Response: {response}")
         return response
 
     def get_persona_response(self, intent, sentiment):

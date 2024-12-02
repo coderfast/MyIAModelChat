@@ -91,6 +91,7 @@ class MainTrain:
         #     if 'output' in example:
         #         print(f"Output: {example['output']}")
         #     print()
+        # sys.exit("End 1")
 
         print(f"processAiml done...")
 
@@ -159,44 +160,7 @@ class MainTrain:
 
     def performMainTrain(self):
 
-        # Create a dataset dictionary
-        # dataset_dict = DatasetDict({f'dataset_{i}': dataset for i, dataset in enumerate(aiml_list_objects_datasets)})
-
-        # for dataset_name, dataset in dataset_dict.items():
-            # aiml_hf_dataset.append( dataset )
-            # print(f"Dataset Name: {dataset_name}")
-            # print(dataset)
-            # print()
-
-        # dataset_name = 'dataset_0'
-        # dataset = dataset_dict[dataset_name]
-        # print(f"Dataset Name: {dataset_name}")
-        # print(dataset)
-
-        # Access the first row of the dataset
-        # first_row = dataset_dict['dataset_0'][1]
-        # print("first row: %s" % first_row)
-
-        # Get the 'input_ids' feature from the first row
-        # input_ids = first_row['input_ids']
-        # print("input_ids: %s" % input_ids)
-
-        # sys.exit("edu exit")
-
-        # final_hf_datasets = concatenate_datasets(dataset_dict.values())
-        
-        # Load a Hugging Face Dataset
-        # if args.hf:
-        #     huggingface_hf_dataset = load_dataset("wikimedia/wikipedia", "20231101.es")
-        #     final_hf_datasets.append( huggingface_hf_dataset )
-
         # Merge the datasets
-        # Create a data list
-        # self.aiml_list_datasets_objects = Dataset.from_list([])
-        # merged_dataset = concatenate_datasets([aiml_hf_dataset, huggingface_hf_dataset])
-        # merged_dataset = concatenate_datasets([aiml_hf_dataset])
-        # merged_dataset = concatenate_datasets(final_hf_datasets)
-        # merged_dataset = final_hf_datasets
         merged_dataset = concatenate_datasets([self.aiml_list_datasets_objects])
 
         print(f"Length of merged dataset: {len(merged_dataset)}")
@@ -211,98 +175,44 @@ class MainTrain:
         #         print(f"Output: {example['output']}")
         #     print()
 
-
-        # Check if the tokenizer and tokenized data files exist
-        # if os.path.exists('tokenizer.pkl') and os.path.exists('tokenized_data.pkl'):
-
-        #     # Load the tokenizer from the file
-        #     with open('tokenizer.pkl', 'rb') as f:
-        #         tokenizer = pickle.load(f)
-
-        #     # Load the tokenized data from the file
-        #     with open('tokenized_data.pkl', 'rb') as f:
-        #         tokenized_data = pickle.load(f)
-
-        # Tokenizing data
-    #   all_texts = []
-
-    #     # all_texts = [merged_dataset['input'][i] + ' ' + merged_dataset['output'][i] for i in range(len(merged_dataset))]
-    #     for i in range(len(merged_dataset)):
-    #         print(f"Input: {merged_dataset['input'][i]}")
-    #         print(f"Output: {merged_dataset['output'][i]}")
-    #         print()
-    #         input_text = merged_dataset['input'][i]
-    #         output_text = merged_dataset['output'][i]
-    #         combined_text = input_text + ' ' + output_text
-    #         all_texts.append(combined_text)
-
-    #         # save in each loop 
-    #         tokenizer.fit(all_texts)
-    #         print(f"Tokenized data")
-
-    #         # Save the tokenizer to a file
-    #         with open('tokenizer.pkl', 'wb') as f:
-    #             pickle.dump(tokenizer, f)
-
-    #         # Save the tokenized data to a file
-    #         # tokenized_data = tokenizer.encode_batch(all_texts)
-    #         tokenized_data = [tokenizer.encode(text) for text in all_texts]
-    #         with open('tokenized_data.pkl', 'wb') as f:
-    #             pickle.dump(tokenized_data, f)
-
-    #     tokenizer.fit(all_texts)
-    #     print(f"Tokenized data")
-
-    #     # Save the tokenizer to a file
-    #     with open('tokenizer.pkl', 'wb') as f:
-    #         pickle.dump(tokenizer, f)
-    #
-
-
-    #     # Save the tokenized data to a file
-    #     # tokenized_data = tokenizer.encode_batch(all_texts)
-    #     tokenized_data = [tokenizer.encode(text) for text in all_texts]
-    #     with open('tokenized_data.pkl', 'wb') as f:
-    #         pickle.dump(tokenized_data, f)
-
-    #     if args.onlytokenize:
-    #         sys.exit("only tokenized, all done, exit")
-
-
         # Prepare data for PyTorch
-        # print(f"preparing data for pytorch, encoding data")
-        # encoded_data = [(tokenizer.encode(merged_dataset['input'][i]), tokenizer.encode(merged_dataset['output'][i])) for i in range(len(merged_dataset))]
-        # print(f"prepared data for pytorch, encoded data")
+        print(f"Preparando datos para PyTorch, codificando datos")
+        for i in range(len(merged_dataset)):
+            self.tokenizer.fit(merged_dataset[i]['input_ids']['input'] + merged_dataset[i]['input_ids']['output'])
 
-        # Prepare data for PyTorch
-        print(f"Preparing data for PyTorch, encoding data")
         encoded_data = []
         for i in range(len(merged_dataset)):
             if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
-                # print(f"input1: {merged_dataset[i]['input']}")
-                # print(f"output1: {merged_dataset[i]['output']}")
-                encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input'])), self.tokenizer.encode(str(merged_dataset[i]['output']))))
+                input_ids = self.tokenizer.encode(str(merged_dataset[i]['input']))
+                output_ids = self.tokenizer.encode(str(merged_dataset[i]['output']))
+                # print(f"input1: {input_ids}")
+                # print(f"output1: {output_ids}")
+                encoded_data.append((input_ids, output_ids))
             else:
-                # Check the keys in the merged_dataset and access the data accordingly
                 keys = list(merged_dataset[i].keys())
                 if len(keys) == 2 and 'input_ids' in keys and 'output' in keys:
-                    # print(f"input2: {merged_dataset[i]['input_ids']['input']}")
-                    # print(f"output2: {merged_dataset[i]['input_ids']['output']}")
-                    encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input'])), self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))))
+                    input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
+                    output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
+                    # print(f"input1: {input_ids}")
+                    # print(f"output1: {output_ids}")
+                    encoded_data.append((input_ids, output_ids))
                 else:
-                    # print(f"input3: {merged_dataset[i]['input_ids']['input']}")
-                    # print(f"output3: {merged_dataset[i]['input_ids']['output']}")
-                    encoded_data.append((self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input'])), self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))))
+                    input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
+                    output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
+                    # print(f"input1: {input_ids}")
+                    # print(f"output1: {output_ids}")
+                    encoded_data.append((input_ids, output_ids))
         print(f"Prepared data for PyTorch, encoded data")
 
         # Inspeccionar el contenido de encoded_data
-        print("Contenido de los primeros 5 ejemplos de encoded_data:")
+        # print("Contenido de los primeros 5 ejemplos de encoded_data:")
         # print(f"encoded_data: {encoded_data}")
-        # for i in range(2):
+        # for i in range(5):
         #     input_ids, output_ids = encoded_data[i]
         #     print(f"Input IDs: {input_ids}")
         #     print(f"Output IDs: {output_ids}")
         #     print()
+        # sys.exit("End 2")
 
         print(f"create dataloader")
         # Create DataLoader with custom collate function
@@ -310,8 +220,6 @@ class MainTrain:
         print(f"created dataloader")
 
         # Set the number of CPU threads and cores to use
-        # num_threads = 8
-        # num_cores = 8
         var_num_threads = self.num_threads
         var_num_cores = self.num_cores
         
@@ -329,7 +237,6 @@ class MainTrain:
         print(f"Number of CPU threads: {var_num_threads}")
 
         # Initialize model
-        # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
         model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)
         print(f"Using {device} device")
@@ -347,9 +254,8 @@ class MainTrain:
 
             loss = self.train(model, dataloader, criterion, optimizer, device)
             print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
-
-            # Save the model
+            
+            # Save the model, tokenizer, and pre-trained embeddings
             torch.save(model.state_dict(), 'chat_model.pth')
-
-        # Save the model
-        # torch.save(model.state_dict(), 'chat_model.pth')
+            torch.save(self.tokenizer, 'tokenizer.pth')
+            torch.save(self.tokenizer.embedding.weight.data, 'pretrained_embeddings.pth')

@@ -33,21 +33,17 @@ class MainChat:
         self.tokenizer = None
         self.tokenized_data = None
 
-        self.tokenizer = SimpleTokenizer()
-
         # Parse command-line arguments
         self.chat = args.chat
         self.num_cores = args.num_cores
         self.num_threads = args.num_threads
-        
+
         # print(f"create dataloader")
         # Create DataLoader with custom collate function
         # dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
         # print(f"created dataloader")
 
         # Set the number of CPU threads and cores to use
-        # num_threads = 8
-        # num_cores = 8
         var_num_threads = args.num_threads
         var_num_cores = args.num_cores
 
@@ -65,18 +61,29 @@ class MainChat:
         print(f"Number of CPU threads: {var_num_threads}")
 
         # Initialize and Load pre-trained model
-        # device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
-        self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)        
-        model_path = 'chat_model.pth'
-        self.model.load_state_dict(torch.load(model_path))
-        self.model.eval()
+        self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
+        self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)
+        try:
+            # Load the pre-trained embeddings
+            pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device, pickle_module=pickle)
+            pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device)
+            # Load the tokenizer
+            self.tokenizer = torch.load('tokenizer.pth')
+            # Load the model
+            self.model.load_state_dict(torch.load('chat_model.pth', map_location=device))
+
+            # Set the pre-trained embeddings in the tokenizer
+            self.tokenizer.embedding.weight.data.copy_(pretrained_embeddings)
+
+            print("Pre-trained model loaded successfully.")
+            self.model.eval()
+        except RuntimeError as e:
+            print(f"Error loading pre-trained model: {e}")
+            print("Initializing model with random weights...")
+            self.model.apply(self.tokenizer.init_weights)
 
         print(f"Using {device} device")
-
-        # Define loss and optimizer
-        criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.word2idx['<PAD>'])
-        optimizer = optim.Adam(self.model.parameters())
 
         # Initialize Dialogue Manager
         intent_classifier = pipeline('text-classification', model='nlptown/bert-base-multilingual-uncased-sentiment')
