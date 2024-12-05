@@ -7,7 +7,7 @@ class SimpleTokenizer:
     def __init__(self, max_vocab_size=128, embedding_dim=128):
         self.word2idx = {'<PAD>': 0, '<UNK>': 1}
         self.idx2word = {0: '<PAD>', 1: '<UNK>'}
-        self.vocab_size = 128
+        self.vocab_size = 2
         self.max_vocab_size = max_vocab_size
         self.embedding_dim = embedding_dim
         self.embedding = nn.Embedding(self.max_vocab_size, self.embedding_dim)
@@ -54,7 +54,12 @@ class SimpleTokenizer:
 
     def init_weights(self, module):
         if isinstance(module, nn.Embedding):
-            nn.init.uniform_(module.weight, -0.1, 0.1)
+            # Uniform initialization for Embedding layer
+            # nn.init.uniform_(module.weight, -0.1, 0.1)
+            # Xavier initialization for Embedding layer
+            # nn.init.xavier_uniform_(module.weight)
+            # Kaiming initialization for Embedding layer
+            nn.init.kaiming_uniform_(module.weight, a=0, mode='fan_in', nonlinearity='linear')
         elif isinstance(module, nn.LSTM):
             for param in module.parameters():
                 if len(param.shape) >= 2:
@@ -62,5 +67,9 @@ class SimpleTokenizer:
                 else:
                     nn.init.normal_(param)
         elif isinstance(module, nn.Linear):
-            nn.init.xavier_uniform_(module.weight)
+            # Uniform initialization for Linear layer
+            # nn.init.uniform_(module.weight, -0.1, 0.1)
+            # nn.init.xavier_uniform_(module.weight)
+            # Kaiming initialization for Linear layer
+            nn.init.kaiming_uniform_(module.weight, a=0, mode='fan_in', nonlinearity='relu')
             nn.init.normal_(module.bias, 0, 0.01)

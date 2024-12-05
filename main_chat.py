@@ -25,10 +25,10 @@ class MainChat:
     dialogue_manager = None
 
     def __init__(self, args):
-        
+
         # Don't show the next wanings
         warnings.filterwarnings("ignore", message=".*clean_up_tokenization_spaces.*", category=FutureWarning)
-        
+
         # Check if the tokenizer and tokenized data files exist
         self.tokenizer = None
         self.tokenized_data = None
@@ -62,16 +62,31 @@ class MainChat:
 
         # Initialize and Load pre-trained model
         device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "xla" if "XLA_AVAILABLE" in os.environ else "rocm" if torch.version.hip is not None else "cpu" if torch.backends.mkldnn.is_available() else "opengl" if torch.backends.opengl.is_available() else "opencl" if torch.backends.opencl.is_available() else "ideep" if torch.backends.ideep.is_available() else "hip" if torch.version.hip is not None else "ve" if torch.version.ve is not None else "fpga" if torch.version.fpga is not None else "ort" if torch.version.ort is not None else "lazy" if torch.version.lazy is not None else "vulkan" if torch.version.vulkan is not None else "meta" if torch.version.meta is not None else "hpu" if torch.version.hpu is not None else "mtia" if torch.version.mtia is not None else "privateuse" if torch.version.privateuse is not None else "openmp" if torch.backends.openmp.is_available() else "cpu")
-        self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
-        self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)
+
+        # Check if tokenizer file exists
+        tokenizer_path = 'tokenizer.pth'
+        if os.path.exists(tokenizer_path):
+            try:
+                # Attempt to load existing tokenizer
+                self.tokenizer = torch.load(tokenizer_path)
+                print(f"Tokenizer loaded from {tokenizer_path}")
+            except Exception as e:
+                print(f"Error loading tokenizer: {e}")
+        else:
+            # Create new tokenizer instance
+            self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
+
+        # Load model and weights
         try:
+            # Create the model
+            self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)
+
             # Load the pre-trained embeddings
-            pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device, pickle_module=pickle)
+            # pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device, pickle_module=pickle)
             pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device)
-            # Load the tokenizer
-            self.tokenizer = torch.load('tokenizer.pth')
+            
             # Load the model
-            self.model.load_state_dict(torch.load('chat_model.pth', map_location=device))
+            # self.model.load_state_dict(torch.load('chat_model.pth', map_location=device))
 
             # Set the pre-trained embeddings in the tokenizer
             self.tokenizer.embedding.weight.data.copy_(pretrained_embeddings)

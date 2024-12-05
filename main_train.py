@@ -56,12 +56,13 @@ class MainTrain:
         
         # Create a data list
         data_dir = 'aiml_dev'
+        # data_dir = 'aiml'
         self.aiml_list_datasets_objects = Dataset.from_list([])
         self.aiml_list_datasets_data = []
 
         # Load AIML files
         if self.aiml:
-            aiml_loader = AIMLLoader('aiml_dev')
+            aiml_loader = AIMLLoader(data_dir)
         
         for filename in os.listdir(data_dir):
             if filename.endswith('.datasets'):
@@ -185,22 +186,22 @@ class MainTrain:
             if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
                 input_ids = self.tokenizer.encode(str(merged_dataset[i]['input']))
                 output_ids = self.tokenizer.encode(str(merged_dataset[i]['output']))
-                # print(f"input1: {input_ids}")
-                # print(f"output1: {output_ids}")
+                print(f"input1-1: {input_ids}")
+                print(f"output1-1: {output_ids}")
                 encoded_data.append((input_ids, output_ids))
             else:
                 keys = list(merged_dataset[i].keys())
                 if len(keys) == 2 and 'input_ids' in keys and 'output' in keys:
                     input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
                     output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
-                    # print(f"input1: {input_ids}")
-                    # print(f"output1: {output_ids}")
+                    print(f"input1-2: {input_ids}")
+                    print(f"output1-2: {output_ids}")
                     encoded_data.append((input_ids, output_ids))
                 else:
                     input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
                     output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
-                    # print(f"input1: {input_ids}")
-                    # print(f"output1: {output_ids}")
+                    print(f"input1-3: {input_ids}")
+                    print(f"output1-3: {output_ids}")
                     encoded_data.append((input_ids, output_ids))
         print(f"Prepared data for PyTorch, encoded data")
 
@@ -222,7 +223,7 @@ class MainTrain:
         # Set the number of CPU threads and cores to use
         var_num_threads = self.num_threads
         var_num_cores = self.num_cores
-        
+
         os.environ["OMP_NUM_THREADS"] = str(var_num_threads)
         torch.set_num_threads(var_num_threads)
         os.environ["MKL_NUM_THREADS"] = str(var_num_cores)
@@ -254,7 +255,7 @@ class MainTrain:
 
             loss = self.train(model, dataloader, criterion, optimizer, device)
             print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
-            
+
             # Save the model, tokenizer, and pre-trained embeddings
             torch.save(model.state_dict(), 'chat_model.pth')
             torch.save(self.tokenizer, 'tokenizer.pth')
