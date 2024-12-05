@@ -33,26 +33,23 @@ class DialogueManager:
 
         # Persona modeling
         persona_response = self.get_persona_response(intent, sentiment)
-        # print(f"Persona response: {persona_response}")
 
-        # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.tokenize(self.context + " " + relevant_knowledge + " " + persona_response)]
-        # input_ids = [self.tokenizer.word2idx[token] for token in self.tokenizer.encode(self.context + " " + persona_response)]
-        # print(f"Response: {self.context}")
+        # Codificar el contexto
         input_ids = self.tokenizer.encode(self.context)
         input_tensor = torch.LongTensor([input_ids]).to(self.device)
 
         with torch.no_grad():
             output = self.model(input_tensor)
-            output_id = output[0].argmax().item()
+            output_ids = output[0].argmax(dim=-1).tolist()
 
-        response_token = self.tokenizer.idx2word.get(output_id, "<UNK>")
-        response = response_token
-        self.history.append(response)
+        # Decodificar la respuesta
+        response_text = self.tokenizer.decode(output_ids)
+        self.history.append(response_text)
         self.context = " ".join(self.history)
 
-        # Print the response
-        print(f"Bot Response: {response}")
-        return response
+        # Imprimir la respuesta
+        print(f"Bot Response: {response_text}")
+        return response_text
 
     def get_persona_response(self, intent, sentiment):
         if intent == "greeting":

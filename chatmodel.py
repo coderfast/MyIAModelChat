@@ -58,19 +58,32 @@ La implementación específica del proceso de entrenamiento y inferencia depende
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from simpletokenizer import *
+import torch.nn.utils.rnn as rnn_utils
 
 # Model
 class ChatModel(nn.Module):
-
     def __init__(self, tokenizer, embed_size, hidden_size):
         super(ChatModel, self).__init__()
-        self.embedding = nn.Embedding(tokenizer.vocab_size, embed_size, padding_idx=tokenizer.word2idx['<PAD>'])
+        self.tokenizer = tokenizer
+        self.embedding = nn.Embedding(tokenizer.vocab_size, embed_size, padding_idx=tokenizer.trie.get_index('<PAD>'))
         self.lstm = nn.LSTM(embed_size, hidden_size, batch_first=True)
         self.fc = nn.Linear(hidden_size, tokenizer.vocab_size)
 
-    def forward(self, x):
-        embedded = self.embedding(x)
-        output, _ = self.lstm(embedded)
-        return self.fc(output)
+        # Inicializar los pesos del modelo
+        self.apply(self.tokenizer.init_weights)
+
+    def forward(self, input_ids):
+      # Empaquetar las secuencias de entrada
+      input_lengths = [len(seq) for seq in input_ids]
+      # input_tensor = rnn_utils.pack_sequence([torch.tensor(seq) for seq in input_ids])
+      # input_tensor = rnn_utils.pack_sequence([torch.tensor(seq).clone().detach() for seq in input_ids])
+      input_tensor = rnn_utils.pack_sequence([seq.clone().detach() for seq in input_ids])
+
+      # Pasar la entrada a través del modelo
+      embedded = self.embedding(input_tensor.data)
+      output, _ = self.lstm(embedded)
+
+      # Aplicar la capa fully connected
+      logits = self.fc(output.data)
+
+      return logits

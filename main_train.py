@@ -115,7 +115,8 @@ class MainTrain:
             targets = targets.contiguous().view(-1)
 
             # Ignore padded elements
-            non_pad_mask = targets.ne(self.tokenizer.word2idx['<PAD>'])
+            # non_pad_mask = targets.ne(self.tokenizer.word2idx['<PAD>'])
+            non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
             outputs = outputs[non_pad_mask]
             targets = targets[non_pad_mask]
 
@@ -140,10 +141,12 @@ class MainTrain:
         max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
 
         # Pad sequences
-        # padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_input_len - len(seq)) for seq in input_sequences]
-        # padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_output_len - len(seq)) for seq in output_sequences]
-        padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in input_sequences]
-        padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in output_sequences]
+        ## padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_input_len - len(seq)) for seq in input_sequences]
+        ## padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_output_len - len(seq)) for seq in output_sequences]
+        # padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in input_sequences]
+        # padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in output_sequences]
+        padded_inputs = [seq + [self.tokenizer.get_pad_index()] * (max_len - len(seq)) for seq in input_sequences]
+        padded_outputs = [seq + [self.tokenizer.get_pad_index()] * (max_len - len(seq)) for seq in output_sequences]
 
         # Convert to tensors
         input_tensor = torch.LongTensor(padded_inputs)
@@ -152,11 +155,11 @@ class MainTrain:
         return input_tensor, output_tensor
 
 
-    def encode(self, text):
-        if isinstance(text, str):
-            return [self.word2idx.get(word, self.word2idx['<UNK>']) for word in text.split()]
-        else:
-            return [self.encode(str(item)) for item in text]
+    # def encode(self, text):
+    #     if isinstance(text, str):
+    #         return [self.word2idx.get(word, self.word2idx['<UNK>']) for word in text.split()]
+    #     else:
+    #         return [self.encode(str(item)) for item in text]
 
 
     def performMainTrain(self):
@@ -178,31 +181,46 @@ class MainTrain:
 
         # Prepare data for PyTorch
         print(f"Preparando datos para PyTorch, codificando datos")
-        for i in range(len(merged_dataset)):
-            self.tokenizer.fit(merged_dataset[i]['input_ids']['input'] + merged_dataset[i]['input_ids']['output'])
+        # for i in range(len(merged_dataset)):
+        #     self.tokenizer.fit(merged_dataset[i]['input_ids']['input'] + merged_dataset[i]['input_ids']['output'])        
+        # Ajustar el tokenizador una sola vez con todo el vocabulario
+        all_input_texts = []
+        all_output_texts = []
+        for item in merged_dataset:
+            all_input_texts.append(item['input_ids']['input'])
+            all_output_texts.append(item['input_ids']['output'])
+
+        self.tokenizer.fit(all_input_texts + all_output_texts)
 
         encoded_data = []
         for i in range(len(merged_dataset)):
-            if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
-                input_ids = self.tokenizer.encode(str(merged_dataset[i]['input']))
-                output_ids = self.tokenizer.encode(str(merged_dataset[i]['output']))
-                print(f"input1-1: {input_ids}")
-                print(f"output1-1: {output_ids}")
-                encoded_data.append((input_ids, output_ids))
-            else:
-                keys = list(merged_dataset[i].keys())
-                if len(keys) == 2 and 'input_ids' in keys and 'output' in keys:
-                    input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
-                    output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
-                    print(f"input1-2: {input_ids}")
-                    print(f"output1-2: {output_ids}")
-                    encoded_data.append((input_ids, output_ids))
-                else:
-                    input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
-                    output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
-                    print(f"input1-3: {input_ids}")
-                    print(f"output1-3: {output_ids}")
-                    encoded_data.append((input_ids, output_ids))
+            # input_ids = self.tokenizer.encode(merged_dataset[i]['input_ids']['input'])
+            # output_ids = self.tokenizer.encode(merged_dataset[i]['input_ids']['output'])
+            input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
+            output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
+            print(f"input1-3: {input_ids}")
+            print(f"output1-3: {output_ids}")
+            encoded_data.append((input_ids, output_ids))
+            # if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
+            #     input_ids = self.tokenizer.encode(str(merged_dataset[i]['input']))
+            #     output_ids = self.tokenizer.encode(str(merged_dataset[i]['output']))
+            #     print(f"input1-1: {input_ids}")
+            #     print(f"output1-1: {output_ids}")
+            #     encoded_data.append((input_ids, output_ids))
+            # else:
+            #     keys = list(merged_dataset[i].keys())
+            #     if len(keys) == 2 and 'input_ids' in keys and 'output' in keys:
+            #         input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
+            #         output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
+            #         print(f"input1-2: {input_ids}")
+            #         print(f"output1-2: {output_ids}")
+            #         encoded_data.append((input_ids, output_ids))
+            #     else:
+            #         input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
+            #         output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
+            #         print(f"input1-3: {input_ids}")
+            #         print(f"output1-3: {output_ids}")
+            #         encoded_data.append((input_ids, output_ids))
         print(f"Prepared data for PyTorch, encoded data")
 
         # Inspeccionar el contenido de encoded_data
@@ -243,7 +261,8 @@ class MainTrain:
         print(f"Using {device} device")
 
         # Define loss and optimizer
-        criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.word2idx['<PAD>'])
+        # criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.word2idx['<PAD>'])
+        criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
         optimizer = optim.Adam(model.parameters())
 
         # Training loop
