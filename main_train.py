@@ -193,13 +193,11 @@ class MainTrain:
         self.tokenizer.fit(all_input_texts + all_output_texts)
 
         encoded_data = []
-        for i in range(len(merged_dataset)):
-            # input_ids = self.tokenizer.encode(merged_dataset[i]['input_ids']['input'])
-            # output_ids = self.tokenizer.encode(merged_dataset[i]['input_ids']['output'])
-            input_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['input']))
-            output_ids = self.tokenizer.encode(str(merged_dataset[i]['input_ids']['output']))
-            print(f"input1-3: {input_ids}")
-            print(f"output1-3: {output_ids}")
+        for i in range(len(all_input_texts)):
+            input_ids = self.tokenizer.encode(all_input_texts[i])
+            output_ids = self.tokenizer.encode(all_output_texts[i])
+            print(f"input ids: {input_ids}")
+            print(f"output ids: {output_ids}")
             encoded_data.append((input_ids, output_ids))
             # if 'input' in merged_dataset[i] and 'output' in merged_dataset[i]:
             #     input_ids = self.tokenizer.encode(str(merged_dataset[i]['input']))

@@ -42,13 +42,15 @@ class DialogueManager:
             output = self.model(input_tensor)
             output_ids = output[0].argmax(dim=-1).tolist()
 
+        print(f"output_ids vale: {output_ids}")
+
         # Decodificar la respuesta
         response_text = self.tokenizer.decode(output_ids)
         self.history.append(response_text)
         self.context = " ".join(self.history)
 
         # Imprimir la respuesta
-        print(f"Bot Response: {response_text}")
+        # print(f"Bot Response: {response_text}")
         return response_text
 
     def get_persona_response(self, intent, sentiment):

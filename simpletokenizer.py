@@ -33,7 +33,7 @@ class Trie:
 
 class SimpleTokenizer:
 
-    def __init__(self, max_vocab_size=128, embedding_dim=128, num_workers=4):
+    def __init__(self, max_vocab_size=65536, embedding_dim=65536, num_workers=4):
         # self.word2idx = {'<PAD>': 0, '<UNK>': 1}
         # self.idx2word = {0: '<PAD>', 1: '<UNK>'}
         self.trie = Trie()
@@ -52,6 +52,8 @@ class SimpleTokenizer:
         with Pool(processes=self.num_workers) as pool:
             results = pool.map(self.process_text, texts)
 
+        print(f"{results}")
+        print(f" ")
         for result in results:
             for word, index in result:
                 if self.vocab_size < self.max_vocab_size:
@@ -65,10 +67,12 @@ class SimpleTokenizer:
             if index is None:
                 index = self.vocab_size
                 word_indices.append((word, index))
+                self.vocab_size += 1
         return word_indices
 
     def encode(self, text):
-        return [self.trie.get_index(word) or self.trie.get_index('<UNK>') for word in text.split()]
+        return [self.trie.get_index(word) or 1 for word in text.split()]
+        # return [self.trie.get_index(word) or self.trie.get_index('<UNK>') for word in text.split()]
 
     def decode(self, indices):
         if isinstance(indices, int):
@@ -77,6 +81,8 @@ class SimpleTokenizer:
         words = []
         for idx in indices:
             if idx is None:
+                words.append('<UNK>')
+            elif idx is 1:
                 words.append('<UNK>')
             else:
                 for word, node in self.trie.root.children.items():
