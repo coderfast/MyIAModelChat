@@ -1,10 +1,11 @@
-os
-json
+# os -> included by default in python
+# json -> included by default in python
 onnx
 torch
 torchvision
 torchaudio
 torchtext
-numpy==1.26
+# numpy==1.26  -> python 3.12
+numpy
 python-aiml
 transformers
