@@ -82,7 +82,7 @@ class SimpleTokenizer:
         for idx in indices:
             if idx is None:
                 words.append('<UNK>')
-            elif idx is 1:
+            elif idx == 1:
                 words.append('<UNK>')
             else:
                 for word, node in self.trie.root.children.items():
