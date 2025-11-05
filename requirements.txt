@@ -9,3 +9,4 @@ torchtext
 numpy
 python-aiml
 transformers
+keyboard
