@@ -15,6 +15,15 @@ TRAIN MODE (build/train the model):
 CHAT MODE (run interactive chat):
     python main.py --chat --num_cores 4 --num_threads 4
 
+PREPARE DATASETS (validate data without training):
+    python main.py --prepare-data --aiml --hf
+
+USE CACHED DATASET (skip data loading, much faster):
+    python main.py --prepare-data --aiml --hf --use-cache
+
+REFRESH CACHE (rebuild cached dataset):
+    python main.py --prepare-data --aiml --hf --refresh-cache
+
 TOKENIZE ONLY (prepare vocabulary without training):
     python main.py --train --onlytokenize --aiml
 
@@ -47,6 +56,80 @@ Primary Mode Arguments (choose one):
         - Provides interactive chat interface
         - Uses intent classification and sentiment analysis
         - Requires trained model (chat_model.pth)
+
+--prepare-data
+    Description: Prepare and validate datasets only (no training)
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --hf
+    Notes:
+        - Loads AIML and/or Hugging Face datasets
+        - Validates data structure and content
+        - Shows dataset statistics (samples, text length, sources)
+        - Automatically saves prepared dataset to cache (dataset_cache/)
+        - Does NOT train the model
+        - Useful before starting training to verify data quality
+        - Helps identify data issues early
+
+--use-cache
+    Description: Load cached dataset instead of reloading from sources
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --hf --use-cache
+    Requirements:
+        - Must have run --prepare-data first to create cache
+        - Cache persists in dataset_cache/ directory
+    Benefits:
+        - Skips all data loading (MUCH faster - seconds vs minutes)
+        - Useful for repeated runs with same data
+        - Ideal for model parameter tuning
+    Notes:
+        - Does NOT refresh data from original sources
+        - Use --refresh-cache to update cached data
+        - Works with --train and --prepare-data modes
+
+--refresh-cache
+    Description: Clear old cache and rebuild from fresh data
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --hf --refresh-cache
+    When to use:
+        - After updating AIML files
+        - After adding/modifying HF dataset selection
+        - When data sources change
+    Notes:
+        - Removes old dataset_cache/ directory
+        - Reloads all data from sources
+        - Slower than --use-cache but ensures latest data
+        - Automatically saves new cache
+
+--clear-cache
+    Description: Remove cached datasets and exit (no other operations)
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --clear-cache
+    Notes:
+        - Removes entire dataset_cache/ directory
+        - Exits immediately (ignores other flags)
+        - Useful for disk space cleanup
+        - Next --prepare-data run will rebuild cache
+
+================================================================================
+
+Dataset Caching Arguments (improves speed on repeated runs):
+================================================================================
+
+Note: Dataset caching significantly improves performance for repeated runs.
+First run prepares and caches data, subsequent runs load from cache.
+
+Cache Location: dataset_cache/ directory in project root
+Cache Size: Typically 100MB - 1GB depending on data sources
+
+Typical Cache Workflow:
+    1. python main.py --prepare-data --aiml --hf     (5-30 seconds, creates cache)
+    2. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
+    3. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
+    4. python main.py --prepare-data --aiml --hf --refresh-cache  (5-30 seconds, updates)
 
 ================================================================================
 
@@ -176,16 +259,66 @@ INFERENCE/CHAT EXAMPLES:
 
 ================================================================================
 
+DATA PREPARATION & CACHING EXAMPLES:
+================================================================================
+
+Data preparation validates datasets and shows statistics before training.
+Dataset caching enables fast repeated runs without reloading source data.
+
+1. Prepare AIML data only:
+    python main.py --prepare-data --aiml
+
+2. Prepare Hugging Face datasets only:
+    python main.py --prepare-data --hf
+
+3. Prepare both AIML and Hugging Face data (creates cache):
+    python main.py --prepare-data --aiml --hf
+
+4. Load from cache on second run (MUCH faster):
+    python main.py --prepare-data --aiml --hf --use-cache
+
+5. Refresh cache after modifying source data:
+    python main.py --prepare-data --aiml --hf --refresh-cache
+
+6. Clear cache to free disk space:
+    python main.py --clear-cache
+
+7. Complete workflow with caching (prepare → cache → train → chat):
+    python main.py --prepare-data --aiml --hf
+    python main.py --train --aiml --hf --epochs 10
+    python main.py --chat
+
+8. Workflow for repeated experiments (use cache to save time):
+    python main.py --prepare-data --aiml --hf          (first time: ~10 seconds)
+    python main.py --train --aiml --hf --epochs 5      (uses cache)
+    python main.py --train --aiml --hf --epochs 10     (uses cache)
+    python main.py --train --aiml --hf --epochs 15     (uses cache)
+
+================================================================================
+
 BATCH PROCESSING EXAMPLES:
 ================================================================================
 
-Run multiple training sessions:
+Run multiple training sessions with data preparation:
+    python main.py --prepare-data --aiml --hf
     python main.py --train --aiml --epochs 5
     python main.py --train --aiml --hf --epochs 10
 
 Train, then switch to chat:
     python main.py --train --aiml --epochs 5
     python main.py --chat
+
+Complete workflow (prepare → tokenize → train → chat):
+    python main.py --prepare-data --aiml --hf
+    python main.py --train --onlytokenize --aiml --hf
+    python main.py --train --aiml --hf --epochs 20 --num_cores 8
+    python main.py --chat
+
+Workflow with cached data (fast iteration):
+    python main.py --prepare-data --aiml --hf          (first run, cached)
+    python main.py --train --aiml --epochs 5           (uses cache)
+    python main.py --train --aiml --epochs 10          (uses cache)
+    python main.py --train --aiml --epochs 15          (uses cache)
 
 ================================================================================
                         EXPECTED FILE OUTPUTS
@@ -196,7 +329,14 @@ Training Mode Creates:
     - tokenizer.pth               Vocabulary and tokenizer state
     - pretrained_embeddings.pth   Embedding layer weights
 
+Data Preparation Creates (in dataset_cache/ directory):
+    - dataset_cache/
+        ├── prepared_dataset/      Prepared and validated datasets
+        ├── dataset_stats.pkl      Statistics (samples, lengths, sources)
+        └── cache_metadata.pkl     Cache metadata and creation time
+
 These are required for chat mode to work properly.
+Dataset cache can be safely deleted with --clear-cache or manually.
 
 ================================================================================
                         TROUBLESHOOTING
@@ -288,19 +428,33 @@ Check GPU availability:
     cd G:\PROJECTS\MyIAModelChat
     .\envMyIAModelChat\Scripts\Activate.ps1
 
-2. Build Vocabulary (first time):
+2. Prepare and Validate Datasets (recommended):
+    python main.py --prepare-data --aiml --hf
+    (Review statistics and check for data issues)
+    (Cache is automatically created)
+
+3. Build Vocabulary (first time):
     python main.py --train --onlytokenize --aiml --hf
 
-3. Train Model:
+4. Train Model (uses cached data from step 2):
     python main.py --train --aiml --hf --epochs 20 --num_cores 8
 
-4. Test Chat:
+5. Test Chat:
     python main.py --chat
 
-5. Iterate:
-    - Modify AIML files if needed
+6. Iterate (use --use-cache for fast repeated runs):
+    python main.py --prepare-data --aiml --hf --use-cache
+    python main.py --train --aiml --hf --epochs 30 --num_cores 8
+    python main.py --chat
+    
+7. If source data changes:
+    python main.py --prepare-data --aiml --hf --refresh-cache
+    (Re-runs data loading and updates cache)
+
+8. To clean up disk space:
+    python main.py --clear-cache
     - Retrain: python main.py --train --aiml --epochs 10
-    - Monitor loss and adjust epochs/cores as needed
+    - Monitor loss convergence and stop early if plateau reached
 
 ================================================================================
                         MONITORING TRAINING
@@ -317,6 +471,38 @@ Optimization Tips:
     - If loss plateaus, reduce learning rate or stop
     - Press ESC to stop early if converged
     - Check GPU memory: nvidia-smi (if using CUDA)
+
+================================================================================
+                        DATA PREPARATION OUTPUT
+================================================================================
+
+When running `python main.py --prepare-data`, you'll see:
+
+1. Data Loading Phase:
+    - Lists each AIML file loaded with sample count
+    - Shows Hugging Face datasets being loaded
+    - Displays any warnings about missing files
+
+2. Dataset Combination:
+    - Shows samples from each source
+    - Total combined sample count
+
+3. Statistics Summary:
+    - Data Sources: Breakdown by source (AIML, HuggingFace)
+    - Total Samples: Complete dataset size
+    - Average Text Length: Average words per sample
+    - Min/Max Text Length: Range of sample lengths
+
+4. Validation Results:
+    - Column structure check
+    - Null/empty value warnings
+    - Data quality indicators
+
+Use these statistics to:
+    - Verify data was loaded correctly
+    - Detect data quality issues before training
+    - Estimate training time (more samples = longer training)
+    - Identify imbalanced datasets
 
 ================================================================================
                         KNOWN LIMITATIONS
