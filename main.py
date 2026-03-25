@@ -66,10 +66,16 @@ Performance Tips:
     parser.add_argument("--use-cache", action='store_true', help="Load cached dataset if available (skip data loading)")
     parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache from scratch")
     parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets and exit")
+    parser.add_argument("--use-cpuonly", action='store_true', help="Force CPU-only execution (disable GPU)")
     args = parser.parse_args()
 
     # Garbage collector
     gc.collect()
+    
+    # Handle CPU-only mode
+    if args.use_cpuonly:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        print("✓ CPU-only mode enabled (GPU disabled)")
     
     # Display system information
     print(f"\n{'='*80}")
