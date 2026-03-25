@@ -35,30 +35,6 @@ class MainChat:
 
         # Parse command-line arguments
         self.chat = args.chat
-        self.num_cores = args.num_cores
-        self.num_threads = args.num_threads
-
-        # print(f"create dataloader")
-        # Create DataLoader with custom collate function
-        # dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
-        # print(f"created dataloader")
-
-        # Set the number of CPU threads and cores to use
-        var_num_threads = args.num_threads
-        var_num_cores = args.num_cores
-
-        os.environ["OMP_NUM_THREADS"] = str(var_num_threads)
-        torch.set_num_threads(var_num_threads)
-        os.environ["MKL_NUM_THREADS"] = str(var_num_cores)
-        torch.set_num_interop_threads(var_num_cores)
-
-        # Get the number of CPU cores and threads
-        var_num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
-        var_num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
-
-        # Print the information
-        print(f"Number of CPU cores: {var_num_cores}")
-        print(f"Number of CPU threads: {var_num_threads}")
 
         # Initialize and Load pre-trained model
         def get_device():

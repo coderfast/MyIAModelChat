@@ -23,6 +23,12 @@ try:
     from PyPDF2 import PdfReader
 except ImportError:
     PdfReader = None
+try:
+    import ebooklib
+    from ebooklib import epub
+except ImportError:
+    ebooklib = None
+    epub = None
 
 # Setup logging
 logging.basicConfig(
@@ -46,12 +52,13 @@ class DataPreparer:
         Initialize DataPreparer.
         
         Args:
-            args: Command line arguments with aiml, hf, pdf, use_cache, refresh_cache flags
+            args: Command line arguments with aiml, hf, pdf, epub, use_cache, refresh_cache flags
         """
         self.args = args
         self.aiml_data = None
         self.hf_data = None
         self.pdf_data = None
+        self.epub_data = None
         self.combined_data = None
         self.statistics = {}
         self._ensure_cache_dir()
@@ -179,8 +186,13 @@ class DataPreparer:
                 logger.info("\n[3/3] Loading PDF files...")
                 self.pdf_data = self._load_pdf_data()
             
+            # Load EPUB data
+            if hasattr(self.args, 'epub') and self.args.epub:
+                logger.info("\n[4/3] Loading EPUB files...")
+                self.epub_data = self._load_epub_data()
+            
             # Combine datasets
-            logger.info("\n[4/3] Combining datasets...")
+            logger.info("\n[5/3] Combining datasets...")
             self.combined_data = self._combine_datasets()
             
             # Collect statistics
@@ -388,9 +400,88 @@ class DataPreparer:
             logger.warning(f"  ⚠ No PDF files found in '{pdf_dir}' directory")
             return Dataset.from_list([])
     
+    def _load_epub_data(self) -> Dataset:
+        """
+        Load text data from EPUB files (e-books) in 'epub' directory.
+        
+        Returns:
+            Hugging Face Dataset with EPUB text data
+        """
+        if epub is None:
+            logger.warning("  ⚠ ebooklib not installed. Install with: pip install ebooklib")
+            return Dataset.from_list([])
+        
+        epub_dir = 'epub'
+        
+        # Create epub directory if it doesn't exist
+        if not os.path.exists(epub_dir):
+            os.makedirs(epub_dir)
+            logger.info(f"  Created directory: {epub_dir}")
+            logger.info(f"  ℹ Place EPUB files in '{epub_dir}' directory to load them")
+            return Dataset.from_list([])
+        
+        epub_texts = []
+        epub_count = 0
+        
+        for filename in os.listdir(epub_dir):
+            if filename.lower().endswith('.epub'):
+                file_path = os.path.join(epub_dir, filename)
+                try:
+                    logger.info(f"  Reading EPUB: {filename}...")
+                    
+                    # Open and parse EPUB
+                    book = epub.read_epub(file_path)
+                    text = ""
+                    
+                    # Extract text from all chapters
+                    for item in book.get_items():
+                        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                            try:
+                                # Get chapter content
+                                content = item.get_content().decode('utf-8', errors='ignore')
+                                
+                                # Remove HTML tags (simple regex approach)
+                                import re
+                                content = re.sub(r'<[^>]+>', '', content)
+                                
+                                # Clean up whitespace
+                                content = re.sub(r'\s+', ' ', content)
+                                text += content + " "
+                            except Exception as e:
+                                logger.warning(f"    ⚠ Error extracting chapter from {filename}: {e}")
+                    
+                    # Split text into samples
+                    if text.strip():
+                        # Split by periods, keeping reasonable chunk sizes
+                        sentences = text.split('.')
+                        sentence_count = 0
+                        
+                        for sentence in sentences:
+                            sentence = sentence.strip()
+                            if len(sentence) > 10:  # Skip very short sentences
+                                epub_texts.append({'input_ids': sentence})
+                                sentence_count += 1
+                        
+                        epub_count += 1
+                        logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
+                    else:
+                        logger.warning(f"  ⚠ No text extracted from {filename}")
+                
+                except Exception as e:
+                    logger.warning(f"  ⚠ Error loading {filename}: {e}")
+        
+        if epub_texts:
+            dataset = Dataset.from_list(epub_texts)
+            logger.info(f"\nTotal EPUB files processed: {epub_count}")
+            logger.info(f"Total EPUB samples: {len(dataset)}")
+            return dataset
+        else:
+            logger.warning(f"  ⚠ No EPUB files found in '{epub_dir}' directory")
+            return Dataset.from_list([])
+    
     def _combine_datasets(self) -> Dataset:
         """
-        Combine AIML, HF, and PDF datasets.
+        Combine AIML, HF, PDF, and EPUB datasets.
         
         Returns:
             Combined dataset
@@ -412,6 +503,11 @@ class DataPreparer:
             datasets_to_combine.append(self.pdf_data)
             total_samples += len(self.pdf_data)
             logger.info(f"  Adding PDF data: {len(self.pdf_data)} samples")
+        
+        if self.epub_data is not None and len(self.epub_data) > 0:
+            datasets_to_combine.append(self.epub_data)
+            total_samples += len(self.epub_data)
+            logger.info(f"  Adding EPUB data: {len(self.epub_data)} samples")
         
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
@@ -437,6 +533,7 @@ class DataPreparer:
             'aiml_samples': 0,
             'hf_samples': 0,
             'pdf_samples': 0,
+            'epub_samples': 0,
             'avg_text_length': 0,
             'min_text_length': 0,
             'max_text_length': 0,
@@ -457,6 +554,11 @@ class DataPreparer:
             pdf_count = len(self.pdf_data)
             stats['pdf_samples'] = pdf_count
             stats['source_breakdown']['PDF'] = pdf_count
+        
+        if self.epub_data:
+            epub_count = len(self.epub_data)
+            stats['epub_samples'] = epub_count
+            stats['source_breakdown']['EPUB'] = epub_count
         
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)

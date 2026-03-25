@@ -12,3 +12,4 @@ transformers
 keyboard
 datasets
 PyPDF2
+ebooklib
