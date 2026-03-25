@@ -73,17 +73,22 @@ class ChatModel(nn.Module):
         self.apply(self.tokenizer.init_weights)
 
     def forward(self, input_ids):
-      # Empaquetar las secuencias de entrada
-      input_lengths = [len(seq) for seq in input_ids]
-      # input_tensor = rnn_utils.pack_sequence([torch.tensor(seq) for seq in input_ids])
-      # input_tensor = rnn_utils.pack_sequence([torch.tensor(seq).clone().detach() for seq in input_ids])
-      input_tensor = rnn_utils.pack_sequence([seq.clone().detach() for seq in input_ids])
-
-      # Pasar la entrada a través del modelo
-      embedded = self.embedding(input_tensor.data)
-      output, _ = self.lstm(embedded)
-
-      # Aplicar la capa fully connected
-      logits = self.fc(output.data)
-
-      return logits
+        """
+        Forward pass through the model.
+        
+        Args:
+            input_ids: Tensor of shape (batch_size, seq_length) with token IDs
+            
+        Returns:
+            logits: Tensor of shape (batch_size, seq_length, vocab_size)
+        """
+        # Pass input IDs through embedding layer
+        embedded = self.embedding(input_ids)
+        
+        # Pass through LSTM layer
+        lstm_output, (hidden, cell) = self.lstm(embedded)
+        
+        # Pass through fully connected layer to get logits
+        logits = self.fc(lstm_output)
+        
+        return logits

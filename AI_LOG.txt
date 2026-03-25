@@ -1,0 +1,59 @@
+Optimizing tool selection...I'll help you create skills for this project. Let me first explore the project to understand its structure and purpose.   
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat)
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat/requirements.txt)
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat/README.md)
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat/main_train.py#1-1), lines 1 to 40
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat/chatmodel.py#1-1), lines 1 to 50
+
+Read [](file:///g%3A/PROJECTS/MyIAModelChat/dialogmanager.py#1-1), lines 1 to 50
+
+Now I'll create comprehensive skills documentation for your AI chat model project. 
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/.instructions.md)
+
+ 
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/AIML-USAGE.md)
+
+ 
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/MODEL-ARCHITECTURE.md)
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/TRAINING-GUIDE.md)
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/NLP-TRANSFORMERS.md)
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/DEVELOPMENT-GUIDE.md)
+
+Created [](file:///g%3A/PROJECTS/MyIAModelChat/QUICK-REFERENCE.md)
+
+Perfect! I've created a comprehensive set of **7 skill guides** for your MyIAModelChat project:
+
+## 📚 Skills Created
+
+1. **.instructions.md** - Main project overview and key components
+2. **QUICK-REFERENCE.md** - Command cheat sheet and quick lookups
+3. **MODEL-ARCHITECTURE.md** - Deep dive into PyTorch LSTM architecture and dialogue pipeline
+4. **TRAINING-GUIDE.md** - Dataset management, hyperparameters, and tokenization
+5. **NLP-TRANSFORMERS.md** - Intent classification & sentiment analysis with BERT models
+6. **AIML-USAGE.md** - AIML file format and integration patterns
+7. **DEVELOPMENT-GUIDE.md** - Debugging, common issues, and troubleshooting
+
+## 🎯 Coverage
+
+These skills document:
+- **Architecture**: LSTM model, dialogue flow, intent/sentiment detection
+- **Training**: Dataset loading, hyperparameters, tokenization, progress monitoring
+- **NLP**: BERT models, transformers integration, context-aware detection
+- **AIML**: Pattern files (60+ files), XML structure, dialogue patterns
+- **Development**: Debugging tips, common errors, performance optimization
+- **Quick Reference**: Commands, configs, file maps, and best practices
+
+All files are in your project root and ready for VS Code Copilot to reference during development!
+
+Made changes.

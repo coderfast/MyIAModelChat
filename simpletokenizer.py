@@ -34,61 +34,57 @@ class Trie:
 class SimpleTokenizer:
 
     def __init__(self, max_vocab_size=65536, embedding_dim=65536, num_workers=4):
-        # self.word2idx = {'<PAD>': 0, '<UNK>': 1}
-        # self.idx2word = {0: '<PAD>', 1: '<UNK>'}
+        """Initialize SimpleTokenizer with vocabulary and embedding."""
         self.trie = Trie()
+        self.idx2word = {}  # Inverse mapping for efficient O(1) decoding
         self.vocab_size = 0
         self.max_vocab_size = max_vocab_size
         self.embedding_dim = embedding_dim
         self.embedding = nn.Embedding(self.max_vocab_size, self.embedding_dim)
         self.num_workers = num_workers
         
-        # Agregar el token de relleno al Trie
-        self.trie.insert('<PAD>', 0)
-        self.trie.insert('<UNK>', 1)
-        self.vocab_size += 2
+        # Add special tokens
+        self._insert_word('<PAD>', 0)
+        self._insert_word('<UNK>', 1)
+    
+    def _insert_word(self, word, index):
+        """Insert a word into both trie and idx2word mapping."""
+        self.trie.insert(word, index)
+        self.idx2word[index] = word
+        if index >= self.vocab_size:
+            self.vocab_size = index + 1
 
     def fit(self, texts):
+        """Build vocabulary from texts using multiprocessing (no race conditions)."""
+        # Collect unique words from all texts
+        all_words = set()
         with Pool(processes=self.num_workers) as pool:
-            results = pool.map(self.process_text, texts)
-
-        print(f"{results}")
-        print(f" ")
-        for result in results:
-            for word, index in result:
-                if self.vocab_size < self.max_vocab_size:
-                    self.trie.insert(word, index)
-                    self.vocab_size += 1
-
-    def process_text(self, text):
-        word_indices = []
-        for word in text.split():
-            index = self.trie.get_index(word)
-            if index is None:
-                index = self.vocab_size
-                word_indices.append((word, index))
-                self.vocab_size += 1
-        return word_indices
+            results = pool.map(self._extract_words, texts)
+        
+        # Merge results from all processes (no race conditions during merge)
+        for words_set in results:
+            all_words.update(words_set)
+        
+        # Build vocabulary sequentially
+        for idx, word in enumerate(all_words, start=2):
+            if self.vocab_size < self.max_vocab_size:
+                self._insert_word(word, idx)
+    
+    def _extract_words(self, text):
+        """Extract unique words from text (for multiprocessing)."""
+        return set(text.split())
 
     def encode(self, text):
+        """Encode text into token IDs."""
         return [self.trie.get_index(word) or 1 for word in text.split()]
-        # return [self.trie.get_index(word) or self.trie.get_index('<UNK>') for word in text.split()]
 
     def decode(self, indices):
+        """Decode token IDs into text (O(n) complexity using idx2word mapping)."""
         if isinstance(indices, int):
             indices = [indices]
-
-        words = []
-        for idx in indices:
-            if idx is None:
-                words.append('<UNK>')
-            elif idx == 1:
-                words.append('<UNK>')
-            else:
-                for word, node in self.trie.root.children.items():
-                    if node.index == idx:
-                        words.append(word)
-                        break
+        
+        # Use idx2word mapping for O(1) lookup instead of O(vocab_size) trie search
+        words = [self.idx2word.get(idx, '<UNK>') for idx in indices]
         return ' '.join(words)
 
     def pad_sequence(self, sequence, max_length):
@@ -97,9 +93,9 @@ class SimpleTokenizer:
         return sequence[:max_length]
 
     def add_word(self, word):
+        """Add a new word to the vocabulary."""
         if self.vocab_size < self.max_vocab_size:
-            self.trie.insert(word, self.vocab_size)
-            self.vocab_size += 1
+            self._insert_word(word, self.vocab_size)
             self.embedding.weight.data[self.vocab_size - 1] = torch.randn(self.embedding_dim)
 
     def load_pretrained_embeddings(self, pretrained_embeddings):

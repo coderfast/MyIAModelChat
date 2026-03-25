@@ -1,0 +1,335 @@
+================================================================================
+                    MyIAModelChat - USAGE GUIDE
+================================================================================
+
+This file describes all command line parameters for training and inference 
+with the MyIAModelChat model.
+
+================================================================================
+                            QUICK START
+================================================================================
+
+TRAIN MODE (build/train the model):
+    python main.py --train --epochs 10 --aiml --num_cores 4 --num_threads 4
+
+CHAT MODE (run interactive chat):
+    python main.py --chat --num_cores 4 --num_threads 4
+
+TOKENIZE ONLY (prepare vocabulary without training):
+    python main.py --train --onlytokenize --aiml
+
+================================================================================
+                        COMMAND LINE ARGUMENTS
+================================================================================
+
+Primary Mode Arguments (choose one):
+================================================================================
+
+--train
+    Description: Run training mode
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train
+    Notes:
+        - Loads AIML data and/or Hugging Face datasets
+        - Builds vocabulary from all text data
+        - Trains the neural model
+        - Saves: chat_model.pth, tokenizer.pth, pretrained_embeddings.pth
+        - Can be interrupted with ESC key
+
+--chat
+    Description: Run inference/chat mode (interactive dialogue)
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --chat
+    Notes:
+        - Loads pre-trained tokenizer.pth and chat_model.pth
+        - Provides interactive chat interface
+        - Uses intent classification and sentiment analysis
+        - Requires trained model (chat_model.pth)
+
+================================================================================
+
+Data Source Arguments (use with --train):
+================================================================================
+
+--aiml
+    Description: Include AIML files in training data
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --aiml
+    Notes:
+        - Loads AIML files from aiml_dev/ directory
+        - Contains ~60 dialogue pattern files
+        - Uses XML-based patterns for training
+        - Recommended for dialogue variety
+
+--hf
+    Description: Include Hugging Face datasets
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --hf
+    Notes:
+        - Loads public datasets from Hugging Face
+        - Examples: wikitext, common_voice, opus_100
+        - Requires internet connection
+        - Larger vocabulary and more examples
+
+    Combine both data sources:
+        python main.py --train --aiml --hf
+
+================================================================================
+
+Performance Tuning Arguments:
+================================================================================
+
+--num_cores <N>
+    Description: Number of CPU cores for multiprocessing
+    Type: Integer
+    Default: 4
+    Range: 1 to CPU count on your machine
+    Example: python main.py --train --num_cores 8
+    Notes:
+        - Used in DataLoader for parallel data loading
+        - Use machine CPU count for optimal speed
+        - Check CPU count: python -c "import os; print(os.cpu_count())"
+        - Recommended: Set to 50-75% of available cores
+
+--num_threads <N>
+    Description: Number of threads per worker
+    Type: Integer
+    Default: 4
+    Range: 1 to 16 (typically)
+    Example: python main.py --train --num_threads 8
+    Notes:
+        - Controls OpenMP and MKL threading
+        - Affects BLAS operations efficiency
+        - Usually num_threads = num_cores or slightly less
+
+================================================================================
+
+Training Arguments:
+================================================================================
+
+--epochs <N>
+    Description: Number of training epochs
+    Type: Integer
+    Default: 1
+    Example: python main.py --train --epochs 10
+    Notes:
+        - One epoch = one pass through entire dataset
+        - Typical range: 5-50 epochs
+        - Higher epochs = more training time but better convergence
+        - Early stopping via ESC key (press ESC to stop training)
+        - Model saves after each epoch
+
+--onlytokenize
+    Description: Build vocabulary only, skip training
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --onlytokenize --aiml
+    Notes:
+        - Useful for vocabulary inspection
+        - Saves tokenizer.pth without training model
+        - Fast operation (seconds to minutes)
+        - Recommended before long training runs
+
+================================================================================
+                            USAGE EXAMPLES
+================================================================================
+
+TRAINING EXAMPLES:
+================================================================================
+
+1. Basic training with default settings:
+    python main.py --train
+
+2. Train with AIML data for 10 epochs:
+    python main.py --train --aiml --epochs 10
+
+3. Train with both AIML and Hugging Face data:
+    python main.py --train --aiml --hf --epochs 20
+
+4. Train with optimized performance (assuming 16 CPU cores):
+    python main.py --train --aiml --epochs 15 --num_cores 12 --num_threads 6
+
+5. Just build vocabulary without training:
+    python main.py --train --onlytokenize --aiml --hf
+
+6. Extensive training with maximum cores:
+    python main.py --train --aiml --hf --epochs 50 --num_cores 16 --num_threads 8
+
+================================================================================
+
+INFERENCE/CHAT EXAMPLES:
+================================================================================
+
+1. Start interactive chat (default settings):
+    python main.py --chat
+
+2. Chat with specific CPU configuration:
+    python main.py --chat --num_cores 8 --num_threads 4
+
+3. Chat with GPU (if available):
+    python main.py --chat
+    (Automatically detects and uses GPU if available)
+
+================================================================================
+
+BATCH PROCESSING EXAMPLES:
+================================================================================
+
+Run multiple training sessions:
+    python main.py --train --aiml --epochs 5
+    python main.py --train --aiml --hf --epochs 10
+
+Train, then switch to chat:
+    python main.py --train --aiml --epochs 5
+    python main.py --chat
+
+================================================================================
+                        EXPECTED FILE OUTPUTS
+================================================================================
+
+Training Mode Creates:
+    - chat_model.pth              Main model weights (saved each epoch)
+    - tokenizer.pth               Vocabulary and tokenizer state
+    - pretrained_embeddings.pth   Embedding layer weights
+
+These are required for chat mode to work properly.
+
+================================================================================
+                        TROUBLESHOOTING
+================================================================================
+
+Error: "No such file or directory: tokenizer.pth"
+    → Run training first: python main.py --train --aiml
+    → Or: python main.py --train --onlytokenize --aiml
+
+Error: "CUDA out of memory"
+    → Reduce num_cores: python main.py --train --num_cores 2
+    → Use CPU (default) instead of GPU
+
+Error: Directory "aiml/" not found
+    → Current directory must be project root
+    → Files should be in: G:\PROJECTS\MyIAModelChat\
+
+Training too slow:
+    → Increase num_cores: --num_cores 16
+    → Use GPU if available (automatic detection)
+    → Reduce epochs for testing: --epochs 2
+
+Training stuck or unresponsive:
+    → Press ESC key to stop gracefully
+    → Go back to terminal and restart
+
+================================================================================
+                        ADVANCED CONFIGURATION
+================================================================================
+
+Modifying Model Architecture:
+    Edit in chatmodel.py:
+        embed_size: embedding dimension (default 128)
+        hidden_size: LSTM hidden dimension (default 256)
+    Then retrain: python main.py --train --epochs 10
+
+Changing Maximum Vocabulary Size:
+    Edit in simpletokenizer.py:
+        max_vocab_size: default 65536
+    Then retrain: python main.py --train --onlytokenize
+
+Using Different AIML Files:
+    Edit in main_train.py (line: data_dir = 'aiml_dev'):
+        data_dir = 'aiml'  # for production AIML files
+    Then retrain: python main.py --train --aiml
+
+================================================================================
+                        SYSTEM REQUIREMENTS
+================================================================================
+
+Minimum:
+    - Python 3.8+
+    - 4 CPU cores
+    - 8 GB RAM
+    - 2 GB disk space
+
+Recommended:
+    - Python 3.10+
+    - 8+ CPU cores
+    - 16 GB RAM
+    - 5 GB disk space
+    - NVIDIA GPU with CUDA support
+
+================================================================================
+                        ENVIRONMENT SETUP
+================================================================================
+
+Activate virtual environment:
+    Windows (PowerShell):
+        .\envMyIAModelChat\Scripts\Activate.ps1
+    
+    Windows (CMD):
+        envMyIAModelChat\Scripts\activate.bat
+    
+    Linux/Mac:
+        source envMyIAModelChat/bin/activate
+
+Install dependencies:
+    pip install -r requirements.txt
+
+Check GPU availability:
+    python -c "import torch; print(torch.cuda.is_available())"
+
+================================================================================
+                        TYPICAL WORKFLOW
+================================================================================
+
+1. Prepare Environment:
+    cd G:\PROJECTS\MyIAModelChat
+    .\envMyIAModelChat\Scripts\Activate.ps1
+
+2. Build Vocabulary (first time):
+    python main.py --train --onlytokenize --aiml --hf
+
+3. Train Model:
+    python main.py --train --aiml --hf --epochs 20 --num_cores 8
+
+4. Test Chat:
+    python main.py --chat
+
+5. Iterate:
+    - Modify AIML files if needed
+    - Retrain: python main.py --train --aiml --epochs 10
+    - Monitor loss and adjust epochs/cores as needed
+
+================================================================================
+                        MONITORING TRAINING
+================================================================================
+
+Output Information:
+    - Epoch number and loss value (per epoch)
+    - Device type: CUDA, MPS, or CPU
+    - Number of CPU cores and threads
+    - Loaded files and datasets
+
+Optimization Tips:
+    - Loss should decrease each epoch
+    - If loss plateaus, reduce learning rate or stop
+    - Press ESC to stop early if converged
+    - Check GPU memory: nvidia-smi (if using CUDA)
+
+================================================================================
+                        KNOWN LIMITATIONS
+================================================================================
+
+- Device detection is automatic (prioritizes CUDA > MPS > CPU)
+- Vocabulary size currently fixed at initialization
+- Maximum batch size depends on available memory
+- No distributed multi-GPU training
+- Chat mode uses single-turn responses (queue-based context)
+
+================================================================================
+
+For more details, see: README.md, CORRECTIONS.md, MODEL-ARCHITECTURE.md
+
+================================================================================

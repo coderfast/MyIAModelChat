@@ -233,7 +233,8 @@ class MainTrain:
 
         print(f"create dataloader")
         # Create DataLoader with custom collate function
-        dataloader = DataLoader(encoded_data, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
+        batch_size = 4  # Reduce from 32 to 4 (or 8 if it fits)
+        dataloader = DataLoader(encoded_data, batch_size=batch_size, shuffle=True, collate_fn=self.collate_fn, pin_memory=True, num_workers=2)
         print(f"created dataloader")
 
         # Set the number of CPU threads and cores to use
@@ -262,6 +263,21 @@ class MainTrain:
         # criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.word2idx['<PAD>'])
         criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
         optimizer = optim.Adam(model.parameters())
+
+        # Add gradient accumulation
+        accumulation_steps = 8  # Simulate batch_size=32 (4 * 8)
+        optimizer.zero_grad()
+
+        for i, (inputs, targets) in enumerate(dataloader):
+            inputs, targets = inputs.to(device), targets.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+            loss = loss / accumulation_steps  # Scale loss
+            loss.backward()
+
+            if (i + 1) % accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
 
         # Training loop
         num_epochs = self.epochs
