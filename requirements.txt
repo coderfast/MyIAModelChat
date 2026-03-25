@@ -11,3 +11,4 @@ python-aiml
 transformers
 keyboard
 datasets
+PyPDF2

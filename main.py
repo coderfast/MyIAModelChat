@@ -33,7 +33,7 @@ if __name__ == '__main__':
 Examples:
   python main.py --train --aiml --epochs 10
   python main.py --prepare-data --aiml --hf
-  python main.py --prepare-data --aiml --hf --use-cache
+  python main.py --prepare-data --aiml --pdf
   python main.py --chat
         """
     )
@@ -44,6 +44,7 @@ Examples:
     parser.add_argument("--num_threads", type=int, default=4, help="Number of threads per worker (default: 4)")
     parser.add_argument("--aiml", action='store_true', help="Include AIML data")
     parser.add_argument("--hf", action='store_true', help="Include Hugging Face datasets")
+    parser.add_argument("--pdf", action='store_true', help="Include PDF data from 'pdfs' directory")
     parser.add_argument("--onlytokenize", action='store_true', help="Build vocabulary only")
     parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs (default: 1)")
     parser.add_argument("--use-cache", action='store_true', help="Load cached dataset if available (skipdata loading)")

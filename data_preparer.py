@@ -19,6 +19,10 @@ from collections import Counter
 from aimlloder import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
 import sys
+try:
+    from PyPDF2 import PdfReader
+except ImportError:
+    PdfReader = None
 
 # Setup logging
 logging.basicConfig(
@@ -42,11 +46,12 @@ class DataPreparer:
         Initialize DataPreparer.
         
         Args:
-            args: Command line arguments with aiml, hf, use_cache, refresh_cache flags
+            args: Command line arguments with aiml, hf, pdf, use_cache, refresh_cache flags
         """
         self.args = args
         self.aiml_data = None
         self.hf_data = None
+        self.pdf_data = None
         self.combined_data = None
         self.statistics = {}
         self._ensure_cache_dir()
@@ -169,8 +174,13 @@ class DataPreparer:
                 logger.info("\n[2/3] Loading Hugging Face datasets...")
                 self.hf_data = self._load_hf_data()
             
+            # Load PDF data
+            if hasattr(self.args, 'pdf') and self.args.pdf:
+                logger.info("\n[3/3] Loading PDF files...")
+                self.pdf_data = self._load_pdf_data()
+            
             # Combine datasets
-            logger.info("\n[3/3] Combining datasets...")
+            logger.info("\n[4/3] Combining datasets...")
             self.combined_data = self._combine_datasets()
             
             # Collect statistics
@@ -309,9 +319,78 @@ class DataPreparer:
             logger.warning("  ⚠ No HuggingFace datasets loaded successfully")
             return Dataset.from_list([])
     
+    def _load_pdf_data(self) -> Dataset:
+        """
+        Load text data from PDF files in 'pdfs' directory.
+        
+        Returns:
+            Hugging Face Dataset with PDF text data
+        """
+        if PdfReader is None:
+            logger.warning("  ⚠ PyPDF2 not installed. Install with: pip install PyPDF2")
+            return Dataset.from_list([])
+        
+        pdf_dir = 'pdfs'
+        
+        # Create pdfs directory if it doesn't exist
+        if not os.path.exists(pdf_dir):
+            os.makedirs(pdf_dir)
+            logger.info(f"  Created directory: {pdf_dir}")
+            logger.info(f"  ℹ Place PDF files in '{pdf_dir}' directory to load them")
+            return Dataset.from_list([])
+        
+        pdf_texts = []
+        pdf_count = 0
+        
+        for filename in os.listdir(pdf_dir):
+            if filename.lower().endswith('.pdf'):
+                file_path = os.path.join(pdf_dir, filename)
+                try:
+                    logger.info(f"  Reading PDF: {filename}...")
+                    
+                    with open(file_path, 'rb') as f:
+                        pdf_reader = PdfReader(f)
+                        text = ""
+                        
+                        # Extract text from all pages
+                        for page_num, page in enumerate(pdf_reader.pages):
+                            try:
+                                text += page.extract_text() + " "
+                            except Exception as e:
+                                logger.warning(f"    ⚠ Error extracting page {page_num} from {filename}: {e}")
+                        
+                        # Split text by sentences/paragraphs into samples
+                        if text.strip():
+                            # Split by periods, keeping reasonable chunk sizes
+                            sentences = text.split('.')
+                            sentence_count = 0
+                            
+                            for sentence in sentences:
+                                sentence = sentence.strip()
+                                if len(sentence) > 10:  # Skip very short sentences
+                                    pdf_texts.append({'input_ids': sentence})
+                                    sentence_count += 1
+                            
+                            pdf_count += 1
+                            logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
+                        else:
+                            logger.warning(f"  ⚠ No text extracted from {filename}")
+                
+                except Exception as e:
+                    logger.warning(f"  ⚠ Error loading {filename}: {e}")
+        
+        if pdf_texts:
+            dataset = Dataset.from_list(pdf_texts)
+            logger.info(f"\nTotal PDF files processed: {pdf_count}")
+            logger.info(f"Total PDF samples: {len(dataset)}")
+            return dataset
+        else:
+            logger.warning(f"  ⚠ No PDF files found in '{pdf_dir}' directory")
+            return Dataset.from_list([])
+    
     def _combine_datasets(self) -> Dataset:
         """
-        Combine AIML and HF datasets.
+        Combine AIML, HF, and PDF datasets.
         
         Returns:
             Combined dataset
@@ -328,6 +407,11 @@ class DataPreparer:
             datasets_to_combine.append(self.hf_data)
             total_samples += len(self.hf_data)
             logger.info(f"  Adding HuggingFace data: {len(self.hf_data)} samples")
+        
+        if self.pdf_data is not None and len(self.pdf_data) > 0:
+            datasets_to_combine.append(self.pdf_data)
+            total_samples += len(self.pdf_data)
+            logger.info(f"  Adding PDF data: {len(self.pdf_data)} samples")
         
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
@@ -352,6 +436,7 @@ class DataPreparer:
             'total_samples': 0,
             'aiml_samples': 0,
             'hf_samples': 0,
+            'pdf_samples': 0,
             'avg_text_length': 0,
             'min_text_length': 0,
             'max_text_length': 0,
@@ -367,6 +452,11 @@ class DataPreparer:
             hf_count = len(self.hf_data)
             stats['hf_samples'] = hf_count
             stats['source_breakdown']['HuggingFace'] = hf_count
+        
+        if self.pdf_data:
+            pdf_count = len(self.pdf_data)
+            stats['pdf_samples'] = pdf_count
+            stats['source_breakdown']['PDF'] = pdf_count
         
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)

@@ -3,14 +3,8 @@
   "description": "",
   "features": {
     "input_ids": {
-      "input": {
-        "dtype": "string",
-        "_type": "Value"
-      },
-      "output": {
-        "dtype": "string",
-        "_type": "Value"
-      }
+      "dtype": "string",
+      "_type": "Value"
     }
   },
   "homepage": "",

@@ -4,10 +4,8 @@
       "filename": "data-00000-of-00001.arrow"
     }
   ],
-  "_fingerprint": "ada2468941afa46e",
-  "_format_columns": [
-    "input_ids"
-  ],
+  "_fingerprint": "150ac046f232bb17",
+  "_format_columns": null,
   "_format_kwargs": {},
   "_format_type": null,
   "_output_all_columns": false,
