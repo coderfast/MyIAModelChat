@@ -5,6 +5,12 @@ import re
 import unicodedata
 from collections import Counter
 from typing import List, Dict, Tuple, Optional
+import logging
+
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class TrieNode:
     def __init__(self):
