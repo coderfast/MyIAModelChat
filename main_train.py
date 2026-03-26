@@ -2,10 +2,10 @@ import os
 import argparse
 import pickle
 import sys
-import keyboard
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler
 import multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader
 from torch.cuda.amp import autocast, GradScaler
@@ -18,6 +18,12 @@ from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from transformers import pipeline
 import logging
 
+try:
+    import keyboard
+    KEYBOARD_AVAILABLE = True
+except ImportError:
+    KEYBOARD_AVAILABLE = False
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,28 +33,48 @@ CACHE_DIR = 'dataset_cache'
 CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
 
+# Training configuration constants
+TRAINING_CONFIG = {
+    'batch_size': 4,
+    'accumulation_steps': 8,
+    'learning_rate': 1e-3,
+    'embed_size': 128,
+    'hidden_size': 256,
+    'grad_clip_norm': 1.0,
+    'memory_cleanup_interval': 10,
+    'warm_up_warmup': True,
+}
+
+# Model checkpoint configuration
+MODEL_CHECKPOINT_DIR = 'checkpoints'
+BEST_MODEL_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'best_model.pth')
+LATEST_MODEL_FILE = 'chat_model.pth'
+
 
 class MainTrain:
     
     def __init__(self, args):
         
-        print(f"MainTrain initializing...")
+        logger.info("MainTrain initializing...")
 
         # Check if the tokenizer and cached dataset exist
         self.tokenizer = None
         self.tokenized_data = None
-        self.merged_dataset = None
+        self.loaded_dataset = None
         
         # Device and training configuration tracking
         self.use_gpu = False
         self.use_mixed_precision = False
         self.use_gradient_checkpointing = False
+        self.use_cpuonly = False
+        self.best_loss = float('inf')
 
         # Parse command-line arguments
         self.aiml = args.aiml
         self.hf = args.hf
         self.onlytokenize = args.onlytokenize
         self.epochs = args.epochs
+        self.use_cpuonly = getattr(args, 'use_cpuonly', False)
 
         # Load cached dataset
         print(f"Loading dataset from cache...")
@@ -71,8 +97,8 @@ class MainTrain:
                 )
             
             logger.info(f"Loading cached dataset from: {CACHE_DATASET_FILE}")
-            self.merged_dataset = Dataset.load_from_disk(CACHE_DATASET_FILE)
-            logger.info(f"✓ Loaded cached dataset: {len(self.merged_dataset)} samples")
+            self.loaded_dataset = Dataset.load_from_disk(CACHE_DATASET_FILE)
+            logger.info(f"✓ Loaded cached dataset: {len(self.loaded_dataset)} samples")
             
             # Load statistics if available
             if os.path.exists(CACHE_STATS_FILE):
@@ -88,8 +114,8 @@ class MainTrain:
     def _setup_device_and_config(self):
         """Setup device configuration with CPU-GPU combined strategy and mixed precision support."""
         
-        # Detect GPU availability
-        cuda_available = torch.cuda.is_available()
+        # Detect GPU availability (respect --use-cpuonly flag)
+        cuda_available = torch.cuda.is_available() and not self.use_cpuonly
         
         if cuda_available:
             device_name = torch.cuda.get_device_name(0)
@@ -182,234 +208,318 @@ class MainTrain:
             self.use_mixed_precision = False
             return model
 
+    def _compute_loss(self, model, inputs, targets, criterion):
+        """Unified loss computation for both mixed and standard precision."""
+        outputs = model(inputs)
+        
+        # Reshape outputs and targets
+        outputs = outputs.contiguous().view(-1, outputs.size(-1))
+        targets = targets.contiguous().view(-1)
+        
+        # Ignore padded elements
+        non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
+        outputs = outputs[non_pad_mask]
+        targets = targets[non_pad_mask]
+        
+        return criterion(outputs, targets)
+    
+    def _backward_pass(self, loss, optimizer, scaler, accumulation_step=1):
+        """Unified backward pass handling for mixed and standard precision."""
+        # Scale loss for gradient accumulation
+        loss = loss / accumulation_step
+        
+        if self.use_mixed_precision and scaler is not None:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
+        
+        return loss * accumulation_step  # Return original loss for tracking
+
     # Training function with mixed precision support
-    def train(self, model, dataloader, criterion, optimizer, device, scaler=None):
-        """Train function with support for mixed precision training."""
+    def train(self, model, dataloader, criterion, optimizer, device, scaler=None, accumulation_steps=1):
+        """Train function with support for mixed precision training and gradient accumulation."""
         
         total_loss = 0
         model.train()
+        optimizer.zero_grad()
         
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             inputs = inputs.to(device)
             targets = targets.to(device)
-
-            optimizer.zero_grad()
             
-            # Use mixed precision if available
+            # Forward pass
             if self.use_mixed_precision and scaler is not None:
                 with autocast(dtype=torch.float16):
-                    outputs = model(inputs)
-                    
-                    # Reshape outputs and targets
-                    outputs = outputs.contiguous().view(-1, outputs.size(-1))
-                    targets = targets.contiguous().view(-1)
-                    
-                    # Ignore padded elements
-                    non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
-                    outputs = outputs[non_pad_mask]
-                    targets = targets[non_pad_mask]
-                    
-                    loss = criterion(outputs, targets)
-                
-                # Backward pass with gradient scaling
-                scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
+                    loss = self._compute_loss(model, inputs, targets, criterion)
+            else:
+                loss = self._compute_loss(model, inputs, targets, criterion)
+            
+            # Backward pass
+            original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
+            total_loss += original_loss.item()
+            
+            # Optimizer step with gradient accumulation
+            if (batch_idx + 1) % accumulation_steps == 0:
+                if self.use_mixed_precision and scaler is not None:
+                    scaler.unscale_(optimizer)
                 
                 # Gradient clipping for stability
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=TRAINING_CONFIG['grad_clip_norm'])
                 
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                # Standard precision training
-                outputs = model(inputs)
-                
-                # Reshape outputs and targets
-                outputs = outputs.contiguous().view(-1, outputs.size(-1))
-                targets = targets.contiguous().view(-1)
-                
-                # Ignore padded elements
-                non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
-                outputs = outputs[non_pad_mask]
-                targets = targets[non_pad_mask]
-                
-                loss = criterion(outputs, targets)
-                loss.backward()
-                
-                # Gradient clipping for stability
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                
-                optimizer.step()
-
-            total_loss += loss.item()
-            
-            # Memory cleanup every 10 batches on GPU
-            if self.use_gpu and (batch_idx + 1) % 10 == 0:
-                torch.cuda.empty_cache()
-
-        return total_loss / len(dataloader)
-
-
-    # Collate function for DataLoader
-    def collate_fn(self, batch):
-
-        input_sequences, output_sequences = zip(*batch)
-
-        # Find max lengths
-        # max_input_len = max(len(seq) for seq in input_sequences)
-        # max_output_len = max(len(seq) for seq in output_sequences)
-        max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
-
-        # Pad sequences
-        ## padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_input_len - len(seq)) for seq in input_sequences]
-        ## padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_output_len - len(seq)) for seq in output_sequences]
-        # padded_inputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in input_sequences]
-        # padded_outputs = [seq + [self.tokenizer.word2idx['<PAD>']] * (max_len - len(seq)) for seq in output_sequences]
-        padded_inputs = [seq + [self.tokenizer.get_pad_index()] * (max_len - len(seq)) for seq in input_sequences]
-        padded_outputs = [seq + [self.tokenizer.get_pad_index()] * (max_len - len(seq)) for seq in output_sequences]
-
-        # Convert to tensors
-        input_tensor = torch.LongTensor(padded_inputs)
-        output_tensor = torch.LongTensor(padded_outputs)
-
-        return input_tensor, output_tensor
-
-
-    # def encode(self, text):
-    #     if isinstance(text, str):
-    #         return [self.word2idx.get(word, self.word2idx['<UNK>']) for word in text.split()]
-    #     else:
-    #         return [self.encode(str(item)) for item in text]
-
-
-    def performMainTrain(self):
-
-        # Use the cached dataset
-        merged_dataset = self.merged_dataset
-
-        print(f"Length of dataset: {len(merged_dataset)}")
-        print(f"Dataset columns: {merged_dataset.column_names}")
-
-        # Prepare data for PyTorch
-        print(f"Preparando datos para PyTorch, codificando datos")
-        
-        # Extract text data from cached dataset
-        all_texts = []
-        for item in merged_dataset:
-            text = item['input_ids']
-            if isinstance(text, str) and len(text.strip()) > 0:
-                all_texts.append(text)
-        
-        if not all_texts:
-            logger.error("No valid text data found in cached dataset")
-            sys.exit(1)
-        
-        logger.info(f"Extracted {len(all_texts)} text samples from cache")
-
-        # Fit tokenizer on all texts
-        self.tokenizer.fit(all_texts)
-        logger.info("Tokenizer fitted on cached dataset")
-
-        # Create input-output pairs for training
-        # Use each text as both input and output for language model training
-        encoded_data = []
-        for i, text in enumerate(all_texts):
-            encoded_text = self.tokenizer.encode(text)
-            if encoded_text and len(encoded_text) > 1:
-                # Input is all but last token, output is all but first token
-                input_ids = encoded_text[:-1]
-                output_ids = encoded_text[1:]
-                encoded_data.append((input_ids, output_ids))
-            
-            if (i + 1) % max(1, len(all_texts) // 10) == 0:
-                logger.info(f"  Encoded {i + 1}/{len(all_texts)} samples")
-        
-        logger.info(f"Created {len(encoded_data)} training pairs")
-        
-        if not encoded_data:
-            logger.error("No valid encoded data generated")
-            sys.exit(1)
-
-        print(f"create dataloader")
-        # Create DataLoader with custom collate function
-        batch_size = 4  # Reduce from 32 to 4 (or 8 if it fits)
-        dataloader = DataLoader(encoded_data, batch_size=batch_size, shuffle=True, collate_fn=self.collate_fn, pin_memory=True, num_workers=2)
-        print(f"created dataloader")
-
-        # CPU configuration already set in main.py entry point
-        var_num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
-        var_num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
-        logger.info(f"Using CPU configuration - Cores: {var_num_cores}, Threads: {var_num_threads}")
-
-        # Setup device with improved configuration for CPU-GPU combined training
-        device = self._setup_device_and_config()
-
-        # Initialize model with device strategy
-        model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
-        model = self._setup_model_with_device_strategy(model, device)
-
-        # Define loss and optimizer
-        criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
-        optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-        # Initialize gradient scaler for mixed precision training
-        scaler = GradScaler() if self.use_mixed_precision else None
-        
-        if scaler:
-            logger.info("✓ Gradient scaler initialized for mixed precision training")
-
-        # Add gradient accumulation
-        accumulation_steps = 8  # Simulate batch_size=32 (4 * 8)
-        optimizer.zero_grad()
-
-        logger.info(f"\nStarting pre-training warm-up phase...")
-        for i, (inputs, targets) in enumerate(dataloader):
-            inputs, targets = inputs.to(device), targets.to(device)
-            
-            if self.use_mixed_precision and scaler:
-                with autocast(dtype=torch.float16):
-                    outputs = model(inputs)
-                    loss = criterion(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-                    loss = loss / accumulation_steps
-                scaler.scale(loss).backward()
-            else:
-                outputs = model(inputs)
-                loss = criterion(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-                loss = loss / accumulation_steps
-                loss.backward()
-
-            if (i + 1) % accumulation_steps == 0:
                 if scaler:
                     scaler.step(optimizer)
                     scaler.update()
                 else:
                     optimizer.step()
+                
                 optimizer.zero_grad()
             
-            # Memory cleanup
-            if self.use_gpu and (i + 1) % 10 == 0:
+            # Memory cleanup on GPU
+            if self.use_gpu and (batch_idx + 1) % TRAINING_CONFIG['memory_cleanup_interval'] == 0:
                 torch.cuda.empty_cache()
 
-        # Training loop
-        logger.info(f"\nStarting main training phase ({self.epochs} epochs)...")
-        num_epochs = self.epochs
-        for epoch in range(num_epochs):
+        return total_loss / max(1, len(dataloader))
 
-            if keyboard.is_pressed('esc'):
-                logger.info("Training interrupted by user")
-                break
 
-            loss = self.train(model, dataloader, criterion, optimizer, device, scaler)
-            
-            # Memory information
-            if self.use_gpu:
-                gpu_memory = torch.cuda.memory_allocated(device) / 1e9
-                gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
-                logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f} | GPU Memory: {gpu_memory:.2f}GB / {gpu_memory_reserved:.2f}GB (reserved)")
+    def collate_fn(self, batch):
+        """Collate function for DataLoader with proper padding."""
+        input_sequences, output_sequences = zip(*batch)
+        
+        # Find max length across all sequences
+        max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
+        
+        # Pad sequences to max length
+        pad_idx = self.tokenizer.get_pad_index()
+        padded_inputs = [seq + [pad_idx] * (max_len - len(seq)) for seq in input_sequences]
+        padded_outputs = [seq + [pad_idx] * (max_len - len(seq)) for seq in output_sequences]
+        
+        # Convert to tensors
+        input_tensor = torch.LongTensor(padded_inputs)
+        output_tensor = torch.LongTensor(padded_outputs)
+        
+        return input_tensor, output_tensor
+
+
+    def performMainTrain(self):
+        """Main training loop with proper error handling and model checkpointing."""
+        
+        try:
+            # Use the cached dataset
+            loaded_dataset = self.loaded_dataset
+
+            logger.info(f"Dataset size: {len(loaded_dataset)} samples")
+            logger.info(f"Dataset columns: {loaded_dataset.column_names}")
+
+            # Extract and normalize records from cached dataset
+            logger.info("Extracting and validating dataset samples...")
+            all_texts = []
+            all_token_sequences = []
+
+            for item in loaded_dataset:
+                value = item.get('input_ids', None)
+                if value is None:
+                    continue
+
+                if isinstance(value, str):
+                    raw = value.strip()
+                    if raw:
+                        all_texts.append(raw)
+
+                elif isinstance(value, dict):
+                    # Legacy fallback for old AIML loader structure
+                    input_text = value.get('input', '')
+                    output_text = value.get('output', '')
+                    merged = f"{input_text} {output_text}".strip()
+                    if merged:
+                        all_texts.append(merged)
+
+                elif isinstance(value, (list, tuple)):
+                    if len(value) == 0:
+                        continue
+
+                    if all(isinstance(v, int) for v in value):
+                        all_token_sequences.append(list(value))
+                    elif all(isinstance(v, str) for v in value):
+                        merged = " ".join(v.strip() for v in value if isinstance(v, str) and v.strip())
+                        if merged:
+                            all_texts.append(merged)
+                    else:
+                        # Mixed sequences: guard by casting to string
+                        text_tokens = " ".join(str(v).strip() for v in value if str(v).strip())
+                        if text_tokens:
+                            all_texts.append(text_tokens)
+
+                elif hasattr(value, 'tolist'):
+                    seq = list(value.tolist())
+                    if seq and all(isinstance(v, int) for v in seq):
+                        all_token_sequences.append(seq)
+                    else:
+                        text_tokens = " ".join(str(v).strip() for v in seq if str(v).strip())
+                        if text_tokens:
+                            all_texts.append(text_tokens)
+
+            if not all_texts and not all_token_sequences:
+                logger.error("No valid text/token sequences found in cached dataset")
+                sys.exit(1)
+
+            # Prepare token sequences for training
+            if all_texts:
+                logger.info(f"✓ Extracted {len(all_texts)} text samples")
+                logger.info("Fitting tokenizer on dataset...")
+                self.tokenizer.fit(all_texts)
+                logger.info(f"✓ Tokenizer fitted (vocabulary size: {self.tokenizer.vocab_size})")
+                tokenized_sequences = [self.tokenizer.encode(text) for text in all_texts if text]
             else:
-                logger.info(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss:.4f}")
+                logger.info(f"✓ Extracted {len(all_token_sequences)} tokenized samples")
+                tokenized_sequences = all_token_sequences
 
-            # Save the model, tokenizer, and pre-trained embeddings
-            torch.save(model.state_dict(), 'chat_model.pth')
+                # Ensure tokenizer covers existing id range
+                max_id = max((max(seq) for seq in tokenized_sequences), default=self.tokenizer.vocab_size - 1)
+                if max_id >= self.tokenizer.vocab_size:
+                    logger.warning(f"Token IDs exceed initialized vocab size ({self.tokenizer.vocab_size}), expanding tokenizer to {max_id + 1}")
+                    for idx in range(self.tokenizer.vocab_size, max_id + 1):
+                        self.tokenizer._insert_word(f"<TOKEN_{idx}>", idx)
+
+            if not tokenized_sequences:
+                logger.error("No valid sequence encoding produced after tokenizer processing")
+                sys.exit(1)
+
+            logger.info(f"✓ Prepared {len(tokenized_sequences)} token sequences for encoding")
+
+            # Create input-output pairs for training
+            logger.info("Building input-output pairs from token sequences...")
+            encoded_data = []
+            for i, token_seq in enumerate(tokenized_sequences):
+                try:
+                    if token_seq and len(token_seq) > 1:
+                        input_ids = token_seq[:-1]
+                        output_ids = token_seq[1:]
+                        encoded_data.append((input_ids, output_ids))
+                except Exception as e:
+                    logger.warning(f"Failed to create training pair at index {i}: {e}")
+                    continue
+
+                if (i + 1) % max(1, len(tokenized_sequences) // 10) == 0:
+                    logger.info(f"  Processed {i + 1}/{len(tokenized_sequences)} samples")
+
+            logger.info(f"✓ Created {len(encoded_data)} training pairs")
+            
+            if not encoded_data:
+                logger.error("No valid encoded data generated")
+                sys.exit(1)
+
+            # Create DataLoader with custom collate function
+            logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
+            pin_memory = self.use_gpu  # Only use pin_memory if GPU is available
+            num_workers = max(1, min(2, mp.cpu_count() // 2))  # Adaptive num_workers
+            
+            dataloader = DataLoader(
+                encoded_data,
+                batch_size=TRAINING_CONFIG['batch_size'],
+                shuffle=True,
+                collate_fn=self.collate_fn,
+                pin_memory=pin_memory,
+                num_workers=num_workers
+            )
+            logger.info(f"✓ DataLoader created ({len(dataloader)} batches)")
+        
+        except Exception as e:
+            logger.error(f"Error in data preparation: {e}", exc_info=True)
+            sys.exit(1)
+
+        try:
+            # CPU configuration already set in main.py entry point
+            var_num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
+            var_num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
+            logger.info(f"CPU configuration - Cores: {var_num_cores}, Threads: {var_num_threads}")
+
+            # Setup device with improved configuration for CPU-GPU combined training
+            device = self._setup_device_and_config()
+
+            # Initialize model with device strategy
+            logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']})...")
+            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'])
+            model = self._setup_model_with_device_strategy(model, device)
+            logger.info(f"✓ Model initialized and deployed")
+
+            # Define loss and optimizer
+            criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
+            optimizer = optim.Adam(model.parameters(), lr=TRAINING_CONFIG['learning_rate'])
+            
+            # Add learning rate scheduler
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=max(1, self.epochs // 3), gamma=0.1)
+            logger.info(f"✓ Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
+
+            # Initialize gradient scaler for mixed precision training
+            scaler = GradScaler() if self.use_mixed_precision else None
+            if scaler:
+                logger.info("✓ Gradient scaler initialized for mixed precision training")
+
+            # Create checkpoint directory
+            os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+            logger.info(f"✓ Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
+
+            # Warm-up phase (optional light training)
+            if TRAINING_CONFIG['warm_up_warmup']:
+                logger.info(f"\nStarting warm-up phase (1 epoch)...")
+                _ = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+                logger.info("✓ Warm-up phase completed")
+
+            # Main training loop
+            logger.info(f"\nStarting main training phase ({self.epochs} epochs)...")
+            logger.info(f"{'='*80}")
+            
+            num_epochs = self.epochs
+            for epoch in range(num_epochs):
+                
+                # Check for user interrupt
+                if KEYBOARD_AVAILABLE:
+                    try:
+                        if keyboard.is_pressed('esc'):
+                            logger.info("\n⚠ Training interrupted by user (ESC pressed)")
+                            break
+                    except:
+                        pass  # Keyboard library may not work in all environments
+
+                # Training
+                loss = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+                
+                # Update learning rate
+                scheduler.step()
+                current_lr = optimizer.param_groups[0]['lr']
+                
+                # Memory and performance information
+                if self.use_gpu:
+                    gpu_memory = torch.cuda.memory_allocated(device) / 1e9
+                    gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
+                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Loss: {loss:.4f} | LR: {current_lr:.2e} | GPU: {gpu_memory:.2f}GB / {gpu_memory_reserved:.2f}GB")
+                else:
+                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Loss: {loss:.4f} | LR: {current_lr:.2e}")
+
+                # Save best model checkpoint
+                if loss < self.best_loss:
+                    self.best_loss = loss
+                    logger.info(f"  ✓ New best loss! Saving checkpoint to {BEST_MODEL_FILE}")
+                    os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+                    torch.save({
+                        'epoch': epoch + 1,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'scheduler_state_dict': scheduler.state_dict(),
+                        'loss': loss,
+                    }, BEST_MODEL_FILE)
+
+            # Save final model and tokenizer
+            logger.info(f"\n{'='*80}")
+            logger.info("Training completed! Saving final models...")
+            torch.save(model.state_dict(), LATEST_MODEL_FILE)
             torch.save(self.tokenizer, 'tokenizer.pth')
             torch.save(self.tokenizer.embedding.weight.data, 'pretrained_embeddings.pth')
+            logger.info("✓ Models saved successfully")
+        
+        except KeyboardInterrupt:
+            logger.warning("\nTraining interrupted by user")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Error during training: {e}", exc_info=True)
+            sys.exit(1)

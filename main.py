@@ -1,142 +1,227 @@
 import os
 import gc
 import argparse
-import pickle
 import sys
-import keyboard
+import logging
+import multiprocessing as mp
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader
-from aimlloder import *
-from dialogmanager import DialogueManager
-from simpletokenizer import *
-from chatmodel import *
-from chatdataset import *
-from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
-from transformers import pipeline
-from main_train import *
-from main_chat import *
+
+# Import project modules
+from main_train import MainTrain
+from main_chat import MainChat
 from data_preparer import prepare_datasets_for_training
 
+try:
+    import keyboard
+    KEYBOARD_AVAILABLE = True
+except ImportError:
+    KEYBOARD_AVAILABLE = False
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Configuration constants
+SYSTEM_CONFIG = {
+    'default_cores_fraction': 0.5,
+    'min_cores': 1,
+    'min_threads': 1,
+}
 
 
-# Main
-if __name__ == '__main__':
-
-    # Calculate default CPU configuration (half of available cores)
-    system_cpu_count = mp.cpu_count()
-    default_num_cores = max(1, system_cpu_count // 2)
-    default_num_threads = max(1, system_cpu_count // 2)
-
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(
-        description='MyIAModelChat - AI Chat Model Training and Inference',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python main.py --train --aiml --hf --epochs 10
-  python main.py --train --aiml --hf --epochs 5 --num_cores 8 --num_threads 8
-  python main.py --train --aiml --hf --epochs 10 --use-cache
-  python main.py --prepare-data --aiml --hf
-  python main.py --prepare-data --aiml --pdf
-  python main.py --prepare-data --aiml --epub
-  python main.py --chat
-  
-Performance Tips:
-  - Use --use-cache after first data preparation for faster training starts
-  - Adjust --num_cores and --num_threads based on your CPU capabilities
-  - Default: Half of available system cores (currently {half_cores} cores)
-  - Use explicit values to override: --num_cores 4 --num_threads 4
-  - Use 0 for auto-detection (all available): --num_cores 0 --num_threads 0
-        """.format(half_cores=default_num_cores)
-    )
-    parser.add_argument("--train", action='store_true', help="Train the model")
-    parser.add_argument("--chat", action='store_true', help="Run chat interface")
-    parser.add_argument("--prepare-data", action='store_true', help="Prepare and validate datasets only")
-    parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"Number of CPU cores for parallel processing (default: {default_num_cores} - half of system, 0 for all)")
-    parser.add_argument("--num_threads", type=int, default=default_num_threads, help=f"Number of threads per worker (default: {default_num_threads} - half of system, 0 for all)")
-    parser.add_argument("--aiml", action='store_true', help="Include AIML data")
-    parser.add_argument("--hf", action='store_true', help="Include Hugging Face datasets")
-    parser.add_argument("--pdf", action='store_true', help="Include PDF data from 'pdfs' directory")
-    parser.add_argument("--epub", action='store_true', help="Include EPUB data from 'epub' directory")
-    parser.add_argument("--onlytokenize", action='store_true', help="Build vocabulary only")
-    parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs (default: 1)")
-    parser.add_argument("--use-cache", action='store_true', help="Load cached dataset if available (skip data loading)")
-    parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache from scratch")
-    parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets and exit")
-    parser.add_argument("--use-cpuonly", action='store_true', help="Force CPU-only execution (disable GPU)")
-    args = parser.parse_args()
-
-    # Garbage collector
-    gc.collect()
+def validate_arguments(args):
+    """Validate command-line arguments for consistency."""
+    if not (args.train or args.chat or args.prepare_data or args.clear_cache):
+        return False, "Please specify: --train, --chat, --prepare-data, or --clear-cache"
     
-    # Handle CPU-only mode
-    if args.use_cpuonly:
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''
-        print("✓ CPU-only mode enabled (GPU disabled)")
+    if (args.train or args.prepare_data) and not (args.aiml or args.hf or args.pdf or args.epub):
+        return False, "Specify data source: --aiml, --hf, --pdf, or --epub"
     
-    # Display system information
-    print(f"\n{'='*80}")
-    print(f"SYSTEM INFORMATION")
-    print(f"{'='*80}")
-    print(f"Total available CPU cores: {system_cpu_count}")
-    print(f"Specified --num_cores: {args.num_cores}")
-    print(f"Specified --num_threads: {args.num_threads}")
-    print(f"{'='*80}\n")
+    if args.num_cores < 0 or args.num_threads < 0:
+        return False, "--num_cores and --num_threads must be >= 0"
     
-    # Auto-detect CPU cores and threads if set to 0
+    if args.epochs < 1 and args.train:
+        return False, "--epochs must be >= 1"
+    
+    return True, None
+
+
+def setup_cpu_configuration(args):
+    """Configure CPU threading based on arguments."""
     if args.num_cores == 0:
-        args.num_cores = system_cpu_count
-        print(f"✓ Auto-detected CPU cores (0 specified): {args.num_cores}")
+        args.num_cores = mp.cpu_count()
+        logger.info(f"Auto-detected CPU cores: {args.num_cores}")
     
     if args.num_threads == 0:
-        args.num_threads = system_cpu_count
-        print(f"✓ Auto-detected threads (0 specified): {args.num_threads}")
-
-    # Setup CPU configuration globally for all components
-    print(f"\n{'='*80}")
-    print(f"CPU CONFIGURATION SETUP")
-    print(f"{'='*80}")
+        args.num_threads = mp.cpu_count()
+        logger.info(f"Auto-detected threads: {args.num_threads}")
+    
+    logger.info(f"\n{'='*80}")
+    logger.info("CPU CONFIGURATION")
+    logger.info(f"{'='*80}")
     
     os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
     torch.set_num_threads(args.num_threads)
     os.environ["MKL_NUM_THREADS"] = str(args.num_cores)
     torch.set_num_interop_threads(args.num_cores)
     
-    print(f"OMP_NUM_THREADS (PyTorch): {args.num_threads}")
-    print(f"MKL_NUM_THREADS (NumPy): {args.num_cores}")
-    print(f"PyTorch threads: {torch.get_num_threads()}")
-    print(f"Available CPU count: {system_cpu_count}")
-    print(f"{'='*80}\n")
+    logger.info(f"OMP_NUM_THREADS (PyTorch): {args.num_threads}")
+    logger.info(f"MKL_NUM_THREADS (NumPy): {args.num_cores}")
+    logger.info(f"PyTorch threads: {torch.get_num_threads()}")
+    logger.info(f"Available CPUs: {mp.cpu_count()}")
+    logger.info(f"{'='*80}\n")
 
-    # Clear cache if requested
-    if args.clear_cache:
-        from data_preparer import CACHE_DIR, DataPreparer
-        preparer = DataPreparer(args)
-        preparer._clear_cache()
-        print("✅ Cache cleared successfully")
-        sys.exit(0)
 
-    # Prepare Data
-    if args.prepare_data:
-        dataset, stats = prepare_datasets_for_training(args)
-        if dataset is not None:
-            print("\n✅ Dataset preparation completed!")
-            print(f"Total samples: {stats.get('total_samples', 0):,}")
-            if stats.get('from_cache'):
-                print("(Loaded from cache)")
-        else:
-            print("\n❌ Dataset preparation failed!")
+# Main
+if __name__ == '__main__':
+    try:
+        # Calculate default CPU configuration
+        system_cpu_count = mp.cpu_count()
+        default_num_cores = max(
+            SYSTEM_CONFIG['min_cores'],
+            int(system_cpu_count * SYSTEM_CONFIG['default_cores_fraction'])
+        )
+        default_num_threads = max(
+            SYSTEM_CONFIG['min_threads'],
+            int(system_cpu_count * SYSTEM_CONFIG['default_cores_fraction'])
+        )
+
+        
+        # Parse command-line arguments
+        parser = argparse.ArgumentParser(
+            description='MyIAModelChat - AI Chat Model Training and Inference',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=f"""
+OPERATIONS:
+  --train              Train the neural network model
+  --chat               Run interactive chat interface
+  --prepare-data       Prepare and validate datasets only
+  --clear-cache        Clear cached datasets and exit
+
+DATA SOURCES (required with --train or --prepare-data):
+  --aiml               Include AIML data from 'aiml/' directory
+  --hf                 Include Hugging Face datasets
+  --pdf                Include PDF data from 'pdfs/' directory
+  --epub               Include EPUB data from 'epub/' directory
+
+TRAINING OPTIONS:
+  --epochs NUM         Number of training epochs (default: 1)
+  --use-cache          Load cached dataset if available
+  --refresh-cache      Rebuild cache from scratch
+  --use-cpuonly        Force CPU-only execution (disable GPU)
+  --onlytokenize       Build vocabulary only
+
+CPU CONFIGURATION:
+  --num_cores NUM      CPU cores for processing (default: {default_num_cores}, 0=all)
+  --num_threads NUM    Threads per worker (default: {default_num_threads}, 0=all)
+
+EXAMPLES:
+  python main.py --train --aiml --hf --epochs 10
+  python main.py --train --aiml --use-cpuonly --num_cores 4
+  python main.py --prepare-data --aiml --hf --pdf --epub
+  python main.py --chat
+            """
+        )
+        
+        # Operation arguments
+        parser.add_argument("--train", action='store_true', help="Train the model")
+        parser.add_argument("--chat", action='store_true', help="Run chat interface")
+        parser.add_argument("--prepare-data", action='store_true', help="Prepare datasets only")
+        parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets")
+        
+        # CPU configuration
+        parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")
+        parser.add_argument("--num_threads", type=int, default=default_num_threads, help=f"Threads (default: {default_num_threads})")
+        
+        # Data sources
+        parser.add_argument("--aiml", action='store_true', help="Include AIML data")
+        parser.add_argument("--hf", action='store_true', help="Include HuggingFace data")
+        parser.add_argument("--pdf", action='store_true', help="Include PDF data")
+        parser.add_argument("--epub", action='store_true', help="Include EPUB data")
+        
+        # Training options
+        parser.add_argument("--epochs", type=int, default=1, help="Training epochs (default: 1)")
+        parser.add_argument("--onlytokenize", action='store_true', help="Build vocabulary only")
+        parser.add_argument("--use-cache", action='store_true', help="Load cached dataset")
+        parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache")
+        parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
+        
+        args = parser.parse_args()
+        
+        # Validate arguments
+        is_valid, error_msg = validate_arguments(args)
+        if not is_valid:
+            logger.error(f"Argument error: {error_msg}")
+            parser.print_help()
             sys.exit(1)
-    
-    # Train
-    elif args.train:
-        iMainTrain = MainTrain(args)
-        iMainTrain.performMainTrain()
 
-    # Chat
-    if args.chat:
-        iMainChat = MainChat(args)
-        iMainChat.performMainChat()
+        
+        # Garbage collection
+        gc.collect()
+        
+        # Display system information
+        logger.info(f"\n{'='*80}")
+        logger.info("SYSTEM INFORMATION")
+        logger.info(f"{'='*80}")
+        logger.info(f"Total available CPU cores: {system_cpu_count}")
+        logger.info(f"Specified --num_cores: {args.num_cores}")
+        logger.info(f"Specified --num_threads: {args.num_threads}")
+        logger.info(f"{'='*80}\n")
+        
+        # Handle CPU-only mode
+        if args.use_cpuonly:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
+            logger.info("✓ CPU-only mode enabled (GPU disabled)")
+        
+        # Setup CPU configuration
+        setup_cpu_configuration(args)
+        
+        # Clear cache if requested
+        if args.clear_cache:
+            from data_preparer import CACHE_DIR, DataPreparer
+            preparer = DataPreparer(args)
+            preparer._clear_cache()
+            logger.info("✅ Cache cleared successfully")
+            sys.exit(0)
+        
+        # Prepare data if needed
+        if args.prepare_data or (args.train and not args.use_cache):
+            logger.info("Preparing datasets...")
+            dataset, stats = prepare_datasets_for_training(args)
+            if dataset is not None:
+                logger.info("✅ Dataset preparation completed!")
+                logger.info(f"Total samples: {stats.get('total_samples', 0):,}")
+                if stats.get('from_cache'):
+                    logger.info("(Loaded from cache)")
+            else:
+                logger.error("❌ Dataset preparation failed!")
+                sys.exit(1)
+        
+        # Train
+        if args.train:
+            logger.info("Initializing training...")
+            main_train = MainTrain(args)
+            main_train.performMainTrain()
+        
+        # Chat
+        if args.chat:
+            logger.info("Starting chat interface...")
+            main_chat = MainChat(args)
+            main_chat.performMainChat()
+        
+        logger.info("\n" + "="*80)
+        logger.info("✅ Program completed successfully")
+        logger.info("="*80)
+    
+    except KeyboardInterrupt:
+        logger.warning("\nProgram interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        sys.exit(1)

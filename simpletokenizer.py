@@ -195,12 +195,12 @@ class BilingualTokenizer:
         # Collect unique words from all texts
         all_words = {}  # {word: (count, language)}
         
-        with Pool(processes=self.num_workers) as pool:
-            # Prepare arguments for preprocessing
-            preprocess_args = [(text, lang, remove_accents_flag) for text, lang in zip(texts, languages)]
-            
-            # Map preprocessing
-            preprocessed_texts = pool.starmap(self._preprocess_worker, preprocess_args)
+        # Use sequential processing to avoid memory issues on laptops
+        logger.info(f"Preprocessing {len(texts)} texts sequentially...")
+        preprocessed_texts = []
+        for text, lang in zip(texts, languages):
+            preprocessed = self._preprocess_worker(text, lang, remove_accents_flag)
+            preprocessed_texts.append(preprocessed)
         
         # Extract words and their frequencies
         for preprocessed_text in preprocessed_texts:
