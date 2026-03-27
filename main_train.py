@@ -549,13 +549,11 @@ class MainTrain:
                         'loss': loss,
                     }, BEST_MODEL_FILE)
 
-            # Save final model and tokenizer
+            # Save final model
             logger.info(f"\n{'='*80}")
-            logger.info("Training completed! Saving final models...")
+            logger.info("Training completed! Saving final model...")
             torch.save(model.state_dict(), LATEST_MODEL_FILE)
-            torch.save(self.tokenizer, 'tokenizer.pth')
-            torch.save(self.tokenizer.embedding.weight.data, 'pretrained_embeddings.pth')
-            logger.info("✓ Models saved successfully")
+            logger.info("✓ Model saved successfully")
         
         except KeyboardInterrupt:
             logger.warning("\nTraining interrupted by user")

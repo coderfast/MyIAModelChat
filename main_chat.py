@@ -54,33 +54,16 @@ class MainChat:
         
         device = get_device()
 
-        # Check if tokenizer file exists
-        tokenizer_path = 'tokenizer.pth'
-        if os.path.exists(tokenizer_path):
-            try:
-                # Attempt to load existing tokenizer
-                self.tokenizer = torch.load(tokenizer_path)
-                print(f"Tokenizer loaded from {tokenizer_path}")
-            except Exception as e:
-                print(f"Error loading tokenizer: {e}")
-        else:
-            # Create new tokenizer instance
-            self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
+        # Create tokenizer instance (no persisted tokenizer file)
+        self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
 
         # Load model and weights
         try:
             # Create the model
             self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256).to(device)
 
-            # Load the pre-trained embeddings
-            # pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device, pickle_module=pickle)
-            pretrained_embeddings = torch.load('pretrained_embeddings.pth', map_location=device)
-            
-            # Load the model
-            # self.model.load_state_dict(torch.load('chat_model.pth', map_location=device))
-
-            # Set the pre-trained embeddings in the tokenizer
-            self.tokenizer.embedding.weight.data.copy_(pretrained_embeddings)
+            # Load the model weights
+            self.model.load_state_dict(torch.load('chat_model.pth', map_location=device))
 
             print("Pre-trained model loaded successfully.")
             self.model.eval()

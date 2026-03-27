@@ -43,7 +43,7 @@ Primary Mode Arguments (choose one):
         - Loads AIML data and/or Hugging Face datasets
         - Builds vocabulary from all text data
         - Trains the neural model
-        - Saves: chat_model.pth, tokenizer.pth, pretrained_embeddings.pth
+        - Saves: chat_model.pth
         - Can be interrupted with ESC key
 
 --chat
@@ -52,7 +52,7 @@ Primary Mode Arguments (choose one):
     Default: False
     Example: python main.py --chat
     Notes:
-        - Loads pre-trained tokenizer.pth and chat_model.pth
+        - Loads pre-trained chat_model.pth
         - Provides interactive chat interface
         - Uses intent classification and sentiment analysis
         - Requires trained model (chat_model.pth)
