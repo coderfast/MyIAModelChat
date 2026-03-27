@@ -330,10 +330,12 @@ class MainTrain:
         """Train function with support for mixed precision training and gradient accumulation."""
         
         total_loss = 0
+        total_batches = 0
         model.train()
         optimizer.zero_grad()
         
         for batch_idx, (inputs, targets) in enumerate(dataloader):
+            total_batches += 1
             inputs = inputs.to(device)
             targets = targets.to(device)
             
@@ -368,7 +370,8 @@ class MainTrain:
             if self.use_gpu and (batch_idx + 1) % TRAINING_CONFIG['memory_cleanup_interval'] == 0:
                 torch.cuda.empty_cache()
 
-        return total_loss / max(1, len(dataloader))
+        num_batches = max(1, total_batches)
+        return total_loss / num_batches
 
 
     def collate_fn(self, batch):
@@ -447,14 +450,15 @@ class MainTrain:
             # Create DataLoader with custom collate function
             logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
             pin_memory = self.use_gpu  # Only use pin_memory if GPU is available
-            num_workers = self._limit_num_workers_by_memory(max(1, min(2, mp.cpu_count() // 2)))
+            # num_workers = self._limit_num_workers_by_memory(max(1, min(2, mp.cpu_count() // 2)))
 
             dataloader = DataLoader(
                 iterable_dataset,
                 batch_size=TRAINING_CONFIG['batch_size'],
+                shuffle=False,
                 collate_fn=self.collate_fn,
                 pin_memory=pin_memory,
-                num_workers=num_workers
+                num_workers=0
             )
 
             logger.info("✓ DataLoader created")
@@ -487,7 +491,7 @@ class MainTrain:
             logger.info(f"✓ Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
 
             # Initialize gradient scaler for mixed precision training
-            scaler = GradScaler(device_type=device.type) if self.use_mixed_precision else None
+            scaler = GradScaler() if self.use_mixed_precision else None
             if scaler:
                 logger.info("✓ Gradient scaler initialized for mixed precision training")
 
