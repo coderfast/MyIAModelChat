@@ -452,7 +452,6 @@ class MainTrain:
             dataloader = DataLoader(
                 iterable_dataset,
                 batch_size=TRAINING_CONFIG['batch_size'],
-                shuffle=True,
                 collate_fn=self.collate_fn,
                 pin_memory=pin_memory,
                 num_workers=num_workers
