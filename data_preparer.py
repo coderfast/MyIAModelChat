@@ -19,6 +19,11 @@ from collections import Counter
 from aimlloder import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
 import sys
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 try:
     from PyPDF2 import PdfReader
 except ImportError:
@@ -61,8 +66,20 @@ class DataPreparer:
         self.epub_data = None
         self.combined_data = None
         self.statistics = {}
+
+        self.max_ram_fraction = getattr(args, 'max_ram_fraction', 0.75)
+        self.max_ram_bytes = self._get_memory_limit_bytes(self.max_ram_fraction)
         self._ensure_cache_dir()
         
+    def _get_memory_limit_bytes(self, max_ram_fraction: float):
+        if psutil is None:
+            logger.warning("psutil is not installed. Cannot enforce memory limit in data preparer.")
+            return None
+        total_bytes = psutil.virtual_memory().total
+        limit_bytes = int(total_bytes * max_ram_fraction)
+        logger.info(f"DataPreparer applying memory limit: {max_ram_fraction*100:.0f}% of {total_bytes/(1024**3):.2f} GB = {limit_bytes/(1024**3):.2f} GB")
+        return limit_bytes
+
     def _ensure_cache_dir(self):
         """Create cache directory if it doesn't exist."""
         if not os.path.exists(CACHE_DIR):
@@ -146,7 +163,15 @@ class DataPreparer:
         logger.info("=" * 80)
         logger.info("DATASET PREPARATION STARTING")
         logger.info("=" * 80)
-        
+
+        if self.max_ram_bytes is not None and psutil is not None:
+            used = psutil.virtual_memory().used
+            if used > self.max_ram_bytes:
+                logger.warning(
+                    f"Current memory usage ({used/(1024**3):.2f} GB) exceeds max allowed ({self.max_ram_bytes/(1024**3):.2f} GB). "
+                    "Please reduce system load before preparation."
+                )
+
         try:
             # Check for refresh cache flag
             if hasattr(self.args, 'refresh_cache') and self.args.refresh_cache:

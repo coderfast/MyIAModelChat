@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import multiprocessing as mp
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.cuda.amp import autocast, GradScaler
 from aimlloder import *
 from dialogmanager import DialogueManager
@@ -51,6 +51,15 @@ BEST_MODEL_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'best_model.pth')
 LATEST_MODEL_FILE = 'chat_model.pth'
 
 
+class TokenPairIterableDataset(IterableDataset):
+    """Iterable dataset that yields input-output token pairs without materializing all in memory."""
+    def __init__(self, sequence_generator):
+        self.sequence_generator = sequence_generator
+
+    def __iter__(self):
+        return iter(self.sequence_generator())
+
+
 class MainTrain:
     
     def __init__(self, args):
@@ -69,12 +78,17 @@ class MainTrain:
         self.use_cpuonly = False
         self.best_loss = float('inf')
 
+        # Memory cap for entire application
+        self.max_ram_fraction = getattr(args, 'max_ram_fraction', 0.75)
+        self.max_ram_bytes = getattr(args, 'max_ram_bytes', None)
+
         # Parse command-line arguments
         self.aiml = args.aiml
         self.hf = args.hf
         self.onlytokenize = args.onlytokenize
         self.epochs = args.epochs
         self.use_cpuonly = getattr(args, 'use_cpuonly', False)
+        self.cuda_device = getattr(args, 'cuda_device', None)
 
         # Load cached dataset
         print(f"Loading dataset from cache...")
@@ -111,12 +125,93 @@ class MainTrain:
             logger.error(f"❌ Error loading cached dataset: {e}")
             sys.exit(1)
 
+    def _warn_memory_usage(self, stage="training"):
+        """Check and warn about memory usage compared to configured max RAM."""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            if self.max_ram_bytes is not None:
+                usage = mem.used
+                if usage > self.max_ram_bytes:
+                    logger.warning(
+                        f"Memory usage ({usage/(1024**3):.2f} GB) above configured max ({self.max_ram_bytes/(1024**3):.2f} GB) during {stage}."
+                    )
+                else:
+                    logger.info(
+                        f"Memory usage ({usage/(1024**3):.2f} GB) within limit ({self.max_ram_bytes/(1024**3):.2f} GB) during {stage}."
+                    )
+        except ImportError:
+            logger.warning("psutil unavailable; cannot monitor RAM usage")
+
+    def _limit_num_workers_by_memory(self, default_workers: int):
+        """Heuristic: reduce num_workers when memory limit is low."""
+        if self.max_ram_bytes is None:
+            return default_workers
+
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            free = mem.available
+            if free < (self.max_ram_bytes * 0.25):
+                return max(1, int(default_workers // 2))
+        except ImportError:
+            pass
+        return default_workers
+
+    def _sample_generator(self):
+        """Yield text or tokenized sequences from the loaded dataset in streaming mode."""
+        for item in self.loaded_dataset:
+            value = item.get('input_ids', None)
+            if value is None:
+                continue
+
+            if isinstance(value, str):
+                raw = value.strip()
+                if raw:
+                    yield raw, None
+            elif isinstance(value, dict):
+                input_text = value.get('input', '').strip()
+                output_text = value.get('output', '').strip()
+                merged = f"{input_text} {output_text}".strip()
+                if merged:
+                    yield merged, None
+            elif isinstance(value, (list, tuple)):
+                if len(value) == 0:
+                    continue
+
+                if all(isinstance(v, int) for v in value):
+                    yield None, list(value)
+                else:
+                    merged = " ".join(str(v).strip() for v in value if isinstance(v, str) and str(v).strip())
+                    if merged:
+                        yield merged, None
+            elif hasattr(value, 'tolist'):
+                seq = list(value.tolist())
+                if seq and all(isinstance(v, int) for v in seq):
+                    yield None, seq
+                else:
+                    text_tokens = " ".join(str(v).strip() for v in seq if str(v).strip())
+                    if text_tokens:
+                        yield text_tokens, None
+
     def _setup_device_and_config(self):
         """Setup device configuration with CPU-GPU combined strategy and mixed precision support."""
         
-        # Detect GPU availability (respect --use-cpuonly flag)
-        cuda_available = torch.cuda.is_available() and not self.use_cpuonly
-        
+        # Force CPU if requested
+        if self.use_cpuonly:
+            cuda_available = False
+        else:
+            # If user specified --cuda-device, torch should read CUDA_VISIBLE_DEVICES set by main.py
+            cuda_available = torch.cuda.is_available()
+
+        # If explicit device is set and available, force it on torch
+        if self.cuda_device is not None and not self.use_cpuonly:
+            try:
+                selected = int(str(self.cuda_device).split(',')[0])
+                torch.cuda.set_device(selected)
+            except Exception:
+                pass
+
         if cuda_available:
             device_name = torch.cuda.get_device_name(0)
             device_capability = torch.cuda.get_device_capability(0)
@@ -310,118 +405,65 @@ class MainTrain:
             logger.info(f"Dataset size: {len(loaded_dataset)} samples")
             logger.info(f"Dataset columns: {loaded_dataset.column_names}")
 
-            # Extract and normalize records from cached dataset
-            logger.info("Extracting and validating dataset samples...")
-            all_texts = []
-            all_token_sequences = []
+            # Extract and normalize records from cached dataset in streaming mode
+            logger.info("Extracting and validating dataset samples (streaming mode)...")
 
-            for item in loaded_dataset:
-                value = item.get('input_ids', None)
-                if value is None:
-                    continue
+            # Fit tokenizer incrementally to avoid memory spikes
+            tokenizer_batch = []
+            tokenizer_batch_size = 1000
+            if self.max_ram_bytes:
+                tokenizer_batch_size = max(128, int((self.max_ram_bytes / (1024**2)) // 10))
 
-                if isinstance(value, str):
-                    raw = value.strip()
-                    if raw:
-                        all_texts.append(raw)
+            sample_count = 0
+            for text, token_seq in self._sample_generator():
+                sample_count += 1
+                if text is not None:
+                    tokenizer_batch.append(text)
+                    if len(tokenizer_batch) >= tokenizer_batch_size:
+                        self.tokenizer.fit(tokenizer_batch)
+                        tokenizer_batch.clear()
 
-                elif isinstance(value, dict):
-                    # Legacy fallback for old AIML loader structure
-                    input_text = value.get('input', '')
-                    output_text = value.get('output', '')
-                    merged = f"{input_text} {output_text}".strip()
-                    if merged:
-                        all_texts.append(merged)
+            if tokenizer_batch:
+                self.tokenizer.fit(tokenizer_batch)
+                tokenizer_batch.clear()
 
-                elif isinstance(value, (list, tuple)):
-                    if len(value) == 0:
-                        continue
-
-                    if all(isinstance(v, int) for v in value):
-                        all_token_sequences.append(list(value))
-                    elif all(isinstance(v, str) for v in value):
-                        merged = " ".join(v.strip() for v in value if isinstance(v, str) and v.strip())
-                        if merged:
-                            all_texts.append(merged)
-                    else:
-                        # Mixed sequences: guard by casting to string
-                        text_tokens = " ".join(str(v).strip() for v in value if str(v).strip())
-                        if text_tokens:
-                            all_texts.append(text_tokens)
-
-                elif hasattr(value, 'tolist'):
-                    seq = list(value.tolist())
-                    if seq and all(isinstance(v, int) for v in seq):
-                        all_token_sequences.append(seq)
-                    else:
-                        text_tokens = " ".join(str(v).strip() for v in seq if str(v).strip())
-                        if text_tokens:
-                            all_texts.append(text_tokens)
-
-            if not all_texts and not all_token_sequences:
+            if sample_count == 0:
                 logger.error("No valid text/token sequences found in cached dataset")
                 sys.exit(1)
 
-            # Prepare token sequences for training
-            if all_texts:
-                logger.info(f"✓ Extracted {len(all_texts)} text samples")
-                logger.info("Fitting tokenizer on dataset...")
-                self.tokenizer.fit(all_texts)
-                logger.info(f"✓ Tokenizer fitted (vocabulary size: {self.tokenizer.vocab_size})")
-                tokenized_sequences = [self.tokenizer.encode(text) for text in all_texts if text]
-            else:
-                logger.info(f"✓ Extracted {len(all_token_sequences)} tokenized samples")
-                tokenized_sequences = all_token_sequences
+            logger.info(f"✓ Processed {sample_count} samples for tokenizer fitting")
+            logger.info(f"✓ Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
-                # Ensure tokenizer covers existing id range
-                max_id = max((max(seq) for seq in tokenized_sequences), default=self.tokenizer.vocab_size - 1)
-                if max_id >= self.tokenizer.vocab_size:
-                    logger.warning(f"Token IDs exceed initialized vocab size ({self.tokenizer.vocab_size}), expanding tokenizer to {max_id + 1}")
-                    for idx in range(self.tokenizer.vocab_size, max_id + 1):
-                        self.tokenizer._insert_word(f"<TOKEN_{idx}>", idx)
+            # Create iterable dataset for training pairs without materializing all pairs
+            self._warn_memory_usage(stage="data preparation")
 
-            if not tokenized_sequences:
-                logger.error("No valid sequence encoding produced after tokenizer processing")
-                sys.exit(1)
+            def token_pair_generator():
+                for text, token_seq in self._sample_generator():
+                    if token_seq is None:
+                        token_seq = self.tokenizer.encode(text)
+                    if not token_seq or len(token_seq) <= 1:
+                        continue
+                    input_ids = token_seq[:-1]
+                    output_ids = token_seq[1:]
+                    yield input_ids, output_ids
 
-            logger.info(f"✓ Prepared {len(tokenized_sequences)} token sequences for encoding")
-
-            # Create input-output pairs for training
-            logger.info("Building input-output pairs from token sequences...")
-            encoded_data = []
-            for i, token_seq in enumerate(tokenized_sequences):
-                try:
-                    if token_seq and len(token_seq) > 1:
-                        input_ids = token_seq[:-1]
-                        output_ids = token_seq[1:]
-                        encoded_data.append((input_ids, output_ids))
-                except Exception as e:
-                    logger.warning(f"Failed to create training pair at index {i}: {e}")
-                    continue
-
-                if (i + 1) % max(1, len(tokenized_sequences) // 10) == 0:
-                    logger.info(f"  Processed {i + 1}/{len(tokenized_sequences)} samples")
-
-            logger.info(f"✓ Created {len(encoded_data)} training pairs")
-            
-            if not encoded_data:
-                logger.error("No valid encoded data generated")
-                sys.exit(1)
+            iterable_dataset = TokenPairIterableDataset(token_pair_generator)
 
             # Create DataLoader with custom collate function
             logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
             pin_memory = self.use_gpu  # Only use pin_memory if GPU is available
-            num_workers = max(1, min(2, mp.cpu_count() // 2))  # Adaptive num_workers
-            
+            num_workers = self._limit_num_workers_by_memory(max(1, min(2, mp.cpu_count() // 2)))
+
             dataloader = DataLoader(
-                encoded_data,
+                iterable_dataset,
                 batch_size=TRAINING_CONFIG['batch_size'],
                 shuffle=True,
                 collate_fn=self.collate_fn,
                 pin_memory=pin_memory,
                 num_workers=num_workers
             )
-            logger.info(f"✓ DataLoader created ({len(dataloader)} batches)")
+
+            logger.info("✓ DataLoader created")
         
         except Exception as e:
             logger.error(f"Error in data preparation: {e}", exc_info=True)

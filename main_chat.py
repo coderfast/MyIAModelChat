@@ -35,10 +35,22 @@ class MainChat:
 
         # Parse command-line arguments
         self.chat = args.chat
+        self.use_cpuonly = getattr(args, 'use_cpuonly', False)
+        self.cuda_device = getattr(args, 'cuda_device', None)
+
+        # If explicit CUDA device is requested and CPU-only is not set, enforce it in environment
+        if self.cuda_device is not None and not self.use_cpuonly:
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_device)
+            print(f"Using CUDA devices limited to: {self.cuda_device}")
 
         # Initialize and Load pre-trained model
         def get_device():
             """Select the best available device for computation."""
+            if self.use_cpuonly:
+                device = torch.device('cpu')
+                print("Using CPU (forced by --use-cpuonly)")
+                return device
+
             if torch.cuda.is_available():
                 device = torch.device('cuda')
                 print(f"Using CUDA: {torch.cuda.get_device_name(0)}")

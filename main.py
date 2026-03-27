@@ -4,6 +4,13 @@ import argparse
 import sys
 import logging
 import multiprocessing as mp
+
+# Memory information
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -32,6 +39,7 @@ SYSTEM_CONFIG = {
     'default_cores_fraction': 0.5,
     'min_cores': 1,
     'min_threads': 1,
+    'max_ram_fraction': 0.75,
 }
 
 
@@ -45,11 +53,35 @@ def validate_arguments(args):
     
     if args.num_cores < 0 or args.num_threads < 0:
         return False, "--num_cores and --num_threads must be >= 0"
-    
+
+    if args.max_ram_fraction < 0 or args.max_ram_fraction > 1:
+        return False, "--max-ram-fraction must be between 0 and 1"
+
+    if args.cuda_device is not None:
+        try:
+            device_ids = [int(x) for x in str(args.cuda_device).split(',')]
+            if any(d < 0 for d in device_ids):
+                raise ValueError
+        except Exception:
+            return False, "--cuda-device must be kernel indices like '0' or '0,1'"
+
     if args.epochs < 1 and args.train:
         return False, "--epochs must be >= 1"
     
     return True, None
+
+
+def get_memory_limit_bytes(max_ram_fraction):
+    """Return the maximum memory limit in bytes based on available system RAM."""
+    if psutil is None:
+        logger.warning("psutil is not installed. Cannot enforce RAM usage limits precisely.")
+        return None
+
+    total_bytes = psutil.virtual_memory().total
+    limited_bytes = int(total_bytes * max_ram_fraction)
+    logger.info(f"System memory: {total_bytes / (1024 ** 3):.2f} GB")
+    logger.info(f"Applying max RAM usage fraction: {max_ram_fraction * 100:.0f}% => {limited_bytes / (1024 ** 3):.2f} GB")
+    return limited_bytes
 
 
 def setup_cpu_configuration(args):
@@ -71,6 +103,14 @@ def setup_cpu_configuration(args):
     os.environ["MKL_NUM_THREADS"] = str(args.num_cores)
     torch.set_num_interop_threads(args.num_cores)
     
+    # Enforce memory limit (75% of system RAM by default)
+    args.max_ram_bytes = get_memory_limit_bytes(getattr(args, 'max_ram_fraction', SYSTEM_CONFIG['max_ram_fraction']))
+    if args.max_ram_bytes is not None:
+        current_used = psutil.virtual_memory().used
+        if current_used > args.max_ram_bytes:
+            logger.warning(f"Current memory usage ({current_used/(1024**3):.2f} GB) exceeds set limit ({args.max_ram_bytes/(1024**3):.2f} GB).\n"
+                           "Consider closing other programs before training.")
+
     logger.info(f"OMP_NUM_THREADS (PyTorch): {args.num_threads}")
     logger.info(f"MKL_NUM_THREADS (NumPy): {args.num_cores}")
     logger.info(f"PyTorch threads: {torch.get_num_threads()}")
@@ -151,6 +191,10 @@ EXAMPLES:
         parser.add_argument("--use-cache", action='store_true', help="Load cached dataset")
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache")
         parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
+        parser.add_argument("--cuda-device", type=str, default=None,
+                            help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
+        parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
+                            help="Maximum fraction of total RAM to use (0-1, default 0.75)")
         
         args = parser.parse_args()
         
@@ -174,10 +218,13 @@ EXAMPLES:
         logger.info(f"Specified --num_threads: {args.num_threads}")
         logger.info(f"{'='*80}\n")
         
-        # Handle CPU-only mode
+# Handle CPU-only mode or explicit CUDA device selection
         if args.use_cpuonly:
             os.environ['CUDA_VISIBLE_DEVICES'] = ''
             logger.info("✓ CPU-only mode enabled (GPU disabled)")
+        elif args.cuda_device is not None:
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_device)
+            logger.info(f"✓ CUDA device(s) forced: {args.cuda_device}")
         
         # Setup CPU configuration
         setup_cpu_configuration(args)
