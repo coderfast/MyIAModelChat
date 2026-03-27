@@ -37,7 +37,10 @@ TRAINING_CONFIG = {
     'hidden_size': 256,
     'grad_clip_norm': 1.0,
     'memory_cleanup_interval': 10,
-    'warm_up_warmup': True,
+    # Warm-up settings
+    'warm_up': True,
+    'warm_up_ratio': 0.1,  # use 10% of dataset for warm-up
+    'warm_up_steps': 100,  # maximum batches for warm-up phase
 }
 
 # Model checkpoint configuration
@@ -500,9 +503,31 @@ class MainTrain:
             logger.info(f"✓ Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
 
             # Warm-up phase (optional light training)
-            if TRAINING_CONFIG['warm_up_warmup']:
-                logger.info(f"\nStarting warm-up phase (1 epoch)...")
-                _ = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+            if TRAINING_CONFIG.get('warm_up', False):
+                warm_up_ratio = float(TRAINING_CONFIG.get('warm_up_ratio', 0.1))
+                warm_up_steps = int(TRAINING_CONFIG.get('warm_up_steps', 100))
+                warmup_limit = max(1, int(len(loaded_dataset) * warm_up_ratio))
+
+                logger.info(f"\nStarting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
+
+                def warmup_pair_generator():
+                    idx = 0
+                    for input_ids, output_ids in token_pair_generator():
+                        if idx >= warmup_limit or idx >= warm_up_steps:
+                            break
+                        yield input_ids, output_ids
+                        idx += 1
+
+                warmup_dataloader = DataLoader(
+                    TokenPairIterableDataset(warmup_pair_generator),
+                    batch_size=TRAINING_CONFIG['batch_size'],
+                    shuffle=False,
+                    collate_fn=self.collate_fn,
+                    pin_memory=pin_memory,
+                    num_workers=0
+                )
+
+                _ = self.train(model, warmup_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
                 logger.info("✓ Warm-up phase completed")
 
             # Main training loop
