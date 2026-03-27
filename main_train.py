@@ -7,7 +7,8 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import multiprocessing as mp
 from torch.utils.data import DataLoader, IterableDataset
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
+from datasets import Dataset
 from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
 import logging
@@ -487,7 +488,7 @@ class MainTrain:
             logger.info(f"✓ Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
 
             # Initialize gradient scaler for mixed precision training
-            scaler = GradScaler() if self.use_mixed_precision else None
+            scaler = GradScaler(device_type=device.type) if self.use_mixed_precision else None
             if scaler:
                 logger.info("✓ Gradient scaler initialized for mixed precision training")
 
