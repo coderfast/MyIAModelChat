@@ -1,5 +1,4 @@
 import os
-import argparse
 import pickle
 import sys
 import torch
@@ -7,15 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import multiprocessing as mp
-from torch.utils.data import Dataset, DataLoader, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset
 from torch.cuda.amp import autocast, GradScaler
-from aimlloder import *
-from dialogmanager import DialogueManager
-from simpletokenizer import *
-from chatmodel import *
-from chatdataset import *
-from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
-from transformers import pipeline
+from simpletokenizer import SimpleTokenizer
+from chatmodel import ChatModel
 import logging
 
 try:

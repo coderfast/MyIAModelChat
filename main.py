@@ -12,9 +12,6 @@ except ImportError:
     psutil = None
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
 
 # Import project modules
 from main_train import MainTrain

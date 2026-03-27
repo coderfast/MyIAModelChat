@@ -1,21 +1,11 @@
 import os
-import argparse
-import pickle
-import sys
+import warnings
 import keyboard
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import warnings
-import multiprocessing as mp
-from torch.utils.data import Dataset, DataLoader
-from aimlloder import *
 from dialogmanager import DialogueManager
-from simpletokenizer import *
-from chatmodel import *
-from chatdataset import *
-from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
-from transformers import pipeline, BertTokenizer
+from simpletokenizer import SimpleTokenizer
+from chatmodel import ChatModel
+from transformers import pipeline
 
 
 class MainChat:
