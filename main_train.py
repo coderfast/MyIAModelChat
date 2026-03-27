@@ -7,7 +7,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import multiprocessing as mp
 from torch.utils.data import DataLoader, IterableDataset
-from torch.cuda.amp import autocast, GradScaler
+from torch.cuda.amp import GradScaler
 from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
 import logging
@@ -338,7 +338,7 @@ class MainTrain:
             
             # Forward pass
             if self.use_mixed_precision and scaler is not None:
-                with autocast(dtype=torch.float16):
+                with torch.autocast(device_type=device.type, dtype=torch.float16):
                     loss = self._compute_loss(model, inputs, targets, criterion)
             else:
                 loss = self._compute_loss(model, inputs, targets, criterion)
