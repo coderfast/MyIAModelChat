@@ -1,64 +1,138 @@
-# Dialogue Manager
 import torch
-from collections import deque
+import torch.nn.functional as F
+import logging
 
+logger = logging.getLogger(__name__)
 
-# Dialogue Manager
 class DialogueManager:
-
-    def __init__(self, model, device, tokenizer, intent_classifier, sentiment_analyzer, persona, max_history=5):
+    def __init__(self, model, device, tokenizer,
+                 intent_classifier=None, sentiment_analyzer=None, persona=None,
+                 top_k=50, top_p=0.9, temperature=0.8, max_len=128,
+                 pad_token_id=None, eos_token_id=None, unk_token_id=None,
+                 default_response="Lo siento, no puedo responder ahora."):
         self.model = model
         self.device = device
         self.tokenizer = tokenizer
         self.intent_classifier = intent_classifier
         self.sentiment_analyzer = sentiment_analyzer
-        # self.knowledge_base = knowledge_base
         self.persona = persona
-        self.history = deque(maxlen=max_history)
-        self.context = ""
 
-    def generate_response(self, user_input):
-        self.history.append(user_input)
+        self.top_k = top_k
+        self.top_p = top_p
+        self.temperature = temperature
+        self.max_len = max_len
 
-        # Intent recognition
-        intent = self.intent_classifier(user_input)[0]['label']
-        print(f"Detected intent: {intent}")
+        self.pad_token_id = pad_token_id if pad_token_id is not None else getattr(tokenizer, "get_pad_index", lambda: None)()
+        self.eos_token_id = eos_token_id if eos_token_id is not None else (getattr(tokenizer, "get_eos_index", lambda: None)() if hasattr(tokenizer, "get_eos_index") else None)
+        self.unk_token_id = unk_token_id if unk_token_id is not None else getattr(tokenizer, "get_unk_index", lambda: None)()
 
-        # Sentiment analysis
-        sentiment = self.sentiment_analyzer(user_input)[0]['label']
-        print(f"Detected sentiment: {sentiment}")
+        self.default_response = default_response
 
-        # Update context
-        self.context = " ".join(self.history)
+    def top_k_top_p_filtering(self, logits, top_k=0, top_p=1.0, filter_value=-float("Inf")):
+        logits = logits.clone()
+        top_k = min(max(top_k, 0), logits.size(-1))
+        if top_k > 0:
+            kth_vals, _ = torch.topk(logits, top_k)
+            min_kth = kth_vals[..., -1, None]
+            logits[logits < min_kth] = filter_value
 
-        # Persona modeling
-        persona_response = self.get_persona_response(intent, sentiment)
+        if top_p < 1.0:
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+            sorted_indices_to_remove = cumulative_probs > top_p
+            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+            sorted_indices_to_remove[..., 0] = False
+            indices_to_remove = sorted_indices[sorted_indices_to_remove]
+            logits[indices_to_remove] = filter_value
 
-        # Codificar el contexto
-        input_ids = self.tokenizer.encode(self.context)
-        input_tensor = torch.LongTensor([input_ids]).to(self.device)
+        return logits
 
-        with torch.no_grad():
-            output = self.model(input_tensor)
-            output_ids = output[0].argmax(dim=-1).tolist()
+    def sample_next_token(self, logits):
+        if logits is None:
+            return None
+        logits = logits / max(self.temperature, 1e-8)
+        filtered_logits = self.top_k_top_p_filtering(logits, top_k=self.top_k, top_p=self.top_p)
+        probs = F.softmax(filtered_logits, dim=-1)
 
-        print(f"output_ids vale: {output_ids}")
+        if torch.isnan(probs).any() or torch.isclose(probs.sum(), torch.tensor(0.0, device=probs.device)):
+            return int(torch.argmax(logits).item())
 
-        # Decodificar la respuesta
-        response_text = self.tokenizer.decode(output_ids)
-        self.history.append(response_text)
-        self.context = " ".join(self.history)
+        try:
+            token = torch.multinomial(probs, num_samples=1)
+            return int(token.item())
+        except Exception as e:
+            logger.debug("Sampling failed, falling back to argmax: %s", e)
+            return int(torch.argmax(probs).item())
 
-        # Imprimir la respuesta
-        # print(f"Bot Response: {response_text}")
-        return response_text
+    def generate_response(self, user_text):
+        try:
+            if self.intent_classifier:
+                _ = self.intent_classifier(user_text)
+            if self.sentiment_analyzer:
+                _ = self.sentiment_analyzer(user_text)
+        except Exception:
+            pass
 
-    def get_persona_response(self, intent, sentiment):
-        if intent == "greeting":
-            return self.persona.get_greeting()
-        elif sentiment == "positive":
-            return self.persona.get_positive_response()
-        elif sentiment == "negative":
-            return self.persona.get_negative_response()
-        else:
-            return ""
+        try:
+            input_ids = self.tokenizer.encode(user_text)
+        except Exception:
+            input_ids = [self.unk_token_id] if self.unk_token_id is not None else [0]
+
+        input_ids = [i for i in input_ids if i is not None]
+        if len(input_ids) == 0:
+            input_ids = [self.unk_token_id] if self.unk_token_id is not None else [0]
+
+        src = torch.LongTensor([input_ids]).to(self.device)
+
+        generated = []
+        try:
+            with torch.no_grad():
+                for step in range(self.max_len):
+                    try:
+                        out = self.model(src)
+                        if isinstance(out, (tuple, list)):
+                            out = out[0]
+                        logits = out[:, -1, :]
+                    except Exception:
+                        full = src if len(generated) == 0 else torch.LongTensor([input_ids + generated]).to(self.device)
+                        out = self.model(full)
+                        if isinstance(out, (tuple, list)):
+                            out = out[0]
+                        logits = out[:, -1, :]
+
+                    next_token = self.sample_next_token(logits.squeeze(0))
+                    if next_token is None:
+                        break
+
+                    if self.eos_token_id is not None and next_token == self.eos_token_id:
+                        break
+
+                    generated.append(next_token)
+
+                    if len(generated) >= 3:
+                        uniq = set(generated)
+                        specials = {tid for tid in (self.pad_token_id, self.unk_token_id) if tid is not None}
+                        if uniq.issubset(specials):
+                            logger.debug("Generated only special tokens, aborting.")
+                            generated = []
+                            break
+
+        except Exception as e:
+            logger.exception("Error during generation: %s", e)
+            return self.default_response
+
+        if not generated:
+            return self.default_response
+
+        try:
+            text = self.tokenizer.decode(generated)
+        except Exception:
+            try:
+                text = " ".join(self.tokenizer.convert_ids_to_tokens(generated))
+            except Exception:
+                text = " ".join(str(t) for t in generated)
+
+        if not text or text.strip() == "":
+            return self.default_response
+
+        return text
