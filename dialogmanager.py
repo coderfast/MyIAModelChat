@@ -65,6 +65,58 @@ class DialogueManager:
             return int(torch.argmax(probs).item())
 
     def generate_response(self, user_text):
+        # Comando debug: "debug" o "debug N"
+        txt = user_text.strip()
+        if txt.lower().startswith("debug"):
+            parts = txt.split()
+            try:
+                n = int(parts[1]) if len(parts) > 1 else 20
+            except Exception:
+                n = 20
+            n = max(1, min(n, 200))  # límite razonable
+
+            # Intentar obtener vocab list desde tokenizer
+            vocab_items = []
+            if hasattr(self.tokenizer, "vocab") and isinstance(self.tokenizer.vocab, dict):
+                vocab_items = list(self.tokenizer.vocab.items())
+            elif hasattr(self.tokenizer, "word2idx") and isinstance(self.tokenizer.word2idx, dict):
+                vocab_items = list(self.tokenizer.word2idx.items())
+            elif hasattr(self.tokenizer, "trie") and hasattr(self.tokenizer.trie, "get_all_tokens"):
+                try:
+                    toks = self.tokenizer.trie.get_all_tokens()
+                    vocab_items = [(t, self.tokenizer.trie.get_index(t)) for t in toks]
+                except Exception:
+                    vocab_items = []
+            elif hasattr(self.tokenizer, "vocab_size"):
+                # Fallback: sample ids and attempt to decode each id to a token string
+                vocab_items = []
+                for i in range(self.tokenizer.vocab_size):
+                    token_str = None
+                    try:
+                        token_str = self.tokenizer.decode([i])
+                    except Exception:
+                        try:
+                            token_str = self.tokenizer.convert_ids_to_tokens([i])[0]
+                        except Exception:
+                            token_str = None
+
+                    # If still empty or None, mark as <empty:id>
+                    if token_str is None or (isinstance(token_str, str) and token_str.strip() == ""):
+                        token_str = f"<empty:{i}>"
+
+                    vocab_items.append((token_str, i))
+            else:
+                vocab_items = []
+
+            import random
+            if vocab_items:
+                sample = random.sample(vocab_items, min(n, len(vocab_items)))
+                lines = [f"{tok} -> {idx}" for tok, idx in sample]
+                return "DEBUG VOCAB SAMPLE:\n" + "\n".join(lines)
+            else:
+                return "DEBUG: tokenizer vocabulary not accessible."
+
+        # --- resto de la función (tokenización, generación) se mantiene sin cambios ---
         try:
             if self.intent_classifier:
                 _ = self.intent_classifier(user_text)
@@ -136,3 +188,4 @@ class DialogueManager:
             return self.default_response
 
         return text
+
