@@ -44,10 +44,16 @@ def validate_arguments(args):
     """Validate command-line arguments for consistency."""
     if not (args.train or args.chat or args.prepare_data or args.clear_cache):
         return False, "Please specify: --train, --chat, --prepare-data, or --clear-cache"
-    
-    if (args.train or args.prepare_data) and not (args.aiml or args.hf or args.pdf or args.epub):
-        return False, "Specify data source: --aiml, --hf, --pdf, or --epub"
-    
+
+    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub):
+        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, or --epub"
+
+    # Allow --train without source if using cache and dataset is already prepared
+    if args.train and not args.use_cache and not (args.aiml or args.hf or args.pdf or args.epub):
+        cache_path = os.path.join('dataset_cache', 'prepared_dataset')
+        if not os.path.exists(cache_path):
+            return False, "No dataset source specified for --train and no cached dataset found. Use --aiml/--hf/--pdf/--epub or --prepare-data + source to prepare data."    
+
     if args.num_cores < 0 or args.num_threads < 0:
         return False, "--num_cores and --num_threads must be >= 0"
 
@@ -194,7 +200,13 @@ EXAMPLES:
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
         
         args = parser.parse_args()
-        
+
+        # Force cache use for training if available
+        cache_path = os.path.join('dataset_cache', 'prepared_dataset')
+        if args.train and os.path.exists(cache_path):
+            args.use_cache = True
+            logger.info("Cache found, forcing --use-cache for training")
+
         # Validate arguments
         is_valid, error_msg = validate_arguments(args)
         if not is_valid:
