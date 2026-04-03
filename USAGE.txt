@@ -3,29 +3,29 @@
 ================================================================================
 
 This file describes all command line parameters for training and inference 
-with the MyIAModelChat model.
+with the MyIAModelChat model. Supports AIML, PDF, EPUB, and Hugging Face datasets.
 
 ================================================================================
                             QUICK START
 ================================================================================
 
 TRAIN MODE (build/train the model):
-    python main.py --train --epochs 10 --aiml --num_cores 4 --num_threads 4
+    python main.py --train --epochs 30 --aiml --pdf --epub --use-cache
 
 CHAT MODE (run interactive chat):
-    python main.py --chat --num_cores 4 --num_threads 4
+    python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
 
 PREPARE DATASETS (validate data without training):
-    python main.py --prepare-data --aiml --hf
+    python main.py --prepare-data --aiml --pdf --epub
 
 USE CACHED DATASET (skip data loading, much faster):
-    python main.py --prepare-data --aiml --hf --use-cache
+    python main.py --prepare-data --aiml --pdf --epub --use-cache
 
 REFRESH CACHE (rebuild cached dataset):
-    python main.py --prepare-data --aiml --hf --refresh-cache
+    python main.py --prepare-data --aiml --pdf --epub --refresh-cache
 
 TOKENIZE ONLY (prepare vocabulary without training):
-    python main.py --train --onlytokenize --aiml
+    python main.py --train --onlytokenize --aiml --pdf --epub
 
 ================================================================================
                         COMMAND LINE ARGUMENTS
@@ -38,13 +38,14 @@ Primary Mode Arguments (choose one):
     Description: Run training mode
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train
+    Example: python main.py --train --aiml --epochs 30
     Notes:
-        - Loads AIML data and/or Hugging Face datasets
-        - Builds vocabulary from all text data
-        - Trains the neural model
-        - Saves: chat_model.pth
+        - Loads AIML, PDF, EPUB, and/or Hugging Face datasets
+        - Builds vocabulary from all text data using BilingualTokenizer
+        - Trains the neural model with LSTM architecture
+        - Saves: checkpoints/chat_model_best.pth and checkpoints/tokenizer.pkl
         - Can be interrupted with ESC key
+        - Supports bilingual EN/ES text processing
 
 --chat
     Description: Run inference/chat mode (interactive dialogue)
@@ -52,24 +53,27 @@ Primary Mode Arguments (choose one):
     Default: False
     Example: python main.py --chat
     Notes:
-        - Loads pre-trained chat_model.pth
-        - Provides interactive chat interface
+        - Loads pre-trained model from checkpoints/chat_model_best.pth
+        - Loads tokenizer from checkpoints/tokenizer.pkl
+        - Provides interactive chat interface with dynamic n-gram penalization
         - Uses intent classification and sentiment analysis
-        - Requires trained model (chat_model.pth)
+        - Requires trained model and tokenizer
+        - Supports min-length enforcement and repetition prevention
 
 --prepare-data
     Description: Prepare and validate datasets only (no training)
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --prepare-data --aiml --hf
+    Example: python main.py --prepare-data --aiml --pdf --epub
     Notes:
-        - Loads AIML and/or Hugging Face datasets
+        - Loads AIML, PDF, EPUB, and/or Hugging Face datasets
         - Validates data structure and content
         - Shows dataset statistics (samples, text length, sources)
         - Automatically saves prepared dataset to cache (dataset_cache/)
         - Does NOT train the model
         - Useful before starting training to verify data quality
         - Helps identify data issues early
+        - Supports schema alignment for dataset concatenation
 
 --use-cache
     Description: Load cached dataset instead of reloading from sources
@@ -133,7 +137,7 @@ Typical Cache Workflow:
 
 ================================================================================
 
-Data Source Arguments (use with --train):
+Data Source Arguments (use with --train or --prepare-data):
 ================================================================================
 
 --aiml
@@ -147,6 +151,29 @@ Data Source Arguments (use with --train):
         - Uses XML-based patterns for training
         - Recommended for dialogue variety
 
+--pdf
+    Description: Include PDF documents in training data
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --pdf
+    Notes:
+        - Loads PDF files from pdfs/ directory
+        - Uses PyPDF2 for automatic text extraction
+        - Supports complex layouts and formatting
+        - Place PDF files in pdfs/ folder
+
+--epub
+    Description: Include EPUB e-books in training data
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --epub
+    Notes:
+        - Loads EPUB files from epub/ directory
+        - Uses ebooklib for e-book parsing
+        - Extracts chapter-by-chapter content
+        - Supports metadata and structure
+        - Place EPUB files in epub/ folder
+
 --hf
     Description: Include Hugging Face datasets
     Type: Boolean flag (no value needed)
@@ -154,17 +181,27 @@ Data Source Arguments (use with --train):
     Example: python main.py --train --hf
     Notes:
         - Loads public datasets from Hugging Face
-        - Examples: wikitext, common_voice, opus_100
+        - Examples: wikitext, bookcorpus, common_voice, opus_100
         - Requires internet connection
         - Larger vocabulary and more examples
 
-    Combine both data sources:
-        python main.py --train --aiml --hf
+    Combine multiple data sources:
+        python main.py --train --aiml --pdf --epub --hf
 
 ================================================================================
 
-Performance Tuning Arguments:
+Performance & Hardware Arguments:
 ================================================================================
+
+--use-cpuonly
+    Description: Force CPU usage even if GPU is available
+    Type: Boolean flag (no value needed)
+    Default: False (auto-detect GPU)
+    Example: python main.py --train --use-cpuonly
+    Notes:
+        - Useful for testing or when GPU memory is insufficient
+        - Prevents CUDA-related errors
+        - Slower than GPU but more stable
 
 --num_cores <N>
     Description: Number of CPU cores for multiprocessing
@@ -197,14 +234,14 @@ Training Arguments:
 --epochs <N>
     Description: Number of training epochs
     Type: Integer
-    Default: 1
-    Example: python main.py --train --epochs 10
+    Default: 30
+    Example: python main.py --train --epochs 50
     Notes:
         - One epoch = one pass through entire dataset
-        - Typical range: 5-50 epochs
-        - Higher epochs = more training time but better convergence
+        - Typical range: 10-100 epochs for good convergence
+        - Higher epochs = more training time but better quality
         - Early stopping via ESC key (press ESC to stop training)
-        - Model saves after each epoch
+        - Model saves best checkpoint after each epoch
 
 --onlytokenize
     Description: Build vocabulary only, skip training
@@ -227,20 +264,20 @@ TRAINING EXAMPLES:
 1. Basic training with default settings:
     python main.py --train
 
-2. Train with AIML data for 10 epochs:
-    python main.py --train --aiml --epochs 10
+2. Train with AIML data for 30 epochs:
+    python main.py --train --aiml --epochs 30
 
-3. Train with both AIML and Hugging Face data:
-    python main.py --train --aiml --hf --epochs 20
+3. Train with multiple sources (recommended):
+    python main.py --train --aiml --pdf --epub --hf --epochs 50
 
 4. Train with optimized performance (assuming 16 CPU cores):
-    python main.py --train --aiml --epochs 15 --num_cores 12 --num_threads 6
+    python main.py --train --aiml --pdf --epub --epochs 30 --num_cores 12 --num_threads 6
 
 5. Just build vocabulary without training:
-    python main.py --train --onlytokenize --aiml --hf
+    python main.py --train --onlytokenize --aiml --pdf --epub
 
-6. Extensive training with maximum cores:
-    python main.py --train --aiml --hf --epochs 50 --num_cores 16 --num_threads 8
+6. Extensive training with maximum cores and CPU-only:
+    python main.py --train --aiml --pdf --epub --hf --epochs 100 --num_cores 16 --num_threads 8 --use-cpuonly
 
 ================================================================================
 
@@ -268,31 +305,34 @@ Dataset caching enables fast repeated runs without reloading source data.
 1. Prepare AIML data only:
     python main.py --prepare-data --aiml
 
-2. Prepare Hugging Face datasets only:
-    python main.py --prepare-data --hf
+2. Prepare PDF documents only:
+    python main.py --prepare-data --pdf
 
-3. Prepare both AIML and Hugging Face data (creates cache):
-    python main.py --prepare-data --aiml --hf
+3. Prepare EPUB e-books only:
+    python main.py --prepare-data --epub
 
-4. Load from cache on second run (MUCH faster):
-    python main.py --prepare-data --aiml --hf --use-cache
+4. Prepare multiple sources (recommended):
+    python main.py --prepare-data --aiml --pdf --epub
 
-5. Refresh cache after modifying source data:
-    python main.py --prepare-data --aiml --hf --refresh-cache
+5. Load from cache on second run (MUCH faster):
+    python main.py --prepare-data --aiml --pdf --epub --use-cache
 
-6. Clear cache to free disk space:
+6. Refresh cache after adding new documents:
+    python main.py --prepare-data --aiml --pdf --epub --refresh-cache
+
+7. Clear cache to free disk space:
     python main.py --clear-cache
 
-7. Complete workflow with caching (prepare → cache → train → chat):
-    python main.py --prepare-data --aiml --hf
-    python main.py --train --aiml --hf --epochs 10
+8. Complete workflow with caching (prepare → cache → train → chat):
+    python main.py --prepare-data --aiml --pdf --epub
+    python main.py --train --aiml --pdf --epub --epochs 30 --use-cache
     python main.py --chat
 
-8. Workflow for repeated experiments (use cache to save time):
-    python main.py --prepare-data --aiml --hf          (first time: ~10 seconds)
-    python main.py --train --aiml --hf --epochs 5      (uses cache)
-    python main.py --train --aiml --hf --epochs 10     (uses cache)
-    python main.py --train --aiml --hf --epochs 15     (uses cache)
+9. Workflow for repeated experiments (use cache to save time):
+    python main.py --prepare-data --aiml --pdf --epub          (first time: ~30 seconds)
+    python main.py --train --aiml --pdf --epub --epochs 10     (uses cache)
+    python main.py --train --aiml --pdf --epub --epochs 20     (uses cache)
+    python main.py --train --aiml --pdf --epub --epochs 30     (uses cache)
 
 ================================================================================
 
@@ -324,10 +364,10 @@ Workflow with cached data (fast iteration):
                         EXPECTED FILE OUTPUTS
 ================================================================================
 
-Training Mode Creates:
-    - chat_model.pth              Main model weights (saved each epoch)
-    - tokenizer.pth               Vocabulary and tokenizer state
-    - pretrained_embeddings.pth   Embedding layer weights
+Training Mode Creates (in checkpoints/ directory):
+    - chat_model_best.pth         Best model weights (saved when validation improves)
+    - tokenizer.pkl               Bilingual tokenizer with vocabulary and mappings
+    - config.json                 Training configuration and metadata
 
 Data Preparation Creates (in dataset_cache/ directory):
     - dataset_cache/
@@ -342,26 +382,37 @@ Dataset cache can be safely deleted with --clear-cache or manually.
                         TROUBLESHOOTING
 ================================================================================
 
-Error: "No such file or directory: tokenizer.pth"
+Error: "No such file or directory: checkpoints/tokenizer.pkl"
     → Run training first: python main.py --train --aiml
-    → Or: python main.py --train --onlytokenize --aiml
+    → Or: python main.py --train --onlytokenize --aiml --pdf --epub
 
 Error: "CUDA out of memory"
-    → Reduce num_cores: python main.py --train --num_cores 2
-    → Use CPU (default) instead of GPU
+    → Use --use-cpuonly flag
+    → Reduce num_cores: python main.py --train --num_cores 2 --use-cpuonly
 
 Error: Directory "aiml/" not found
     → Current directory must be project root
     → Files should be in: G:\PROJECTS\MyIAModelChat\
 
+Error: PDF/EPUB loading fails
+    → Install dependencies: pip install PyPDF2 ebooklib
+    → Check files exist in pdfs/ or epub/ directories
+    → Verify file formats are valid
+
 Training too slow:
+    → Use --use-cache after first --prepare-data run
     → Increase num_cores: --num_cores 16
-    → Use GPU if available (automatic detection)
-    → Reduce epochs for testing: --epochs 2
+    → Use GPU if available (remove --use-cpuonly)
+    → Reduce epochs for testing: --epochs 5
 
 Training stuck or unresponsive:
     → Press ESC key to stop gracefully
     → Go back to terminal and restart
+
+Chat produces gibberish:
+    → Ensure model is trained with sufficient epochs (30+)
+    → Check tokenizer matches training data
+    → Try different temperature/top_p values in dialogmanager.py
 
 ================================================================================
                         ADVANCED CONFIGURATION
@@ -369,19 +420,30 @@ Training stuck or unresponsive:
 
 Modifying Model Architecture:
     Edit in chatmodel.py:
-        embed_size: embedding dimension (default 128)
-        hidden_size: LSTM hidden dimension (default 256)
-    Then retrain: python main.py --train --epochs 10
+        embedding_dim: embedding dimension (default 256)
+        hidden_size: LSTM hidden dimension (default 512)
+    Then retrain: python main.py --train --epochs 30
 
-Changing Maximum Vocabulary Size:
-    Edit in simpletokenizer.py:
-        max_vocab_size: default 65536
+Changing Tokenizer Settings:
+    Edit in BilingualTokenizer initialization:
+        max_vocab_size: default 50000
+        use_language_tokens: default True
     Then retrain: python main.py --train --onlytokenize
 
-Using Different AIML Files:
-    Edit in main_train.py (line: data_dir = 'aiml_dev'):
-        data_dir = 'aiml'  # for production AIML files
-    Then retrain: python main.py --train --aiml
+Using Different Data Directories:
+    Place files in:
+        aiml_dev/ for AIML files
+        pdfs/ for PDF documents
+        epub/ for EPUB e-books
+    Then run: python main.py --prepare-data --aiml --pdf --epub
+
+Adjusting Generation Parameters:
+    Edit in dialogmanager.py __init__:
+        top_k: sampling parameter (default 50)
+        top_p: nucleus sampling (default 0.9)
+        temperature: randomness (default 0.8)
+        min_length: minimum response length (default 5)
+        no_repeat_ngram_size: repetition prevention (default 3)
 
 ================================================================================
                         SYSTEM REQUIREMENTS
@@ -391,13 +453,20 @@ Minimum:
     - Python 3.8+
     - 4 CPU cores
     - 8 GB RAM
-    - 2 GB disk space
+    - 5 GB disk space
 
 Recommended:
     - Python 3.10+
     - 8+ CPU cores
     - 16 GB RAM
-    - 5 GB disk space
+    - 10 GB disk space
+
+Dependencies:
+    - PyTorch 2.0+
+    - Transformers (Hugging Face)
+    - PyPDF2 (for PDF support)
+    - ebooklib (for EPUB support)
+    - datasets (for Hugging Face integration)
     - NVIDIA GPU with CUDA support
 
 ================================================================================
