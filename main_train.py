@@ -435,6 +435,11 @@ class MainTrain:
             logger.info(f"✓ Processed {sample_count} samples for tokenizer fitting")
             logger.info(f"✓ Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
+            # Save tokenizer vocabulary for chat loading
+            vocab_file = 'tokenizer_vocab.json'
+            self.tokenizer.save_vocabulary(vocab_file)
+            logger.info(f"✓ Tokenizer vocabulary saved to {vocab_file}")
+
             # Create iterable dataset for training pairs without materializing all pairs
             self._warn_memory_usage(stage="data preparation")
 

@@ -44,13 +44,24 @@ class MainChat:
                 logger.warning("Could not enforce RAM limit via psutil: %s", e)
 
         # Tokenizer and model
-        self.tokenizer = SimpleTokenizer(max_vocab_size=128, embedding_dim=128)
+        self.tokenizer = SimpleTokenizer()
+        vocab_file = 'tokenizer_vocab.json'
+        if os.path.exists(vocab_file):
+            self.tokenizer.load_vocabulary(vocab_file)
+            logger.info(f"Loaded tokenizer vocabulary from {vocab_file}, vocab_size: {self.tokenizer.vocab_size}")
+        else:
+            logger.warning(f"Tokenizer vocabulary file {vocab_file} not found. Using default vocabulary.")
         self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
 
         try:
             ckpt = self.try_load_checkpoint(CKPT_PATH, device, use_trusted)
             if isinstance(ckpt, dict) and ('model_state_dict' in ckpt or 'state_dict' in ckpt):
                 state_dict = ckpt.get('model_state_dict', ckpt.get('state_dict'))
+                if 'tokenizer' in ckpt:
+                    self.tokenizer = ckpt['tokenizer']
+                    logger.info(f"Loaded tokenizer from checkpoint, vocab_size: {self.tokenizer.vocab_size}")
+                    # Recreate model with correct vocab_size
+                    self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
             else:
                 state_dict = ckpt
 
