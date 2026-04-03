@@ -284,10 +284,50 @@ class DataPreparer:
                 try:
                     with open(file_path, 'rb') as f:
                         tokenized_data = pickle.load(f)
-                        data = [{'input_ids': token_ids} for token_ids in tokenized_data]
+
+                    # AIML dataset pickles are usually HuggingFace Datasets with input/output fields.
+                    if isinstance(tokenized_data, Dataset):
+                        ds = tokenized_data
+
+                        if 'input' in ds.column_names and 'output' in ds.column_names:
+                            ds = ds.map(
+                                lambda x: {
+                                    'input_ids': (x['input'] + ' ' + x['output']).strip()
+                                    if x.get('output') else x['input']
+                                },
+                                batched=False
+                            )
+                        elif 'input_ids' in ds.column_names:
+                            # Already normalized
+                            ds = ds
+                        else:
+                            # Fallback, try to concatenate any available text fields
+                            text_fields = [c for c in ds.column_names if c in ('input', 'text', 'sentence')]
+                            if text_fields:
+                                ds = ds.map(
+                                    lambda x: {'input_ids': ' '.join(str(x[c]) for c in text_fields if x.get(c))},
+                                    batched=False
+                                )
+                            else:
+                                raise ValueError("AIML dataset missing both 'input'/'output' and 'input_ids' fields")
+
+                        if 'input_ids' in ds.column_names:
+                            ds = ds.select_columns(['input_ids'])
+
+                        aiml_datasets.append(ds)
+                        datasets_count += len(ds)
+                        logger.info(f"  ✓ Loaded: {filename} ({len(ds)} samples)")
+
+                    elif isinstance(tokenized_data, list):
+                        # Fallback: tokenized_data is list of sequences
+                        data = [{'input_ids': ' '.join(map(str, token_ids))} for token_ids in tokenized_data]
                         aiml_datasets.append(Dataset.from_list(data))
-                        datasets_count += 1
+                        datasets_count += len(data)
                         logger.info(f"  ✓ Loaded: {filename} ({len(data)} samples)")
+
+                    else:
+                        raise ValueError("Unexpected AIML .datasets content type: %s" % type(tokenized_data))
+
                 except Exception as e:
                     logger.warning(f"  ⚠ Error loading {filename}: {e}")
         

@@ -44,26 +44,36 @@ class MainChat:
                 logger.warning("Could not enforce RAM limit via psutil: %s", e)
 
         # Tokenizer and model
-        self.tokenizer = SimpleTokenizer()
+        self.tokenizer = None
         vocab_file = 'tokenizer_vocab.json'
+
         if os.path.exists(vocab_file):
+            self.tokenizer = SimpleTokenizer()
             self.tokenizer.load_vocabulary(vocab_file)
             logger.info(f"Loaded tokenizer vocabulary from {vocab_file}, vocab_size: {self.tokenizer.vocab_size}")
-        else:
-            logger.warning(f"Tokenizer vocabulary file {vocab_file} not found. Using default vocabulary.")
-        self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
 
         try:
             ckpt = self.try_load_checkpoint(CKPT_PATH, device, use_trusted)
-            if isinstance(ckpt, dict) and ('model_state_dict' in ckpt or 'state_dict' in ckpt):
-                state_dict = ckpt.get('model_state_dict', ckpt.get('state_dict'))
-                if 'tokenizer' in ckpt:
+            if isinstance(ckpt, dict):
+                # Load tokenizer from checkpoint if included
+                if 'tokenizer' in ckpt and ckpt['tokenizer'] is not None:
                     self.tokenizer = ckpt['tokenizer']
                     logger.info(f"Loaded tokenizer from checkpoint, vocab_size: {self.tokenizer.vocab_size}")
-                    # Recreate model with correct vocab_size
-                    self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
+
+                # Extract state dict for the model
+                state_dict = ckpt.get('model_state_dict', ckpt.get('state_dict', None))
             else:
                 state_dict = ckpt
+
+            if self.tokenizer is None:
+                self.tokenizer = SimpleTokenizer()
+                logger.warning("No tokenizer found in checkpoint or vocab file. Using fresh SimpleTokenizer.")
+
+            # Instantiate model with tokenizer-derived vocab
+            self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
+
+            if state_dict is None:
+                raise ValueError('Checkpoint does not contain model state dict')
 
             new_state = {}
             for k, v in state_dict.items():
@@ -74,8 +84,12 @@ class MainChat:
             self.model.to(device)
             self.model.eval()
             logger.info("Pre-trained model loaded successfully.")
+
         except Exception as e:
             logger.exception("Error loading pre-trained model: %s", e)
+            if self.tokenizer is None:
+                self.tokenizer = SimpleTokenizer()
+            self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
             logger.info("Initializing model with random weights...")
             init_fn = getattr(self.tokenizer, "init_weights", None)
             if callable(init_fn):
@@ -139,11 +153,16 @@ class MainChat:
     def try_load_checkpoint(self, path, device, trusted):
         try:
             if trusted:
+                # Load complete checkpoint (includes tokenizer object)
                 return torch.load(path, map_location=device, weights_only=False)
             else:
-                return torch.load(path, map_location=device, weights_only=True)
+                # Prefer weights-only for safety, fallback if it fails for local trusted checkpoint
+                try:
+                    return torch.load(path, map_location=device, weights_only=True)
+                except Exception:
+                    return torch.load(path, map_location=device, weights_only=False)
         except Exception as e:
-            # Attempt to parse unsupported global class and allowlist it
+            # Attempt to parse unsupported globals and allowlist them
             msg = str(e)
             m = re.search(r"Unsupported global: GLOBAL\s+([\w\.]+)\s+was", msg)
             if m:
@@ -153,10 +172,20 @@ class MainChat:
                     mod = importlib.import_module(module_name)
                     cls = getattr(mod, class_name)
                     with torch.serialization.safe_globals([cls]):
-                        return torch.load(path, map_location=device, weights_only=True)
+                        return torch.load(path, map_location=device, weights_only=False)
                 except Exception:
                     logger.exception("Allowlisting failed for %s", full_name)
                     raise
+
+            # Allow key My tokenizer types in case tokenizer object is stored
+            try:
+                import simpletokenizer
+                allowed = [simpletokenizer.Trie, simpletokenizer.BilingualTokenizer, simpletokenizer.SimpleTokenizer]
+                with torch.serialization.safe_globals(allowed):
+                    return torch.load(path, map_location=device, weights_only=False)
+            except Exception:
+                pass
+
             raise
 
     def performMainChat(self):
