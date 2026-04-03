@@ -126,10 +126,12 @@ class MainChat:
                 "occupation": "AI assistant",
                 "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
             },
-            top_k=50,
-            top_p=0.9,
-            temperature=0.8,
+            top_k=20,
+            top_p=0.85,
+            temperature=0.7,
             max_len=128,
+            min_length=5,
+            no_repeat_ngram_size=3,
             default_response="Lo siento, no puedo responder ahora."
         )
 

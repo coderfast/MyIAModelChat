@@ -562,9 +562,9 @@ class MainTrain:
                 if self.use_gpu:
                     gpu_memory = torch.cuda.memory_allocated(device) / 1e9
                     gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
-                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Loss: {loss:.4f} | LR: {current_lr:.2e} | GPU: {gpu_memory:.2f}GB / {gpu_memory_reserved:.2f}GB")
+                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e} | GPU mem used: {gpu_memory:.2f}GB / reserved: {gpu_memory_reserved:.2f}GB")
                 else:
-                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Loss: {loss:.4f} | LR: {current_lr:.2e}")
+                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
 
                 # Save best model checkpoint
                 if loss < self.best_loss:
@@ -582,12 +582,23 @@ class MainTrain:
             # Save final model + tokenizer state for consistent inference
             logger.info(f"\n{'='*80}")
             logger.info("Training completed! Saving final model and tokenizer...")
+
+            # Prefer best model over final model (prevents loss regression over epochs)
+            if os.path.exists(BEST_MODEL_FILE):
+                try:
+                    best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device)
+                    if isinstance(best_ckpt, dict) and 'model_state_dict' in best_ckpt:
+                        logger.info(f"Using best checkpoint from {BEST_MODEL_FILE} for final save")
+                        model.load_state_dict(best_ckpt['model_state_dict'])
+                except Exception as e:
+                    logger.warning(f"Failed to load best checkpoint for final save: {e}")
+
             torch.save({
                 'model_state_dict': model.state_dict(),
                 'tokenizer': self.tokenizer,
             }, LATEST_MODEL_FILE)
             logger.info("✓ Model + tokenizer saved successfully")
-        
+
         except KeyboardInterrupt:
             logger.warning("\nTraining interrupted by user")
             sys.exit(0)

@@ -7,7 +7,8 @@ logger = logging.getLogger(__name__)
 class DialogueManager:
     def __init__(self, model, device, tokenizer,
                  intent_classifier=None, sentiment_analyzer=None, persona=None,
-                 top_k=50, top_p=0.9, temperature=0.8, max_len=128,
+                 top_k=12, top_p=0.8, temperature=0.65, max_len=128,
+                 min_length=5, no_repeat_ngram_size=3,
                  pad_token_id=None, eos_token_id=None, unk_token_id=None,
                  default_response="Lo siento, no puedo responder ahora."):
         self.model = model
@@ -21,10 +22,15 @@ class DialogueManager:
         self.top_p = top_p
         self.temperature = temperature
         self.max_len = max_len
+        self.min_length = min_length
+        self.no_repeat_ngram_size = no_repeat_ngram_size
 
         self.pad_token_id = pad_token_id if pad_token_id is not None else getattr(tokenizer, "get_pad_index", lambda: None)()
         self.eos_token_id = eos_token_id if eos_token_id is not None else (getattr(tokenizer, "get_eos_index", lambda: None)() if hasattr(tokenizer, "get_eos_index") else None)
         self.unk_token_id = unk_token_id if unk_token_id is not None else getattr(tokenizer, "get_unk_index", lambda: None)()
+
+        self.min_length = min_length
+        self.no_repeat_ngram_size = no_repeat_ngram_size
 
         self.default_response = default_response
 
@@ -47,12 +53,21 @@ class DialogueManager:
 
         return logits
 
-    def sample_next_token(self, logits):
+    def sample_next_token(self, logits, banned_tokens=None):
         if logits is None:
             return None
         logits = logits / max(self.temperature, 1e-8)
         filtered_logits = self.top_k_top_p_filtering(logits, top_k=self.top_k, top_p=self.top_p)
         probs = F.softmax(filtered_logits, dim=-1)
+
+        if banned_tokens is not None and len(banned_tokens) > 0:
+            for tok in banned_tokens:
+                if 0 <= tok < probs.size(-1):
+                    probs[tok] = 0.0
+            total = probs.sum()
+            if total <= 0 or torch.isnan(total):
+                return None
+            probs = probs / total
 
         if torch.isnan(probs).any() or torch.isclose(probs.sum(), torch.tensor(0.0, device=probs.device)):
             return int(torch.argmax(logits).item())
@@ -140,27 +155,35 @@ class DialogueManager:
         try:
             with torch.no_grad():
                 for step in range(self.max_len):
-                    try:
-                        out = self.model(src)
-                        if isinstance(out, (tuple, list)):
-                            out = out[0]
-                        logits = out[:, -1, :]
-                    except Exception:
-                        full = src if len(generated) == 0 else torch.LongTensor([input_ids + generated]).to(self.device)
-                        out = self.model(full)
-                        if isinstance(out, (tuple, list)):
-                            out = out[0]
-                        logits = out[:, -1, :]
+                    out = self.model(src)
+                    if isinstance(out, (tuple, list)):
+                        out = out[0]
+                    logits = out[:, -1, :]
+
+                    # Apply dynamic penalization for repeated n-grams
+                    if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size - 1:
+                        penalty = 5.0  # Adjustable penalty value
+                        for token_id in range(logits.size(-1)):
+                            cand_seq = generated + [token_id]
+                            if self._is_repeated_ngram(cand_seq, self.no_repeat_ngram_size):
+                                logits[0, token_id] -= penalty
 
                     next_token = self.sample_next_token(logits.squeeze(0))
+
                     if next_token is None:
                         break
 
-                    if self.eos_token_id is not None and next_token == self.eos_token_id:
+                    # Enforce min_length: don't stop on EOS until minimum length reached
+                    if self.eos_token_id is not None and next_token == self.eos_token_id and len(generated) >= self.min_length:
                         break
 
                     generated.append(next_token)
 
+                    # Append token to context for autoregressive generation
+                    next_token_tensor = torch.LongTensor([[next_token]]).to(self.device)
+                    src = torch.cat([src, next_token_tensor], dim=1)
+
+                    # If generation keeps outputting only special/tiny tokens, abort
                     if len(generated) >= 3:
                         uniq = set(generated)
                         specials = {tid for tid in (self.pad_token_id, self.unk_token_id) if tid is not None}
@@ -176,6 +199,20 @@ class DialogueManager:
         if not generated:
             return self.default_response
 
+        # Ensure no repeated n-grams in output
+        if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size:
+            def has_repeated_ngram(seq, n):
+                if len(seq) < n * 2:
+                    return False
+                last = tuple(seq[-n:])
+                for i in range(len(seq) - n):
+                    if tuple(seq[i:i+n]) == last:
+                        return True
+                return False
+
+            if has_repeated_ngram(generated, self.no_repeat_ngram_size):
+                return self.default_response
+
         try:
             text = self.tokenizer.decode(generated)
         except Exception:
@@ -187,5 +224,19 @@ class DialogueManager:
         if not text or text.strip() == "":
             return self.default_response
 
+        # Ensure minimum response length
+        tokens = text.split()
+        if self.min_length is not None and len(tokens) < self.min_length:
+            return self.default_response
+
         return text
+
+    def _is_repeated_ngram(self, seq, n):
+        if n < 1 or len(seq) < n * 2:
+            return False
+        last = tuple(seq[-n:])
+        for i in range(len(seq) - n):
+            if tuple(seq[i:i+n]) == last:
+                return True
+        return False
 
