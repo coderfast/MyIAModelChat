@@ -64,6 +64,7 @@ class DataPreparer:
         self.hf_data = None
         self.pdf_data = None
         self.epub_data = None
+        self.special_facts_data = None
         self.combined_data = None
         self.statistics = {}
 
@@ -215,9 +216,13 @@ class DataPreparer:
             if hasattr(self.args, 'epub') and self.args.epub:
                 logger.info("\n[4/3] Loading EPUB files...")
                 self.epub_data = self._load_epub_data()
+
+            # Load special facts (curated supplementary dataset)
+            logger.info("\n[5/3] Loading special facts (CSV)...")
+            self.special_facts_data = self._load_special_facts()
             
             # Combine datasets
-            logger.info("\n[5/3] Combining datasets...")
+            logger.info("\n[6/3] Combining datasets...")
             self.combined_data = self._combine_datasets()
             
             # Collect statistics
@@ -252,6 +257,41 @@ class DataPreparer:
                 'from_cache': False
             }
     
+    def _safe_load_dataset_pickle(self, file_path: str):
+        """
+        Load a pickled dataset in a backward-compatible way, handling old DatasetInfo fields such as task_templates.
+        """
+        try:
+            from datasets import DatasetInfo
+        except Exception:
+            DatasetInfo = None
+
+        orig_init = None
+        if DatasetInfo is not None:
+            orig_init = DatasetInfo.__init__
+
+            def patched_init(self, *args, **kwargs):
+                kwargs.pop('task_templates', None)
+                return orig_init(self, *args, **kwargs)
+
+            DatasetInfo.__init__ = patched_init
+
+        try:
+            with open(file_path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            # If it is still failing with task_templates and still DatasetInfo is present, retry once more.
+            if DatasetInfo is not None and 'task_templates' in str(e):
+                try:
+                    with open(file_path, 'rb') as f:
+                        return pickle.load(f)
+                except Exception:
+                    pass
+            raise
+        finally:
+            if DatasetInfo is not None and orig_init is not None:
+                DatasetInfo.__init__ = orig_init
+
     def _load_aiml_data(self) -> Dataset:
         """
         Load AIML files from aiml_dev directory.
@@ -282,8 +322,7 @@ class DataPreparer:
             if filename.endswith('.datasets'):
                 file_path = os.path.join(data_dir, filename)
                 try:
-                    with open(file_path, 'rb') as f:
-                        tokenized_data = pickle.load(f)
+                    tokenized_data = self._safe_load_dataset_pickle(file_path)
 
                     # AIML dataset pickles are usually HuggingFace Datasets with input/output fields.
                     if isinstance(tokenized_data, Dataset):
@@ -395,7 +434,54 @@ class DataPreparer:
         else:
             logger.warning("  ⚠ No HuggingFace datasets loaded successfully")
             return Dataset.from_list([])
-    
+
+    def _load_special_facts(self) -> Dataset:
+        """
+        Load curated supplemental facts/conversational pairs from datasets/special_facts.csv.
+        This keeps special knowledge in data, not hardcoded code paths.
+        Returns:
+            Hugging Face Dataset with input_ids column
+        """
+        csv_path = os.path.join('datasets', 'special_facts.csv')
+
+        if not os.path.exists(csv_path):
+            logger.warning(f"  ⚠ Special facts CSV not found: {csv_path}")
+            return Dataset.from_list([])
+
+        special_items = []
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                # Skip header if present
+                header = f.readline().strip().split(',')
+                has_header = 'input' in header and 'output' in header
+                if not has_header:
+                    f.seek(0)
+
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(',', 1)
+                    if len(parts) != 2:
+                        continue
+
+                    input_text = parts[0].strip().strip('"')
+                    output_text = parts[1].strip().strip('"')
+                    if input_text and output_text:
+                        special_items.append({'input_ids': f"{input_text} {output_text}"})
+
+            if special_items:
+                ds = Dataset.from_list(special_items)
+                logger.info(f"  ✓ Loaded special facts: {len(ds)} samples")
+                return ds
+            else:
+                logger.warning("  ⚠ No special facts found in CSV")
+                return Dataset.from_list([])
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Error reading special facts CSV: {e}")
+            return Dataset.from_list([])
+
     def _load_pdf_data(self) -> Dataset:
         """
         Load text data from PDF files in 'pdfs' directory.
@@ -573,6 +659,11 @@ class DataPreparer:
             datasets_to_combine.append(self.epub_data)
             total_samples += len(self.epub_data)
             logger.info(f"  Adding EPUB data: {len(self.epub_data)} samples")
+
+        if self.special_facts_data is not None and len(self.special_facts_data) > 0:
+            datasets_to_combine.append(self.special_facts_data)
+            total_samples += len(self.special_facts_data)
+            logger.info(f"  Adding special facts data: {len(self.special_facts_data)} samples")
         
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
@@ -599,6 +690,7 @@ class DataPreparer:
             'hf_samples': 0,
             'pdf_samples': 0,
             'epub_samples': 0,
+            'special_facts_samples': 0,
             'avg_text_length': 0,
             'min_text_length': 0,
             'max_text_length': 0,
@@ -624,6 +716,11 @@ class DataPreparer:
             epub_count = len(self.epub_data)
             stats['epub_samples'] = epub_count
             stats['source_breakdown']['EPUB'] = epub_count
+
+        if self.special_facts_data:
+            special_count = len(self.special_facts_data)
+            stats['special_facts_samples'] = special_count
+            stats['source_breakdown']['SpecialFacts'] = special_count
         
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)
