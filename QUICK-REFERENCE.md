@@ -8,10 +8,12 @@
 | `chatdataset.py` | PyTorch Dataset loader |
 | `dialogmanager.py` | Dialogue flow, intent/sentiment, persona modeling |
 | `simpletokenizer.py` | Custom tokenization (encode/decode) |
+| `bilingual_tokenizer.py` | Bilingual EN/ES tokenization with accent handling |
 | `aimlloder.py` | Loads AIML files for training |
+| `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB) |
 | `main_train.py` | Training pipeline (MainTrain class) |
 | `main_chat.py` | Chat inference interface |
-| `main.py` | Primary entry point |
+| `main.py` | Primary entry point with argument parsing |
 
 ## Command Cheat Sheet
 
@@ -19,17 +21,35 @@
 # Activate environment
 .\envMyIAModelChat\Scripts\Activate.ps1
 
-# Train model (all data)
-python main_train.py --epochs 10 --num-cores 4 --aiml --hf
+# Prepare data from multiple sources
+python main.py --prepare-data --aiml --pdf --epub
+
+# Train with cached data (fast)
+python main.py --train --use-cache --epochs 30
+
+# Train without cache (slower)
+python main.py --train --epochs 10 --aiml --pdf --epub
+
+# Use cache for faster iterations
+python main.py --train --use-cache --epochs 5
+
+# Refresh cache after adding new data
+python main.py --prepare-data --aiml --epub --refresh-cache
+
+# Clear old cache
+python main.py --clear-cache
 
 # Train with AIML only
-python main_train.py --epochs 10 --aiml
+python main.py --train --epochs 10 --aiml
 
 # Tokenize only (no training)
-python main_train.py --onlytokenize
+python main.py --train --onlytokenize
 
 # Run chat interface
-python main_chat.py
+python main.py --chat
+
+# Chat with CPU optimization
+python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
 
 # Just preprocess data
 python main.py --prepare-data
@@ -39,21 +59,32 @@ python main.py --prepare-data
 
 ```python
 # chatmodel.py - Key parameters
-vocab_size = 10000        # Vocabulary size
-embedding_dim = 100       # Embedding dimension
-hidden_size = 256         # LSTM hidden state size
+vocab_size = 50000        # Vocabulary size (increased)
+embedding_dim = 256       # Embedding dimension
+hidden_size = 512         # LSTM hidden state size
 output_size = vocab_size  # Output vocabulary size
 
 # dialogmanager.py - Key settings
 max_history = 5           # Conversation history window
 intent_model = "facebook/bart-large-mnli"
 sentiment_model = "distilbert-base-uncased-finetuned-sst-2-english"
+top_k = 50               # Sampling parameter
+top_p = 0.9              # Nucleus sampling
+temperature = 0.8        # Generation temperature
+min_length = 5           # Minimum response length
+no_repeat_ngram_size = 3 # N-gram repetition prevention
+
+# data_preparer.py - Feature flags
+enable_pdf = True        # Enable PDF processing
+enable_epub = True       # Enable EPUB processing
+enable_caching = True    # Enable dataset caching
 
 # main_train.py - Training params
 batch_size = 32
 learning_rate = 0.001
-epochs = 10
+epochs = 30             # Default increased
 num_workers = 4
+use_cache = True        # Use cached datasets
 ```
 
 ## Model Architecture Flow
@@ -61,18 +92,22 @@ num_workers = 4
 ```
 User Input (text)
     ↓
+Language Detection (EN/ES)
+    ↓
 Intent Classifier (BERT)
     ↓
 Sentiment Analyzer (BERT)
     ↓
-Tokenizer.encode() → Token IDs
+BilingualTokenizer.encode() → Token IDs
     ↓
 ChatModel forward pass:
     Token IDs → Embedding → LSTM → FC → Logits
     ↓
-argmax(logits) → Output Token IDs
+Dynamic N-gram Penalization + Top-K/Top-P Sampling
     ↓
-Tokenizer.decode() → Response text
+Output Token IDs
+    ↓
+BilingualTokenizer.decode() → Response text
 ```
 
 ## Key Classes & Methods
@@ -91,22 +126,33 @@ model.save_pretrained()  # Save weights
 ```python
 from dialogmanager import DialogueManager
 
-dialog = DialogueManager(model, device, tokenizer, 
-                         intent_classifier, sentiment_analyzer, 
-                         persona, max_history=5)
+dialog = DialogueManager(model, device, tokenizer,
+                         intent_classifier, sentiment_analyzer,
+                         persona, max_history=5, top_k=50, top_p=0.9,
+                         temperature=0.8, min_length=5, no_repeat_ngram_size=3)
 response = dialog.generate_response(user_input)
 intent = dialog.detected_intent
 sentiment = dialog.detected_sentiment
 ```
 
-### SimpleTokenizer
+### BilingualTokenizer
 ```python
-from simpletokenizer import SimpleTokenizer
+from bilingual_tokenizer import BilingualTokenizer
 
-tokenizer = SimpleTokenizer()
+tokenizer = BilingualTokenizer()
 tokenizer.train(raw_text)
-token_ids = tokenizer.encode("hello")
+token_ids = tokenizer.encode("hello world")
 text = tokenizer.decode(token_ids)
+# Supports accent handling: "español" → proper tokenization
+```
+
+### DataPreparer
+```python
+from data_preparer import DataPreparer
+
+preparer = DataPreparer(enable_pdf=True, enable_epub=True, enable_caching=True)
+datasets = preparer.load_all_data()
+cached_dataset = preparer.cache_dataset(datasets)
 ```
 
 ### MainTrain
@@ -114,40 +160,79 @@ text = tokenizer.decode(token_ids)
 from main_train import MainTrain
 
 trainer = MainTrain(args)
-trainer.prepare_datasets()  # Load AIML + HF datasets
+trainer.prepare_datasets()  # Load AIML + PDF + EPUB + HF datasets
 trainer.train()
 ```
 
 ## Dataset Sources
 
-1. **AIML** (`aiml/` folder): ~60 AIML pattern files
-2. **Hugging Face**: Dialogue datasets (wikitext, etc.)
-3. **Custom**: User-provided data in `datasets/` folder
+1. **AIML** (`aiml/` folder): ~60 AIML pattern files from A.L.I.C.E.
+2. **PDF Documents** (`pdfs/` folder): Automatic text extraction via PyPDF2
+3. **EPUB E-books** (`epub/` folder): Full e-book parsing via ebooklib
+4. **Hugging Face**: Dialogue datasets (wikitext, bookcorpus, etc.)
+5. **Custom**: User-provided data in `datasets/` folder
 
 ## Model Files
 
 | File | Size | Purpose |
 |------|------|---------|
-| `chat_model.pth` | ~1GB | Trained model weights |
-| `tokenizer.pth` | ~10MB | Vocabulary & token mappings |
-| `pretrained_embeddings.pth` | ~50MB | Pre-trained embeddings (optional) |
+| `checkpoints/chat_model_best.pth` | ~2GB | Best trained model weights |
+| `checkpoints/tokenizer.pkl` | ~20MB | Bilingual tokenizer with vocab |
+| `dataset_cache/` | ~5GB | Cached processed datasets |
+| `pretrained_embeddings.pth` | ~100MB | Pre-trained embeddings (optional) |
+
+## Caching System
+
+```bash
+# Enable caching for 12x faster training
+python main.py --train --use-cache --epochs 10
+
+# Refresh cache after adding new PDFs/EPUBs
+python main.py --prepare-data --pdf --epub --refresh-cache
+
+# Clear cache to free space
+python main.py --clear-cache
+
+# Check cache status
+python main.py --cache-status
+```
 
 ## Common Fixes
 
 | Issue | Fix |
 |-------|-----|
 | Import errors | Activate venv: `.\envMyIAModelChat\Scripts\Activate.ps1` |
-| CUDA out of memory | Reduce batch size or use CPU |
-| Gibberish responses | Ensure `model.eval()` is called |
-| Tokenizer mismatch | Use same `tokenizer.pth` for train & inference |
-| No AIML data | Verify `aiml/` folder exists and `--aiml` flag used |
-| Slow training | Increase `num_workers`, use GPU |
+| CUDA out of memory | Use `--use-cpuonly` or reduce batch_size |
+| Gibberish responses | Ensure `model.eval()` and check tokenizer match |
+| Tokenizer mismatch | Use same checkpoint for train & inference |
+| No data loaded | Run `--prepare-data` first, check source folders |
+| Slow training | Use `--use-cache`, increase `num_workers` |
+| PDF/EPUB not loading | Verify PyPDF2/ebooklib installed, files in correct folders |
+| Repetitive responses | Adjust `no_repeat_ngram_size`, `temperature` |
+| Short responses | Increase `min_length` parameter |
 
 ## Debugging Commands
 
 ```python
 # Check model structure
 print(model)
+
+# Debug tokenizer
+print(f"Vocab size: {tokenizer.vocab_size}")
+print(f"Sample tokens: {tokenizer.encode('Hello world')}")
+
+# Check dataset loading
+print(f"Dataset size: {len(dataset)}")
+print(f"Sample: {dataset[0]}")
+
+# Debug generation
+response = dialog.generate_response("debug")
+print(f"Debug response: {response}")
+
+# Check cache status
+import os
+print(f"Cache exists: {os.path.exists('dataset_cache')}")
+```
 
 # Check tensor shapes
 print(f"Input shape: {input_ids.shape}")

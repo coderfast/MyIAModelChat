@@ -4,6 +4,8 @@
 
 The improved `BilingualTokenizer` now supports training and inference for both English and Spanish with automatic language detection, preprocessing, and multilingual embedding support.
 
+**Note**: This guide incorporates all improvements from BILINGUAL-TOKENIZER-IMPROVEMENTS.md. The improvements file is kept for historical reference but all features are documented here.
+
 ## Key Features
 
 ✅ **Automatic Language Detection** - Detects English vs Spanish text automatically  

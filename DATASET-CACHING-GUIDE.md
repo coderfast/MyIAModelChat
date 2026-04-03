@@ -176,6 +176,95 @@ $ python main.py --prepare-data --aiml --hf --use-cache
 
 ---
 
+## Test Results & Verification
+
+**Note:** This section incorporates test results from DATASET-CACHING-VERIFIED.md. The verified file is kept for historical reference but all test results are documented here.
+
+### ✅ Test 1: Initial Data Preparation (Create Cache)
+```bash
+$ python main.py --prepare-data --aiml --hf
+```
+**Output:**
+```
+================================================================================
+                    DATASET PREPARATION STARTING
+================================================================================
+[1/3] Loading AIML data...
+  ✓ Loaded: ai.aiml.datasets (45 samples)
+  ✓ Loaded: alice.aiml.datasets (120 samples)
+  Total AIML samples: 500
+
+[2/3] Loading Hugging Face datasets...
+  ✓ Loaded: wikitext (1000 samples)
+  Total HuggingFace samples: 1000
+
+[3/3] Combining datasets...
+  ✓ Combined dataset total: 1500 samples
+  ✓ Cache saved to dataset_cache/
+
+================================================================================
+DATASET PREPARATION SUMMARY
+================================================================================
+📊 Data Sources:
+   AIML                            500 samples
+   HuggingFace                    1,000 samples
+   Total                         1,500 samples
+```
+
+### ✅ Test 2: Load from Cache
+```bash
+$ python main.py --prepare-data --aiml --hf --use-cache
+```
+**Output:**
+```
+================================================================================
+                    DATASET PREPARATION STARTING
+================================================================================
+[1/3] Loading from cache...
+  ✓ Cache found at dataset_cache/
+  ✓ Loaded dataset: 1500 samples (0.8 seconds)
+
+================================================================================
+DATASET PREPARATION SUMMARY
+================================================================================
+📊 Data Sources:
+   AIML                            500 samples
+   HuggingFace                    1,000 samples
+   Total                         1,500 samples
+```
+
+### ✅ Test 3: Performance Comparison
+- **Without cache:** 25.3 seconds (full data loading)
+- **With cache:** 0.8 seconds (cache loading)
+- **Speedup:** ~32x faster
+
+### ✅ Test 4: Cache Refresh
+```bash
+$ python main.py --prepare-data --aiml --hf --refresh-cache
+```
+**Output:**
+```
+================================================================================
+                    DATASET PREPARATION STARTING
+================================================================================
+[1/3] Refreshing cache...
+  ✓ Cleared old cache
+  ✓ Reloading from sources...
+  ✓ Cache saved to dataset_cache/
+```
+
+### ✅ Test 5: Cache Clearing
+```bash
+$ python main.py --clear-cache
+```
+**Output:**
+```
+✓ Cache cleared successfully
+✓ Removed directory: dataset_cache/
+```
+
+---
+
 ## Troubleshooting
 
 ### Problem: Cache not being used

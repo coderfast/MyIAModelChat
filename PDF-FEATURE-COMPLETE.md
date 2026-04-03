@@ -1,5 +1,7 @@
 # ✅ PDF Support Feature - Complete Implementation
 
+**Note:** This is part of the PDF documentation trilogy. For comprehensive usage instructions, see [PDF-USAGE-GUIDE.md](PDF-USAGE-GUIDE.md). For technical implementation details, see [PDF-SUPPORT-IMPLEMENTATION.md](PDF-SUPPORT-IMPLEMENTATION.md).
+
 ## Summary
 
 PDF loading support has been **fully implemented, tested, and documented**. Users can now add PDF documents to their training datasets with a single CLI flag.

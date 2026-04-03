@@ -1,5 +1,7 @@
 # ✅ EPUB E-Book Support - Implementation Complete
 
+**Note:** This is part of the EPUB documentation trilogy. For comprehensive usage instructions, see [EPUB-USAGE-GUIDE.md](EPUB-USAGE-GUIDE.md). For technical implementation details, see [EPUB-SUPPORT-IMPLEMENTATION.md](EPUB-SUPPORT-IMPLEMENTATION.md).
+
 ## Summary
 
 E-book (EPUB) loading support has been **fully implemented, tested, and documented**. Users can now add e-books to their training datasets with a single CLI flag.

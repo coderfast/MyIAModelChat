@@ -1,5 +1,7 @@
 # EPUB E-Book Support - Implementation Status Report
 
+**Note:** This is part of the EPUB documentation trilogy. For user-friendly usage instructions, see [EPUB-USAGE-GUIDE.md](EPUB-USAGE-GUIDE.md). For feature overview, see [EPUB-FEATURE-COMPLETE.md](EPUB-FEATURE-COMPLETE.md).
+
 ## ✅ PHASE 8 COMPLETE: EPUB E-Book Support
 
 **Status:** Production Ready  

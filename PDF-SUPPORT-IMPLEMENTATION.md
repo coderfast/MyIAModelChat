@@ -1,5 +1,7 @@
 # PDF Support Implementation - Complete Summary
 
+**Note:** This is part of the PDF documentation trilogy. For user-friendly usage instructions, see [PDF-USAGE-GUIDE.md](PDF-USAGE-GUIDE.md). For feature overview, see [PDF-FEATURE-COMPLETE.md](PDF-FEATURE-COMPLETE.md).
+
 ## ✅ PDF Feature Successfully Added
 
 All PDF loading functionality has been implemented and tested.

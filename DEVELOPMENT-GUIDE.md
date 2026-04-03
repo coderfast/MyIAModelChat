@@ -102,32 +102,48 @@ assert train_ids == inference_ids, "Tokenizers don't match!"
 
 ---
 
-### Issue: Model Predictions are Gibberish
+### Issue: Tokenizer Issues (Race Conditions & Performance)
 
-**Problem**: Generated responses don't make sense
+**Problem**: Slow decoding, vocabulary corruption, or inconsistent tokenization
 
 **Solution**:
 ```python
-# Check if model is in eval mode
-model.eval()  # This is critical
-with torch.no_grad():
-    # inference code
+# For SimpleTokenizer issues:
+# Check if idx2word mapping exists (fixed in recent update)
+if hasattr(tokenizer, 'idx2word') and tokenizer.idx2word:
+    print("O(1) decoding available")
+else:
+    print("Falling back to O(n) decoding - consider updating")
 
-# Check if context is being maintained
-print(f"Context: {self.context}")
-print(f"Context length: {len(self.context)}")
+# For BilingualTokenizer:
+from bilingual_tokenizer import BilingualTokenizer
+tokenizer = BilingualTokenizer()
+tokenizer.load('checkpoints/tokenizer.pkl')
 
-# Check token IDs being generated
-print(f"Output token IDs: {output_ids}")
-decoded = tokenizer.decode(output_ids)
-print(f"Decoded text: {decoded}")
+# Test accent handling
+test_spanish = "español, México, café"
+ids = tokenizer.encode(test_spanish)
+decoded = tokenizer.decode(ids)
+print(f"Original: {test_spanish}")
+print(f"Decoded: {decoded}")
+assert test_spanish == decoded, "Accent handling failed"
+
+# Check language detection
+print(f"Language detection: {tokenizer.detect_language('Hello world')}")  # 'en'
+print(f"Language detection: {tokenizer.detect_language('Hola mundo')}")  # 'es'
 ```
 
+**Recent Fixes Applied**:
+- **Race conditions**: Fixed thread-unsafe vocabulary building in `SimpleTokenizer.fit()`
+- **Slow decoding**: Added `idx2word` mapping for O(1) token ID to string conversion
+- **Vocabulary corruption**: Implemented atomic save/load operations
+- **Bilingual support**: Added `BilingualTokenizer` with EN/ES detection and accent handling
+
 **Prevention**:
-- Always call `model.eval()` before inference
-- Use `torch.no_grad()` context manager
-- Test with known inputs first
-- Verify tokenizer.decode() works correctly
+- Use `BilingualTokenizer` for new projects (handles EN/ES automatically)
+- Save/load tokenizers from checkpoints only
+- Test tokenization consistency across runs
+- Monitor decoding performance (should be near-instant)
 
 ---
 
