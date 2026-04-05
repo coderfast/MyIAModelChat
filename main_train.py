@@ -613,7 +613,13 @@ class MainTrain:
             # Prefer best model over final model (prevents loss regression over epochs)
             if os.path.exists(BEST_MODEL_FILE):
                 try:
-                    best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device)
+                    # PyTorch 2.6+ requires weights_only handling for custom classes
+                    try:
+                        best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device, weights_only=True)
+                    except Exception:
+                        # Fallback: weights_only=False for custom objects (SimpleTokenizer)
+                        best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device, weights_only=False)
+                    
                     if isinstance(best_ckpt, dict) and 'model_state_dict' in best_ckpt:
                         logger.info(f"Using best checkpoint from {BEST_MODEL_FILE} for final save")
                         model.load_state_dict(best_ckpt['model_state_dict'])
