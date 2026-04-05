@@ -13,6 +13,8 @@ from datasets import Dataset
 from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
 import logging
+import shutil
+from datetime import datetime
 
 class TrainingStopRequested(Exception):
     """Raised when a stop request is issued from the main thread."""
@@ -614,6 +616,21 @@ class MainTrain:
                     logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e} | GPU mem used: {gpu_memory:.2f}GB / reserved: {gpu_memory_reserved:.2f}GB")
                 else:
                     logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
+
+                # Save checkpoint after each epoch
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                epoch_filename = f"chat_model_epoch_{epoch+1}_{timestamp}.pth"
+                epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
+                os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+                torch.save({
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'loss': loss,
+                    'tokenizer': self.tokenizer,
+                }, epoch_path)
+                logger.info(f"  ✓ Epoch {epoch+1} checkpoint saved to {epoch_path}")
 
                 # Save best model checkpoint
                 if loss < self.best_loss:
