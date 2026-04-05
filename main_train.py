@@ -54,7 +54,6 @@ TRAINING_CONFIG = {
 # Model checkpoint configuration
 MODEL_CHECKPOINT_DIR = 'checkpoints'
 TOKENIZER_VOCAB_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'tokenizer_vocab.json')
-BEST_MODEL_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'best_model.pth')
 LATEST_MODEL_FILE = 'chat_model.pth'
 
 
@@ -617,25 +616,12 @@ class MainTrain:
                 else:
                     logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
 
-                # Save checkpoint after each epoch
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                epoch_filename = f"chat_model_epoch_{epoch+1}_{timestamp}.pth"
-                epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-                os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
-                torch.save({
-                    'epoch': epoch + 1,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': scheduler.state_dict(),
-                    'loss': loss,
-                    'tokenizer': self.tokenizer,
-                }, epoch_path)
-                logger.info(f"  ✓ Epoch {epoch+1} checkpoint saved to {epoch_path}")
-
-                # Save best model checkpoint
+                # Save best model checkpoint after each epoch
                 if loss < self.best_loss:
                     self.best_loss = loss
-                    logger.info(f"  ✓ New best loss! Saving checkpoint to {BEST_MODEL_FILE}")
+                    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                    epoch_filename = f"chat_model_epoch_{epoch+1}_{timestamp}.pth"
+                    epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
                     os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
                     torch.save({
                         'epoch': epoch + 1,
@@ -644,7 +630,8 @@ class MainTrain:
                         'scheduler_state_dict': scheduler.state_dict(),
                         'loss': loss,
                         'tokenizer': self.tokenizer,
-                    }, BEST_MODEL_FILE)
+                    }, epoch_path)
+                    logger.info(f"  ✓ Epoch {epoch+1} checkpoint saved to {epoch_path}")
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():
@@ -665,24 +652,13 @@ class MainTrain:
             logger.info(f"\n{'='*80}")
             logger.info("Training completed! Saving final model and tokenizer...")
 
-            # Prefer best model over final model (prevents loss regression over epochs)
-            if os.path.exists(BEST_MODEL_FILE):
-                try:
-                    # PyTorch 2.6+ requires weights_only handling for custom classes
-                    try:
-                        best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device, weights_only=True)
-                    except Exception:
-                        # Fallback: weights_only=False for custom objects (SimpleTokenizer)
-                        best_ckpt = torch.load(BEST_MODEL_FILE, map_location=device, weights_only=False)
-                    
-                    if isinstance(best_ckpt, dict) and 'model_state_dict' in best_ckpt:
-                        logger.info(f"Using best checkpoint from {BEST_MODEL_FILE} for final save")
-                        model.load_state_dict(best_ckpt['model_state_dict'])
-                except Exception as e:
-                    logger.warning(f"Failed to load best checkpoint for final save: {e}")
-
+            
             torch.save({
+                'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'loss': loss,
                 'tokenizer': self.tokenizer,
             }, LATEST_MODEL_FILE)
             logger.info("✓ Model + tokenizer saved successfully")
