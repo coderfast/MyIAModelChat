@@ -57,6 +57,7 @@ class BilingualTokenizer:
             multilingual_vocab: Share vocabulary across languages vs separate vocabularies
         """
         self.trie = Trie()
+        self.word2idx = {}
         self.idx2word = {}  # Inverse mapping for efficient O(1) decoding
         self.vocab_size = 0
         self.max_vocab_size = max_vocab_size
@@ -81,11 +82,16 @@ class BilingualTokenizer:
             self._insert_word('<ES>', 5)
     
     def _insert_word(self, word, index):
-        """Insert a word into both trie and idx2word mapping."""
+        """Insert a word into word2idx and idx2word mapping."""
         self.trie.insert(word, index)
+        self.word2idx[word] = index
         self.idx2word[index] = word
         if index >= self.vocab_size:
             self.vocab_size = index + 1
+
+    def get_index(self, word: str) -> Optional[int]:
+        """Get the token index for a word using a direct dictionary lookup."""
+        return self.word2idx.get(word)
 
     def detect_language(self, text: str) -> str:
         """
@@ -198,31 +204,18 @@ class BilingualTokenizer:
         if languages is None:
             languages = [self.detect_language(text) for text in texts]
         
-        # Collect unique words from all texts
-        all_words = {}  # {word: (count, language)}
-        
-        # Use sequential processing to avoid memory issues on laptops
+        # Collect unique word frequencies from all texts
+        word_counter = Counter()
         logger.info(f"Preprocessing {len(texts)} texts sequentially...")
-        preprocessed_texts = []
         for text, lang in zip(texts, languages):
             preprocessed = self._preprocess_worker(text, lang, remove_accents_flag)
-            preprocessed_texts.append(preprocessed)
-        
-        # Extract words and their frequencies
-        for preprocessed_text in preprocessed_texts:
-            words = preprocessed_text.split()
-            for word in words:
-                if word:
-                    if word not in all_words:
-                        all_words[word] = 0
-                    all_words[word] += 1
+            word_counter.update(word for word in preprocessed.split() if word)
         
         # Sort by frequency and build vocabulary
-        sorted_words = sorted(all_words.items(), key=lambda x: x[1], reverse=True)
-        
+        sorted_words = word_counter.most_common()
         reserved_tokens = 6 if self.use_language_tokens else 4
         for idx, (word, _) in enumerate(sorted_words, start=reserved_tokens):
-            if self.vocab_size < self.max_vocab_size:
+            if self.vocab_size < self.max_vocab_size and word not in self.word2idx:
                 self._insert_word(word, idx)
     
     def _preprocess_worker(self, text: str, language: str, remove_accents_flag: bool) -> str:
@@ -259,18 +252,18 @@ class BilingualTokenizer:
         # Add language token if enabled
         if self.use_language_tokens and add_language_token:
             lang_token = '<EN>' if language == 'en' else '<ES>'
-            lang_idx = self.trie.get_index(lang_token)
+            lang_idx = self.get_index(lang_token)
             if lang_idx is not None:
                 tokens.append(lang_idx)
         
         # Add START token
-        start_idx = self.trie.get_index('<START>')
+        start_idx = self.get_index('<START>')
         if start_idx is not None:
             tokens.append(start_idx)
         
         # Encode words
         for word in words:
-            idx = self.trie.get_index(word)
+            idx = self.get_index(word)
             if idx is None:
                 # Use UNK token for unknown words
                 tokens.append(1)
@@ -278,7 +271,7 @@ class BilingualTokenizer:
                 tokens.append(idx)
         
         # Add END token
-        end_idx = self.trie.get_index('<END>')
+        end_idx = self.get_index('<END>')
         if end_idx is not None:
             tokens.append(end_idx)
         
@@ -312,9 +305,10 @@ class BilingualTokenizer:
     
     def batch_encode(self, texts: List[str], languages: Optional[List[str]] = None,
                      add_language_token: bool = True, remove_accents_flag: bool = False,
-                     max_length: Optional[int] = None, pad: bool = True) -> torch.Tensor:
+                     max_length: Optional[int] = None, pad: bool = True,
+                     return_tensors: bool = True):
         """
-        Encode multiple texts into padded tensor for batch processing.
+        Encode multiple texts into padded tensor or Python lists for batch processing.
         
         Args:
             texts: List of text samples
@@ -323,9 +317,10 @@ class BilingualTokenizer:
             remove_accents_flag: Whether to remove accents
             max_length: Maximum sequence length (auto-determined if None)
             pad: Whether to pad sequences
+            return_tensors: If True, return a torch.Tensor; otherwise return List[List[int]]
             
         Returns:
-            Tensor of shape (batch_size, max_length)
+            Tensor or list of token id lists
         """
         if languages is None:
             languages = [self.detect_language(text) for text in texts]
@@ -342,7 +337,7 @@ class BilingualTokenizer:
         
         # Pad sequences
         if pad:
-            pad_idx = self.trie.get_index('<PAD>')
+            pad_idx = self.get_index('<PAD>')
             padded_texts = [
                 seq + [pad_idx] * (max_length - len(seq)) if len(seq) < max_length else seq[:max_length]
                 for seq in encoded_texts
@@ -350,8 +345,9 @@ class BilingualTokenizer:
         else:
             padded_texts = encoded_texts
         
-        # Convert to tensor
-        return torch.tensor(padded_texts, dtype=torch.long)
+        if return_tensors:
+            return torch.tensor(padded_texts, dtype=torch.long)
+        return padded_texts
     
     def batch_decode(self, tensor: torch.Tensor, skip_special_tokens: bool = True) -> List[str]:
         """
@@ -382,7 +378,7 @@ class BilingualTokenizer:
             Padded/truncated sequence
         """
         if pad_idx is None:
-            pad_idx = self.trie.get_index('<PAD>')
+            pad_idx = self.get_index('<PAD>')
         
         if len(sequence) < max_length:
             return sequence + [pad_idx] * (max_length - len(sequence))
@@ -413,10 +409,7 @@ class BilingualTokenizer:
 
     def get_vocab_dict(self) -> Dict[str, int]:
         """Get word to index mapping."""
-        vocab_dict = {}
-        for idx, word in self.idx2word.items():
-            vocab_dict[word] = idx
-        return vocab_dict
+        return dict(self.word2idx)
 
     def get_language_stats(self) -> Dict[str, int]:
         """Get language statistics."""
@@ -425,7 +418,7 @@ class BilingualTokenizer:
     def get_language_token_index(self, language: str) -> int:
         """Get token index for language marker."""
         lang_token = '<EN>' if language == 'en' else '<ES>'
-        return self.trie.get_index(lang_token)
+        return self.get_index(lang_token)
 
     def load_pretrained_embeddings(self, pretrained_embeddings: torch.Tensor):
         """Load pretrained embeddings."""
@@ -437,7 +430,7 @@ class BilingualTokenizer:
 
     def get_word_embedding(self, word: str) -> Optional[torch.Tensor]:
         """Get embedding vector for a word."""
-        idx = self.trie.get_index(word)
+        idx = self.get_index(word)
         if idx is not None:
             return self.embedding.weight.data[idx]
         return None
@@ -460,11 +453,11 @@ class BilingualTokenizer:
 
     def get_pad_index(self) -> int:
         """Get padding token index."""
-        return self.trie.get_index('<PAD>')
+        return self.get_index('<PAD>')
 
     def get_unknown_index(self) -> int:
         """Get unknown token index."""
-        return self.trie.get_index('<UNK>')
+        return self.get_index('<UNK>')
 
     def save_vocabulary(self, filepath: str):
         """Save vocabulary to file."""
@@ -481,16 +474,17 @@ class BilingualTokenizer:
         
         # Rebuild trie and mappings
         self.trie = Trie()
+        self.word2idx = {}
         self.idx2word = {}
         self.vocab_size = 0
         
-        for word, idx in vocab_dict.items():
+        for word, idx in sorted(vocab_dict.items(), key=lambda item: item[1]):
             self._insert_word(word, idx)
 
 
 # Backward compatibility alias
 class SimpleTokenizer(BilingualTokenizer):
     """Backward compatibility wrapper for SimpleTokenizer."""
-    def __init__(self, max_vocab_size=65536, embedding_dim=65536, num_workers=4):
+    def __init__(self, max_vocab_size=65536, embedding_dim=300, num_workers=4):
         super().__init__(max_vocab_size, embedding_dim, num_workers, 
                          use_language_tokens=False, multilingual_vocab=True)

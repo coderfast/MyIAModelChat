@@ -2,6 +2,7 @@ import os
 import gc
 import argparse
 import sys
+import threading
 import logging
 import multiprocessing as mp
 
@@ -263,8 +264,30 @@ EXAMPLES:
         if args.train:
             logger.info("Initializing training...")
             main_train = MainTrain(args)
-            main_train.performMainTrain()
-        
+            training_thread = threading.Thread(target=main_train.performMainTrain, name="TrainingThread", daemon=True)
+            training_thread.start()
+            try:
+                while training_thread.is_alive():
+                    training_thread.join(timeout=1)
+                    if KEYBOARD_AVAILABLE:
+                        try:
+                            if keyboard.is_pressed('esc'):
+                                logger.warning("\nTraining interrupted by user (ESC pressed)")
+                                main_train.request_stop()
+                                training_thread.join(timeout=10)
+                                if training_thread.is_alive():
+                                    logger.warning("Training thread did not stop within timeout")
+                                sys.exit(0)
+                        except Exception:
+                            pass
+            except KeyboardInterrupt:
+                logger.warning("\nTraining interrupted by user (Ctrl+C)")
+                main_train.request_stop()
+                training_thread.join(timeout=10)
+                if training_thread.is_alive():
+                    logger.warning("Training thread did not stop within timeout")
+                sys.exit(0)
+
         # Chat
         if args.chat:
             logger.info("Starting chat interface...")

@@ -1,6 +1,7 @@
 import os
 import pickle
 import sys
+import threading
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,19 +14,24 @@ from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
 import logging
 
+class TrainingStopRequested(Exception):
+    """Raised when a stop request is issued from the main thread."""
+
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 try:
     import keyboard
     KEYBOARD_AVAILABLE = True
 except ImportError:
     KEYBOARD_AVAILABLE = False
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Cache configuration
 CACHE_DIR = 'dataset_cache'
 CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
+CACHE_TOKENIZED_DATASET_DIR = os.path.join(CACHE_DIR, 'prepared_dataset_tokenized')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
 
 # Training configuration constants
@@ -45,6 +51,7 @@ TRAINING_CONFIG = {
 
 # Model checkpoint configuration
 MODEL_CHECKPOINT_DIR = 'checkpoints'
+TOKENIZER_VOCAB_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'tokenizer_vocab.json')
 BEST_MODEL_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'best_model.pth')
 LATEST_MODEL_FILE = 'chat_model.pth'
 
@@ -68,6 +75,7 @@ class MainTrain:
         self.tokenizer = None
         self.tokenized_data = None
         self.loaded_dataset = None
+        self.stop_event = threading.Event()
         
         # Device and training configuration tracking
         self.use_gpu = False
@@ -98,6 +106,10 @@ class MainTrain:
             self.tokenizer = SimpleTokenizer()
 
         print(f"MainTrain initialized...")
+
+    def request_stop(self):
+        """Request that training stop gracefully."""
+        self.stop_event.set()
 
     def _load_cached_dataset(self):
         """Load dataset from pre-prepared cache."""
@@ -156,10 +168,20 @@ class MainTrain:
             pass
         return default_workers
 
+    def _get_num_proc(self):
+        """Choose a safe number of processes for dataset map operations."""
+        try:
+            cpus = mp.cpu_count()
+            if cpus <= 2:
+                return 1
+            return min(4, max(1, cpus // 2))
+        except Exception:
+            return 1
+
     def _sample_generator(self):
         """Yield text or tokenized sequences from the loaded dataset in streaming mode."""
         for item in self.loaded_dataset:
-            value = item.get('input_ids', None)
+            value = item.get('token_ids', item.get('input_ids', None))
             if value is None:
                 continue
 
@@ -338,6 +360,10 @@ class MainTrain:
         optimizer.zero_grad()
         
         for batch_idx, (inputs, targets) in enumerate(dataloader):
+            if self.stop_event.is_set():
+                logger.info("Stop requested; exiting current training epoch early")
+                break
+
             total_batches += 1
             inputs = inputs.to(device)
             targets = targets.to(device)
@@ -435,12 +461,13 @@ class MainTrain:
             logger.info(f"✓ Processed {sample_count} samples for tokenizer fitting")
             logger.info(f"✓ Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
-            # Save tokenizer vocabulary for chat loading
-            vocab_file = 'tokenizer_vocab.json'
-            self.tokenizer.save_vocabulary(vocab_file)
-            logger.info(f"✓ Tokenizer vocabulary saved to {vocab_file}")
+            # Save tokenizer vocabulary for chat loading inside checkpoints
+            os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+            self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
+            logger.info(f"✓ Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
 
-            # Create iterable dataset for training pairs without materializing all pairs
+            # Build or load pretokenized cache for faster training iterations
+            self.loaded_dataset = self._get_tokenized_dataset()
             self._warn_memory_usage(stage="data preparation")
 
             def token_pair_generator():
@@ -541,15 +568,9 @@ class MainTrain:
             
             num_epochs = self.epochs
             for epoch in range(num_epochs):
-                
-                # Check for user interrupt
-                if KEYBOARD_AVAILABLE:
-                    try:
-                        if keyboard.is_pressed('esc'):
-                            logger.info("\n⚠ Training interrupted by user (ESC pressed)")
-                            break
-                    except:
-                        pass  # Keyboard library may not work in all environments
+                if self.stop_event.is_set():
+                    logger.warning("Training stop requested; ending before next epoch")
+                    break
 
                 # Training
                 loss = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
@@ -577,7 +598,13 @@ class MainTrain:
                         'optimizer_state_dict': optimizer.state_dict(),
                         'scheduler_state_dict': scheduler.state_dict(),
                         'loss': loss,
+                        'tokenizer': self.tokenizer,
                     }, BEST_MODEL_FILE)
+
+            # Stop requested? Do not write a partial final checkpoint.
+            if self.stop_event.is_set():
+                logger.info("\nStop requested; skipping final model save")
+                return
 
             # Save final model + tokenizer state for consistent inference
             logger.info(f"\n{'='*80}")
@@ -599,9 +626,120 @@ class MainTrain:
             }, LATEST_MODEL_FILE)
             logger.info("✓ Model + tokenizer saved successfully")
 
+        except TrainingStopRequested:
+            logger.warning("\nTraining interrupted by request")
+            return
         except KeyboardInterrupt:
             logger.warning("\nTraining interrupted by user")
-            sys.exit(0)
+            self.stop_event.set()
+            return
         except Exception as e:
             logger.error(f"Error during training: {e}", exc_info=True)
-            sys.exit(1)
+            raise
+
+    def _tokenize_dataset_item(self, value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            if all(isinstance(v, int) for v in value):
+                return value
+            return self.tokenizer.encode(" ".join(str(v) for v in value))
+        if isinstance(value, dict):
+            input_text = value.get('input', '').strip()
+            output_text = value.get('output', '').strip()
+            merged = f"{input_text} {output_text}".strip()
+            return self.tokenizer.encode(merged) if merged else []
+        if isinstance(value, str):
+            return self.tokenizer.encode(value)
+        if hasattr(value, 'tolist'):
+            seq = list(value.tolist())
+            if seq and all(isinstance(v, int) for v in seq):
+                return seq
+            return self.tokenizer.encode(" ".join(str(v) for v in seq))
+        return []
+
+    def _tokenize_batch(self, batch):
+        if 'token_ids' in batch:
+            return {'token_ids': batch['token_ids']}
+
+        if 'input_ids' in batch:
+            if all(isinstance(value, str) for value in batch['input_ids']):
+                tokenized = self.tokenizer.batch_encode(
+                    batch['input_ids'],
+                    add_language_token=False,
+                    remove_accents_flag=False,
+                    pad=False,
+                    return_tensors=False
+                )
+            else:
+                tokenized = [self._tokenize_dataset_item(value) for value in batch['input_ids']]
+            return {'token_ids': tokenized}
+
+        if 'input' in batch and 'output' in batch:
+            texts = [
+                f"{inp.strip()} {out.strip()}".strip()
+                for inp, out in zip(batch['input'], batch['output'])
+            ]
+        elif 'text' in batch:
+            texts = batch['text']
+        elif 'sentence' in batch:
+            texts = batch['sentence']
+        else:
+            columns = [k for k in batch.keys() if k not in ('__index_level_0__', 'token_ids')]
+            length = len(batch[next(iter(batch))]) if batch else 0
+            texts = []
+            for i in range(length):
+                pieces = []
+                for key in columns:
+                    value = batch[key][i]
+                    if value is None:
+                        continue
+                    pieces.append(str(value))
+                texts.append(' '.join(pieces).strip())
+
+        tokenized = self.tokenizer.batch_encode(
+            texts,
+            add_language_token=False,
+            remove_accents_flag=False,
+            pad=False,
+            return_tensors=False
+        )
+        return {'token_ids': tokenized}
+
+    def _get_tokenized_dataset(self):
+        if os.path.exists(CACHE_TOKENIZED_DATASET_DIR):
+            logger.info(f"Loading tokenized dataset from cache: {CACHE_TOKENIZED_DATASET_DIR}")
+            tokenized_ds = Dataset.load_from_disk(CACHE_TOKENIZED_DATASET_DIR)
+            logger.info(f"✓ Loaded tokenized dataset with {len(tokenized_ds)} samples")
+            return tokenized_ds
+
+        if 'token_ids' in self.loaded_dataset.column_names:
+            logger.info("Dataset already contains token_ids; skipping tokenization")
+            return self.loaded_dataset
+
+        logger.info("Tokenizing cached dataset for faster training...")
+
+        columns_to_remove = [c for c in self.loaded_dataset.column_names if c not in ('input_ids', 'token_ids')]
+        num_proc = self._get_num_proc()
+        try:
+            tokenized_ds = self.loaded_dataset.map(
+                self._tokenize_batch,
+                batched=True,
+                batch_size=512,
+                num_proc=num_proc,
+                remove_columns=columns_to_remove
+            )
+        except Exception as e:
+            logger.warning(f"Could not tokenize dataset with num_proc={num_proc}: {e}. Falling back to num_proc=1")
+            tokenized_ds = self.loaded_dataset.map(
+                self._tokenize_batch,
+                batched=True,
+                batch_size=512,
+                num_proc=1,
+                remove_columns=columns_to_remove
+            )
+
+        os.makedirs(CACHE_TOKENIZED_DATASET_DIR, exist_ok=True)
+        tokenized_ds.save_to_disk(CACHE_TOKENIZED_DATASET_DIR)
+        logger.info(f"✓ Saved tokenized dataset to {CACHE_TOKENIZED_DATASET_DIR}")
+        return tokenized_ds

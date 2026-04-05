@@ -19,6 +19,7 @@ from collections import Counter
 from aimlloder import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
 import sys
+import multiprocessing as mp
 
 try:
     import psutil
@@ -86,6 +87,20 @@ class DataPreparer:
         if not os.path.exists(CACHE_DIR):
             os.makedirs(CACHE_DIR)
             logger.debug(f"Created cache directory: {CACHE_DIR}")
+
+    def _get_num_proc(self) -> int:
+        """Calculate safe number of processes for Dataset.map().
+        
+        Returns:
+            int: Number of processes to use (min 1, max 4)
+        """
+        try:
+            cpus = mp.cpu_count()
+            if cpus <= 2:
+                return 1
+            return min(4, max(1, cpus // 2))
+        except Exception:
+            return 1
     
     def _cache_exists(self) -> bool:
         """Check if cached dataset exists."""
@@ -224,6 +239,7 @@ class DataPreparer:
             # Combine datasets
             logger.info("\n[6/3] Combining datasets...")
             self.combined_data = self._combine_datasets()
+            self._standardize_combined_dataset()
             
             # Collect statistics
             logger.info("\nGathering statistics...")
@@ -677,6 +693,51 @@ class DataPreparer:
         logger.info(f"\n  ✓ Combined dataset total: {total_samples} samples")
         return combined
     
+    def _standardize_combined_dataset(self):
+        """Ensure the combined dataset exposes a consistent input_ids text field using parallel processing."""
+        if self.combined_data is None:
+            return
+        if 'input_ids' in self.combined_data.column_names:
+            return
+
+        def build_input_ids(example):
+            if 'input' in example and 'output' in example:
+                text = f"{example.get('input', '').strip()} {example.get('output', '').strip()}".strip()
+                return {'input_ids': text}
+            if 'text' in example:
+                return {'input_ids': example.get('text', '').strip()}
+            if 'sentence' in example:
+                return {'input_ids': example.get('sentence', '').strip()}
+
+            text_fields = [k for k in example.keys() if k in ('input', 'output', 'text', 'sentence')]
+            if text_fields:
+                merged = ' '.join(str(example.get(k, '')).strip() for k in text_fields if example.get(k))
+                return {'input_ids': merged.strip()}
+
+            # Fallback: join all string fields
+            merged = ' '.join(str(v).strip() for v in example.values() if isinstance(v, str) and v.strip())
+            return {'input_ids': merged.strip()}
+
+        columns_to_remove = [c for c in self.combined_data.column_names if c != 'input_ids']
+        num_proc = self._get_num_proc()
+        
+        try:
+            logger.info(f"  Standardizing dataset with num_proc={num_proc}...")
+            self.combined_data = self.combined_data.map(
+                build_input_ids,
+                batched=False,
+                num_proc=num_proc,
+                remove_columns=columns_to_remove
+            )
+        except Exception as e:
+            logger.warning(f"Could not standardize with num_proc={num_proc}: {e}. Falling back to num_proc=1...")
+            self.combined_data = self.combined_data.map(
+                build_input_ids,
+                batched=False,
+                num_proc=1,
+                remove_columns=columns_to_remove
+            )
+
     def _collect_statistics(self) -> Dict:
         """
         Collect statistics about prepared datasets.

@@ -45,7 +45,7 @@ class MainChat:
 
         # Tokenizer and model
         self.tokenizer = None
-        vocab_file = 'tokenizer_vocab.json'
+        vocab_file = os.path.join('checkpoints', 'tokenizer_vocab.json')
 
         if os.path.exists(vocab_file):
             self.tokenizer = SimpleTokenizer()

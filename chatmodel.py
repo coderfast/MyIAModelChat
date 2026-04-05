@@ -58,19 +58,21 @@ La implementación específica del proceso de entrenamiento y inferencia depende
 
 import torch
 import torch.nn as nn
-import torch.nn.utils.rnn as rnn_utils
+from transformers import GPT2Config, GPT2LMHeadModel
 
 # Model
 class ChatModel(nn.Module):
-    def __init__(self, tokenizer, embed_size, hidden_size):
+    def __init__(self, tokenizer, embed_size, hidden_size, num_layers=2):
         super(ChatModel, self).__init__()
         self.tokenizer = tokenizer
-        self.embedding = nn.Embedding(tokenizer.vocab_size, embed_size, padding_idx=tokenizer.trie.get_index('<PAD>'))
-        self.lstm = nn.LSTM(embed_size, hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, tokenizer.vocab_size)
-
-        # Inicializar los pesos del modelo
-        self.apply(self.tokenizer.init_weights)
+        config = GPT2Config(
+            vocab_size=tokenizer.vocab_size,
+            n_embd=embed_size,
+            n_head=4,  # Número de cabezas de atención, ajusta según necesidad
+            n_layer=num_layers,
+            n_positions=512  # Longitud máxima de secuencia, ajusta según tu dataset
+        )
+        self.model = GPT2LMHeadModel(config)
 
     def forward(self, input_ids):
         """
@@ -82,13 +84,4 @@ class ChatModel(nn.Module):
         Returns:
             logits: Tensor of shape (batch_size, seq_length, vocab_size)
         """
-        # Pass input IDs through embedding layer
-        embedded = self.embedding(input_ids)
-        
-        # Pass through LSTM layer
-        lstm_output, (hidden, cell) = self.lstm(embedded)
-        
-        # Pass through fully connected layer to get logits
-        logits = self.fc(lstm_output)
-        
-        return logits
+        return self.model(input_ids).logits
