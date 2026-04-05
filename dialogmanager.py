@@ -31,7 +31,6 @@ class DialogueManager:
 
         self.min_length = min_length
         self.no_repeat_ngram_size = no_repeat_ngram_size
-
         self.default_response = default_response
 
     def top_k_top_p_filtering(self, logits, top_k=0, top_p=1.0, filter_value=-float("Inf")):
@@ -140,8 +139,9 @@ class DialogueManager:
         except Exception:
             pass
 
+        prompt_text = f"Pregunta: {user_text.strip()}\nRespuesta:"
         try:
-            input_ids = self.tokenizer.encode(user_text)
+            input_ids = self.tokenizer.encode(prompt_text)
         except Exception:
             input_ids = [self.unk_token_id] if self.unk_token_id is not None else [0]
 

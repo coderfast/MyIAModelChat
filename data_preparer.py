@@ -484,7 +484,10 @@ class DataPreparer:
                     input_text = parts[0].strip().strip('"')
                     output_text = parts[1].strip().strip('"')
                     if input_text and output_text:
-                        special_items.append({'input_ids': f"{input_text} {output_text}"})
+                        prompt_text = f"Pregunta: {input_text}\nRespuesta: {output_text}"
+                        # Oversample special facts to reinforce exact memorization during training
+                        for _ in range(100):
+                            special_items.append({'input_ids': prompt_text})
 
             if special_items:
                 ds = Dataset.from_list(special_items)

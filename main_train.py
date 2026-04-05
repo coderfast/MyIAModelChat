@@ -39,8 +39,8 @@ TRAINING_CONFIG = {
     'batch_size': 4,
     'accumulation_steps': 8,
     'learning_rate': 1e-3,
-    'embed_size': 128,
-    'hidden_size': 256,
+    'embed_size': 256,
+    'hidden_size': 512,
     'grad_clip_norm': 1.0,
     'memory_cleanup_interval': 10,
     # Warm-up settings
@@ -421,6 +421,31 @@ class MainTrain:
         
         return input_tensor, output_tensor
 
+    def _get_special_facts_dataloader(self, batch_size):
+        """Build a dataloader from special facts examples for fine-tuning."""
+        if getattr(self, 'raw_dataset', None) is None:
+            return None
+
+        def special_pair_generator():
+            for item in self.raw_dataset:
+                value = item.get('input_ids', None)
+                if not isinstance(value, str):
+                    continue
+                if not value.startswith('Pregunta:'):
+                    continue
+                token_seq = self.tokenizer.encode(value)
+                if not token_seq or len(token_seq) <= 1:
+                    continue
+                yield token_seq[:-1], token_seq[1:]
+
+        return DataLoader(
+            TokenPairIterableDataset(special_pair_generator),
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=self.collate_fn,
+            pin_memory=self.use_gpu,
+            num_workers=0
+        )
 
     def performMainTrain(self):
         """Main training loop with proper error handling and model checkpointing."""
@@ -465,6 +490,9 @@ class MainTrain:
             os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
             self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
             logger.info(f"✓ Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
+
+            # Preserve raw dataset text for special facts fine-tuning before tokenization
+            self.raw_dataset = loaded_dataset
 
             # Build or load pretokenized cache for faster training iterations
             self.loaded_dataset = self._get_tokenized_dataset()
@@ -512,8 +540,8 @@ class MainTrain:
             device = self._setup_device_and_config()
 
             # Initialize model with device strategy
-            logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']})...")
-            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'])
+            logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
+            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'], num_layers=4)
             model = self._setup_model_with_device_strategy(model, device)
             logger.info(f"✓ Model initialized and deployed")
 
@@ -605,6 +633,16 @@ class MainTrain:
             if self.stop_event.is_set():
                 logger.info("\nStop requested; skipping final model save")
                 return
+
+            # Fine-tune on special facts examples if available
+            special_dataloader = self._get_special_facts_dataloader(batch_size=TRAINING_CONFIG['batch_size'])
+            if special_dataloader is not None:
+                logger.info("\nStarting special facts fine-tuning...")
+                try:
+                    _ = self.train(model, special_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+                    logger.info("✓ Special facts fine-tuning completed")
+                except Exception as e:
+                    logger.warning(f"Special facts fine-tuning failed: {e}")
 
             # Save final model + tokenizer state for consistent inference
             logger.info(f"\n{'='*80}")

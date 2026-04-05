@@ -70,7 +70,7 @@ class MainChat:
                 logger.warning("No tokenizer found in checkpoint or vocab file. Using fresh SimpleTokenizer.")
 
             # Instantiate model with tokenizer-derived vocab
-            self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
+            self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512, num_layers=4)
 
             if state_dict is None:
                 raise ValueError('Checkpoint does not contain model state dict')
@@ -126,9 +126,9 @@ class MainChat:
                 "occupation": "AI assistant",
                 "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
             },
-            top_k=20,
-            top_p=0.85,
-            temperature=0.7,
+            top_k=1,
+            top_p=1.0,
+            temperature=1e-8,
             max_len=128,
             min_length=5,
             no_repeat_ngram_size=3,
