@@ -166,10 +166,13 @@ CPU CONFIGURATION:
   --num_threads NUM    Threads per worker (default: {default_num_threads}, 0=all)
 
 EXAMPLES:
-  python main.py --train --aiml --hf --epochs 10
-  python main.py --train --aiml --use-cpuonly --num_cores 4
   python main.py --prepare-data --aiml --hf --pdf --epub
+
+  python main.py --train --aiml --hf --epochs 10
+  python main.py --train --aiml --use-cpuonly --num_cores 4 --num_threads 4
+
   python main.py --chat
+  python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
             """
         )
         

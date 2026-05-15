@@ -3,21 +3,67 @@ import warnings
 import argparse
 import logging
 import importlib
+import json
 import re
+import time
+import hashlib
 import psutil
 import torch
+import multiprocessing as mp
+from typing import Any, Dict, List, Optional, Union
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 from dialogmanager import DialogueManager
 from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
 from transformers import pipeline
 
+# Configuration constants
+SYSTEM_CONFIG = {
+    'default_cores_fraction': 0.5,
+    'min_cores': 1,
+    'min_threads': 1,
+    'max_ram_fraction': 0.75,
+}
+
 # Configuración principal
 use_trusted = False  # Cambia a True solo si confías totalmente en el checkpoint
 CKPT_PATH = 'chat_model.pth'
 MAX_RAM_GB = None  # Ej: 4 para limitar a 4GB; None para no aplicar límite
+MODEL_NAME = 'myiamodelchat-local'
+OLLAMA_VERSION = '0.6.4'
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s: %(message)s")
 logger = logging.getLogger(__name__)
+app = FastAPI(title="MyIAModelChat Ollama-compatible Server")
+main_chat_instance = None
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    model: Optional[str] = None
+    messages: List[ChatMessage]
+    max_tokens: Optional[int] = 512
+    temperature: Optional[float] = 1.0
+    top_p: Optional[float] = 1.0
+    stream: Optional[bool] = False
+    stop: Optional[List[str]] = None
+
+class GenerateRequest(BaseModel):
+    prompt: str
+    max_tokens: Optional[int] = 256
+    temperature: Optional[float] = 1.0
+    top_p: Optional[float] = 1.0
+    stop: Optional[List[str]] = None
+    stream: Optional[bool] = False
+
+class EmbeddingRequest(BaseModel):
+    model: Optional[str] = None
+    input: Union[str, List[str]]
+    user: Optional[str] = None
 
 class MainChat:
     def __init__(self, args):
@@ -208,15 +254,288 @@ class MainChat:
         except KeyboardInterrupt:
             logger.info("Chat terminated by user.")
 
+    def generate_response(self, prompt: str) -> str:
+        return self.dialogue_manager.generate_response(prompt)
+
+
+def get_main_chat_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None):
+    global main_chat_instance
+    if main_chat_instance is None:
+        args = argparse.Namespace(chat=False, use_cpuonly=use_cpuonly, cuda_device=cuda_device)
+        main_chat_instance = MainChat(args)
+    return main_chat_instance
+
+
+def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
+    parts: List[str] = []
+    for message in messages:
+        role = str(message.get('role', 'user')).lower()
+        content = str(message.get('content', ''))
+        if role == 'system':
+            parts.append(f"System: {content}")
+        elif role == 'assistant':
+            parts.append(f"Assistant: {content}")
+        else:
+            parts.append(f"User: {content}")
+    parts.append('Assistant:')
+    return '\n'.join(parts)
+
+
+def truncate_stop_sequences(text: str, stop: Optional[List[str]]) -> str:
+    if not stop:
+        return text
+    for s in stop:
+        if s and s in text:
+            text = text.split(s, 1)[0]
+    return text
+
+
+def make_usage(prompt_text: str, completion_text: str) -> Dict[str, int]:
+    prompt_tokens = len(prompt_text.split())
+    completion_tokens = len(completion_text.split())
+    return {
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completion_tokens,
+        'total_tokens': prompt_tokens + completion_tokens
+    }
+
+
+def stream_chat_text(text: str, request_id: Optional[str] = None):
+    def gen():
+        chunk_size = 64
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i+chunk_size]
+            payload = {
+                'id': request_id,
+                'object': 'chat.completion.chunk',
+                'delta': {'role': 'assistant', 'content': chunk}
+            }
+            yield json.dumps(payload) + '\n'
+            time.sleep(0.01)
+        yield json.dumps({'id': request_id, 'object': 'chat.completion.complete'}) + '\n'
+    return gen()
+
+
+def encode_text_embedding(text: str, chat: MainChat) -> List[float]:
+    default_size = 512
+    try:
+        token_ids = chat.tokenizer.encode(text)
+        if not token_ids:
+            return [0.0] * default_size
+        emb_weights = chat.model.model.transformer.wte.weight
+        tokens_tensor = torch.LongTensor(token_ids).to(emb_weights.device)
+        token_embeds = emb_weights[tokens_tensor]
+        avg_embed = token_embeds.mean(dim=0)
+        vector = avg_embed.detach().cpu().tolist()
+        if len(vector) < default_size:
+            vector.extend([0.0] * (default_size - len(vector)))
+        return [float(x) for x in vector[:default_size]]
+    except Exception:
+        digest = hashlib.sha256(text.encode('utf-8')).digest()
+        vector = [b / 255.0 for b in digest]
+        if len(vector) < default_size:
+            vector.extend([0.0] * (default_size - len(vector)))
+        return vector[:default_size]
+
+
+@app.get('/v1/health')
+def v1_health():
+    return {'status': 'ok'}
+
+
+@app.get('/v1/models')
+def v1_models():
+    return [
+        {
+            'name': MODEL_NAME,
+            'id': MODEL_NAME,
+            'description': 'MyIAModelChat local model',
+            'size': 'custom',
+            'family': 'myiamodelchat'
+        }
+    ]
+
+
+@app.get('/v1/version')
+def v1_version():
+    return {'name': MODEL_NAME, 'version': OLLAMA_VERSION}
+
+
+@app.post('/v1/chat/completions')
+@app.post('/api/chat/completions')
+async def chat_completions(req: ChatRequest):
+    prompt = build_prompt_from_messages([m.dict() for m in req.messages])
+    chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
+    text = chat.generate_response(prompt)
+    text = truncate_stop_sequences(text, req.stop)
+    if req.stream:
+        return StreamingResponse(stream_chat_text(text), media_type='application/json')
+    response = {
+        'id': None,
+        'object': 'chat.completion',
+        'created': int(time.time()),
+        'model': req.model or MODEL_NAME,
+        'choices': [
+            {
+                'index': 0,
+                'message': {'role': 'assistant', 'content': text},
+                'finish_reason': 'stop'
+            }
+        ],
+        'usage': make_usage(prompt, text)
+    }
+    return JSONResponse(response)
+
+
+@app.post('/api/chat')
+async def api_chat(request: Request):
+    data = await request.json()
+    messages = data.get('messages', [])
+    prompt = build_prompt_from_messages(messages)
+    chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
+    text = chat.generate_response(prompt)
+    text = truncate_stop_sequences(text, data.get('stop'))
+    if data.get('stream', False):
+        return StreamingResponse(stream_chat_text(text), media_type='application/json')
+    response = {
+        'id': None,
+        'object': 'chat.completion',
+        'created': int(time.time()),
+        'model': data.get('model', MODEL_NAME),
+        'choices': [
+            {
+                'index': 0,
+                'message': {'role': 'assistant', 'content': text},
+                'finish_reason': 'stop'
+            }
+        ],
+        'usage': make_usage(prompt, text)
+    }
+    return JSONResponse(response)
+
+
+@app.post('/v1/embeddings')
+async def v1_embeddings(req: EmbeddingRequest):
+    chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
+    inputs = [req.input] if isinstance(req.input, str) else req.input
+    embeddings = []
+    for index, item in enumerate(inputs):
+        text = str(item)
+        vector = encode_text_embedding(text, chat)
+        embeddings.append({'object': 'embedding', 'embedding': vector, 'index': index})
+    return {
+        'object': 'list',
+        'data': embeddings,
+        'model': req.model or MODEL_NAME
+    }
+
+
+@app.post('/api/generate')
+async def api_generate(req: GenerateRequest):
+    chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
+    text = chat.generate_response(req.prompt)
+    text = truncate_stop_sequences(text, req.stop)
+    if req.stream:
+        return StreamingResponse(stream_chat_text(text), media_type='application/json')
+    return {
+        'id': None,
+        'model': MODEL_NAME,
+        'object': 'text_completion',
+        'text': text,
+        'usage': make_usage(req.prompt, text)
+    }
+
+
 def parse_args():
+    
     parser = argparse.ArgumentParser()
-    parser.add_argument('--chat', action='store_true')
+    
+    parser.add_argument('--chat', action='store_true', help='Run Ollama-compatible HTTP server')
+    parser.add_argument('--console', action='store_true', help='Run terminal chat loop')
+    
+    parser.add_argument('--host', default='127.0.0.1')
+    parser.add_argument('--port', type=int, default=11434)
+    
     parser.add_argument('--use-cpuonly', action='store_true')
     parser.add_argument('--cuda_device', type=int, default=None)
+    
+    # CPU configuration
+    parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")
+    parser.add_argument("--num_threads", type=int, default=default_num_threads, help=f"Threads (default: {default_num_threads})")
     return parser.parse_args()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
+
+    def get_memory_limit_bytes(max_ram_fraction):
+        """Return the maximum memory limit in bytes based on available system RAM."""
+        if psutil is None:
+            logger.warning("psutil is not installed. Cannot enforce RAM usage limits precisely.")
+            return None
+
+        total_bytes = psutil.virtual_memory().total
+        limited_bytes = int(total_bytes * max_ram_fraction)
+        logger.info(f"System memory: {total_bytes / (1024 ** 3):.2f} GB")
+        logger.info(f"Applying max RAM usage fraction: {max_ram_fraction * 100:.0f}% => {limited_bytes / (1024 ** 3):.2f} GB")
+        return limited_bytes
+
+    def setup_cpu_configuration(args):
+        """Configure CPU threading based on arguments."""
+        if args.num_cores == 0:
+            args.num_cores = mp.cpu_count()
+            logger.info(f"Auto-detected CPU cores: {args.num_cores}")
+        
+        if args.num_threads == 0:
+            args.num_threads = mp.cpu_count()
+            logger.info(f"Auto-detected threads: {args.num_threads}")
+        
+        logger.info(f"\n{'='*80}")
+        logger.info("CPU CONFIGURATION")
+        logger.info(f"{'='*80}")
+        
+        os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
+        torch.set_num_threads(args.num_threads)
+        os.environ["MKL_NUM_THREADS"] = str(args.num_cores)
+        torch.set_num_interop_threads(args.num_cores)
+        
+        # Enforce memory limit (75% of system RAM by default)
+        args.max_ram_bytes = get_memory_limit_bytes(getattr(args, 'max_ram_fraction', SYSTEM_CONFIG['max_ram_fraction']))
+        if args.max_ram_bytes is not None:
+            current_used = psutil.virtual_memory().used
+            if current_used > args.max_ram_bytes:
+                logger.warning(f"Current memory usage ({current_used/(1024**3):.2f} GB) exceeds set limit ({args.max_ram_bytes/(1024**3):.2f} GB).\n"
+                            "Consider closing other programs before training.")
+
+        logger.info(f"OMP_NUM_THREADS (PyTorch): {args.num_threads}")
+        logger.info(f"MKL_NUM_THREADS (NumPy): {args.num_cores}")
+        logger.info(f"PyTorch threads: {torch.get_num_threads()}")
+        logger.info(f"Available CPUs: {mp.cpu_count()}")
+        logger.info(f"{'='*80}\n")
+
+    # Calculate default CPU configuration
+    system_cpu_count = mp.cpu_count()
+    default_num_cores = max(
+        SYSTEM_CONFIG['min_cores'],
+        int(system_cpu_count * SYSTEM_CONFIG['default_cores_fraction'])
+    )
+    default_num_threads = max(
+        SYSTEM_CONFIG['min_threads'],
+        int(system_cpu_count * SYSTEM_CONFIG['default_cores_fraction'])
+    )
+
+    # get command line arguments
     args = parse_args()
-    main = MainChat(args)
+
+    # Setup CPU configuration
+    setup_cpu_configuration(args)
+
     if args.chat:
+        logger.info('Starting Ollama-compatible server on %s:%s', args.host, args.port)
+        get_main_chat_instance(use_cpuonly=args.use_cpuonly, cuda_device=args.cuda_device)
+        import uvicorn
+        uvicorn.run('main_chat:app', host=args.host, port=args.port, log_level='info')
+    elif args.console:
+        main = MainChat(args)
         main.performMainChat()
+    else:
+        logger.info('No mode selected. Use --chat for server or --console for terminal chat.')
