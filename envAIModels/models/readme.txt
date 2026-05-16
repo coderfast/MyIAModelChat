@@ -1,0 +1,1 @@
+Aqui modelos gguf o de otro tipo pero que cumplan con API v1 Ollama
