@@ -7,7 +7,7 @@ Agregar soporte para rethinking en el modelo y en la inferencia, de forma que el
 
 ## Tareas pendientes
 
-### 1. Preparación en caché de datasets con BPE y multilingüe
+### 1. Preparación en caché de datasets con BPE y multilingüe ✅ (COMPLETADA)
 - Crear o mejorar el pipeline de preparación de datos para que genere un cache previo de datasets.
 - Incluir tokenización BPE durante la fase de preprocesamiento antes de guardar en caché.
 - Permitir que la caché soporte datos en Español e Inglés desde el inicio y pueda ampliarse a más idiomas.
@@ -39,6 +39,19 @@ Agregar soporte para rethinking en el modelo y en la inferencia, de forma que el
 - Actualizar `main_train.py` para incluir nuevos flags o parámetros de rethinking.
 - Actualizar `main_chat.py` y cualquier API wrapper para exponer la opción de uso de rethinking.
 - Añadir tests básicos que verifiquen la activación/desactivación de rethinking en inferencia y entrenamiento.
+
+### Cambios recientes (COMPLETADOS)
+
+- `main_train.py`: ahora carga `dataset_cache/cache_metadata.pkl` y detecta si la caché incluye `token_ids`. Si existen `token_ids`, el pipeline de entrenamiento los usa directamente para evitar re-tokenización. ✅ (COMPLETADO)
+- Añadido `SentencePieceTokenizerWrapper` y soporte opcional para cargar `dataset_cache/sentencepiece.model` cuando `cache_metadata.pkl` contiene `bpe_model_path`; si `sentencepiece` está instalado el wrapper se inicializa automáticamente. ✅ (COMPLETADO)
+
+### Tarea prioritaria para mañana (Máxima prioridad)
+
+- Ejecutar pruebas de verificación BPE + caché:
+  1. `python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 2000 --refresh-cache`
+  2. `python main.py --train --use-cache --epochs 1`
+
+  Objetivo: confirmar que `sentencepiece.model` se crea/carga correctamente, `dataset_cache/prepared_dataset` contiene `token_ids`, y `main_train.py` usa los `token_ids` pre-tokenizados sin volver a tokenizar. (NOT-STARTED) — Prioridad: ALTA
 
 ### 6. Documentación y guías
 - Añadir sección en `README.md` o `FICHA_HUGGINGFACE.MD` sobre la nueva capacidad de rethinking y la tokenización BPE multilingüe.

@@ -23,6 +23,8 @@
 
 # Prepare data from multiple sources
 python main.py --prepare-data --aiml --pdf --epub
+# Prepare and build a BPE-tokenized cache (requires sentencepiece)
+python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
 
 # Train with cached data (fast)
 python main.py --train --use-cache --epochs 30
@@ -39,6 +41,9 @@ python main.py --prepare-data --aiml --epub --refresh-cache
 # Clear old cache
 python main.py --clear-cache
 
+# Prepare data and build BPE-tokenized cache
+python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 8000
+
 # Train with AIML only
 python main.py --train --epochs 10 --aiml
 
@@ -53,7 +58,16 @@ python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
 
 # Just preprocess data
 python main.py --prepare-data
+
+# Inspect cache metadata (quick check)
+python - <<'PY'
+import pickle
+md = pickle.load(open('dataset_cache/cache_metadata.pkl','rb'))
+print(md)
+PY
 ```
+
+**BPE note:** Use `--use-bpe` to build a SentencePiece BPE-tokenized cache from textual sources (AIML, extracted PDF/EPUB text, Hugging Face datasets). If `sentencepiece` is not installed the prepare step will skip BPE and create a non-tokenized cache (a warning is emitted).
 
 ## Model Config Essentials
 

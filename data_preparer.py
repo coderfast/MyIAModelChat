@@ -26,6 +26,10 @@ try:
 except ImportError:
     psutil = None
 try:
+    import sentencepiece as spm
+except Exception:
+    spm = None
+try:
     from PyPDF2 import PdfReader
 except ImportError:
     PdfReader = None
@@ -48,6 +52,7 @@ CACHE_DIR = 'dataset_cache'
 CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
 CACHE_METADATA_FILE = os.path.join(CACHE_DIR, 'cache_metadata.pkl')
+BPE_MODEL_PATH = os.path.join(CACHE_DIR, 'sentencepiece.model')
 
 
 class DataPreparer:
@@ -153,6 +158,11 @@ class DataPreparer:
             with open(CACHE_STATS_FILE, 'wb') as f:
                 pickle.dump(self.statistics, f)
             logger.info(f"  ✓ Saved statistics: {CACHE_STATS_FILE}")
+            # Save metadata (e.g., tokenizer info)
+            metadata = getattr(self, 'cache_metadata', {})
+            with open(CACHE_METADATA_FILE, 'wb') as f:
+                pickle.dump(metadata, f)
+            logger.info(f"  ✓ Saved cache metadata: {CACHE_METADATA_FILE}")
             
             logger.info("  ✓ Cache ready for future runs")
             
@@ -244,6 +254,15 @@ class DataPreparer:
             # Collect statistics
             logger.info("\nGathering statistics...")
             self.statistics = self._collect_statistics()
+
+            # Optional: train or load BPE tokenizer and tokenize data before caching
+            use_bpe = getattr(self.args, 'use_bpe', False)
+            bpe_vocab_size = getattr(self.args, 'bpe_vocab_size', 8000)
+            if use_bpe:
+                try:
+                    self._prepare_bpe_tokenizer_and_tokenize(bpe_vocab_size)
+                except Exception as e:
+                    logger.warning(f"  ⚠ BPE tokenization failed: {e}")
             
             # Save to cache
             self._save_to_cache()
@@ -648,6 +667,133 @@ class DataPreparer:
         else:
             logger.warning(f"  ⚠ No EPUB files found in '{epub_dir}' directory")
             return Dataset.from_list([])
+
+    def _prepare_bpe_tokenizer_and_tokenize(self, vocab_size: int = 8000):
+        """
+        Train or load a SentencePiece (BPE) tokenizer and apply it to the combined dataset.
+        Adds a `token_ids` column with list[int] per sample and stores tokenizer model in cache.
+        """
+        if spm is None:
+            logger.warning("sentencepiece not installed. Install with: pip install sentencepiece\nSkipping BPE tokenization.")
+            return
+
+        # Ensure we have a textual field to train BPE on (avoid numeric token ids)
+        logger.info("\n[7/3] Preparing BPE tokenizer (SentencePiece)...")
+        sample = None
+        try:
+            sample = self.combined_data[0]
+        except Exception:
+            sample = None
+
+        text_column = None
+        if sample is not None:
+            # Prefer existing textual 'input_ids' if it's a string
+            val = sample.get('input_ids')
+            if isinstance(val, str):
+                text_column = 'input_ids'
+            else:
+                # Find any other string column to use
+                for col in self.combined_data.column_names:
+                    if col == 'input_ids':
+                        continue
+                    v = sample.get(col)
+                    if isinstance(v, str):
+                        text_column = col
+                        break
+
+        if text_column is None:
+            logger.warning("  ⚠ No textual field found for BPE training (dataset may already be pre-tokenized). Skipping BPE.")
+            return
+
+        # Create a 'bpe_text' column copying the chosen text column to avoid overwriting
+        if 'bpe_text' not in self.combined_data.column_names:
+            def extract_text(example):
+                return {'bpe_text': example.get(text_column, '') if example.get(text_column) is not None else ''}
+
+            num_proc = self._get_num_proc()
+            try:
+                self.combined_data = self.combined_data.map(extract_text, batched=False, num_proc=num_proc)
+            except Exception:
+                self.combined_data = self.combined_data.map(extract_text, batched=False, num_proc=1)
+
+        # Collect texts for tokenizer training (subset if too large)
+        texts = []
+        max_train_samples = 50000
+        try:
+            for i, item in enumerate(self.combined_data):
+                text = item.get('bpe_text')
+                if isinstance(text, str) and text.strip():
+                    texts.append(text)
+                if len(texts) >= max_train_samples:
+                    break
+        except Exception as e:
+            logger.warning(f"  ⚠ Error collecting texts for tokenizer training: {e}")
+
+        if not texts:
+            logger.warning("  ⚠ No texts available for BPE tokenizer training after extraction. Skipping.")
+            return
+
+        # Prepare temporary file for sentencepiece training
+        tmp_corpus = os.path.join(CACHE_DIR, 'sp_corpus.txt')
+        with open(tmp_corpus, 'w', encoding='utf-8') as f:
+            for t in texts:
+                f.write(t.replace('\n', ' ') + "\n")
+
+        model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
+        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=1.0"
+        logger.info(f"  Training SentencePiece BPE model (vocab_size={vocab_size})... this may take a while")
+        spm.SentencePieceTrainer.Train(spm_cmd)
+
+        model_file = model_prefix + '.model'
+        if not os.path.exists(model_file):
+            raise FileNotFoundError(f"SentencePiece model not found after training: {model_file}")
+
+        # Load the trained model
+        sp = spm.SentencePieceProcessor()
+        sp.load(model_file)
+
+        # Tokenize dataset to token ids
+        def tokenize_example(example):
+            # Prefer bpe_text (raw text); fall back to input_ids if textual
+            text = example.get('bpe_text') or example.get('input_ids', '')
+            if not isinstance(text, str):
+                # If input_ids is numeric tokens, we cannot reliably re-tokenize into BPE
+                return {'token_ids': []}
+            ids = sp.encode(text, out_type=int)
+            return {'token_ids': ids}
+
+        num_proc = self._get_num_proc()
+        try:
+            logger.info(f"  Applying BPE tokenizer to dataset with num_proc={num_proc}...")
+            self.combined_data = self.combined_data.map(
+                tokenize_example,
+                batched=False,
+                num_proc=num_proc,
+            )
+        except Exception as e:
+            logger.warning(f"  Could not tokenize with num_proc={num_proc}: {e}. Falling back to num_proc=1...")
+            self.combined_data = self.combined_data.map(
+                tokenize_example,
+                batched=False,
+                num_proc=1,
+            )
+
+        # Save metadata about tokenizer
+        self.cache_metadata = getattr(self, 'cache_metadata', {})
+        self.cache_metadata['bpe_vocab_size'] = vocab_size
+        self.cache_metadata['bpe_model'] = os.path.basename(model_file)
+        # Move model to canonical path
+        try:
+            shutil.copyfile(model_file, BPE_MODEL_PATH)
+            self.cache_metadata['bpe_model_path'] = BPE_MODEL_PATH
+        except Exception:
+            self.cache_metadata['bpe_model_path'] = model_file
+
+        # Cleanup temporary corpus
+        try:
+            os.remove(tmp_corpus)
+        except Exception:
+            pass
     
     def _combine_datasets(self) -> Dataset:
         """

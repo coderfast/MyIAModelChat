@@ -48,7 +48,14 @@ python main.py --prepare-data --pdf --epub --refresh-cache
 
 # Clear cache to free space
 python main.py --clear-cache
+
+## Build a BPE-tokenized cache (optional)
+
+```bash
+python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
 ```
+
+When using `--use-bpe`, SentencePiece (BPE) is trained on extracted text and the prepared cache will include a `token_ids` column for each sample as well as `dataset_cache/sentencepiece.model` and `dataset_cache/cache_metadata.pkl` containing tokenizer metadata. Note: BPE is applied to textual sources (AIML/PDF/EPUB/HF). If `sentencepiece` is not installed the pipeline will skip BPE and continue preparing a non-tokenized cache (a warning is emitted).
 
 **Caching Benefits:**
 - 12x faster dataset loading

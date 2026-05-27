@@ -16,6 +16,60 @@ import logging
 import shutil
 from datetime import datetime
 
+# Optional SentencePiece support
+try:
+    import sentencepiece as spm
+    SP_AVAILABLE = True
+except Exception:
+    spm = None
+    SP_AVAILABLE = False
+
+
+class SentencePieceTokenizerWrapper:
+    """Light wrapper exposing a tokenizer API compatible with SimpleTokenizer used by training.
+
+    Methods implemented: encode, batch_encode, get_pad_index, fit (no-op), save_vocabulary
+    """
+    def __init__(self, model_path: str):
+        self.model_path = model_path
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.load(model_path)
+        # Try to detect PAD token id; fallback to 0
+        try:
+            pad_id = self.sp.piece_to_id('<pad>')
+            if pad_id < 0:
+                pad_id = self.sp.piece_to_id('<PAD>')
+        except Exception:
+            pad_id = -1
+        if pad_id is None or pad_id < 0:
+            # fallback: use 0 as pad (common scheme)
+            pad_id = 0
+        self._pad_id = pad_id
+
+    def encode(self, text: str, *args, **kwargs):
+        return list(self.sp.encode(text, out_type=int))
+
+    def batch_encode(self, texts, *args, **kwargs):
+        return [list(self.sp.encode(t, out_type=int)) for t in texts]
+
+    def get_pad_index(self):
+        return self._pad_id
+
+    def fit(self, texts):
+        # No-op: model already trained
+        return
+
+    @property
+    def vocab_size(self):
+        return self.sp.get_piece_size()
+
+    def save_vocabulary(self, filepath: str):
+        # Save small metadata pointing to sentencepiece model
+        import json
+        data = {'sentencepiece_model': self.model_path, 'vocab_size': self.vocab_size}
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
 class TrainingStopRequested(Exception):
     """Raised when a stop request is issued from the main thread."""
 
@@ -35,6 +89,7 @@ CACHE_DIR = 'dataset_cache'
 CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
 CACHE_TOKENIZED_DATASET_DIR = os.path.join(CACHE_DIR, 'prepared_dataset_tokenized')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
+CACHE_METADATA_FILE = os.path.join(CACHE_DIR, 'cache_metadata.pkl')
 
 # Training configuration constants
 TRAINING_CONFIG = {
@@ -97,13 +152,31 @@ class MainTrain:
         self.use_cpuonly = getattr(args, 'use_cpuonly', False)
         self.cuda_device = getattr(args, 'cuda_device', None)
 
-        # Load cached dataset
+        # Load cached dataset and metadata (if present)
+        self.cache_metadata = {}
+        self.cache_has_token_ids = False
         print(f"Loading dataset from cache...")
         self._load_cached_dataset()
 
         # Create Tokenizer
         print(f"Create Tokenizer")
-        if self.tokenizer == None:
+        # If cache metadata points to a SentencePiece model and SP is available, use it
+        bpe_path = None
+        try:
+            bpe_path = self.cache_metadata.get('bpe_model_path') if isinstance(self.cache_metadata, dict) else None
+        except Exception:
+            bpe_path = None
+
+        if bpe_path and SP_AVAILABLE and os.path.exists(bpe_path):
+            try:
+                self.tokenizer = SentencePieceTokenizerWrapper(bpe_path)
+                logger.info(f"Using SentencePiece tokenizer from {bpe_path}")
+            except Exception as e:
+                logger.warning(f"Could not initialize SentencePiece tokenizer: {e}; falling back to SimpleTokenizer")
+                self.tokenizer = SimpleTokenizer()
+        else:
+            if bpe_path and not SP_AVAILABLE:
+                logger.warning("cache_metadata indicates a BPE model but 'sentencepiece' package is not installed. Falling back to SimpleTokenizer.")
             self.tokenizer = SimpleTokenizer()
 
         print(f"MainTrain initialized...")
@@ -125,6 +198,24 @@ class MainTrain:
             self.loaded_dataset = Dataset.load_from_disk(CACHE_DATASET_FILE)
             logger.info(f"✓ Loaded cached dataset: {len(self.loaded_dataset)} samples")
             
+            # Load cache metadata if available
+            if os.path.exists(CACHE_METADATA_FILE):
+                try:
+                    with open(CACHE_METADATA_FILE, 'rb') as f:
+                        self.cache_metadata = pickle.load(f)
+                    logger.info("Cache metadata loaded")
+                except Exception as me:
+                    logger.warning(f"Could not read cache metadata: {me}")
+
+            # Detect whether cached dataset already contains tokenized ids
+            if 'token_ids' in getattr(self.loaded_dataset, 'column_names', []):
+                self.cache_has_token_ids = True
+                logger.info("Cached dataset contains 'token_ids' - will use pre-tokenized data for training")
+            # fallback: if metadata includes a bpe model path, prefer tokenized flow
+            elif isinstance(self.cache_metadata, dict) and self.cache_metadata.get('bpe_model_path'):
+                self.cache_has_token_ids = True
+                logger.info("Cache metadata indicates BPE model present; training will prefer tokenized cache if available")
+
             # Load statistics if available
             if os.path.exists(CACHE_STATS_FILE):
                 with open(CACHE_STATS_FILE, 'rb') as f:

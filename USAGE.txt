@@ -92,6 +92,22 @@ Primary Mode Arguments (choose one):
         - Use --refresh-cache to update cached data
         - Works with --train and --prepare-data modes
 
+--use-bpe
+    Description: Train/apply a SentencePiece BPE tokenizer during data preparation and save tokenized cache
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --pdf --use-bpe --bpe-vocab-size 8000
+    Notes:
+        - Requires `sentencepiece` package to be installed to train BPE (`pip install sentencepiece`)
+        - When enabled, prepared cache will include `token_ids` per sample and a `sentencepiece.model` in `dataset_cache/`
+        - Use `--bpe-vocab-size` to control vocabulary size (default: 8000)
+
+--bpe-vocab-size <N>
+    Description: Vocabulary size for SentencePiece BPE tokenizer when using --use-bpe
+    Type: Integer
+    Default: 8000
+    Example: python main.py --prepare-data --aiml --use-bpe --bpe-vocab-size 16000
+
 --refresh-cache
     Description: Clear old cache and rebuild from fresh data
     Type: Boolean flag (no value needed)
@@ -134,6 +150,13 @@ Typical Cache Workflow:
     2. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
     3. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
     4. python main.py --prepare-data --aiml --hf --refresh-cache  (5-30 seconds, updates)
+
+Quick verification (BPE + cached training smoke test):
+    # Prepare data with BPE and build tokenized cache
+    python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 2000 --refresh-cache
+
+    # Run a very short training using the cached token_ids to verify integration
+    python main.py --train --use-cache --epochs 1
 
 ================================================================================
 
@@ -322,6 +345,10 @@ Dataset caching enables fast repeated runs without reloading source data.
 
 7. Clear cache to free disk space:
     python main.py --clear-cache
+
+8. Prepare data and build a BPE-tokenized cache:
+    python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
+
 
 8. Complete workflow with caching (prepare → cache → train → chat):
     python main.py --prepare-data --aiml --pdf --epub

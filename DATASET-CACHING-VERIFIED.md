@@ -211,6 +211,16 @@ python main.py --clear-cache
 
 ---
 
+### BPE and tokenized cache
+
+When `--use-bpe` is passed to `--prepare-data`, the prepared cache will additionally include a trained SentencePiece model and tokenized IDs per sample. Expect these extra files inside `dataset_cache/`:
+
+- `sentencepiece.model` — the trained SentencePiece BPE model
+- `dataset_cache/prepared_dataset/` — dataset with a `token_ids` column and optional `bpe_text` field
+- `cache_metadata.pkl` — metadata that records `bpe_model_path` and `bpe_vocab_size`
+
+The BPE flow is compatible with AIML, PDF and EPUB extracted text as these are plain textual sources. If `sentencepiece` is not available the prepare step will skip BPE and create a standard (non-tokenized) cache; check console warnings or `cache_metadata.pkl` to confirm.
+
 ## 📝 Implementation Details
 
 ### Cache Lifecycle

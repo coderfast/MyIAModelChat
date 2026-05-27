@@ -123,6 +123,16 @@ project_root/
   - `max_text_length`: Maximum text length
   - `source_breakdown`: Per-source sample counts
 
+### Nota sobre BPE y cache
+
+Si se utiliza el flag `--use-bpe` durante `--prepare-data`, el pipeline entrenará o cargará un modelo SentencePiece (BPE) y aplicará la tokenización al dataset antes de guardarlo en caché. En ese caso la carpeta `dataset_cache/` incluirá además:
+
+- `sentencepiece.model` — modelo SentencePiece entrenado (BPE)
+- `cache_metadata.pkl` — metadata con `bpe_model_path` y `bpe_vocab_size`
+- El dataset guardado contendrá una columna `token_ids` con los ids BPE por muestra (y `bpe_text` con el texto fuente usado para entrenar BPE).
+
+Esto permite cargas posteriores del dataset ya tokenizado, acelerando entrenamientos que requieran BPE y mejorando la reproducibilidad.
+
 ### Cache Size
 - Typically 100MB - 1GB depending on data sources
 - Disk space is modest compared to model files

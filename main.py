@@ -198,6 +198,8 @@ EXAMPLES:
         parser.add_argument("--use-cache", action='store_true', help="Load cached dataset")
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache")
         parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
+        parser.add_argument("--use-bpe", action='store_true', help="Train/apply BPE tokenizer during data preparation and cache tokenized data")
+        parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
         parser.add_argument("--cuda-device", type=str, default=None,
                             help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],

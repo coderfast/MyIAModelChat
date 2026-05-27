@@ -254,6 +254,15 @@ for batch in dataloader:
     # Use embeddings in your model
     # outputs = model(embeddings)
     # loss = criterion(outputs, labels)
+
+## Nota: integración con SentencePiece (BPE)
+
+Si el pipeline de preparación de datos se ejecuta con `--use-bpe`, se generará un modelo SentencePiece (BPE) y el dataset cacheado incluirá `token_ids` que corresponden a tokens BPE. En escenarios donde se utilice BPE global (SentencePiece) en lugar de `BilingualTokenizer`, puedes:
+
+- Cargar `dataset_cache/sentencepiece.model` para tokenizar/decodificar de forma consistente en entrenamiento e inferencia.
+- Mantener `BilingualTokenizer` para tareas de preprocesamiento y etiquetado de idioma, pero al entrenar o inferir con `token_ids` BPE asegúrate de alinear el vocabulario y las embeddings con el esquema BPE.
+
+En resumen: `--use-bpe` y `BilingualTokenizer` pueden coexistir; documenta y guarda el `bpe_model_path` en `cache_metadata.pkl` para reproducibilidad.
 ```
 
 ## Inference Integration Example
