@@ -12,7 +12,7 @@ import torch
 import multiprocessing as mp
 from typing import Any, Dict, List, Optional, Union
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from dialogmanager import DialogueManager
 from simpletokenizer import SimpleTokenizer
@@ -38,6 +38,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name
 logger = logging.getLogger(__name__)
 app = FastAPI(title="MyIAModelChat Ollama-compatible Server")
 main_chat_instance = None
+
+
+# Helper to create UTF-8 JSON responses (preserve non-ASCII chars)
+def make_json_response(obj, status_code: int = 200):
+    try:
+        body = json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        try:
+            body = str(obj)
+        except Exception:
+            body = "{}"
+    return Response(content=body.encode("utf-8"), media_type="application/json; charset=utf-8", status_code=status_code)
 
 class ChatMessage(BaseModel):
     role: str
@@ -384,7 +396,7 @@ async def chat_completions(req: ChatRequest):
         ],
         'usage': make_usage(prompt, text)
     }
-    return JSONResponse(response)
+    return make_json_response(response)
 
 
 @app.post('/api/chat')
@@ -411,7 +423,7 @@ async def api_chat(request: Request):
         ],
         'usage': make_usage(prompt, text)
     }
-    return JSONResponse(response)
+    return make_json_response(response)
 
 
 @app.post('/v1/embeddings')
