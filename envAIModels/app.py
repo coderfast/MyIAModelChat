@@ -459,3 +459,85 @@ def v1_models():
 @app.get("/v1/version")
 def v1_version():
     return version()
+
+
+# OpenAI / Ollama-compatible endpoints
+@app.post("/v1/completions")
+async def v1_completions(request: Request):
+    data = await request.json()
+    # accept either 'prompt' or 'input' keys
+    prompt = data.get("prompt") or (data.get("input") if isinstance(data.get("input"), str) else None)
+    if not prompt:
+        return JSONResponse({"error": "no prompt provided"}, status_code=400)
+
+    max_tokens = data.get("max_tokens", 256)
+    temperature = data.get("temperature", 0.0)
+    top_p = data.get("top_p", 1.0)
+    stop = data.get("stop")
+    stream = data.get("stream", False)
+
+    if stream:
+        async def event_stream():
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
+                yield json.dumps({"id": None, "object": "text.chunk", "text": chunk}, ensure_ascii=False) + "\n"
+            yield json.dumps({"id": None, "object": "text.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+    loop = asyncio.get_running_loop()
+    try:
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
+    except Exception as e:
+        logger.exception("v1/completions generation failed")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    text = out["choices"][0].get("text", "") or ""
+    return JSONResponse({"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out})
+
+
+@app.post("/v1/chat/completions")
+async def v1_chat_completions(request: Request):
+    data = await request.json()
+    messages = data.get("messages", [])
+    if not messages:
+        return JSONResponse({"error": "no messages provided"}, status_code=400)
+
+    prompt = build_prompt_from_messages(messages)
+    stream = data.get("stream", False)
+    max_tokens = data.get("max_tokens", 512)
+    temperature = data.get("temperature", 0.0)
+    top_p = data.get("top_p", 1.0)
+    stop = data.get("stop")
+
+    if stream:
+        async def event_stream():
+            first_sent = True
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
+                payload = {"id": None, "object": "chat.completion.chunk", "delta": {"role": "assistant" if first_sent else None, "content": chunk}}
+                if payload["delta"].get("role") is None:
+                    del payload["delta"]["role"]
+                yield json.dumps(payload, ensure_ascii=False) + "\n"
+                first_sent = False
+            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+    loop = asyncio.get_running_loop()
+    try:
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p))
+    except Exception as e:
+        logger.exception("v1/chat/completions failed")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    text = out["choices"][0].get("text", "") or ""
+    response = {
+        "id": None,
+        "object": "chat.completion",
+        "model": MODEL_NAME,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop"
+            }
+        ]
+    }
+    return JSONResponse(response)
