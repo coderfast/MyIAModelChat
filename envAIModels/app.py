@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 from collections.abc import Iterable, Mapping, AsyncIterable
@@ -21,6 +21,18 @@ CHUNK_SIZE = 64  # tamaño de chunk para streaming emulado si es necesario
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
 
+
+# Helper to create UTF-8 JSON responses (preserve non-ASCII chars)
+def make_json_response(obj, status_code: int = 200):
+    try:
+        body = json.dumps(obj, ensure_ascii=False)
+    except Exception:
+        try:
+            body = str(obj)
+        except Exception:
+            body = "{}"
+    return Response(content=body.encode("utf-8"), media_type="application/json; charset=utf-8", status_code=status_code)
+
 # Inicializa el modelo con manejo de errores
 try:
     model = Llama(model_path=MODEL_PATH)
@@ -32,8 +44,8 @@ except Exception as e:
 class GenerateRequest(BaseModel):
     prompt: str
     max_tokens: Optional[int] = 256
-    temperature: Optional[float] = 0.0
-    top_p: Optional[float] = 1.0
+    temperature: Optional[float] = 0.3
+    top_p: Optional[float] = 0.9
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
 
@@ -45,8 +57,8 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     messages: List[ChatMessage]
     max_tokens: Optional[int] = 512
-    temperature: Optional[float] = 0.0
-    top_p: Optional[float] = 1.0
+    temperature: Optional[float] = 0.3
+    top_p: Optional[float] = 0.9
     stream: Optional[bool] = False
     stop: Optional[List[str]] = None
 
@@ -60,8 +72,54 @@ def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
             parts.append(f"{role}: {content}")
         else:
             parts.append(f"user: {content}")
-    parts.append("assistant:")
+    parts.append("assistant: ")
     return "\n".join(parts)
+
+
+def normalize_stop(stop: Optional[Any]) -> Optional[List[str]]:
+    if stop is None:
+        return None
+    if isinstance(stop, str):
+        return [stop]
+    if isinstance(stop, list):
+        return [str(item) for item in stop]
+    return [str(stop)]
+
+
+def remove_excessive_repetition(text: str, max_repetitions: int = 1) -> str:
+    """Remove excessively repeated sentences to avoid token-padding artifacts.
+    Detects and removes sentences that appear more than max_repetitions times.
+    """
+    if not text:
+        return text
+    
+    # Split by sentence-like patterns (., !, ?)
+    import re
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    seen_sentences = {}
+    filtered_sentences = []
+    
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        
+        # Normalize for comparison (lowercase, remove extra spaces)
+        normalized = re.sub(r'\s+', ' ', sentence.lower())
+        
+        if normalized in seen_sentences:
+            seen_sentences[normalized] += 1
+            # Only keep first occurrence(s)
+            if seen_sentences[normalized] <= max_repetitions:
+                filtered_sentences.append(sentence)
+        else:
+            seen_sentences[normalized] = 1
+            filtered_sentences.append(sentence)
+    
+    result = ' '.join(filtered_sentences).strip()
+    return result
+
 
 def safe_get_text_from_item(item: Any) -> str:
     if item is None:
@@ -103,17 +161,17 @@ def is_sync_streamable(obj: Any) -> bool:
 def is_async_streamable(obj: Any) -> bool:
     return isinstance(obj, AsyncIterable)
 
-def call_model_with_signatures(prompt: str, max_tokens: int, temperature: float, top_p: float, stream: bool = False):
+def call_model_with_signatures(prompt: str, max_tokens: int, temperature: float, top_p: float, stream: bool = False, stop: Optional[List[str]] = None):
     """
     Try several possible model completion signatures and return whatever the model returns.
     Synchronous function suitable to be run inside run_in_executor.
     """
     attempts = [
-        lambda: model.create_completion(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=stream),
-        lambda: model.create_completion(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=stream),
-        lambda: model.generate(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=stream),
-        lambda: model.generate(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=stream),
-        lambda: model.generate(prompt, stream=stream),
+        lambda: model.create_completion(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=stream),
+        lambda: model.create_completion(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=stream),
+        lambda: model.generate(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=stream),
+        lambda: model.generate(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=stream),
+        lambda: model.generate(prompt, stop=stop, stream=stream),
         lambda: model.generate(prompt),
     ]
     last_exc = None
@@ -148,7 +206,7 @@ def model_create_compat_sync(prompt: str, max_tokens: int = 512, temperature: fl
     Returns an OpenAI-like dict: {"choices":[{"text": text}]}
     """
     try:
-        resp = call_model_with_signatures(prompt, max_tokens, temperature, top_p, False)
+        resp = call_model_with_signatures(prompt, max_tokens, temperature, top_p, False, stop=stop)
     except Exception as e:
         logger.exception("call_model_with_signatures failed")
         return {"choices": [{"text": f"ERROR_CALLING_MODEL: {e}"}]}
@@ -229,10 +287,10 @@ def llama_create_stream_sync(prompt: str, max_tokens: int, temperature: float, t
     """
     gen = None
     for attempt in (
-        lambda: model.create_completion(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=True),
-        lambda: model.create_completion(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=True),
-        lambda: model.generate(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=True),
-        lambda: model.generate(prompt, stream=True),
+        lambda: model.create_completion(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=True),
+        lambda: model.create_completion(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=True),
+        lambda: model.generate(prompt=prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop, stream=True),
+        lambda: model.generate(prompt, stop=stop, stream=True),
     ):
         try:
             candidate = attempt()
@@ -268,7 +326,7 @@ def llama_create_stream_sync(prompt: str, max_tokens: int, temperature: float, t
             logger.exception("error while iterating streaming generator; falling back")
 
     # Fallback: call full generate and chunk the result
-    out = model_create_compat_sync(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p)
+    out = model_create_compat_sync(prompt, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stop=stop)
     text = out["choices"][0].get("text", "") or ""
     if stop:
         for s in stop:
@@ -321,7 +379,7 @@ def health():
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
     if not req.prompt:
-        return JSONResponse({"error": "no prompt provided"}, status_code=400)
+        return make_json_response({"error": "no prompt provided"}, status_code=400)
 
     if req.stream:
         async def event_stream():
@@ -336,7 +394,7 @@ async def generate(req: GenerateRequest):
         out = await loop.run_in_executor(None, partial(model_create_compat_sync, req.prompt, req.max_tokens or 256, req.temperature or 0.0, req.top_p or 1.0))
     except Exception as e:
         logger.exception("generation failed")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return make_json_response({"error": str(e)}, status_code=500)
 
     text = out["choices"][0].get("text", "") or ""
     if req.stop:
@@ -350,16 +408,21 @@ async def generate(req: GenerateRequest):
 # /api/chat (proxy)
 @app.post("/api/chat")
 async def api_chat(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        return make_json_response({"error": "invalid JSON body"}, status_code=400)
     messages = data.get("messages", [])
     if not messages:
-        return JSONResponse({"error": "no messages provided"}, status_code=400)
+        return make_json_response({"error": "no messages provided"}, status_code=400)
     prompt = build_prompt_from_messages(messages)
     stream = data.get("stream", False)
     max_tokens = data.get("max_tokens", 512)
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
-    stop = data.get("stop")
+    stop = normalize_stop(data.get("stop"))
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
 
     if stream:
         async def event_stream():
@@ -375,10 +438,10 @@ async def api_chat(request: Request):
 
     loop = asyncio.get_running_loop()
     try:
-        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p))
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("chat generation failed")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return make_json_response({"error": str(e)}, status_code=500)
 
     text = out["choices"][0].get("text", "") or ""
     if stop:
@@ -387,6 +450,7 @@ async def api_chat(request: Request):
             if idx != -1:
                 text = text[:idx]
                 break
+    text = remove_excessive_repetition(text)
     response = {
         "id": None,
         "object": "chat.completion",
@@ -399,20 +463,23 @@ async def api_chat(request: Request):
             }
         ]
     }
-    return JSONResponse(response)
+    return make_json_response(response)
 
 # /api/chat/completions (ollama-style)
 @app.post("/api/chat/completions")
 async def chat_completions(req: ChatRequest):
     if not req.messages:
-        return JSONResponse({"error": "no messages provided"}, status_code=400)
+        return make_json_response({"error": "no messages provided"}, status_code=400)
     prompt = build_prompt_from_messages([m.dict() for m in req.messages])
+    stop = normalize_stop(req.stop)
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
     if req.stream:
         async def event_stream():
             first_sent = True
-            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, req.stop):
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop):
                 payload = {"id": None, "object": "chat.completion.chunk", "delta": {"role": "assistant" if first_sent else None, "content": chunk}}
-                if payload["delta"]["role"] is None:
+                if payload["delta"].get("role") is None:
                     del payload["delta"]["role"]
                 yield json.dumps(payload, ensure_ascii=False) + "\n"
                 first_sent = False
@@ -421,18 +488,19 @@ async def chat_completions(req: ChatRequest):
 
     loop = asyncio.get_running_loop()
     try:
-        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0))
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop))
     except Exception as e:
         logger.exception("chat completions failed")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return make_json_response({"error": str(e)}, status_code=500)
 
     text = out["choices"][0].get("text", "") or ""
-    if req.stop:
-        for s in req.stop:
+    if stop:
+        for s in stop:
             idx = text.find(s)
             if idx != -1:
                 text = text[:idx]
                 break
+    text = remove_excessive_repetition(text)
     response = {
         "id": None,
         "object": "chat.completion",
@@ -445,7 +513,7 @@ async def chat_completions(req: ChatRequest):
             }
         ]
     }
-    return JSONResponse(response)
+    return make_json_response(response)
 
 # v1 endpoints for compatibility
 @app.get("/v1/health")
@@ -464,16 +532,19 @@ def v1_version():
 # OpenAI / Ollama-compatible endpoints
 @app.post("/v1/completions")
 async def v1_completions(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        return make_json_response({"error": "invalid JSON body"}, status_code=400)
     # accept either 'prompt' or 'input' keys
     prompt = data.get("prompt") or (data.get("input") if isinstance(data.get("input"), str) else None)
     if not prompt:
-        return JSONResponse({"error": "no prompt provided"}, status_code=400)
+        return make_json_response({"error": "no prompt provided"}, status_code=400)
 
     max_tokens = data.get("max_tokens", 256)
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
-    stop = data.get("stop")
+    stop = normalize_stop(data.get("stop"))
     stream = data.get("stream", False)
 
     if stream:
@@ -488,25 +559,30 @@ async def v1_completions(request: Request):
         out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("v1/completions generation failed")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return make_json_response({"error": str(e)}, status_code=500)
 
     text = out["choices"][0].get("text", "") or ""
-    return JSONResponse({"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out})
+    return make_json_response({"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out})
 
 
 @app.post("/v1/chat/completions")
 async def v1_chat_completions(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        return make_json_response({"error": "invalid JSON body"}, status_code=400)
     messages = data.get("messages", [])
     if not messages:
-        return JSONResponse({"error": "no messages provided"}, status_code=400)
+        return make_json_response({"error": "no messages provided"}, status_code=400)
 
     prompt = build_prompt_from_messages(messages)
     stream = data.get("stream", False)
     max_tokens = data.get("max_tokens", 512)
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
-    stop = data.get("stop")
+    stop = normalize_stop(data.get("stop"))
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
 
     if stream:
         async def event_stream():
@@ -522,12 +598,19 @@ async def v1_chat_completions(request: Request):
 
     loop = asyncio.get_running_loop()
     try:
-        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p))
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("v1/chat/completions failed")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return make_json_response({"error": str(e)}, status_code=500)
 
     text = out["choices"][0].get("text", "") or ""
+    if stop:
+        for s in stop:
+            idx = text.find(s)
+            if idx != -1:
+                text = text[:idx]
+                break
+    text = remove_excessive_repetition(text)
     response = {
         "id": None,
         "object": "chat.completion",
@@ -540,4 +623,4 @@ async def v1_chat_completions(request: Request):
             }
         ]
     }
-    return JSONResponse(response)
+    return make_json_response(response)
