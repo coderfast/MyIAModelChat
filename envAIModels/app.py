@@ -8,6 +8,7 @@ import json
 import time
 import logging
 import asyncio
+import inspect
 from functools import partial
 from pathlib import Path
 
@@ -36,6 +37,343 @@ def make_json_response(obj, status_code: int = 200):
 # Inicializa el modelo con manejo de errores
 try:
     model = Llama(model_path=MODEL_PATH)
+
+    def call_no_args(value):
+        if not callable(value):
+            return value
+        try:
+            sig = inspect.signature(value)
+            params = [p for p in sig.parameters.values() if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD) and p.default is inspect._empty]
+            if len(params) == 0:
+                return value()
+        except Exception:
+            pass
+        return value
+
+    def format_value(value, depth=0):
+        if depth > 1:
+            return f"<{type(value).__name__}>"
+        if isinstance(value, (str, int, float, bool, type(None))):
+            return value
+        if isinstance(value, dict):
+            return {k: format_value(v, depth + 1) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [format_value(v, depth + 1) for v in value]
+        if hasattr(value, 'to_dict') and not isinstance(value, str):
+            try:
+                return format_value(value.to_dict(), depth + 1)
+            except Exception:
+                pass
+        if hasattr(value, '__dict__'):
+            return {k: format_value(v, depth + 1) for k, v in vars(value).items() if not k.startswith("_")}
+        return f"<{type(value).__name__}>"
+
+    def print_object_config(prefix, cfg_obj):
+        if isinstance(cfg_obj, dict):
+            for k, v in cfg_obj.items():
+                print(f"{prefix}{k}: {format_value(v)}")
+            return
+        if hasattr(cfg_obj, 'to_dict'):
+            try:
+                cfg_dict = cfg_obj.to_dict()
+                for k, v in cfg_dict.items():
+                    print(f"{prefix}{k}: {format_value(v)}")
+                return
+            except Exception:
+                pass
+        if hasattr(cfg_obj, '__dict__'):
+            for k, v in vars(cfg_obj).items():
+                if not k.startswith("_"):
+                    print(f"{prefix}{k}: {format_value(v)}")
+            return
+        if hasattr(cfg_obj, '__slots__'):
+            for k in cfg_obj.__slots__:
+                if k.startswith("_"):
+                    continue
+                try:
+                    value = getattr(cfg_obj, k)
+                    print(f"{prefix}{k}: {format_value(value)}")
+                except Exception:
+                    print(f"{prefix}{k}: <unreadable>")
+            return
+        attrs = [a for a in dir(cfg_obj) if not a.startswith("_")]
+        for name in attrs:
+            try:
+                value = getattr(cfg_obj, name)
+                if callable(value):
+                    continue
+                print(f"{prefix}{name}: {format_value(value)}")
+            except Exception:
+                print(f"{prefix}{name}: <unreadable>")
+
+    # Enumerar parámetros del modelo
+    print("\n" + "="*60)
+    print("AI PARAMETERS")
+    print("-"*60)
+    try:
+        param_names = [a for a in dir(model) if not a.startswith("_")]
+        for name in param_names:
+            try:
+                value = getattr(model, name)
+                if callable(value):
+                    continue
+                if isinstance(value, (str, int, float, bool, type(None))):
+                    print(f"Param: {name} -> {value}")
+                elif isinstance(value, (list, tuple, dict)):
+                    print(f"Param: {name} -> {type(value).__name__} (len={len(value)})")
+                else:
+                    print(f"Param: {name} -> {type(value).__name__}")
+            except Exception:
+                print(f"Param: {name} -> <unreadable>")
+    except Exception as e:
+        logger.exception(f"Error enumerating parameters: {e}")
+
+    # Enumerar capas del modelo
+    print("\n" + "="*60)
+    print("AI LAYERS")
+    print("-"*60)
+    try:
+        if hasattr(model, 'layers'):
+            for i, layer in enumerate(model.layers):
+                print(f"Capa {i}: {layer}")
+        elif hasattr(model, 'model') and hasattr(model.model, 'layers'):
+            for i, layer in enumerate(model.model.layers):
+                print(f"Capa {i}: {layer}")
+        else:
+            print("No se encontraron capas accesibles en el modelo")
+            print("Atributos del modelo:", [a for a in dir(model) if 'layer' in a.lower()])
+    except Exception as e:
+        logger.exception(f"Error al enumerar capas: {e}")
+
+    # Enumerar bloques del modelo
+    print("\n" + "="*60)
+    print("AI BLOCKS")
+    print("-"*60)
+    try:
+        if hasattr(model, 'blocks'):
+            for i, block in enumerate(model.blocks):
+                print(f"Bloque {i}: {block}")
+        elif hasattr(model, 'model') and hasattr(model.model, 'blocks'):
+            for i, block in enumerate(model.model.blocks):
+                print(f"Bloque {i}: {block}")
+        else:
+            print("No se encontraron bloques accesibles en el modelo")
+            print("Atributos del modelo:", [a for a in dir(model) if 'block' in a.lower()])
+    except Exception as e:
+        logger.exception(f"Error al enumerar bloques: {e}")
+
+    # Enumerar tensores del modelo
+    print("\n" + "="*60)
+    print("AI TENSORS")
+    print("-"*60)
+    try:
+        tensor_count = 0
+        if hasattr(model, 'tensors'):
+            for i, tensor in enumerate(model.tensors):
+                print(f"Tensor {i}: {tensor}")
+                tensor_count += 1
+        elif hasattr(model, 'state_dict'):
+            state = model.state_dict() if callable(model.state_dict) else model.state_dict
+            for i, (name, tensor) in enumerate(state.items()):
+                print(f"Tensor {i}: {name} - Shape: {tensor.shape if hasattr(tensor, 'shape') else 'N/A'}")
+                tensor_count += 1
+                if tensor_count >= 20:  # Limitar a los primeros 20 tensores
+                    print(f"... ({len(state) - 20} tensores más)")
+                    break
+        else:
+            print("No se encontraron tensores accesibles en el modelo")
+            print("Atributos del modelo:", [a for a in dir(model) if 'tensor' in a.lower() or 'state' in a.lower()])
+    except Exception as e:
+        logger.exception(f"Error al enumerar tensores: {e}")
+
+    # Enumerar submodules del modelo
+    print("\n" + "="*60)
+    print("AI SUBMODULES")
+    print("-"*60)
+    try:
+        submodule_names = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('model', 'transformer', 'encoder', 'decoder', 'body', 'layers')) and not a.startswith("_")]
+        if submodule_names:
+            for name in sorted(set(submodule_names)):
+                try:
+                    sub = getattr(model, name)
+                    print(f"Submodule: {name} -> {type(sub).__name__}")
+                except Exception:
+                    print(f"Submodule: {name} -> <unreadable>")
+        else:
+            print("No se encontraron submodules detectables en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar submodules: {e}")
+
+    # Enumerar model params del modelo
+    print("\n" + "="*60)
+    print("AI MODEL PARAMS")
+    print("-"*60)
+    try:
+        if hasattr(model, 'model_params'):
+            mp = model.model_params
+            print(f"Model Params: {type(mp).__name__}")
+            print_object_config("  ", mp)
+        else:
+            print("No model_params detectable on the model")
+    except Exception as e:
+        logger.exception(f"Error enumerating model_params: {e}")
+
+    # Enumerar context params del modelo
+    print("\n" + "="*60)
+    print("AI CONTEXT PARAMETERS")
+    print("-"*60)
+    try:
+        if hasattr(model, 'context_params'):
+            cp = model.context_params
+            print(f"Context Params: {type(cp).__name__}")
+            print_object_config("  ", cp)
+        else:
+            print("No context_params detectable on the model")
+    except Exception as e:
+        logger.exception(f"Error enumerating context_params: {e}")
+
+    # Enumerar pesos y bias del modelo
+    print("\n" + "="*60)
+    print("AI WEIGHTS")
+    print("-"*60)
+    try:
+        if hasattr(model, 'state_dict'):
+            state = model.state_dict() if callable(model.state_dict) else model.state_dict
+            for i, name in enumerate(state.keys()):
+                print(f"Weight {i}: {name}")
+                if i >= 49:
+                    print("... (displaying first 50 weights)")
+                    break
+        else:
+            print("No se encontró state_dict en el modelo")
+            print("Atributos del modelo:", [a for a in dir(model) if 'state' in a.lower() or 'weight' in a.lower() or 'bias' in a.lower()])
+    except Exception as e:
+        logger.exception(f"Error al enumerar weights: {e}")
+
+    # Enumerar embeddings del modelo
+    print("\n" + "="*60)
+    print("AI EMBEDDINGS")
+    print("-"*60)
+    try:
+        embedding_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('embed', 'token_emb', 'word_embeddings', 'position_embeddings')) and not a.startswith("_")]
+        if embedding_attrs:
+            for name in sorted(set(embedding_attrs)):
+                try:
+                    emb = getattr(model, name)
+                    print(f"Embedding: {name} -> {type(emb).__name__}")
+                except Exception:
+                    print(f"Embedding: {name} -> <unreadable>")
+        else:
+            print("No se encontraron embeddings accesibles en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar embeddings: {e}")
+
+    # Enumerar output layers del modelo
+    print("\n" + "="*60)
+    print("AI OUTPUT LAYERS")
+    print("-"*60)
+    try:
+        output_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('lm_head', 'head', 'output', 'proj')) and not a.startswith("_")]
+        if output_attrs:
+            for name in sorted(set(output_attrs)):
+                try:
+                    out_layer = getattr(model, name)
+                    print(f"Output Layer: {name} -> {type(out_layer).__name__}")
+                except Exception:
+                    print(f"Output Layer: {name} -> <unreadable>")
+        else:
+            print("No se encontraron output layers detectables en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar output layers: {e}")
+
+    # Enumerar normalizations del modelo
+    print("\n" + "="*60)
+    print("AI NORMALIZATION LAYERS")
+    print("-"*60)
+    try:
+        norm_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('norm', 'layernorm', 'rmsnorm', 'ln')) and not a.startswith("_")]
+        if norm_attrs:
+            for name in sorted(set(norm_attrs)):
+                try:
+                    norm = getattr(model, name)
+                    print(f"Normalization: {name} -> {type(norm).__name__}")
+                except Exception:
+                    print(f"Normalization: {name} -> <unreadable>")
+        else:
+            print("No se encontraron normalizaciones detectables en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar normalization layers: {e}")
+
+    # Enumerar attention heads del modelo
+    print("\n" + "="*60)
+    print("AI ATTENTION HEADS")
+    print("-"*60)
+    try:
+        attn_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('attn', 'attention', 'q_proj', 'k_proj', 'v_proj', 'o_proj', 'heads')) and not a.startswith("_")]
+        if attn_attrs:
+            for name in sorted(set(attn_attrs)):
+                try:
+                    attn = getattr(model, name)
+                    print(f"Attention: {name} -> {type(attn).__name__}")
+                except Exception:
+                    print(f"Attention: {name} -> <unreadable>")
+        else:
+            print("No se encontraron attention heads detectables en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar attention heads: {e}")
+
+    # Enumerar configuración del modelo
+    print("\n" + "="*60)
+    print("AI CONFIGURATION")
+    print("-"*60)
+    try:
+        config_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('config', 'vocab', 'context', 'max_seq', 'n_heads', 'n_layers', 'quant')) and not a.startswith("_")]
+        if hasattr(model, 'config'):
+            try:
+                cfg = model.config
+                print(f"Config: {type(cfg).__name__}")
+                print_object_config("  ", cfg)
+            except Exception:
+                print("Config attribute exists but could not be read")
+        elif config_attrs:
+            for name in sorted(set(config_attrs)):
+                try:
+                    value = getattr(model, name)
+                    value = call_no_args(value)
+                    if isinstance(value, (str, int, float, bool, type(None))):
+                        print(f"Config: {name} -> {value}")
+                    elif isinstance(value, (dict, list, tuple)):
+                        print(f"Config: {name} -> {type(value).__name__} -> {format_value(value)}")
+                    else:
+                        print(f"Config: {name} -> {type(value).__name__}")
+                        print_object_config("    ", value)
+                except Exception:
+                    print(f"Config: {name} -> <unreadable>")
+        else:
+            print("No detectable configurations found in the model")
+    except Exception as e:
+        logger.exception(f"Error enumerating configuration: {e}")
+
+    # Enumerar device map del modelo
+    print("\n" + "="*60)
+    print("AI DEVICE MAP")
+    print("-"*60)
+    try:
+        device_attrs = [a for a in dir(model) if any(keyword in a.lower() for keyword in ('device', 'gpu', 'cuda', 'n_gpu', 'map')) and not a.startswith("_")]
+        if device_attrs:
+            for name in sorted(set(device_attrs)):
+                try:
+                    value = getattr(model, name)
+                    print(f"Device: {name} -> {value}")
+                except Exception:
+                    print(f"Device: {name} -> <unreadable>")
+        else:
+            print("No se encontraron device map detectables en el modelo")
+    except Exception as e:
+        logger.exception(f"Error al enumerar device map: {e}")
+
+    print("\n" + "="*60)
+
 except Exception as e:
     logger.exception("failed loading model")
     raise
