@@ -1,0 +1,1 @@
+ollama create Qwen2.5-1.5B-Instruct-Q4_0 -f Modelfile
