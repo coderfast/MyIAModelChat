@@ -106,6 +106,124 @@ try:
             except Exception:
                 print(f"{prefix}{name}: <unreadable>")
 
+    def infer_model_layer_count(model: Any) -> Optional[int]:
+        """Try to infer the number of transformer layers from a loaded model.
+
+        This uses several heuristics:
+        1. Common config/model params attributes like n_layer, n_layers, num_layers.
+        2. Model metadata (e.g. gguf metadata keys such as qwen2.block_count).
+        3. Tensor/state_dict names with layer/block prefixes.
+        """
+        def _get_int(value: Any) -> Optional[int]:
+            if isinstance(value, int) and value > 0:
+                return value
+            if isinstance(value, str):
+                value = value.strip()
+                if value.isdigit():
+                    return int(value)
+            try:
+                iv = int(value)
+                return iv if iv > 0 else None
+            except Exception:
+                return None
+
+        def search_for_layer_count(root: Any) -> Optional[int]:
+            if root is None:
+                return None
+
+            if isinstance(root, Mapping):
+                for key, value in root.items():
+                    if any(k in key.lower() for k in ("n_layer", "n_layers", "num_layers", "block_count", "layer_count")):
+                        if (count := _get_int(value)) is not None:
+                            return count
+                for key in ("n_layer", "n_layers", "num_layers", "block_count", "layer_count", "qwen2.block_count"):
+                    if key in root:
+                        if (count := _get_int(root[key])) is not None:
+                            return count
+                return None
+
+            for key in ("n_layer", "n_layers", "num_layers", "block_count", "layer_count"):
+                if hasattr(root, key):
+                    try:
+                        if (count := _get_int(getattr(root, key))) is not None:
+                            return count
+                    except Exception:
+                        continue
+
+            for key in dir(root):
+                if any(k in key.lower() for k in ("n_layer", "n_layers", "num_layers", "block_count", "layer_count")):
+                    try:
+                        if (count := _get_int(getattr(root, key))) is not None:
+                            return count
+                    except Exception:
+                        continue
+            return None
+
+        for root in (
+            getattr(model, "metadata", None),
+            getattr(model, "model_params", None),
+            getattr(model, "config", None),
+            getattr(model, "context_params", None),
+            getattr(model, "_model", None),
+        ):
+            if (count := search_for_layer_count(root)) is not None:
+                return count
+
+        names = []
+        if hasattr(model, "state_dict"):
+            try:
+                state = model.state_dict() if callable(model.state_dict) else model.state_dict
+                if isinstance(state, Mapping):
+                    names = list(state.keys())
+                elif isinstance(state, (list, tuple)):
+                    names = [name for name, _ in state if isinstance(name, str)]
+            except Exception:
+                pass
+
+        if not names and hasattr(model, "tensors"):
+            try:
+                tensors = model.tensors
+                if isinstance(tensors, (list, tuple)):
+                    names = [getattr(t, "name", str(t)) for t in tensors]
+            except Exception:
+                pass
+
+        if names:
+            import re
+
+            layer_indices = set()
+            patterns = [
+                r"\bblk\.(\d+)\b",
+                r"\blayer\.(\d+)\b",
+                r"\btransformer\.h\.(\d+)\b",
+                r"\bencoder\.layers\.(\d+)\b",
+                r"\bdecoder\.layers\.(\d+)\b",
+                r"\bblocks\.(\d+)\b",
+                r"\bblock\.(\d+)\b",
+            ]
+            for name in names:
+                for pattern in patterns:
+                    match = re.search(pattern, name)
+                    if match:
+                        layer_indices.add(int(match.group(1)))
+            if layer_indices:
+                return max(layer_indices) + 1
+
+            prefix_counts = {}
+            for name in names:
+                for prefix in ("blk.", "layer.", "transformer.h.", "encoder.layers.", "decoder.layers.", "block."):
+                    if prefix in name:
+                        try:
+                            part = name.split(prefix, 1)[1]
+                            idx = int(part.split(".", 1)[0])
+                            prefix_counts[prefix] = max(prefix_counts.get(prefix, -1), idx)
+                        except Exception:
+                            continue
+            if prefix_counts:
+                return max(prefix_counts.values()) + 1
+
+        return None
+
     # Enumerar parámetros del modelo
     print("\n" + "="*60)
     print("AI PARAMETERS")
@@ -125,8 +243,19 @@ try:
                     print(f"Param: {name} -> {type(value).__name__}")
             except Exception:
                 print(f"Param: {name} -> <unreadable>")
+
     except Exception as e:
         logger.exception(f"Error enumerating parameters: {e}")
+
+    # Total estimated de capas
+    print("\n" + "="*60)
+    print("AI TOTAL LAYERS")
+    print("-"*60)
+    try:
+        layer_count = infer_model_layer_count(model)
+        print(f"Inferred total layers: {layer_count}")
+    except Exception as e:
+        logger.exception(f"Error inferring total layer count: {e}")
 
     # Enumerar capas del modelo
     print("\n" + "="*60)
@@ -374,6 +503,14 @@ try:
 
     print("\n" + "="*60)
 
+    # Enumerar Total Layers
+    print("\n" + "="*60)
+    print("AI TOTAL LAYERS")
+    print("-"*60)
+    inferred_layers = infer_model_layer_count(model)
+    print(f"Inferred total layers: {inferred_layers}")
+    print("\n" + "="*60)
+
 except Exception as e:
     logger.exception("failed loading model")
     raise
@@ -422,7 +559,6 @@ def normalize_stop(stop: Optional[Any]) -> Optional[List[str]]:
     if isinstance(stop, list):
         return [str(item) for item in stop]
     return [str(stop)]
-
 
 def remove_excessive_repetition(text: str, max_repetitions: int = 1) -> str:
     """Remove excessively repeated sentences to avoid token-padding artifacts.
