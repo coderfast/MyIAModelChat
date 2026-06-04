@@ -40,6 +40,19 @@ Agregar soporte para rethinking en el modelo y en la inferencia, de forma que el
 - Actualizar `main_chat.py` y cualquier API wrapper para exponer la opción de uso de rethinking.
 - Añadir tests básicos que verifiquen la activación/desactivación de rethinking en inferencia y entrenamiento.
 
+### 6. Mejora de compatibilidad y legibilidad del servidor FastAPI ✅
+- Refactorizar `envAIModels/app.py` para eliminar duplicación entre endpoints. ✅
+- Extraer helpers comunes para:
+  - llamadas a modelo y compatibilidad de firma ✅
+  - streaming y respuestas por chunk ✅
+  - normalización de `stop` ✅
+  - construcción de respuestas OpenAI/Ollama ✅
+- Usar Pydantic para los endpoints `v1` y `api` cuando sea posible en lugar de parsear JSON manualmente. ✅
+- Normalizar el comportamiento de `/api/chat/completions`, `/v1/chat/completions`, `/api/generate` y `/v1/completions`. ✅
+- Agrupar endpoints por tipo: metadata, API regular y compatibilidad `v1`. ✅
+- Mover la inspección y diagnóstico del modelo a un módulo o función opcional para no mezclarlo con la carga básica del servicio. ✅
+- Si la versión de Python lo permite, usar `asyncio.to_thread` en vez de `loop.run_in_executor` y preferir `JSONResponse` cuando sea viable. ✅
+
 ### Cambios recientes (COMPLETADOS)
 
 - `main_train.py`: ahora carga `dataset_cache/cache_metadata.pkl` y detecta si la caché incluye `token_ids`. Si existen `token_ids`, el pipeline de entrenamiento los usa directamente para evitar re-tokenización. ✅ (COMPLETADO)
