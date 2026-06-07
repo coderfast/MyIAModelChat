@@ -18,7 +18,6 @@ MODEL_PATH = str(BASE_DIR / "models" / "Qwen2.5-1.5B-Instruct-Q4_0.gguf")
 MODEL_NAME = "local-Qwen2.5-1.5B-Instruct-Q4_0"
 OLLAMA_VERSION = "0.6.4"
 CHUNK_SIZE = 64  # tamaño de chunk para streaming emulado si es necesario
-DEFAULT_STOP = ["\nuser:", "\nassistant:"]
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
@@ -561,93 +560,6 @@ def normalize_stop(stop: Optional[Any]) -> Optional[List[str]]:
         return [str(item) for item in stop]
     return [str(stop)]
 
-
-def get_chat_stop(stop: Optional[Any]) -> List[str]:
-    normalized = normalize_stop(stop)
-    return normalized if normalized is not None else DEFAULT_STOP
-
-
-def truncate_text_by_stop(text: str, stop: Optional[List[str]]) -> str:
-    if not stop:
-        return text
-    for s in stop:
-        idx = text.find(s)
-        if idx != -1:
-            return text[:idx]
-    return text
-
-
-def build_text_completion_response(text: str, raw: Optional[Any] = None) -> Dict[str, Any]:
-    response = {
-        "id": None,
-        "object": "text.completion",
-        "model": MODEL_NAME,
-        "choices": [{"text": text, "index": 0}]
-    }
-    if raw is not None:
-        response["raw"] = raw
-    return response
-
-
-def build_chat_completion_response(text: str) -> Dict[str, Any]:
-    return {
-        "id": None,
-        "object": "chat.completion",
-        "model": MODEL_NAME,
-        "choices": [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": text},
-                "finish_reason": "stop"
-            }
-        ]
-    }
-
-
-def extract_v1_prompt(data: Dict[str, Any]) -> Optional[str]:
-    prompt = data.get("prompt")
-    if isinstance(prompt, str) and prompt:
-        return prompt
-    input_value = data.get("input")
-    if isinstance(input_value, str) and input_value:
-        return input_value
-    return None
-
-
-def run_model_sync(prompt: str, max_tokens: int, temperature: float, top_p: float, stop: Optional[List[str]] = None):
-    out = model_create_compat_sync(prompt, max_tokens, temperature, top_p, stop)
-    text = out["choices"][0].get("text", "") or ""
-    return truncate_text_by_stop(text, stop), out
-
-
-async def run_model_async(prompt: str, max_tokens: int, temperature: float, top_p: float, stop: Optional[List[str]] = None):
-    if hasattr(asyncio, "to_thread"):
-        return await asyncio.to_thread(run_model_sync, prompt, max_tokens, temperature, top_p, stop)
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(run_model_sync, prompt, max_tokens, temperature, top_p, stop))
-
-
-def text_stream_event_stream(prompt: str, max_tokens: int, temperature: float, top_p: float, stop: Optional[List[str]]):
-    async def event_stream():
-        async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
-            yield json.dumps({"id": None, "object": "text.chunk", "text": chunk}, ensure_ascii=False) + "\n"
-        yield json.dumps({"id": None, "object": "text.complete"}, ensure_ascii=False) + "\n"
-    return event_stream
-
-
-def chat_stream_event_stream(prompt: str, max_tokens: int, temperature: float, top_p: float, stop: Optional[List[str]]):
-    async def event_stream():
-        first_sent = True
-        async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
-            payload = {"id": None, "object": "chat.completion.chunk", "delta": {"content": chunk}}
-            if first_sent:
-                payload["delta"]["role"] = "assistant"
-            yield json.dumps(payload, ensure_ascii=False) + "\n"
-            first_sent = False
-        yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
-    return event_stream
-
-
 def remove_excessive_repetition(text: str, max_repetitions: int = 1) -> str:
     """Remove excessively repeated sentences to avoid token-padding artifacts.
     Detects and removes sentences that appear more than max_repetitions times.
@@ -944,18 +856,28 @@ async def generate(req: GenerateRequest):
         return make_json_response({"error": "no prompt provided"}, status_code=400)
 
     if req.stream:
-        return StreamingResponse(
-            text_stream_event_stream(req.prompt, req.max_tokens or 256, req.temperature or 0.0, req.top_p or 1.0, req.stop),
-            media_type="application/x-ndjson"
-        )
+        async def event_stream():
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, req.prompt, req.max_tokens or 256, req.temperature or 0.0, req.top_p or 1.0, req.stop):
+                yield json.dumps({"id": None, "object": "text.chunk", "text": chunk}, ensure_ascii=False) + "\n"
+            yield json.dumps({"id": None, "object": "text.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
+    # non-streaming: run generation in executor
+    loop = asyncio.get_running_loop()
     try:
-        text, out = await run_model_async(req.prompt, req.max_tokens or 256, req.temperature or 0.0, req.top_p or 1.0, req.stop)
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, req.prompt, req.max_tokens or 256, req.temperature or 0.0, req.top_p or 1.0))
     except Exception as e:
         logger.exception("generation failed")
         return make_json_response({"error": str(e)}, status_code=500)
 
-    return make_json_response(build_text_completion_response(text, raw=out))
+    text = out["choices"][0].get("text", "") or ""
+    if req.stop:
+        for s in req.stop:
+            idx = text.find(s)
+            if idx != -1:
+                text = text[:idx]
+                break
+    return {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out}
 
 # /api/chat (proxy)
 @app.post("/api/chat")
@@ -964,58 +886,110 @@ async def api_chat(request: Request):
         data = await request.json()
     except json.JSONDecodeError:
         return make_json_response({"error": "invalid JSON body"}, status_code=400)
-
     messages = data.get("messages", [])
     if not messages:
         return make_json_response({"error": "no messages provided"}, status_code=400)
-
     prompt = build_prompt_from_messages(messages)
-    stop = get_chat_stop(data.get("stop"))
+    stream = data.get("stream", False)
     max_tokens = data.get("max_tokens", 512)
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
-    stream = data.get("stream", False)
+    stop = normalize_stop(data.get("stop"))
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
 
     if stream:
-        return StreamingResponse(
-            chat_stream_event_stream(prompt, max_tokens, temperature, top_p, stop),
-            media_type="application/x-ndjson"
-        )
+        async def event_stream():
+            first_sent = True
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
+                payload = {"id": None, "object": "chat.completion.chunk", "delta": {"role": "assistant" if first_sent else None, "content": chunk}}
+                if payload["delta"]["role"] is None:
+                    del payload["delta"]["role"]
+                yield json.dumps(payload, ensure_ascii=False) + "\n"
+                first_sent = False
+            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
+    loop = asyncio.get_running_loop()
     try:
-        text, _ = await run_model_async(prompt, max_tokens, temperature, top_p, stop)
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("chat generation failed")
         return make_json_response({"error": str(e)}, status_code=500)
 
+    text = out["choices"][0].get("text", "") or ""
+    if stop:
+        for s in stop:
+            idx = text.find(s)
+            if idx != -1:
+                text = text[:idx]
+                break
     text = remove_excessive_repetition(text)
-    return make_json_response(build_chat_completion_response(text))
+    response = {
+        "id": None,
+        "object": "chat.completion",
+        "model": MODEL_NAME,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop"
+            }
+        ]
+    }
+    return make_json_response(response)
 
 # /api/chat/completions (ollama-style)
 @app.post("/api/chat/completions")
 async def chat_completions(req: ChatRequest):
     if not req.messages:
         return make_json_response({"error": "no messages provided"}, status_code=400)
-
     prompt = build_prompt_from_messages([m.dict() for m in req.messages])
-    stop = get_chat_stop(req.stop)
-
+    stop = normalize_stop(req.stop)
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
     if req.stream:
-        return StreamingResponse(
-            chat_stream_event_stream(prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop),
-            media_type="application/x-ndjson"
-        )
+        async def event_stream():
+            first_sent = True
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop):
+                payload = {"id": None, "object": "chat.completion.chunk", "delta": {"role": "assistant" if first_sent else None, "content": chunk}}
+                if payload["delta"].get("role") is None:
+                    del payload["delta"]["role"]
+                yield json.dumps(payload, ensure_ascii=False) + "\n"
+                first_sent = False
+            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
+    loop = asyncio.get_running_loop()
     try:
-        text, _ = await run_model_async(prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop)
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, req.max_tokens or 512, req.temperature or 0.0, req.top_p or 1.0, stop))
     except Exception as e:
         logger.exception("chat completions failed")
         return make_json_response({"error": str(e)}, status_code=500)
 
+    text = out["choices"][0].get("text", "") or ""
+    if stop:
+        for s in stop:
+            idx = text.find(s)
+            if idx != -1:
+                text = text[:idx]
+                break
     text = remove_excessive_repetition(text)
-    return make_json_response(build_chat_completion_response(text))
+    response = {
+        "id": None,
+        "object": "chat.completion",
+        "model": MODEL_NAME,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop"
+            }
+        ]
+    }
+    return make_json_response(response)
 
-# v1 endpoints for OpenAI compatibility
+# v1 endpoints for compatibility
 @app.get("/v1/health")
 def v1_health():
     return {"status": "ok"}
@@ -1029,14 +1003,15 @@ def v1_version():
     return version()
 
 
+# OpenAI / Ollama-compatible endpoints
 @app.post("/v1/completions")
 async def v1_completions(request: Request):
     try:
         data = await request.json()
     except json.JSONDecodeError:
         return make_json_response({"error": "invalid JSON body"}, status_code=400)
-
-    prompt = extract_v1_prompt(data)
+    # accept either 'prompt' or 'input' keys
+    prompt = data.get("prompt") or (data.get("input") if isinstance(data.get("input"), str) else None)
     if not prompt:
         return make_json_response({"error": "no prompt provided"}, status_code=400)
 
@@ -1047,18 +1022,21 @@ async def v1_completions(request: Request):
     stream = data.get("stream", False)
 
     if stream:
-        return StreamingResponse(
-            text_stream_event_stream(prompt, max_tokens, temperature, top_p, stop),
-            media_type="application/x-ndjson"
-        )
+        async def event_stream():
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
+                yield json.dumps({"id": None, "object": "text.chunk", "text": chunk}, ensure_ascii=False) + "\n"
+            yield json.dumps({"id": None, "object": "text.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
+    loop = asyncio.get_running_loop()
     try:
-        text, out = await run_model_async(prompt, max_tokens, temperature, top_p, stop)
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("v1/completions generation failed")
         return make_json_response({"error": str(e)}, status_code=500)
 
-    return make_json_response(build_text_completion_response(text, raw=out))
+    text = out["choices"][0].get("text", "") or ""
+    return make_json_response({"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out})
 
 
 @app.post("/v1/chat/completions")
@@ -1067,29 +1045,56 @@ async def v1_chat_completions(request: Request):
         data = await request.json()
     except json.JSONDecodeError:
         return make_json_response({"error": "invalid JSON body"}, status_code=400)
-
     messages = data.get("messages", [])
     if not messages:
         return make_json_response({"error": "no messages provided"}, status_code=400)
 
     prompt = build_prompt_from_messages(messages)
-    stop = get_chat_stop(data.get("stop"))
+    stream = data.get("stream", False)
     max_tokens = data.get("max_tokens", 512)
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
-    stream = data.get("stream", False)
+    stop = normalize_stop(data.get("stop"))
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
 
     if stream:
-        return StreamingResponse(
-            chat_stream_event_stream(prompt, max_tokens, temperature, top_p, stop),
-            media_type="application/x-ndjson"
-        )
+        async def event_stream():
+            first_sent = True
+            async for chunk in stream_generator_wrapper_sync_to_async(llama_create_stream_sync, prompt, max_tokens, temperature, top_p, stop):
+                payload = {"id": None, "object": "chat.completion.chunk", "delta": {"role": "assistant" if first_sent else None, "content": chunk}}
+                if payload["delta"].get("role") is None:
+                    del payload["delta"]["role"]
+                yield json.dumps(payload, ensure_ascii=False) + "\n"
+                first_sent = False
+            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
+    loop = asyncio.get_running_loop()
     try:
-        text, _ = await run_model_async(prompt, max_tokens, temperature, top_p, stop)
+        out = await loop.run_in_executor(None, partial(model_create_compat_sync, prompt, max_tokens, temperature, top_p, stop))
     except Exception as e:
         logger.exception("v1/chat/completions failed")
-        return make_json_response({"error": str(e)}, status_code=400)
+        return make_json_response({"error": str(e)}, status_code=500)
 
+    text = out["choices"][0].get("text", "") or ""
+    if stop:
+        for s in stop:
+            idx = text.find(s)
+            if idx != -1:
+                text = text[:idx]
+                break
     text = remove_excessive_repetition(text)
-    return make_json_response(build_chat_completion_response(text))
+    response = {
+        "id": None,
+        "object": "chat.completion",
+        "model": MODEL_NAME,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop"
+            }
+        ]
+    }
+    return make_json_response(response)
