@@ -221,7 +221,7 @@ class DataPreparer:
                     }
             
             # Prepare fresh dataset
-            logger.info("\n[1/3] Loading AIML data..." if (self.args.aiml or self.args.hf) else "\n[1/3] No data sources selected...")
+            logger.info("\n[1/7] Loading AIML data..." if (self.args.aiml or self.args.hf) else "\n[1/7] No data sources selected...")
             
             # Load AIML data
             if self.args.aiml:
@@ -229,25 +229,25 @@ class DataPreparer:
             
             # Load Hugging Face data
             if self.args.hf:
-                logger.info("\n[2/3] Loading Hugging Face datasets...")
+                logger.info("\n[2/7] Loading Hugging Face datasets...")
                 self.hf_data = self._load_hf_data()
             
             # Load PDF data
             if hasattr(self.args, 'pdf') and self.args.pdf:
-                logger.info("\n[3/3] Loading PDF files...")
+                logger.info("\n[3/7] Loading PDF files...")
                 self.pdf_data = self._load_pdf_data()
             
             # Load EPUB data
             if hasattr(self.args, 'epub') and self.args.epub:
-                logger.info("\n[4/3] Loading EPUB files...")
+                logger.info("\n[4/7] Loading EPUB files...")
                 self.epub_data = self._load_epub_data()
 
             # Load special facts (curated supplementary dataset)
-            logger.info("\n[5/3] Loading special facts (CSV)...")
+            logger.info("\n[5/7] Loading special facts (CSV)...")
             self.special_facts_data = self._load_special_facts()
             
             # Combine datasets
-            logger.info("\n[6/3] Combining datasets...")
+            logger.info("\n[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
             
@@ -678,7 +678,7 @@ class DataPreparer:
             return
 
         # Ensure we have a textual field to train BPE on (avoid numeric token ids)
-        logger.info("\n[7/3] Preparing BPE tokenizer (SentencePiece)...")
+        logger.info("\n[7/7] Preparing BPE tokenizer (SentencePiece)...")
         sample = None
         try:
             sample = self.combined_data[0]
