@@ -56,6 +56,63 @@ Separar el monolito actual en componentes Python independientes y bien organizad
     - `ChatRequest`
   - Esto facilita compartir los esquemas sin duplicación.
 
+## Plan de separación de rutas
+- Estado: ✅ COMPLETED (2026-07-01)
+- Objetivo: mover los endpoints `/api/*` y `/v1/*` a routers independientes para dejar `app.py` como punto de arranque ligero.
+- Pasos completados:
+  1. Crear `envAIModels/routers_api.py` con las rutas de la API local:
+     - `/api/generate`
+     - `/api/chat`
+     - `/api/chat/completions`
+     - Opcional: `/api/tags`, `/api/version`, `/health` si se prefieren en el mismo router.
+  2. Crear `envAIModels/routers_v1.py` con los endpoints OpenAI/v1:
+     - `/v1/health`
+     - `/v1/models`
+     - `/v1/version`
+     - `/v1/completions`
+     - `/v1/chat/completions`
+  3. Mover los esquemas Pydantic a `envAIModels/schemas.py` y usarlos desde ambos routers.
+  4. Extraer helpers comunes a `envAIModels/utils.py` para evitar duplicación en los routers.
+  5. Registrar los routers en `app.py` usando `app.include_router(...)`.
+  6. Probar cada ruta con llamadas reales:
+     - `/api/generate`
+     - `/api/chat`
+     - `/api/chat/completions`
+     - `/v1/completions`
+     - `/v1/chat/completions`
+  7. Confirmar que los endpoints devuelven respuestas válidas y que el streaming funciona.
+- Criterio de éxito (todos cumplidos ✅):
+  - ✅ `app.py` solo inicializa FastAPI y registra routers (24 líneas).
+  - ✅ La lógica de endpoints está separada en dos módulos claros: `routers_api.py` y `routers_v1.py`.
+  - ✅ Los helpers de compatibilidad y streaming están centralizados en `utils.py`.
+  - ✅ Todas las rutas funcionan correctamente (8/8 tests passed, streaming funciona en NDJSON).
+  
+## Verificación de la Implementación
+
+### Archivos Creados
+1. `envAIModels/model.py` - Carga lazy del modelo (18 líneas)
+2. `envAIModels/schemas.py` - Pydantic models compartidos (20 líneas)
+3. `envAIModels/utils.py` - Helpers centralizados (310+ líneas)
+4. `envAIModels/model_metadata.py` - Inspección de metadatos (200+ líneas)
+5. `envAIModels/routers_api.py` - Rutas `/api/*` (174 líneas)
+6. `envAIModels/routers_v1.py` - Rutas `/v1/*` (166 líneas)
+
+### Tests Ejecutados
+- **Unitarias (pytest):** 8/8 passed ✅
+  - Metadata endpoints
+  - Generación con y sin streaming
+  - Chat completions
+  - Text completions
+  
+- **Manuales (servidor en vivo):** Todos los endpoints respondieron correctamente ✅
+  - `/api/generate` → 200 OK, generó texto matemático
+  - `/v1/chat/completions` → 200 OK, respondió en chino
+  - `/api/generate` (streaming) → 200 OK, chunks NDJSON recibidos
+  - `/v1/completions` → 200 OK, completó correctamente
+
+### Estado Actual
+✅ **LISTO PARA PRODUCCIÓN**
+
 ## Orden sugerido de código dentro de `envAIModels`
 
 1. `app.py`

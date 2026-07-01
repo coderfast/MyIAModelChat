@@ -1,3 +1,4 @@
-@echo off
+﻿@echo off
 cls
-uvicorn app:app --reload --port 11434
+uvicorn envAIModels.app:app --reload --port 11434
+
