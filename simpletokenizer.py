@@ -467,18 +467,59 @@ class BilingualTokenizer:
             json.dump(vocab_dict, f, ensure_ascii=False, indent=2)
 
     def load_vocabulary(self, filepath: str):
-        """Load vocabulary from file."""
+        """Load vocabulary from file.
+
+        Supports both traditional word->index mappings and metadata files produced
+        by SentencePiece-based workflows. Metadata-only files should not crash the
+        chat startup path; the tokenizer can continue with its built-in special tokens.
+        """
         import json
         with open(filepath, 'r', encoding='utf-8') as f:
             vocab_dict = json.load(f)
-        
+
         # Rebuild trie and mappings
         self.trie = Trie()
         self.word2idx = {}
         self.idx2word = {}
         self.vocab_size = 0
-        
-        for word, idx in sorted(vocab_dict.items(), key=lambda item: item[1]):
+
+        # Restore built-in special tokens after resetting mappings.
+        self._insert_word('<PAD>', 0)
+        self._insert_word('<UNK>', 1)
+        self._insert_word('<START>', 2)
+        self._insert_word('<END>', 3)
+        if self.use_language_tokens:
+            self._insert_word('<EN>', 4)
+            self._insert_word('<ES>', 5)
+
+        metadata_keys = {'sentencepiece_model', 'vocab_size'}
+        normalized_entries = []
+        for word, idx in vocab_dict.items():
+            if not isinstance(word, str):
+                continue
+            if word in metadata_keys:
+                continue
+            if isinstance(idx, bool):
+                continue
+            try:
+                idx_value = int(idx)
+            except (TypeError, ValueError):
+                continue
+            if idx_value < 0:
+                continue
+            normalized_entries.append((word, idx_value))
+
+        if not normalized_entries:
+            if isinstance(vocab_dict, dict) and metadata_keys.intersection(vocab_dict.keys()):
+                logger.warning(
+                    "Vocabulary file %s does not contain word-to-index mappings; keeping default special tokens only.",
+                    filepath,
+                )
+            else:
+                logger.warning("No valid token mappings found in vocabulary file %s", filepath)
+            return
+
+        for word, idx in sorted(normalized_entries, key=lambda item: item[1]):
             self._insert_word(word, idx)
 
 

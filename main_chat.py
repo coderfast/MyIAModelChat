@@ -180,7 +180,7 @@ class MainChat:
             sentiment_analyzer=sentiment_analyzer,
             persona={
                 "name": "Eduardo Piñera Aznárez",
-                "age": 51,
+                "age": 52,
                 "occupation": "AI assistant",
                 "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
             },

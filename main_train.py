@@ -34,17 +34,41 @@ class SentencePieceTokenizerWrapper:
         self.model_path = model_path
         self.sp = spm.SentencePieceProcessor()
         self.sp.load(model_path)
-        # Try to detect PAD token id; fallback to 0
-        try:
-            pad_id = self.sp.piece_to_id('<pad>')
-            if pad_id < 0:
-                pad_id = self.sp.piece_to_id('<PAD>')
-        except Exception:
-            pad_id = -1
-        if pad_id is None or pad_id < 0:
-            # fallback: use 0 as pad (common scheme)
+        self._initialize_special_token_ids()
+
+    def _initialize_special_token_ids(self):
+        def _resolve_id(*candidates):
+            for candidate in candidates:
+                try:
+                    token_id = self.sp.piece_to_id(candidate)
+                    if token_id is not None and token_id >= 0:
+                        return token_id
+                except Exception:
+                    continue
+            return -1
+
+        pad_id = _resolve_id('<pad>', '<PAD>')
+        unk_id = _resolve_id('<unk>', '<UNK>')
+        bos_id = _resolve_id('<s>', '<BOS>', '<bos>')
+        eos_id = _resolve_id('</s>', '<eos>', '<EOS>')
+
+        if pad_id < 0:
             pad_id = 0
+        if unk_id < 0:
+            unk_id = 1
+        if bos_id < 0:
+            bos_id = -1
+        if eos_id < 0:
+            eos_id = -1
+
         self._pad_id = pad_id
+        self._unk_id = unk_id
+        self._bos_id = bos_id
+        self._eos_id = eos_id
+
+    def _ensure_special_token_ids(self):
+        if not hasattr(self, '_pad_id') or not hasattr(self, '_unk_id') or not hasattr(self, '_eos_id'):
+            self._initialize_special_token_ids()
 
     def encode(self, text: str, *args, **kwargs):
         return list(self.sp.encode(text, out_type=int))
@@ -53,7 +77,53 @@ class SentencePieceTokenizerWrapper:
         return [list(self.sp.encode(t, out_type=int)) for t in texts]
 
     def get_pad_index(self):
+        self._ensure_special_token_ids()
         return self._pad_id
+
+    def get_unk_index(self):
+        self._ensure_special_token_ids()
+        return self._unk_id
+
+    def get_eos_index(self):
+        self._ensure_special_token_ids()
+        return self._eos_id
+
+    def decode(self, indices, skip_special_tokens=True):
+        if indices is None:
+            return ""
+        if isinstance(indices, torch.Tensor):
+            indices = indices.detach().cpu().tolist()
+        if isinstance(indices, int):
+            indices = [indices]
+        if not isinstance(indices, (list, tuple)):
+            try:
+                indices = list(indices)
+            except TypeError:
+                indices = [indices]
+
+        self._ensure_special_token_ids()
+        token_ids = [int(i) for i in indices if i is not None]
+        if skip_special_tokens:
+            special_ids = {id_ for id_ in (self._pad_id, self._unk_id, self._bos_id, self._eos_id) if id_ >= 0}
+            token_ids = [tid for tid in token_ids if tid not in special_ids]
+
+        if not token_ids:
+            return ""
+
+        if hasattr(self.sp, "decode_ids"):
+            return self.sp.decode_ids(token_ids)
+        if hasattr(self.sp, "decode"):
+            return self.sp.decode(token_ids)
+        return " ".join(str(t) for t in token_ids)
+
+    def convert_ids_to_tokens(self, ids):
+        if ids is None:
+            return []
+        if isinstance(ids, torch.Tensor):
+            ids = ids.detach().cpu().tolist()
+        if isinstance(ids, int):
+            ids = [ids]
+        return [self.sp.id_to_piece(int(i)) for i in ids]
 
     def fit(self, texts):
         # No-op: model already trained
