@@ -450,11 +450,15 @@ class MainTrain:
         total_batches = 0
         model.train()
         optimizer.zero_grad()
+        logger.info("Training loop started; the model is actively processing batches")
         
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             if self.stop_event.is_set():
                 logger.info("Stop requested; exiting current training epoch early")
                 break
+
+            if batch_idx == 0 or (batch_idx + 1) % 10 == 0:
+                logger.info(f"Training batch {batch_idx + 1} in progress...")
 
             total_batches += 1
             inputs = inputs.to(device)
@@ -492,6 +496,7 @@ class MainTrain:
                 torch.cuda.empty_cache()
 
         num_batches = max(1, total_batches)
+        logger.info(f"Training loop completed after {num_batches} batches")
         return total_loss / num_batches
 
 
