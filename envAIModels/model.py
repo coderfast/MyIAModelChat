@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,10 +9,21 @@ except Exception:
     Llama = None  # allow tests/usage without the native library present
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = str(BASE_DIR / "models" / "Qwen2.5-1.5B-Instruct-Q4_0.gguf")
-MODEL_NAME = "local-Qwen2.5-1.5B-Instruct-Q4_0"
-OLLAMA_VERSION = "0.6.4"
-CHUNK_SIZE = 64
+ENV_PATH = BASE_DIR / ".env"
+
+if ENV_PATH.exists():
+    with open(ENV_PATH, encoding="utf-8") as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip())
+
+MODEL_PATH = str(BASE_DIR / os.environ.get("MODEL_PATH", "models/Qwen2.5-1.5B-Instruct-Q4_0.gguf"))
+MODEL_NAME = os.environ.get("MODEL_NAME", "local-Qwen2.5-1.5B-Instruct-Q4_0")
+OLLAMA_VERSION = os.environ.get("OLLAMA_VERSION", "0.6.4")
+CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "64"))
 
 logger = logging.getLogger("uvicorn.error")
 
