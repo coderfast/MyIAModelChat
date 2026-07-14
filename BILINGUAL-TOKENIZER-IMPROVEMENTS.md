@@ -1,7 +1,7 @@
 # Bilingual Tokenizer - Improvements Summary
 
 ## Overview
-The `simpletokenizer.py` has been significantly upgraded to support **English and Spanish** with enhanced capabilities for training and inference in AI chat applications.
+The `word_tokenizer.py` module has been significantly upgraded to support **English and Spanish** with enhanced capabilities for training and inference in AI chat applications.
 
 ## Key Improvements
 
@@ -78,16 +78,16 @@ The `simpletokenizer.py` has been significantly upgraded to support **English an
 - ✅ Clear parameter descriptions
 - ✅ Better IDE support and autocompletion
 
-### 12. **Backward Compatibility**
-- ✅ `SimpleTokenizer` class still available as wrapper
-- ✅ Old code continues to work unchanged
-- ✅ Gradual migration path to bilingual features
+### 12. **WordTokenizer**
+- ✅ `WordTokenizer` class provides basic word-level tokenization
+- ✅ Same API as BilingualTokenizer but without language tokens
 
 ## API Comparison
 
-### Old SimpleTokenizer
+### WordTokenizer (Basic)
 ```python
-tokenizer = SimpleTokenizer()
+from word_tokenizer import WordTokenizer
+tokenizer = WordTokenizer()
 tokenizer.fit(texts)
 tokens = tokenizer.encode("Hello world")
 text = tokenizer.decode(tokens)
@@ -194,7 +194,7 @@ BilingualTokenizer(
 
 ### From Old Code
 ```python
-# OLD CODE (still works)
+# OLD CODE
 from simpletokenizer import SimpleTokenizer
 tokenizer = SimpleTokenizer()
 ```
@@ -202,16 +202,16 @@ tokenizer = SimpleTokenizer()
 ### To New Code
 ```python
 # NEW CODE (recommended)
-from simpletokenizer import BilingualTokenizer
+from word_tokenizer import BilingualTokenizer
 tokenizer = BilingualTokenizer(use_language_tokens=True)
 ```
 
 ## Files Updated
 
-1. **simpletokenizer.py** - Main implementation
+1. **word_tokenizer.py** - Main implementation
    - 500+ lines of new code
    - Enhanced with bilingual support
-   - Full backward compatibility
+   - BilingualTokenizer and WordTokenizer classes
 
 2. **BILINGUAL-TOKENIZER-GUIDE.md** - Comprehensive guide
    - 300+ lines of documentation

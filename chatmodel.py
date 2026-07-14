@@ -5,7 +5,7 @@ The provided code defines a PyTorch model for a chatbot application. Let's go th
    - `torch`: The main PyTorch library.
    - `torch.nn`: Provides the neural network modules.
    - `torch.optim`: Provides the optimization algorithms.
-   - `simpletokenizer`: A custom tokenizer module (not shown in the provided code).
+   - `bpe_tokenizer`: SentencePiece BPE tokenizer wrapper.
 
 2. **ChatModel Class**:
    - The `ChatModel` class inherits from `nn.Module`, which is the base class for all neural network modules in PyTorch.
@@ -34,7 +34,7 @@ El código proporcionado define un modelo de PyTorch para una aplicación de cha
    - `torch`: La biblioteca principal de PyTorch.
    - `torch.nn`: Proporciona los módulos de redes neuronales.
    - `torch.optim`: Proporciona los algoritmos de optimización.
-   - `simpletokenizer`: Un módulo de tokenizador personalizado (no se muestra en el código proporcionado).
+   - `bpe_tokenizer`: Wrapper de tokenizador BPE con SentencePiece.
 
 2. **Clase ChatModel**:
    - La clase `ChatModel` hereda de `nn.Module`, que es la clase base para todos los módulos de redes neuronales en PyTorch.

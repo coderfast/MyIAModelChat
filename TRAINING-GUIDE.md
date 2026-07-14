@@ -187,16 +187,16 @@ text = tokenizer.decode(token_ids)
 - Efficient encoding/decoding
 - Vocabulary size up to 50k tokens
 
-### SimpleTokenizer (Legacy)
+### WordTokenizer
 
-For basic tokenization:
+For basic word-level tokenization:
 
 ```python
-from simpletokenizer import SimpleTokenizer
+from word_tokenizer import WordTokenizer
 
-tokenizer = SimpleTokenizer()
-tokenizer.train(raw_text_data)
-tokenizer.save('tokenizer.pth')
+tokenizer = WordTokenizer()
+tokenizer.fit(raw_text_data)
+tokenizer.save_vocabulary('tokenizer_vocab.json')
 token_ids = tokenizer.encode("Hello world")
 text = tokenizer.decode(token_ids)
 ```

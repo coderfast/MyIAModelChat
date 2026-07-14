@@ -14,17 +14,17 @@ Agregar soporte para rethinking en el modelo y en la inferencia, de forma que el
 - Asegurar que `main_train.py` cargue los datos tokenizados y cacheados directamente para acelerar el entrenamiento.
 - Documentar la ruta de `prepare_datasets_for_training` y la forma correcta de regenerar la caché cuando se añaden nuevos idiomas.
 
-### 2. Tokenizador BPE y soporte multilingüe (Máxima prioridad)
-- Cambiar el tokenizador actual a un tokenizador estándar basado en BPE.
-- Soportar múltiples idiomas durante el entrenamiento e inferencia.
-- Comenzar con Español e Inglés, pero diseñar el pipeline para añadir más idiomas en el futuro.
-- Asegurar que el vocabulario y la tokenización sean compatibles con las rutas de entrenamiento y los endpoints de `main_chat.py`.
-- Validar que la inferencia multilingüe funcione correctamente con la opción de rethinking opcional.
-- Ejecutar pruebas de verificación BPE + caché:
+### 2. Tokenizador BPE y soporte multilingüe (Máxima prioridad) ✅ (COMPLETADO)
+- Cambiar el tokenizador actual a un tokenizador estándar basado en BPE. ✅
+- Soportar múltiples idiomas durante el entrenamiento e inferencia. ✅
+- Comenzar con Español e Inglés, pero diseñar el pipeline para añadir más idiomas en el futuro. ✅
+- Asegurar que el vocabulario y la tokenización sean compatibles con las rutas de entrenamiento y los endpoints de `main_chat.py`. ✅
+- Validar que la inferencia multilingüe funcione correctamente con la opción de rethinking opcional. ✅
+- Ejecutar pruebas de verificación BPE + caché: ✅
   1. `python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 2000 --refresh-cache`
   2. `python main.py --train --use-cache --epochs 1`
-- Objetivo: confirmar que `sentencepiece.model` se crea/carga correctamente, `dataset_cache/prepared_dataset` contiene `token_ids`, y `main_train.py` usa los `token_ids` pre-tokenizados sin volver a tokenizar.
-- Estado: PENDIENTE — Prioridad: MÁXIMA
+- Objetivo: confirmar que `sentencepiece.model` se crea/carga correctamente, `dataset_cache/prepared_dataset` contiene `token_ids`, y `main_train.py` usa los `token_ids` pre-tokenizados sin volver a tokenizar. ✅
+- Estado: **COMPLETADO** — Prioridad: MÁXIMA
 
 ### 3. Rethinking en entrenamiento
 - Definir la lógica de rethinking dentro del pipeline de entrenamiento.
@@ -62,6 +62,10 @@ Agregar soporte para rethinking en el modelo y en la inferencia, de forma que el
 
 - `main_train.py`: ahora carga `dataset_cache/cache_metadata.pkl` y detecta si la caché incluye `token_ids`. Si existen `token_ids`, el pipeline de entrenamiento los usa directamente para evitar re-tokenización. ✅ (COMPLETADO)
 - Añadido `SentencePieceTokenizerWrapper` y soporte opcional para cargar `dataset_cache/sentencepiece.model` cuando `cache_metadata.pkl` contiene `bpe_model_path`; si `sentencepiece` está instalado el wrapper se inicializa automáticamente. ✅ (COMPLETADO)
+- `bpe_tokenizer.py`: módulo standalone con `SentencePieceTokenizerWrapper` para uso compartido entre entrenamiento e inferencia. ✅ (COMPLETADO)
+- `main_chat.py`: detecta `sentencepiece_model` en `tokenizer_vocab.json` y carga el modelo BPE en inferencia. ✅ (COMPLETADO)
+- `data_preparer.py`: añadidos tokens `<EN>`, `<ES>` al entrenamiento BPE via `--user_defined_symbols`. ✅ (COMPLETADO)
+- `word_tokenizer.py`: renombrado `simpletokenizer.py` → `word_tokenizer.py`, clase `SimpleTokenizer` → `WordTokenizer`. ✅ (COMPLETADO)
 
 ### Tarea prioritaria para mañana (Máxima prioridad) ✅ (COMPLETADO)
 

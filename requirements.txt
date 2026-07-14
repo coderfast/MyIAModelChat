@@ -16,3 +16,5 @@ ebooklib
 fastapi
 uvicorn
 pydantic
+sentencepiece
+huggingface_hub

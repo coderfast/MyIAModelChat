@@ -29,7 +29,7 @@ def forward(self, input_ids):
 
 ---
 
-### 2. **simpletokenizer.py - Inefficient decode() method**
+### 2. **word_tokenizer.py - Inefficient decode() method**
 
 **Issue**: `decode()` traverses entire trie for each index, extremely slow.
 
@@ -48,7 +48,7 @@ def decode(self, indices):
 **Fix**:
 ```python
 # ✅ CORRECT - Use inverse mapping (O(n) complexity)
-class SimpleTokenizer:
+class WordTokenizer:
     def __init__(self, max_vocab_size=65536, embedding_dim=65536, num_workers=4):
         self.trie = Trie()
         self.idx2word = {}  # ADD THIS!
@@ -70,7 +70,7 @@ class SimpleTokenizer:
 
 ---
 
-### 3. **simpletokenizer.py - Race conditions in multiprocessing**
+### 3. **word_tokenizer.py - Race conditions in multiprocessing**
 
 **Issue**: `fit()` method updates `self.vocab_size` from multiple processes without locks.
 
@@ -225,8 +225,8 @@ def generate_response(self, user_text: str) -> str:
 | Issue | File | Status | Impact |
 |-------|------|--------|--------|
 | Forward pass bug | chatmodel.py | ✅ Fixed | Critical - Model crashes |
-| Slow decoding | simpletokenizer.py | ✅ Fixed | Critical - Performance |
-| Race conditions | simpletokenizer.py | ✅ Fixed | High - Data corruption |
+| Slow decoding | word_tokenizer.py | ✅ Fixed | Critical - Performance |
+| Race conditions | word_tokenizer.py | ✅ Fixed | High - Data corruption |
 | Autoregressive gen | dialogmanager.py | ✅ Fixed | Critical - Gibberish output |
 | Repetition prevention | dialogmanager.py | ✅ Fixed | High - Quality |
 | Dataset caching | data_preparer.py | ✅ Fixed | Medium - Performance |
@@ -499,7 +499,7 @@ if logger.isEnabledFor(logging.DEBUG):
 
 ---
 
-### 11. **Incomplete simpletokenizer.py**
+### 11. **Incomplete word_tokenizer.py**
 
 **Issue**: Class ends abruptly, `add_word()` method is cut off.
 
@@ -551,8 +551,8 @@ print(f"output_ids vale: {output_ids}")  # "vale" is Spanish for "is"
 ## ✅ Recommended Fix Order
 
 1. **First**: Fix chatmodel.py forward() - model won't run without this
-2. **Second**: Complete simpletokenizer.py - it's truncated
-3. **Third**: Fix simpletokenizer decode() and synchronization
+2. **Second**: Complete word_tokenizer.py - it's truncated
+3. **Third**: Fix word_tokenizer decode() and synchronization
 4. **Fourth**: Fix dialogmanager.py tensor handling
 5. **Fifth**: Simplify device detection in main_chat.py
 6. **Sixth**: Add error handling to aimlloder.py
@@ -568,12 +568,12 @@ Create test file: `test_fixes.py`
 
 ```python
 import torch
-from simpletokenizer import SimpleTokenizer
+from word_tokenizer import WordTokenizer
 from chatmodel import ChatModel
 from dialogmanager import DialogueManager
 
 # Test 1: Tokenizer encode/decode
-tokenizer = SimpleTokenizer()
+tokenizer = WordTokenizer()
 text = "Hello world test"
 encoded = tokenizer.encode(text)
 decoded = tokenizer.decode(encoded)

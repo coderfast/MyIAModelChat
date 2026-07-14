@@ -52,10 +52,11 @@ class DialogueManager:
 
         return logits
 
-    def sample_next_token(self, logits, banned_tokens=None):
+    def sample_next_token(self, logits, banned_tokens=None, temperature=None):
         if logits is None:
             return None
-        logits = logits / max(self.temperature, 1e-8)
+        temp = temperature if temperature is not None else self.temperature
+        logits = logits / max(temp, 1e-8)
         filtered_logits = self.top_k_top_p_filtering(logits, top_k=self.top_k, top_p=self.top_p)
         probs = F.softmax(filtered_logits, dim=-1)
 
@@ -93,14 +94,6 @@ class DialogueManager:
             vocab_items = []
             if hasattr(self.tokenizer, "vocab") and isinstance(self.tokenizer.vocab, dict):
                 vocab_items = list(self.tokenizer.vocab.items())
-            elif hasattr(self.tokenizer, "word2idx") and isinstance(self.tokenizer.word2idx, dict):
-                vocab_items = list(self.tokenizer.word2idx.items())
-            elif hasattr(self.tokenizer, "trie") and hasattr(self.tokenizer.trie, "get_all_tokens"):
-                try:
-                    toks = self.tokenizer.trie.get_all_tokens()
-                    vocab_items = [(t, self.tokenizer.trie.get_index(t)) for t in toks]
-                except Exception:
-                    vocab_items = []
             elif hasattr(self.tokenizer, "vocab_size"):
                 # Fallback: sample ids and attempt to decode each id to a token string
                 vocab_items = []
@@ -130,16 +123,54 @@ class DialogueManager:
             else:
                 return "DEBUG: tokenizer vocabulary not accessible."
 
-        # --- resto de la función (tokenización, generación) se mantiene sin cambios ---
+        # --- intent/sentiment analysis ---
+        intent_label = None
+        sentiment_label = None
+        adjusted_temperature = self.temperature
+
         try:
             if self.intent_classifier:
-                _ = self.intent_classifier(user_text)
+                intent_result = self.intent_classifier(user_text)
+                if intent_result and len(intent_result) > 0:
+                    intent_label = intent_result[0].get('label', None)
             if self.sentiment_analyzer:
-                _ = self.sentiment_analyzer(user_text)
+                sentiment_result = self.sentiment_analyzer(user_text)
+                if sentiment_result and len(sentiment_result) > 0:
+                    sentiment_label = sentiment_result[0].get('label', None)
         except Exception:
             pass
 
-        prompt_text = f"Pregunta: {user_text.strip()}\nRespuesta:"
+        # Adjust temperature based on sentiment
+        if sentiment_label:
+            stars = sentiment_label.replace(' stars', '').replace(' star', '').strip()
+            try:
+                stars = int(stars)
+                if stars <= 2:
+                    adjusted_temperature = max(0.3, self.temperature - 0.2)
+                elif stars >= 4:
+                    adjusted_temperature = min(1.0, self.temperature + 0.1)
+            except ValueError:
+                pass
+
+        print(f"Intent: {intent_label}, Sentiment: {sentiment_label}, Adjusted temp: {adjusted_temperature:.2f}")
+
+        # Build enriched prompt with human-readable context
+        prompt_parts = [f"Pregunta: {user_text.strip()}"]
+
+        if intent_label:
+            intent_map = {
+                'POSITIVE': 'El usuario expresa algo positivo',
+                'NEGATIVE': 'El usuario expresa queja o frustración',
+                '1 star': 'El usuario está muy molesto',
+                '2 stars': 'El usuario está frustrado',
+                '3 stars': 'El usuario tiene una consulta neutral',
+                '4 stars': 'El usuario está satisfecho',
+                '5 stars': 'El usuario está muy contento',
+            }
+            intent_desc = intent_map.get(intent_label, f'Tono: {intent_label}')
+            prompt_parts.append(f"Contexto: {intent_desc}")
+
+        prompt_text = "\n".join(prompt_parts) + "\nRespuesta:"
         try:
             input_ids = self.tokenizer.encode(prompt_text)
         except Exception:
@@ -168,7 +199,7 @@ class DialogueManager:
                             if self._is_repeated_ngram(cand_seq, self.no_repeat_ngram_size):
                                 logits[0, token_id] -= penalty
 
-                    next_token = self.sample_next_token(logits.squeeze(0))
+                    next_token = self.sample_next_token(logits.squeeze(0), temperature=adjusted_temperature)
 
                     if next_token is None:
                         break
@@ -196,6 +227,8 @@ class DialogueManager:
             logger.exception("Error during generation: %s", e)
             return self.default_response
 
+        logger.debug(f"Raw generated tokens ({len(generated)}): {generated[:20]}...")
+
         if not generated:
             return self.default_response
 
@@ -220,6 +253,8 @@ class DialogueManager:
                 text = " ".join(self.tokenizer.convert_ids_to_tokens(generated))
             except Exception:
                 text = " ".join(str(t) for t in generated)
+
+        logger.debug(f"Decoded text ({len(text)} chars): '{text[:100]}'")
 
         if not text or text.strip() == "":
             return self.default_response

@@ -15,7 +15,7 @@ The improved `BilingualTokenizer` now supports training and inference for both E
 ✅ **Multilingual Embeddings** - Shared vocabulary across languages (300-dim default)  
 ✅ **Accent Handling** - Optional accent removal for Spanish text  
 ✅ **Language Statistics** - Track language usage during training/inference  
-✅ **Backward Compatible** - Older `SimpleTokenizer` code still works
+✅ **Backward Compatible** - `WordTokenizer` provides the same basic tokenization
 
 ## Installation
 
@@ -26,7 +26,7 @@ No new dependencies needed! The tokenizer uses only standard PyTorch and Python 
 ### 1. **Initialize the Tokenizer**
 
 ```python
-from simpletokenizer import BilingualTokenizer
+from word_tokenizer import BilingualTokenizer
 
 # Create tokenizer with language tokens
 tokenizer = BilingualTokenizer(
@@ -346,15 +346,15 @@ tokenizer.fit(
 ### Issue: Out of memory with batch processing
 **Solution:** Reduce `max_length` or `batch_size`, or use smaller `embedding_dim`
 
-## Backward Compatibility
+## WordTokenizer
 
-The old `SimpleTokenizer` class is still available for existing code:
+The `WordTokenizer` class provides basic word-level tokenization without language tokens:
 
 ```python
-from simpletokenizer import SimpleTokenizer
+from word_tokenizer import WordTokenizer
 
-# This still works (creates BilingualTokenizer without language tokens)
-tokenizer = SimpleTokenizer(
+# Creates BilingualTokenizer without language tokens
+tokenizer = WordTokenizer(
     max_vocab_size=65536,
     embedding_dim=65536,
     num_workers=4

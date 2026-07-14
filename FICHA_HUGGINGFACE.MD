@@ -20,7 +20,7 @@
   - `n_head`: 4
 
 ## Tokenizador
-- Tokenizador personalizado: `SimpleTokenizer`
+- Tokenizador personalizado: `WordTokenizer`
 - Vocabulario cargado desde `checkpoints/tokenizer_vocab.json`
 - Tamaño del vocabulario: 4792
 
@@ -54,7 +54,7 @@
 - `main_chat.py` — servidor y lógica de inferencia
 - `chatmodel.py` — definición del modelo
 - `dialogmanager.py` — gestión de diálogo y generación de respuestas
-- `simpletokenizer.py` — tokenizador personalizado
+- `word_tokenizer.py` — tokenizador por palabras
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
 - `chat_model.pth` — checkpoint del modelo
 

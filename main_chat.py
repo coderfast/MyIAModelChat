@@ -15,8 +15,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from dialogmanager import DialogueManager
-from simpletokenizer import SimpleTokenizer
 from chatmodel import ChatModel
+try:
+    from bpe_tokenizer import SentencePieceTokenizerWrapper
+except ImportError:
+    SentencePieceTokenizerWrapper = None
 from transformers import pipeline
 
 # Configuration constants
@@ -106,9 +109,24 @@ class MainChat:
         vocab_file = os.path.join('checkpoints', 'tokenizer_vocab.json')
 
         if os.path.exists(vocab_file):
-            self.tokenizer = SimpleTokenizer()
-            self.tokenizer.load_vocabulary(vocab_file)
-            logger.info(f"Loaded tokenizer vocabulary from {vocab_file}, vocab_size: {self.tokenizer.vocab_size}")
+            try:
+                import json as _json
+                with open(vocab_file, 'r', encoding='utf-8') as _f:
+                    _vocab_meta = _json.load(_f)
+                sp_path = _vocab_meta.get('sentencepiece_model') if isinstance(_vocab_meta, dict) else None
+                if sp_path and SentencePieceTokenizerWrapper is not None and os.path.exists(sp_path):
+                    self.tokenizer = SentencePieceTokenizerWrapper(sp_path)
+                    logger.info(f"Loaded SentencePiece BPE tokenizer from {sp_path}, vocab_size: {self.tokenizer.vocab_size}")
+                else:
+                    raise RuntimeError(
+                        f"No SentencePiece model found in {vocab_file}. "
+                        "Run: python main.py --prepare-data --aiml --hf"
+                    )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error loading tokenizer from {vocab_file}: {e}. "
+                    "Run: python main.py --prepare-data --aiml --hf"
+                )
 
         try:
             ckpt = self.try_load_checkpoint(CKPT_PATH, device, use_trusted)
@@ -124,8 +142,10 @@ class MainChat:
                 state_dict = ckpt
 
             if self.tokenizer is None:
-                self.tokenizer = SimpleTokenizer()
-                logger.warning("No tokenizer found in checkpoint or vocab file. Using fresh SimpleTokenizer.")
+                raise RuntimeError(
+                    "No tokenizer found in checkpoint or vocab file. "
+                    "Run: python main.py --prepare-data --aiml --hf"
+                )
 
             # Instantiate model with tokenizer-derived vocab
             self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512, num_layers=4)
@@ -146,7 +166,10 @@ class MainChat:
         except Exception as e:
             logger.exception("Error loading pre-trained model: %s", e)
             if self.tokenizer is None:
-                self.tokenizer = SimpleTokenizer()
+                raise RuntimeError(
+                    f"Error loading model checkpoint: {e}. "
+                    "Ensure the model was trained with BPE tokenizer."
+                )
             self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
             logger.info("Initializing model with random weights...")
             init_fn = getattr(self.tokenizer, "init_weights", None)
@@ -167,9 +190,20 @@ class MainChat:
 
         logger.info("Using device: %s", device)
 
-        # Pipelines auxiliares
-        intent_classifier = pipeline('text-classification', model='nlptown/bert-base-multilingual-uncased-sentiment')
-        sentiment_analyzer = pipeline('sentiment-analysis', model='nlptown/bert-base-multilingual-uncased-sentiment')
+        # Pipelines auxiliares — load from local cache
+        from model_downloader import ensure_model_local
+
+        sentiment_model_path = ensure_model_local(
+            'nlptown/bert-base-multilingual-uncased-sentiment',
+            'models/sentiment'
+        )
+        intent_model_path = ensure_model_local(
+            'nlptown/bert-base-multilingual-uncased-sentiment',
+            'models/intent'
+        )
+
+        intent_classifier = pipeline('text-classification', model=intent_model_path)
+        sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path)
 
         # DialogueManager configurable
         self.dialogue_manager = DialogueManager(
@@ -184,11 +218,11 @@ class MainChat:
                 "occupation": "AI assistant",
                 "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
             },
-            top_k=1,
-            top_p=1.0,
-            temperature=1e-8,
+            top_k=50,
+            top_p=0.9,
+            temperature=0.7,
             max_len=128,
-            min_length=5,
+            min_length=3,
             no_repeat_ngram_size=3,
             default_response="Lo siento, no puedo responder ahora."
         )
@@ -237,23 +271,52 @@ class MainChat:
                     logger.exception("Allowlisting failed for %s", full_name)
                     raise
 
-            # Allow key My tokenizer types in case tokenizer object is stored
+            # Allow SentencePiece tokenizer for deserialization
             try:
-                import simpletokenizer
-                allowed = [simpletokenizer.Trie, simpletokenizer.BilingualTokenizer, simpletokenizer.SimpleTokenizer]
-                with torch.serialization.safe_globals(allowed):
-                    return torch.load(path, map_location=device, weights_only=False)
+                allowed = []
+                if SentencePieceTokenizerWrapper is not None:
+                    allowed.append(SentencePieceTokenizerWrapper)
+                if allowed:
+                    with torch.serialization.safe_globals(allowed):
+                        return torch.load(path, map_location=device, weights_only=False)
             except Exception:
                 pass
 
             raise
 
     def performMainChat(self):
-        logger.info("Starting chat interface. Press ESC to exit.")
+        logger.info("Starting chat interface. Type 'exit' or press ESC to exit.")
+        try:
+            import msvcrt
+            use_msvcrt = True
+        except ImportError:
+            use_msvcrt = False
+
         try:
             while True:
                 try:
-                    user_input = input("You: ")
+                    if use_msvcrt:
+                        print("You: ", end="", flush=True)
+                        chars = []
+                        while True:
+                            if msvcrt.kbhit():
+                                ch = msvcrt.getwch()
+                                if ord(ch) == 27:  # ESC
+                                    print("\nExiting chat loop.")
+                                    return
+                                elif ch == '\r':  # Enter
+                                    print()
+                                    break
+                                elif ch == '\b':  # Backspace
+                                    if chars:
+                                        chars.pop()
+                                        print('\b \b', end="", flush=True)
+                                else:
+                                    chars.append(ch)
+                                    print(ch, end="", flush=True)
+                        user_input = "".join(chars)
+                    else:
+                        user_input = input("You: ")
                 except (EOFError, KeyboardInterrupt):
                     logger.info("Exiting chat loop.")
                     break

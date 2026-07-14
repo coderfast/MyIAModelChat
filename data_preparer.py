@@ -255,14 +255,12 @@ class DataPreparer:
             logger.info("\nGathering statistics...")
             self.statistics = self._collect_statistics()
 
-            # Optional: train or load BPE tokenizer and tokenize data before caching
-            use_bpe = getattr(self.args, 'use_bpe', False)
+            # Always train BPE tokenizer and tokenize data before caching
             bpe_vocab_size = getattr(self.args, 'bpe_vocab_size', 8000)
-            if use_bpe:
-                try:
-                    self._prepare_bpe_tokenizer_and_tokenize(bpe_vocab_size)
-                except Exception as e:
-                    logger.warning(f"  ⚠ BPE tokenization failed: {e}")
+            try:
+                self._prepare_bpe_tokenizer_and_tokenize(bpe_vocab_size)
+            except Exception as e:
+                logger.warning(f"  ⚠ BPE tokenization failed: {e}")
             
             # Save to cache
             self._save_to_cache()
@@ -425,9 +423,9 @@ class DataPreparer:
         
         # Example HF datasets to load
         hf_dataset_names = [
-            'wikitext',  # Wikipedia text
-            # 'common_voice',  # Speech data (uncomment for more data)
-            # 'opus_100',  # Multi-language data (uncomment for multilingual)
+            'wikitext',  # Wikipedia text (multilingual via different configs)
+            # 'opus_100',  # Multi-language translation data (100+ languages)
+            # 'common_voice',  # Speech data (multiple languages)
         ]
         
         for dataset_name in hf_dataset_names:
@@ -439,7 +437,7 @@ class DataPreparer:
                     # Take subset for faster preparation
                     ds = ds.select(range(min(1000, len(ds))))
                 elif dataset_name == 'common_voice':
-                    ds = load_dataset('common_voice', '2024-08', split='train[:1000]', languages=["en"])
+                    ds = load_dataset('common_voice', '2024-08', split='train[:1000]', languages=["en", "es", "fr", "de", "pt", "it", "nl", "ru", "zh", "ja"])
                 elif dataset_name == 'opus_100':
                     ds = load_dataset('opus_100', split='train[:1000]')
                 else:
@@ -740,7 +738,7 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=1.0"
+        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=0.9995"
         logger.info(f"  Training SentencePiece BPE model (vocab_size={vocab_size})... this may take a while")
         spm.SentencePieceTrainer.Train(spm_cmd)
 

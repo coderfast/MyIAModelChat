@@ -7,7 +7,7 @@
 | `chatmodel.py` | PyTorch LSTM model (Embedding → LSTM → FC) |
 | `chatdataset.py` | PyTorch Dataset loader |
 | `dialogmanager.py` | Dialogue flow, intent/sentiment, persona modeling |
-| `simpletokenizer.py` | Custom tokenization (encode/decode) |
+| `word_tokenizer.py` | Word-level tokenization (encode/decode) |
 | `bilingual_tokenizer.py` | Bilingual EN/ES tokenization with accent handling |
 | `aimlloder.py` | Loads AIML files for training |
 | `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB) |

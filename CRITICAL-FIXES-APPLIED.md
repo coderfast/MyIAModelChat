@@ -29,21 +29,21 @@ def forward(self, input_ids):
 
 ---
 
-## 2. ✅ simpletokenizer.py - Added idx2word Inverse Mapping
+## 2. ✅ word_tokenizer.py - Added idx2word Inverse Mapping
 
 **Issue**: Decoding was O(n×m) complexity, extremely slow.
 
 **What was fixed**:
 ```python
 # BEFORE (slow)
-class SimpleTokenizer:
+class WordTokenizer:
     def __init__(self, ...):
         self.trie = Trie()
         self.vocab_size = 0
         # NO inverse mapping!
 
 # AFTER (fast)
-class SimpleTokenizer:
+class WordTokenizer:
     def __init__(self, ...):
         self.trie = Trie()
         self.idx2word = {}  # ✅ O(1) lookups
@@ -64,7 +64,7 @@ def _insert_word(self, word, index):
 
 ---
 
-## 3. ✅ simpletokenizer.py - Fixed decode() Method
+## 3. ✅ word_tokenizer.py - Fixed decode() Method
 
 **Issue**: Used inefficient trie traversal for every token.
 
@@ -92,7 +92,7 @@ def decode(self, indices):
 
 ---
 
-## 4. ✅ simpletokenizer.py - Fixed Race Conditions in fit()
+## 4. ✅ word_tokenizer.py - Fixed Race Conditions in fit()
 
 **Issue**: Multiple processes updating `self.vocab_size` simultaneously without synchronization.
 
@@ -168,12 +168,12 @@ device = get_device()  # ✅ Clear, maintainable, verified
 
 ```python
 import torch
-from simpletokenizer import SimpleTokenizer
+from word_tokenizer import WordTokenizer
 from chatmodel import ChatModel
 
 # Test 1: Tokenizer with idx2word
 print("Test 1: Tokenizer encode/decode")
-tokenizer = SimpleTokenizer(max_vocab_size=1000, embedding_dim=128)
+tokenizer = WordTokenizer(max_vocab_size=1000, embedding_dim=128)
 tokenizer.fit(["Hello world", "This is a test"])
 text = "Hello world test"
 encoded = tokenizer.encode(text)
@@ -203,9 +203,9 @@ print(f"Using device: {device}")
 ## Verification Checklist
 
 - [x] **chatmodel.py**: Forward method uses direct embedding → LSTM → FC
-- [x] **simpletokenizer.py**: idx2word mapping added for O(1) decoding
-- [x] **simpletokenizer.py**: decode() method uses mapping instead of trie traversal
-- [x] **simpletokenizer.py**: fit() method has no race conditions
+- [x] **word_tokenizer.py**: idx2word mapping added for O(1) decoding
+- [x] **word_tokenizer.py**: decode() method uses mapping instead of trie traversal
+- [x] **word_tokenizer.py**: fit() method has no race conditions
 - [x] **main_chat.py**: Device detection is clean, simple, and clear
 - [x] All files are syntactically correct
 - [x] No commented-out debug code left

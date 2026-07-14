@@ -35,8 +35,8 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 python main.py --prepare-data --aiml --pdf --epub
 ```
 ```bash
-# Prepare datasets and train/apply BPE tokenizer (saves tokenized cache)
-python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
+# Prepare datasets with custom BPE vocab size (default: 8000)
+python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 ```
 
 ### 2. Train the Model
@@ -80,7 +80,7 @@ MyIAModelChat/
 ├── main_chat.py           # Chat interface
 ├── dialogmanager.py       # Response generation
 ├── data_preparer.py       # Multi-source data loading
-├── simpletokenizer.py     # Base tokenizer
+├── bpe_tokenizer.py       # SentencePiece BPE tokenizer (multilingual)
 ├── chatmodel.py           # LSTM model architecture
 ├── aimlloder.py           # AIML file processing
 ├── checkpoints/           # Model checkpoints
@@ -158,11 +158,11 @@ See [CRITICAL-FIXES-APPLIED.md](CRITICAL-FIXES-APPLIED.md) for details on:
 
 ## 🗂️ Dataset cache and BPE
 
-- When using `--use-bpe` during `--prepare-data`, the pipeline will train (or load) a SentencePiece BPE model and apply it to the prepared dataset. The cache will include:
-	- `dataset_cache/prepared_dataset/` — prepared dataset (includes `bpe_text` and `token_ids` when BPE enabled)
+- During `--prepare-data`, the pipeline always trains a SentencePiece BPE model and applies it to the prepared dataset. The cache will include:
+	- `dataset_cache/prepared_dataset/` — prepared dataset (includes `bpe_text` and `token_ids`)
 	- `dataset_cache/dataset_stats.pkl` — statistics
 	- `dataset_cache/cache_metadata.pkl` — metadata including `bpe_model_path` and vocab size
-	- `dataset_cache/sentencepiece.model` — trained SentencePiece BPE model (if generated)
+	- `dataset_cache/sentencepiece.model` — trained SentencePiece BPE model
 
 Use `--refresh-cache` to rebuild the cache after changing source files or tokenizer settings.
 
@@ -172,13 +172,13 @@ To verify the BPE integration and cached training workflow quickly, run:
 
 ```bash
 # Prepare datasets and build a BPE-tokenized cache (small vocab for quick test)
-python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 2000 --refresh-cache
+python main.py --prepare-data --aiml --hf --bpe-vocab-size 2000 --refresh-cache
 
 # Run a short training that uses the cached token_ids
 python main.py --train --use-cache --epochs 1
 ```
 
-If `cache_metadata.pkl` contains `bpe_model_path`, `main_train.py` will try to load the corresponding `sentencepiece.model` and use it for tokenization consistency; otherwise the training pipeline will prefer pre-tokenized `token_ids` saved in the cache to avoid re-tokenization and speed up startup.
+`main_train.py` will load the `sentencepiece.model` from the cache and use it for tokenization.
 
 ## 🛠️ Requirements
 
