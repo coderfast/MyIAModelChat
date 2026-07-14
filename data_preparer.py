@@ -904,7 +904,7 @@ class DataPreparer:
 
     def _load_csv(self) -> Dataset:
         """
-        Load curated supplemental data from CSV files in datasets/ directory.
+        Load curated supplemental data from all CSV files in datasets_source/csv/ directory.
         This keeps special knowledge in data, not hardcoded code paths.
 
         CSV Format:
@@ -914,59 +914,80 @@ class DataPreparer:
         Returns:
             Hugging Face Dataset with input_ids column
         """
-        csv_path = os.path.join('datasets_source', 'csv', 'special_facts.csv')
+        csv_dir = os.path.join('datasets_source', 'csv')
 
-        if not os.path.exists(csv_path):
-            logger.warning(f"  ⚠ CSV not found: {csv_path}")
+        if not os.path.exists(csv_dir):
+            os.makedirs(csv_dir, exist_ok=True)
+            logger.info(f"  Created directory: {csv_dir}")
+            logger.info(f"  ℹ Place CSV files in '{csv_dir}' directory to load them")
             return Dataset.from_list([])
 
         csv_items = []
+        csv_count = 0
+
         try:
             import csv as csv_mod
 
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                # Detect if file has header
-                first_line = f.readline().strip()
-                f.seek(0)
+            for filename in os.listdir(csv_dir):
+                if not filename.lower().endswith('.csv'):
+                    continue
 
-                has_header = first_line.lower().startswith('input')
+                csv_path = os.path.join(csv_dir, filename)
+                try:
+                    logger.info(f"  Reading CSV: {filename}...")
 
-                reader = csv_mod.DictReader(f) if has_header else csv_mod.reader(f)
+                    with open(csv_path, 'r', encoding='utf-8') as f:
+                        # Detect if file has header
+                        first_line = f.readline().strip()
+                        f.seek(0)
 
-                for row in reader:
-                    if has_header:
-                        input_text = row.get('input', '').strip()
-                        output_text = row.get('output', '').strip()
-                    else:
-                        if len(row) < 2:
-                            continue
-                        input_text = row[0].strip().strip('"')
-                        output_text = row[1].strip().strip('"')
+                        has_header = first_line.lower().startswith('input')
 
-                    # Validate and clean
-                    input_text = clean_text(input_text)
-                    output_text = clean_text(output_text)
+                        reader = csv_mod.DictReader(f) if has_header else csv_mod.reader(f)
 
-                    if not input_text or not output_text:
-                        continue
+                        file_count = 0
+                        for row in reader:
+                            if has_header:
+                                input_text = row.get('input', '').strip()
+                                output_text = row.get('output', '').strip()
+                            else:
+                                if len(row) < 2:
+                                    continue
+                                input_text = row[0].strip().strip('"')
+                                output_text = row[1].strip().strip('"')
 
-                    # Standardized format: question/answer pair
-                    prompt_text = f"{input_text} {output_text}"
+                            # Validate and clean
+                            input_text = clean_text(input_text)
+                            output_text = clean_text(output_text)
 
-                    # Oversample with moderate repetition (20x instead of 100x)
-                    for _ in range(20):
-                        csv_items.append({'input_ids': prompt_text})
+                            if not input_text or not output_text:
+                                continue
+
+                            # Standardized format: question/answer pair
+                            prompt_text = f"{input_text} {output_text}"
+
+                            # Oversample with moderate repetition (20x)
+                            for _ in range(20):
+                                csv_items.append({'input_ids': prompt_text})
+                                file_count += 1
+
+                        csv_count += 1
+                        logger.info(f"  ✓ Loaded: {filename} ({file_count} samples)")
+
+                except Exception as e:
+                    logger.warning(f"  ⚠ Error loading {filename}: {e}")
 
             if csv_items:
                 ds = Dataset.from_list(csv_items)
-                logger.info(f"  ✓ Loaded CSV data: {len(csv_items)} samples ({len(set(item['input_ids'] for item in csv_items))} unique)")
+                logger.info(f"\nTotal CSV files processed: {csv_count}")
+                logger.info(f"Total CSV samples: {len(csv_items)}")
                 return ds
             else:
-                logger.warning("  ⚠ No data found in CSV")
+                logger.warning(f"  ⚠ No CSV files found in '{csv_dir}' directory")
                 return Dataset.from_list([])
 
         except Exception as e:
-            logger.warning(f"  ⚠ Error reading CSV: {e}")
+            logger.warning(f"  ⚠ Error reading CSV files: {e}")
             return Dataset.from_list([])
 
     def _load_pdf_data(self) -> Dataset:
