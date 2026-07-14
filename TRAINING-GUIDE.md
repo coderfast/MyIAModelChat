@@ -162,68 +162,55 @@ python main.py --train \
 
 ## Tokenization
 
-### BilingualTokenizer Workflow
+### SentencePiece BPE Workflow
 
-The system now uses BilingualTokenizer for enhanced EN/ES support:
+The system uses SentencePiece BPE for multilingual tokenization:
 
 ```python
-# Training phase
-from bilingual_tokenizer import BilingualTokenizer
+# Training phase (during --prepare-data)
+from bpe_tokenizer import SentencePieceTokenizerWrapper
 
-tokenizer = BilingualTokenizer()
-tokenizer.train(raw_text_data)  # Learns vocabulary with language detection
-tokenizer.save('checkpoints/tokenizer.pkl')
+# BPE model is trained automatically and saved to:
+# dataset_cache/sentencepiece.model
+# dataset_cache/cache_metadata.pkl
 
 # Inference phase
-tokenizer.load('checkpoints/tokenizer.pkl')
+tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 token_ids = tokenizer.encode("Hello world")  # English
-token_ids_es = tokenizer.encode("Hola mundo")  # Spanish with accents
+token_ids_es = tokenizer.encode("Hola mundo")  # Spanish
+token_ids_fr = tokenizer.encode("Bonjour le monde")  # French
 text = tokenizer.decode(token_ids)
 ```
 
-**Bilingual Features:**
-- Automatic language detection (EN/ES)
-- Accent handling for Spanish text
+**BPE Features:**
+- Multilingual support (any language)
+- Subword tokenization (handles OOV words)
 - Efficient encoding/decoding
-- Vocabulary size up to 50k tokens
-
-### WordTokenizer
-
-For basic word-level tokenization:
-
-```python
-from word_tokenizer import WordTokenizer
-
-tokenizer = WordTokenizer()
-tokenizer.fit(raw_text_data)
-tokenizer.save_vocabulary('tokenizer_vocab.json')
-token_ids = tokenizer.encode("Hello world")
-text = tokenizer.decode(token_ids)
-```
+- Vocabulary size configurable (default: 8000)
 
 ### Vocabulary Management
 
 - Vocabulary size affects model parameters
 - Larger vocab = more flexibility, more memory
-- Common sizes: 25k, 50k, 100k tokens
-- Special tokens: [PAD], [UNK], [CLS], [SEP], [EOS]
+- Common sizes: 2k, 8k, 16k, 32k tokens
+- Special tokens: <pad>, <unk>, <s>, </s>, <think>, </think>
 
 ### Issues & Solutions
 
 **Out-of-vocabulary (OOV) tokens**
 - Problem: Unseen words during inference
-- Solution: Use special [UNK] token
-- Prevention: Larger vocabulary or subword tokenization
+- Solution: BPE handles via subword tokenization
+- Prevention: Use adequate vocabulary size (8000+ recommended)
 
 **Tokenization mismatch**
 - Problem: Different tokenization between train/inference
-- Solution: Always use same tokenizer from checkpoints
+- Solution: Always use same SentencePiece model from cache
 - Verify: Check token IDs for same input across runs
 
-**Language detection issues**
-- Problem: Incorrect EN/ES classification
-- Solution: BilingualTokenizer handles mixed content automatically
-- Prevention: Ensure training data includes both languages
+**Low vocabulary coverage**
+- Problem: Too many unknown tokens
+- Solution: Increase `--bpe-vocab-size` and retrain
+- Prevention: Use 8000+ vocab size for multilingual data
 
 ## Training Best Practices
 
@@ -413,7 +400,7 @@ print(prof.key_averages().table(sort_by="cpu_time_total"))
 ```
 
 ### Common Bottlenecks
-1. Data loading (use more workers, prefetch)
+1. Data loading (use `--use-cache` for 12x speedup)
 2. GPU transfer (use pinned memory)
 3. AIML parsing (cache parsed files)
-4. Tokenization (use batched encoding)
+4. Tokenization (use batched encoding with SentencePiece)

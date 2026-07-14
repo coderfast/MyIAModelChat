@@ -87,19 +87,23 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 MyIAModelChat/
 ├── main.py                 # Main entry point
 ├── main_train.py          # Training pipeline
-├── main_chat.py           # Chat interface
-├── dialogmanager.py       # Response generation
-├── data_preparer.py       # Multi-source data loading
+├── main_chat.py           # Chat interface (API server)
+├── dialogmanager.py       # Response generation with intent/sentiment
+├── data_preparer.py       # Multi-source data loading (AIML, PDF, EPUB, HF)
 ├── bpe_tokenizer.py       # SentencePiece BPE tokenizer (multilingual)
-├── chatmodel.py           # LSTM model architecture
+├── chatmodel.py           # GPT-2 model architecture
+├── chatdataset.py         # PyTorch Dataset loader
 ├── aimlloder.py           # AIML file processing
+├── model_downloader.py    # HuggingFace model downloader
+├── generate_thinking_data.py  # Chain-of-thought data generation
+├── manual_test.py         # Manual testing utilities
 ├── checkpoints/           # Model checkpoints
 ├── dataset_cache/         # Cached datasets
 ├── datasets/              # Raw data storage
-├── aiml/                  # AIML pattern files
-├── pdfs/                  # PDF documents
-├── epub/                  # EPUB e-books
-└── docs/                  # Documentation
+├── models/                # Downloaded ML models (sentiment, intent)
+├── aiml_dev/              # AIML development files
+├── envAIModels/           # API server (FastAPI)
+└── tests/                 # Test suite
 ```
 
 ## 📚 Data Sources
@@ -163,12 +167,14 @@ See [CRITICAL-FIXES-APPLIED.md](CRITICAL-FIXES-APPLIED.md) for details on:
 - [QUICK-REFERENCE.md](QUICK-REFERENCE.md) - Command reference
 - [MODEL-ARCHITECTURE.md](MODEL-ARCHITECTURE.md) - Technical architecture
 - [DATASET-CACHING-GUIDE.md](DATASET-CACHING-GUIDE.md) - Caching system
-- [BILINGUAL-TOKENIZER-GUIDE.md](BILINGUAL-TOKENIZER-GUIDE.md) - Tokenizer features
+- [THINKING-GUIDE.md](THINKING-GUIDE.md) - Chain-of-thought reasoning
 - [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) - Troubleshooting
+- [PLAN_TEST_DATASET.md](PLAN_TEST_DATASET.md) - Dataset preparation analysis
+- [PLAN_BPE_TOKENIZER.md](PLAN_BPE_TOKENIZER.md) - BPE tokenizer migration plan
 
 ## 🗂️ Tokenizador BPE multilingüe
 
-El proyecto usa un tokenizador **SentencePiece BPE** (Byte-Pair Encoding) que soporta múltiples idiomas de forma nativa. Esto permite entrenar e inferir en **Español e Inglés** (y cualquier otro idioma) sin cambiar configuración.
+El proyecto usa un tokenizador **SentencePiece BPE** (Byte-Pair Encoding) como único sistema de tokenización. SentencePiece es nativamente multilingüe — soporta cualquier idioma (Español, Inglés, Francés, etc.) sin configuración adicional.
 
 ### Cómo funciona
 

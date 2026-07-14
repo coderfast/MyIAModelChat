@@ -6,16 +6,19 @@
 
 ```
 ChatModel (nn.Module)
-├── Embedding Layer
-│   ├── Vocabulary Size → Embedding Dimension
-│   └── Converts token IDs to dense vectors
-├── LSTM Layer
-│   ├── Input: embedded sequences
-│   ├── Output: hidden states (bidirectional optional)
-│   └── Captures sequential dependencies
-└── Fully Connected Layer
-    ├── LSTM hidden dim → Vocabulary size
-    └── Outputs logits for next token prediction
+└── GPT-2 Transformer (HuggingFace)
+    ├── Token Embedding
+    │   ├── Vocabulary Size → Embedding Dimension
+    │   └── Converts token IDs to dense vectors
+    ├── Positional Embedding
+    │   └── Encodes position information
+    ├── Transformer Blocks (x num_layers)
+    │   ├── Multi-Head Self-Attention
+    │   ├── Feed-Forward Network
+    │   └── Layer Normalization
+    └── Language Model Head
+        ├── Hidden dim → Vocabulary size
+        └── Outputs logits for next token prediction
 ```
 
 ### Forward Pass Flow
@@ -23,27 +26,25 @@ ChatModel (nn.Module)
 ```
 Input Tokens (LongTensor)
     ↓
-Embedding Layer
+Token Embedding + Positional Embedding
     ↓ (token_ids → embedding_vectors)
-Dense Embeddings
+Transformer Blocks (x num_layers)
+    ↓ (self-attention + feed-forward)
+Hidden States
     ↓
-LSTM Layer
-    ↓ (processes sequences with memory)
-LSTM Output (hidden states)
-    ↓
-Fully Connected Layer
+Language Model Head
     ↓ (projects to vocab dimension)
 Output Logits
 ```
 
-**NOTE: Fixed in recent update** - The forward pass now properly handles batch input dimensions and LSTM sequence processing. Previous version had issues with tensor shapes that caused incorrect gradient flow.
-
 ### Key Parameters (from chatmodel.py)
 
 - **vocab_size**: Number of unique tokens in vocabulary (up to 50k)
-- **embedding_dim**: Dimension of embedding vectors (256-512 recommended)
-- **hidden_size**: LSTM hidden state dimension (512-1024 for complex data)
-- **output_size**: Vocabulary size (same as vocab_size)
+- **embed_size**: Dimension of embedding vectors (256-512 recommended)
+- **hidden_size**: Hidden state dimension (512 for standard models)
+- **num_layers**: Number of transformer layers (2-4 recommended)
+- **n_head**: Number of attention heads (4-8 recommended)
+- **n_positions**: Maximum sequence length (512 default)
 
 ### Input/Output Specifications
 
@@ -101,7 +102,7 @@ for epoch in range(epochs):
 
 **MainTrain**
 - Initializes training pipeline
-- Manages BilingualTokenizer and datasets
+- Manages SentencePieceTokenizerWrapper and datasets
 - Handles multiprocessing for data loading
 - Supports AIML, PDF, EPUB, and Hugging Face datasets
 - Implements best model checkpointing
@@ -112,39 +113,36 @@ for epoch in range(epochs):
 - EPUB parsing with ebooklib
 - Dataset caching system (12x speedup)
 - Schema alignment for concatenation
+- Advanced text processing (chunking, dedup, quality filtering)
 
 **ChatDataset**
 - PyTorch Dataset subclass
 - Loads chat dialogue data from multiple sources
-- Handles BilingualTokenizer
+- Handles SentencePieceTokenizerWrapper
 - Returns (input_ids, target_ids) pairs
 
-**BilingualTokenizer**
-- Enhanced tokenization for EN/ES support
-- Automatic language detection
-- Accent handling for Spanish text
+**SentencePieceTokenizerWrapper**
+- BPE tokenization (multilingual, language-agnostic)
+- Automatic subword tokenization
+- Supports any language via SentencePiece
 - Efficient encoding/decoding with O(1) lookups
 
 ## Dialogue Pipeline (DialogueManager)
 
-### Processing Flow with Language Support
+### Processing Flow
 ```
 User Input String
     ↓
-Language Detection (EN/ES automatic)
-    ↓
-Intent Classification (BERT pipeline)
-    ↓ (e.g., "greeting", "question", "statement")
-Sentiment Analysis (BERT pipeline)
-    ↓ (e.g., "positive", "negative", "neutral")
+Intent/Sentiment Analysis (BERT pipeline)
+    ↓ (1-5 stars sentiment, intent classification)
 Context Management
     ↓ (deque maintains last 5 turns)
 Persona Modeling
     ↓ (adjusts response based on personality)
-Bilingual Tokenization
-    ↓ (string → token IDs with accent support)
+SentencePieceTokenization
+    ↓ (string → token IDs, multilingual)
 Model Inference
-    ↓ (autoregressive generation with penalization)
+    ↓ (autoregressive generation with GPT-2)
 Dynamic N-gram Penalization (no_repeat_ngram_size=3)
     ↓
 Min-Length Enforcement (min_length=5)
@@ -156,17 +154,11 @@ Token ID Decoding
 Response String
 ```
 
-### Intent Recognition
-- Uses `transformers.pipeline('zero-shot-classification')`
-- Pre-trained BERT model (facebook/bart-large-mnli)
-- Detects intent from user input
-- Example outputs: greeting, question, statement, request
-
-### Sentiment Analysis
-- Uses `transformers.pipeline('sentiment-analysis')`
-- Pre-trained BERT model (distilbert-base-uncased-finetuned-sst-2-english)
-- Detects emotional tone: positive, negative, neutral
-- Used for persona modeling adjustment
+### Intent/Sentiment Analysis
+- Uses `transformers.pipeline('text-classification')`
+- Pre-trained BERT model (nlptown/bert-base-multilingual-uncased-sentiment)
+- Detects sentiment from 1-5 stars
+- Used for temperature adjustment (angry → lower temp, happy → higher temp)
 
 ### Context Window
 - Maintains last 5 user inputs/bot responses (configurable)
@@ -206,14 +198,19 @@ Response String
 ## Saved Models
 
 ### Checkpoint Files
-- **checkpoints/chat_model_best.pth**: Complete ChatModel state_dict with best validation loss
-- **checkpoints/tokenizer.pkl**: BilingualTokenizer state (vocabulary, mappings, language detection)
+- **chat_model.pth**: Complete ChatModel state_dict
+- **checkpoints/tokenizer_vocab.json**: SentencePiece tokenizer vocabulary
+- **dataset_cache/sentencepiece.model**: Trained BPE model
 - **dataset_cache/**: Cached processed datasets for fast loading
-- **pretrained_embeddings.pth**: Pre-trained embedding weights (optional)
+- **models/**: Downloaded ML models (sentiment, intent)
 
 ### Loading Models
 ```python
-model = ChatModel(vocab_size, embedding_dim, hidden_size)
+from bpe_tokenizer import SentencePieceTokenizerWrapper
+from chatmodel import ChatModel
+
+tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
+model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
 model.load_state_dict(torch.load('chat_model.pth'))
 model.eval()  # Set to evaluation mode
 ```

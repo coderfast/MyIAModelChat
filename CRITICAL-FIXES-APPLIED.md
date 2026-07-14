@@ -3,6 +3,8 @@
 ## Summary
 All 5 critical issues have been corrected and the project is now functional.
 
+**Note (2026-07-15)**: Some fixes below (word_tokenizer.py improvements) are historical — the file was removed during the BPE tokenizer migration. The project now uses only `bpe_tokenizer.py` (SentencePiece BPE).
+
 ---
 
 ## 1. ✅ chatmodel.py - Fixed Forward Pass

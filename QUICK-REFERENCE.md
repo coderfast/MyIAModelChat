@@ -4,16 +4,17 @@
 
 | File | Purpose |
 |------|---------|
-| `chatmodel.py` | PyTorch LSTM model (Embedding → LSTM → FC) |
+| `chatmodel.py` | GPT-2 model architecture (HuggingFace) |
 | `chatdataset.py` | PyTorch Dataset loader |
 | `dialogmanager.py` | Dialogue flow, intent/sentiment, persona modeling |
-| `word_tokenizer.py` | Word-level tokenization (encode/decode) |
-| `bilingual_tokenizer.py` | Bilingual EN/ES tokenization with accent handling |
+| `bpe_tokenizer.py` | SentencePiece BPE tokenizer (multilingual) |
 | `aimlloder.py` | Loads AIML files for training |
-| `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB) |
+| `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HF) |
 | `main_train.py` | Training pipeline (MainTrain class) |
-| `main_chat.py` | Chat inference interface |
+| `main_chat.py` | Chat interface + FastAPI server |
 | `main.py` | Primary entry point with argument parsing |
+| `model_downloader.py` | HuggingFace model downloader |
+| `generate_thinking_data.py` | Chain-of-thought data generation |
 
 ## Command Cheat Sheet
 
@@ -72,16 +73,18 @@ PY
 ## Model Config Essentials
 
 ```python
-# chatmodel.py - Key parameters
-vocab_size = 50000        # Vocabulary size (increased)
-embedding_dim = 256       # Embedding dimension
-hidden_size = 512         # LSTM hidden state size
-output_size = vocab_size  # Output vocabulary size
+# chatmodel.py - Key parameters (GPT-2 architecture)
+vocab_size = 50000        # Vocabulary size (from BPE tokenizer)
+embed_size = 256          # Embedding dimension
+hidden_size = 512         # Hidden state size
+num_layers = 2            # Number of transformer layers
+n_head = 4                # Attention heads
+n_positions = 512         # Max sequence length
 
 # dialogmanager.py - Key settings
 max_history = 5           # Conversation history window
-intent_model = "facebook/bart-large-mnli"
-sentiment_model = "distilbert-base-uncased-finetuned-sst-2-english"
+intent_model = "nlptown/bert-base-multilingual-uncased-sentiment"
+sentiment_model = "nlptown/bert-base-multilingual-uncased-sentiment"
 top_k = 50               # Sampling parameter
 top_p = 0.9              # Nucleus sampling
 temperature = 0.8        # Generation temperature
@@ -106,22 +109,18 @@ use_cache = True        # Use cached datasets
 ```
 User Input (text)
     ↓
-Language Detection (EN/ES)
+Intent/Sentiment Analysis (BERT)
     ↓
-Intent Classifier (BERT)
-    ↓
-Sentiment Analyzer (BERT)
-    ↓
-BilingualTokenizer.encode() → Token IDs
+SentencePieceTokenizerWrapper.encode() → Token IDs
     ↓
 ChatModel forward pass:
-    Token IDs → Embedding → LSTM → FC → Logits
+    Token IDs → GPT-2 Transformer → Logits
     ↓
 Dynamic N-gram Penalization + Top-K/Top-P Sampling
     ↓
 Output Token IDs
     ↓
-BilingualTokenizer.decode() → Response text
+SentencePieceTokenizerWrapper.decode() → Response text
 ```
 
 ## Key Classes & Methods
@@ -130,10 +129,9 @@ BilingualTokenizer.decode() → Response text
 ```python
 from chatmodel import ChatModel
 
-model = ChatModel(vocab_size, embedding_dim, hidden_size)
+model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
 output = model(input_ids)  # Forward pass
 model.to(device)  # Move to GPU/CPU
-model.save_pretrained()  # Save weights
 ```
 
 ### DialogueManager
@@ -149,15 +147,14 @@ intent = dialog.detected_intent
 sentiment = dialog.detected_sentiment
 ```
 
-### BilingualTokenizer
+### SentencePieceTokenizerWrapper
 ```python
-from bilingual_tokenizer import BilingualTokenizer
+from bpe_tokenizer import SentencePieceTokenizerWrapper
 
-tokenizer = BilingualTokenizer()
-tokenizer.train(raw_text)
+tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 token_ids = tokenizer.encode("hello world")
 text = tokenizer.decode(token_ids)
-# Supports accent handling: "español" → proper tokenization
+# Multilingual: works with any language
 ```
 
 ### DataPreparer

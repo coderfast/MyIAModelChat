@@ -102,46 +102,43 @@ assert train_ids == inference_ids, "Tokenizers don't match!"
 
 ---
 
-### Issue: Tokenizer Issues (Race Conditions & Performance)
+### Issue: Tokenizer Issues
 
 **Problem**: Slow decoding, vocabulary corruption, or inconsistent tokenization
 
 **Solution**:
 ```python
-# For SimpleTokenizer issues:
-# Check if idx2word mapping exists (fixed in recent update)
-if hasattr(tokenizer, 'idx2word') and tokenizer.idx2word:
-    print("O(1) decoding available")
-else:
-    print("Falling back to O(n) decoding - consider updating")
+# For SentencePiece BPE tokenizer:
+from bpe_tokenizer import SentencePieceTokenizerWrapper
 
-# For BilingualTokenizer:
-from bilingual_tokenizer import BilingualTokenizer
-tokenizer = BilingualTokenizer()
-tokenizer.load('checkpoints/tokenizer.pkl')
+tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 
-# Test accent handling
-test_spanish = "español, México, café"
-ids = tokenizer.encode(test_spanish)
-decoded = tokenizer.decode(ids)
-print(f"Original: {test_spanish}")
-print(f"Decoded: {decoded}")
-assert test_spanish == decoded, "Accent handling failed"
+# Test multilingual support
+test_texts = [
+    "Hello world",      # English
+    "Hola mundo",       # Spanish
+    "Bonjour le monde", # French
+    "Hallo Welt",       # German
+]
 
-# Check language detection
-print(f"Language detection: {tokenizer.detect_language('Hello world')}")  # 'en'
-print(f"Language detection: {tokenizer.detect_language('Hola mundo')}")  # 'es'
+for text in test_texts:
+    ids = tokenizer.encode(text)
+    decoded = tokenizer.decode(ids)
+    print(f"Original: {text}")
+    print(f"Decoded: {decoded}")
+    print(f"Tokens: {ids}")
+    print()
 ```
 
 **Recent Fixes Applied**:
-- **Race conditions**: Fixed thread-unsafe vocabulary building in `SimpleTokenizer.fit()`
-- **Slow decoding**: Added `idx2word` mapping for O(1) token ID to string conversion
-- **Vocabulary corruption**: Implemented atomic save/load operations
-- **Bilingual support**: Added `BilingualTokenizer` with EN/ES detection and accent handling
+- **Migration to BPE**: Replaced word-level tokenizers with SentencePiece BPE
+- **Multilingual support**: BPE handles any language natively
+- **Eliminated race conditions**: BPE training is single-threaded and atomic
+- **Consistent tokenization**: Same model used for training and inference
 
 **Prevention**:
-- Use `BilingualTokenizer` for new projects (handles EN/ES automatically)
-- Save/load tokenizers from checkpoints only
+- Use `SentencePieceTokenizerWrapper` for all tokenization
+- Save BPE model to `dataset_cache/sentencepiece.model`
 - Test tokenization consistency across runs
 - Monitor decoding performance (should be near-instant)
 

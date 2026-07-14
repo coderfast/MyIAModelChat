@@ -1,7 +1,9 @@
 # Bilingual Tokenizer - Improvements Summary
 
+> **HISTORICAL DOCUMENT**: This file documents the old `BilingualTokenizer` which has been replaced by `SentencePieceTokenizerWrapper` (BPE). See `BILINGUAL-TOKENIZER-GUIDE.MD` for current documentation.
+
 ## Overview
-The `word_tokenizer.py` module has been significantly upgraded to support **English and Spanish** with enhanced capabilities for training and inference in AI chat applications.
+The `word_tokenizer.py` module was significantly upgraded to support **English and Spanish** with enhanced capabilities for training and inference in AI chat applications. This tokenizer has since been replaced by SentencePiece BPE.
 
 ## Key Improvements
 

@@ -1,5 +1,7 @@
 # Code Corrections & Improvements - MyIAModelChat
 
+> **Note**: Some corrections below (especially to `word_tokenizer.py`) are historical — that file was removed during the BPE tokenizer migration. The project now uses only `bpe_tokenizer.py` (SentencePiece BPE).
+
 ## 🔴 Critical Issues
 
 ### 1. **chatmodel.py - Incorrect forward pass implementation**
