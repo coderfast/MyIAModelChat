@@ -1,1 +1,1 @@
-ollama create Qwen2.5-1.5B-Instruct-Q4_0 -f Modelfile
+ollama create gemma4-coding-Q8_0 -f Modelfile

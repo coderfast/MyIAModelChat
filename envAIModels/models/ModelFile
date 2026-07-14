@@ -1,1 +1,1 @@
-FROM ./Qwen2.5-1.5B-Instruct-Q4_0.gguf
+FROM ./gemma4-coding-Q8_0.gguf
