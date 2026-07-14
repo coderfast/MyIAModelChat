@@ -108,6 +108,129 @@ Primary Mode Arguments (choose one):
     Default: 8000
     Example: python main.py --prepare-data --aiml --use-bpe --bpe-vocab-size 16000
 
+================================================================================
+
+Text Processing Arguments (advanced data preparation):
+================================================================================
+
+--enable-chunking
+    Description: Enable text chunking by tokens for PDF/EPUB documents
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --pdf --enable-chunking
+    Notes:
+        - Splits long texts into overlapping chunks
+        - Useful for models with fixed context windows
+        - Preserves context between chunks with overlap
+        - Only applies to PDF and EPUB data sources
+
+--chunk-max-tokens <N>
+    Description: Maximum tokens per chunk when chunking is enabled
+    Type: Integer
+    Default: 512
+    Example: python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 256
+    Notes:
+        - Smaller values = more chunks, less context per chunk
+        - Larger values = fewer chunks, more context per chunk
+        - Recommended: 256-1024 depending on model
+
+--chunk-overlap <N>
+    Description: Number of overlapping tokens between chunks
+    Type: Integer
+    Default: 50
+    Example: python main.py --prepare-data --pdf --enable-chunking --chunk-overlap 100
+    Notes:
+        - More overlap = better context continuity
+        - Less overlap = fewer duplicate tokens
+        - Recommended: 10-20% of chunk-max-tokens
+
+--enable-dedup
+    Description: Enable deduplication of similar texts using MinHash LSH
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --pdf --enable-dedup
+    Notes:
+        - Removes duplicate and near-duplicate texts
+        - Uses MinHash LSH for efficient similarity detection
+        - Improves training quality by reducing redundancy
+        - Falls back to exact matching if datasketch not installed
+
+--dedup-threshold <float>
+    Description: Similarity threshold for deduplication (0-1)
+    Type: Float
+    Default: 0.8
+    Range: 0.0 to 1.0
+    Example: python main.py --prepare-data --pdf --enable-dedup --dedup-threshold 0.9
+    Notes:
+        - Higher threshold = less aggressive deduplication
+        - Lower threshold = more aggressive deduplication
+        - 0.8 = remove texts that are 80%+ similar
+        - 0.9 = remove texts that are 90%+ similar
+
+--enable-quality-filter
+    Description: Enable quality filtering of texts
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --pdf --enable-quality-filter
+    Notes:
+        - Filters out low-quality texts
+        - Checks word count, alpha ratio, spam detection
+        - Removes texts with too many numbers/symbols
+        - Removes texts with unreasonable sentence structure
+
+--min-words <N>
+    Description: Minimum words per text for quality filter
+    Type: Integer
+    Default: 5
+    Example: python main.py --prepare-data --pdf --enable-quality-filter --min-words 10
+    Notes:
+        - Texts with fewer words are filtered out
+        - Higher value = stricter filtering
+        - Recommended: 3-10 depending on use case
+
+--max-words <N>
+    Description: Maximum words per text for quality filter
+    Type: Integer
+    Default: 1000
+    Example: python main.py --prepare-data --pdf --enable-quality-filter --max-words 500
+    Notes:
+        - Texts with more words are filtered out
+        - Lower value = stricter filtering
+        - Recommended: 500-2000 depending on use case
+
+--preserve-metadata
+    Description: Preserve document metadata (title, author, etc.) in dataset
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --pdf --epub --preserve-metadata
+    Notes:
+        - Extracts and preserves document metadata
+        - PDF: title, author, page count
+        - EPUB: title, author, language, chapter count
+        - Metadata stored in 'metadata' field of each sample
+
+--enable-lang-filter
+    Description: Enable language filtering of texts
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --pdf --enable-lang-filter
+    Notes:
+        - Filters texts by detected language
+        - Uses langdetect library (if available)
+        - Falls back to heuristic-based detection
+        - Keeps texts in allowed languages + unknown
+
+--allowed-languages <lang1> <lang2> ...
+    Description: Allowed language codes for language filtering
+    Type: List of strings
+    Default: es en (Spanish and English)
+    Example: python main.py --prepare-data --pdf --enable-lang-filter --allowed-languages es en fr
+    Notes:
+        - Use ISO 639-1 language codes
+        - Common codes: es (Spanish), en (English), fr (French), de (German)
+        - Unknown language texts are always kept
+        - Requires --enable-lang-filter to work
+
 --refresh-cache
     Description: Clear old cache and rebuild from fresh data
     Type: Boolean flag (no value needed)
@@ -360,6 +483,43 @@ Dataset caching enables fast repeated runs without reloading source data.
     python main.py --train --aiml --pdf --epub --epochs 10     (uses cache)
     python main.py --train --aiml --pdf --epub --epochs 20     (uses cache)
     python main.py --train --aiml --pdf --epub --epochs 30     (uses cache)
+
+================================================================================
+
+ADVANCED DATA PROCESSING EXAMPLES:
+================================================================================
+
+10. Prepare PDF with chunking (for long documents):
+    python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 256
+
+11. Prepare data with deduplication (remove duplicates):
+    python main.py --prepare-data --aiml --pdf --enable-dedup --dedup-threshold 0.9
+
+12. Prepare data with quality filtering:
+    python main.py --prepare-data --pdf --epub --enable-quality-filter --min-words 10
+
+13. Prepare data with language filtering (Spanish only):
+    python main.py --prepare-data --pdf --enable-lang-filter --allowed-languages es
+
+14. Full advanced workflow with all features:
+    python main.py --prepare-data --aiml --pdf --epub \
+        --enable-chunking \
+        --enable-dedup \
+        --enable-quality-filter \
+        --preserve-metadata \
+        --enable-lang-filter \
+        --allowed-languages es en
+
+15. Prepare PDF with metadata preservation:
+    python main.py --prepare-data --pdf --preserve-metadata
+
+16. Prepare EPUB with chunking and quality filter:
+    python main.py --prepare-data --epub \
+        --enable-chunking \
+        --chunk-max-tokens 512 \
+        --enable-quality-filter \
+        --min-words 5 \
+        --max-words 1000
 
 ================================================================================
 

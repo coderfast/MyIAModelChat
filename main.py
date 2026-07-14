@@ -149,10 +149,10 @@ OPERATIONS:
   --clear-cache        Clear cached datasets and exit
 
 DATA SOURCES (required with --train or --prepare-data):
-  --aiml               Include AIML data from 'aiml/' directory
+  --aiml               Include AIML data from datasets_source/aiml directory
   --hf                 Include Hugging Face datasets
-  --pdf                Include PDF data from 'pdfs/' directory
-  --epub               Include EPUB data from 'epub/' directory
+  --pdf                Include PDF data from datasets_source/pdf directory
+  --epub               Include EPUB data from datasets_source/epub directory
 
 TRAINING OPTIONS:
   --epochs NUM         Number of training epochs (default: 1)
@@ -204,6 +204,30 @@ EXAMPLES:
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
         parser.add_argument("--show-thinking", action='store_true', help="Show <think> reasoning in chat")
+
+        # Text processing options
+        parser.add_argument("--enable-chunking", action='store_true',
+                            help="Enable text chunking by tokens (for PDF/EPUB)")
+        parser.add_argument("--chunk-max-tokens", type=int, default=512,
+                            help="Maximum tokens per chunk when chunking is enabled (default: 512)")
+        parser.add_argument("--chunk-overlap", type=int, default=50,
+                            help="Number of overlapping tokens between chunks (default: 50)")
+        parser.add_argument("--enable-dedup", action='store_true',
+                            help="Enable deduplication of similar texts")
+        parser.add_argument("--dedup-threshold", type=float, default=0.8,
+                            help="Similarity threshold for deduplication (0-1, default: 0.8)")
+        parser.add_argument("--enable-quality-filter", action='store_true',
+                            help="Enable quality filtering of texts")
+        parser.add_argument("--min-words", type=int, default=5,
+                            help="Minimum words per text for quality filter (default: 5)")
+        parser.add_argument("--max-words", type=int, default=1000,
+                            help="Maximum words per text for quality filter (default: 1000)")
+        parser.add_argument("--preserve-metadata", action='store_true',
+                            help="Preserve document metadata (title, author, etc.) in dataset")
+        parser.add_argument("--enable-lang-filter", action='store_true',
+                            help="Enable language filtering")
+        parser.add_argument("--allowed-languages", type=str, nargs='+', default=['es', 'en'],
+                            help="Allowed language codes for filtering (default: es en)")
         
         args = parser.parse_args()
 

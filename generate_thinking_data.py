@@ -5,8 +5,8 @@ Reads existing QA pairs and generates synthetic reasoning inside
 <think>...</think> tags before the final answer.
 
 Usage:
-    python generate_thinking_data.py --source csv --input datasets/special_facts.csv --output datasets/thinking/thinking_data.csv
-    python generate_thinking_data.py --source aiml --input aiml_dev --output datasets/thinking/thinking_data.csv
+    python generate_thinking_data.py --source csv --input datasets_source/csv/special_facts.csv --output datasets/thinking/thinking_data.csv
+    python generate_thinking_data.py --source aiml --input datasets_source/aiml --output datasets/thinking/thinking_data.csv
     python generate_thinking_data.py --source all --output datasets/thinking/thinking_data.csv
 """
 
@@ -197,8 +197,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python generate_thinking_data.py --source csv --input datasets/special_facts.csv
-  python generate_thinking_data.py --source aiml --input aiml_dev
+  python generate_thinking_data.py --source csv --input datasets_source/csv/special_facts.csv
+  python generate_thinking_data.py --source aiml --input datasets_source/aiml
   python generate_thinking_data.py --source all --output datasets/thinking/thinking_data.csv
         """
     )
@@ -222,7 +222,7 @@ Examples:
 
     # Load data based on source
     if args.source in ('csv', 'all'):
-        csv_path = args.input if args.source == 'csv' and args.input else 'datasets/special_facts.csv'
+        csv_path = args.input if args.source == 'csv' and args.input else os.path.join('datasets_source', 'csv', 'special_facts.csv')
         if os.path.exists(csv_path):
             logger.info(f"\nLoading CSV data from: {csv_path}")
             csv_pairs = load_csv_data(csv_path)
@@ -232,7 +232,7 @@ Examples:
             logger.warning(f"  CSV not found: {csv_path}")
 
     if args.source in ('aiml', 'all'):
-        aiml_dir = args.input if args.source == 'aiml' and args.input else 'aiml_dev'
+        aiml_dir = args.input if args.source == 'aiml' and args.input else os.path.join('datasets_source', 'aiml')
         if os.path.exists(aiml_dir):
             logger.info(f"\nLoading AIML data from: {aiml_dir}")
             aiml_pairs = load_aiml_data(aiml_dir)

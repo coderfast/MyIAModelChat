@@ -40,6 +40,421 @@ except ImportError:
     ebooklib = None
     epub = None
 
+# NLP libraries for text processing
+try:
+    import spacy
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
+
+try:
+    import unicodedata
+    UNICODE_AVAILABLE = True
+except ImportError:
+    UNICODE_AVAILABLE = False
+
+try:
+    import re
+    REGEX_AVAILABLE = True
+except ImportError:
+    REGEX_AVAILABLE = False
+
+
+def normalize_unicode(text: str) -> str:
+    """Normalize Unicode text to NFKC form for consistency."""
+    if not UNICODE_AVAILABLE:
+        return text
+    return unicodedata.normalize('NFKC', text)
+
+
+def clean_text(text: str) -> str:
+    """Clean text by removing extra whitespace and normalizing."""
+    if not text or not isinstance(text, str):
+        return ""
+    
+    # Normalize Unicode first
+    text = normalize_unicode(text)
+    
+    # Remove multiple whitespace characters
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Strip leading/trailing whitespace
+    text = text.strip()
+    
+    return text
+
+
+def split_sentences(text: str) -> List[str]:
+    """
+    Split text into sentences using spaCy if available, fallback to regex-based splitting.
+
+    Args:
+        text: Input text to split
+
+    Returns:
+        List of sentences
+    """
+    if not text or not isinstance(text, str):
+        return []
+
+    # Clean text first
+    text = clean_text(text)
+
+    if not text:
+        return []
+
+    # Try spaCy first (most accurate)
+    if SPACY_AVAILABLE:
+        try:
+            # Try to load Spanish model, fallback to English
+            try:
+                nlp = spacy.load('es_core_news_sm')
+            except OSError:
+                try:
+                    nlp = spacy.load('en_core_web_sm')
+                except OSError:
+                    # If no model available, use blank pipeline with sentencizer
+                    nlp = spacy.blank("en")
+                    nlp.add_pipe("sentencizer")
+
+            doc = nlp(text)
+            sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+            return sentences
+        except Exception:
+            pass
+
+    # Fallback: improved regex-based sentence splitting
+    # Split on sentence-ending punctuation followed by space or end of string
+    # Handles: Dr. Smith, 3.14, URLs, etc.
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z¡¿])', text)
+
+    # Filter empty sentences
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    return sentences
+
+
+def chunk_text_by_tokens(text: str, max_tokens: int = 512, overlap_tokens: int = 50) -> List[str]:
+    """
+    Split text into overlapping chunks by token count.
+    Useful for models with fixed context windows.
+
+    Args:
+        text: Input text to chunk
+        max_tokens: Maximum tokens per chunk (default 512)
+        overlap_tokens: Number of overlapping tokens between chunks (default 50)
+
+    Returns:
+        List of text chunks
+    """
+    if not text or not isinstance(text, str):
+        return []
+
+    # Simple word-based tokenization (approximation)
+    # For production, use actual tokenizer
+    words = text.split()
+
+    if len(words) <= max_tokens:
+        return [text] if text.strip() else []
+
+    chunks = []
+    start = 0
+
+    while start < len(words):
+        end = min(start + max_tokens, len(words))
+        chunk = ' '.join(words[start:end])
+        if chunk.strip():
+            chunks.append(chunk)
+
+        # Move start forward, accounting for overlap
+        start += max_tokens - overlap_tokens
+
+        # Safety check to avoid infinite loop
+        if start >= len(words):
+            break
+
+    return chunks
+
+
+def deduplicate_texts(texts: List[str], threshold: float = 0.8) -> List[str]:
+    """
+    Remove duplicate or near-duplicate texts using MinHash LSH.
+
+    Args:
+        texts: List of input texts
+        threshold: Similarity threshold for deduplication (0-1, default 0.8)
+
+    Returns:
+        List of deduplicated texts
+    """
+    if not texts:
+        return []
+
+    try:
+        from datasketch import MinHash, MinHashLSH
+        HAS_DATASKETCH = True
+    except ImportError:
+        HAS_DATASKETCH = False
+
+    if not HAS_DATASKETCH:
+        # Fallback: simple exact match deduplication
+        seen = set()
+        unique_texts = []
+        for text in texts:
+            text_normalized = text.strip().lower()
+            if text_normalized not in seen:
+                seen.add(text_normalized)
+                unique_texts.append(text)
+        return unique_texts
+
+    # MinHash LSH deduplication
+    lsh = MinHashLSH(threshold=threshold, num_perm=128)
+    minhashes = {}
+
+    for i, text in enumerate(texts):
+        m = MinHash(num_perm=128)
+        # Create shingles (3-grams)
+        words = text.split()
+        for idx in range(len(words) - 2):
+            shingle = ' '.join(words[idx:idx+3])
+            m.update(shingle.encode('utf-8'))
+
+        minhashes[i] = m
+        try:
+            lsh.insert(str(i), m)
+        except ValueError:
+            pass  # Duplicate signature, skip
+
+    # Query for duplicates
+    duplicates = set()
+    for i, m in minhashes.items():
+        if i in duplicates:
+            continue
+        result = lsh.query(m)
+        for j in result:
+            j_int = int(j)
+            if j_int != i:
+                duplicates.add(j_int)
+
+    # Keep non-duplicate texts
+    unique_texts = [texts[i] for i in range(len(texts)) if i not in duplicates]
+    return unique_texts
+
+
+def filter_by_quality(texts: List[str], min_words: int = 5, max_words: int = 1000,
+                      min_alpha_ratio: float = 0.5) -> List[str]:
+    """
+    Filter texts by quality metrics.
+
+    Args:
+        texts: List of input texts
+        min_words: Minimum number of words (default 5)
+        max_words: Maximum number of words (default 1000)
+        min_alpha_ratio: Minimum ratio of alphabetic characters (default 0.5)
+
+    Returns:
+        List of filtered texts
+    """
+    if not texts:
+        return []
+
+    filtered = []
+
+    for text in texts:
+        if not text or not isinstance(text, str):
+            continue
+
+        text = text.strip()
+
+        # Check word count
+        words = text.split()
+        if len(words) < min_words or len(words) > max_words:
+            continue
+
+        # Check alpha ratio (filter out texts with too many numbers/symbols)
+        alpha_count = sum(1 for c in text if c.isalpha())
+        alpha_ratio = alpha_count / len(text) if len(text) > 0 else 0
+        if alpha_ratio < min_alpha_ratio:
+            continue
+
+        # Check for repeated characters (spam/noise detection)
+        if len(set(text)) < len(text) * 0.1:
+            continue
+
+        # Check for reasonable sentence structure
+        if text.count('.') > len(words) * 0.5:  # Too many periods
+            continue
+
+        filtered.append(text)
+
+    return filtered
+
+
+def extract_pdf_metadata(pdf_path: str) -> Dict:
+    """
+    Extract metadata from a PDF file.
+
+    Args:
+        pdf_path: Path to the PDF file
+
+    Returns:
+        Dictionary with metadata (title, author, pages, etc.)
+    """
+    metadata = {
+        'source_type': 'pdf',
+        'source_file': os.path.basename(pdf_path),
+        'title': '',
+        'author': '',
+        'pages': 0,
+        'language': 'unknown'
+    }
+
+    if PdfReader is None:
+        return metadata
+
+    try:
+        with open(pdf_path, 'rb') as f:
+            pdf_reader = PdfReader(f)
+
+            # Get page count
+            metadata['pages'] = len(pdf_reader.pages)
+
+            # Get document info
+            if pdf_reader.metadata:
+                metadata['title'] = pdf_reader.metadata.title or ''
+                metadata['author'] = pdf_reader.metadata.author or ''
+
+    except Exception:
+        pass
+
+    return metadata
+
+
+def extract_epub_metadata(epub_path: str) -> Dict:
+    """
+    Extract metadata from an EPUB file.
+
+    Args:
+        epub_path: Path to the EPUB file
+
+    Returns:
+        Dictionary with metadata (title, author, language, chapters, etc.)
+    """
+    metadata = {
+        'source_type': 'epub',
+        'source_file': os.path.basename(epub_path),
+        'title': '',
+        'author': '',
+        'language': 'unknown',
+        'chapters': 0
+    }
+
+    if epub is None:
+        return metadata
+
+    try:
+        book = epub.read_epub(epub_path)
+
+        # Get metadata
+        try:
+            metadata['title'] = book.get_metadata('DC', 'title')[0][0] if book.get_metadata('DC', 'title') else ''
+        except Exception:
+            pass
+
+        try:
+            metadata['author'] = book.get_metadata('DC', 'creator')[0][0] if book.get_metadata('DC', 'creator') else ''
+        except Exception:
+            pass
+
+        try:
+            metadata['language'] = book.get_metadata('DC', 'language')[0][0] if book.get_metadata('DC', 'language') else 'unknown'
+        except Exception:
+            pass
+
+        # Count chapters
+        chapter_count = 0
+        for item in book.get_items():
+            if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                chapter_count += 1
+        metadata['chapters'] = chapter_count
+
+    except Exception:
+        pass
+
+    return metadata
+
+
+def detect_language(text: str) -> str:
+    """
+    Detect the language of a text.
+
+    Args:
+        text: Input text
+
+    Returns:
+        Language code (e.g., 'es', 'en', 'fr') or 'unknown'
+    """
+    if not text or not isinstance(text, str):
+        return 'unknown'
+
+    try:
+        from langdetect import detect, LangDetectException
+        HAS_LANGDETECT = True
+    except ImportError:
+        HAS_LANGDETECT = False
+
+    if not HAS_LANGDETECT:
+        # Simple heuristic-based language detection
+        text_lower = text.lower()
+
+        # Spanish indicators
+        spanish_indicators = [' el ', ' la ', ' los ', ' las ', ' de ', ' del ', ' en ', ' un ', ' una ']
+        spanish_count = sum(1 for ind in spanish_indicators if ind in text_lower)
+
+        # English indicators
+        english_indicators = [' the ', ' is ', ' are ', ' was ', ' were ', ' have ', ' has ', ' had ']
+        english_count = sum(1 for ind in english_indicators if ind in text_lower)
+
+        if spanish_count > english_count:
+            return 'es'
+        elif english_count > spanish_count:
+            return 'en'
+        else:
+            return 'unknown'
+
+    try:
+        # Use first 1000 chars for detection (faster and more accurate)
+        sample = text[:1000]
+        lang = detect(sample)
+        return lang
+    except LangDetectException:
+        return 'unknown'
+    except Exception:
+        return 'unknown'
+
+
+def filter_by_language(texts: List[str], allowed_languages: List[str]) -> List[str]:
+    """
+    Filter texts by language.
+
+    Args:
+        texts: List of input texts
+        allowed_languages: List of allowed language codes (e.g., ['es', 'en'])
+
+    Returns:
+        List of texts in allowed languages
+    """
+    if not texts or not allowed_languages:
+        return texts
+
+    filtered = []
+    for text in texts:
+        lang = detect_language(text)
+        if lang in allowed_languages or lang == 'unknown':
+            filtered.append(text)
+
+    return filtered
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -53,8 +468,7 @@ CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
 CACHE_METADATA_FILE = os.path.join(CACHE_DIR, 'cache_metadata.pkl')
 BPE_MODEL_PATH = os.path.join(CACHE_DIR, 'sentencepiece.model')
-THINKING_DATA_DIR = 'datasets/thinking'
-THINKING_DATA_FILE = os.path.join(THINKING_DATA_DIR, 'thinking_data.csv')
+
 
 
 class DataPreparer:
@@ -72,7 +486,7 @@ class DataPreparer:
         self.hf_data = None
         self.pdf_data = None
         self.epub_data = None
-        self.special_facts_data = None
+        self.csv_data = None
         self.combined_data = None
         self.statistics = {}
 
@@ -244,19 +658,33 @@ class DataPreparer:
                 logger.info("\n[4/7] Loading EPUB files...")
                 self.epub_data = self._load_epub_data()
 
-            # Load special facts (curated supplementary dataset)
-            logger.info("\n[5/7] Loading special facts (CSV)...")
-            self.special_facts_data = self._load_special_facts()
+            # Load CSV data (curated supplementary dataset)
+            logger.info("\n[5/7] Loading CSV data...")
+            self.csv_data = self._load_csv()
 
-            # Load thinking data (chain-of-thought reasoning)
-            logger.info("\n[5.5/7] Loading thinking data...")
-            self.thinking_data = self._load_thinking_data()
-            
             # Combine datasets
             logger.info("\n[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
-            
+
+            # Apply deduplication if enabled
+            enable_dedup = getattr(self.args, 'enable_dedup', False)
+            if enable_dedup:
+                logger.info("\n[6.5/7] Applying deduplication...")
+                self._apply_deduplication()
+
+            # Apply quality filtering if enabled
+            enable_quality = getattr(self.args, 'enable_quality_filter', False)
+            if enable_quality:
+                logger.info("\n[6.6/7] Applying quality filtering...")
+                self._apply_quality_filter()
+
+            # Apply language filtering if enabled
+            enable_lang_filter = getattr(self.args, 'enable_lang_filter', False)
+            if enable_lang_filter:
+                logger.info("\n[6.7/7] Applying language filtering...")
+                self._apply_language_filter()
+
             # Collect statistics
             logger.info("\nGathering statistics...")
             self.statistics = self._collect_statistics()
@@ -333,12 +761,12 @@ class DataPreparer:
 
     def _load_aiml_data(self) -> Dataset:
         """
-        Load AIML files from aiml_dev directory.
-        
+        Load AIML files from datasets_source/aiml directory.
+
         Returns:
             Hugging Face Dataset with AIML data
         """
-        data_dir = 'aiml_dev'
+        data_dir = os.path.join('datasets_source', 'aiml')
         
         if not os.path.exists(data_dir):
             raise FileNotFoundError(f"Directory not found: {data_dir}")
@@ -415,7 +843,7 @@ class DataPreparer:
             logger.info(f"  Total AIML samples: {len(combined)}")
             return combined
         else:
-            logger.warning("  ⚠ No .datasets files found in aiml_dev/")
+            logger.warning(f"  ⚠ No .datasets files found in {data_dir}/")
             return Dataset.from_list([])
     
     def _load_hf_data(self) -> Dataset:
@@ -474,176 +902,161 @@ class DataPreparer:
             logger.warning("  ⚠ No HuggingFace datasets loaded successfully")
             return Dataset.from_list([])
 
-    def _load_special_facts(self) -> Dataset:
+    def _load_csv(self) -> Dataset:
         """
-        Load curated supplemental facts/conversational pairs from datasets/special_facts.csv.
+        Load curated supplemental data from CSV files in datasets/ directory.
         This keeps special knowledge in data, not hardcoded code paths.
+
+        CSV Format:
+            input,output
+            "question","answer"
+
         Returns:
             Hugging Face Dataset with input_ids column
         """
-        csv_path = os.path.join('datasets', 'special_facts.csv')
+        csv_path = os.path.join('datasets_source', 'csv', 'special_facts.csv')
 
         if not os.path.exists(csv_path):
-            logger.warning(f"  ⚠ Special facts CSV not found: {csv_path}")
+            logger.warning(f"  ⚠ CSV not found: {csv_path}")
             return Dataset.from_list([])
 
-        special_items = []
-        try:
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                # Skip header if present
-                header = f.readline().strip().split(',')
-                has_header = 'input' in header and 'output' in header
-                if not has_header:
-                    f.seek(0)
-
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split(',', 1)
-                    if len(parts) != 2:
-                        continue
-
-                    input_text = parts[0].strip().strip('"')
-                    output_text = parts[1].strip().strip('"')
-                    if input_text and output_text:
-                        prompt_text = f"Pregunta: {input_text}\nRespuesta: {output_text}"
-                        # Oversample special facts to reinforce exact memorization during training
-                        for _ in range(100):
-                            special_items.append({'input_ids': prompt_text})
-
-            if special_items:
-                ds = Dataset.from_list(special_items)
-                logger.info(f"  ✓ Loaded special facts: {len(ds)} samples")
-                return ds
-            else:
-                logger.warning("  ⚠ No special facts found in CSV")
-                return Dataset.from_list([])
-
-        except Exception as e:
-            logger.warning(f"  ⚠ Error reading special facts CSV: {e}")
-            return Dataset.from_list([])
-
-    def _load_thinking_data(self) -> Dataset:
-        """
-        Load thinking training data from datasets/thinking/thinking_data.csv.
-        This dataset contains QA pairs with <think>...</think> reasoning.
-
-        Returns:
-            Hugging Face Dataset with input_ids column containing thinking format
-        """
-        if not os.path.exists(THINKING_DATA_FILE):
-            logger.info(f"  ℹ Thinking data not found at {THINKING_DATA_FILE}")
-            logger.info(f"    Run: python generate_thinking_data.py to generate thinking data")
-            return Dataset.from_list([])
-
-        thinking_items = []
+        csv_items = []
         try:
             import csv as csv_mod
-            with open(THINKING_DATA_FILE, 'r', encoding='utf-8') as f:
-                reader = csv_mod.DictReader(f)
-                for row in reader:
-                    thinking_text = row.get('thinking_text', '')
-                    if thinking_text:
-                        # Add thinking data with higher weight (oversample)
-                        for _ in range(50):
-                            thinking_items.append({'input_ids': thinking_text})
 
-            if thinking_items:
-                ds = Dataset.from_list(thinking_items)
-                logger.info(f"  ✓ Loaded thinking data: {len(ds)} samples")
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                # Detect if file has header
+                first_line = f.readline().strip()
+                f.seek(0)
+
+                has_header = first_line.lower().startswith('input')
+
+                reader = csv_mod.DictReader(f) if has_header else csv_mod.reader(f)
+
+                for row in reader:
+                    if has_header:
+                        input_text = row.get('input', '').strip()
+                        output_text = row.get('output', '').strip()
+                    else:
+                        if len(row) < 2:
+                            continue
+                        input_text = row[0].strip().strip('"')
+                        output_text = row[1].strip().strip('"')
+
+                    # Validate and clean
+                    input_text = clean_text(input_text)
+                    output_text = clean_text(output_text)
+
+                    if not input_text or not output_text:
+                        continue
+
+                    # Standardized format: question/answer pair
+                    prompt_text = f"{input_text} {output_text}"
+
+                    # Oversample with moderate repetition (20x instead of 100x)
+                    for _ in range(20):
+                        csv_items.append({'input_ids': prompt_text})
+
+            if csv_items:
+                ds = Dataset.from_list(csv_items)
+                logger.info(f"  ✓ Loaded CSV data: {len(csv_items)} samples ({len(set(item['input_ids'] for item in csv_items))} unique)")
                 return ds
             else:
-                logger.warning("  ⚠ No thinking data found in CSV")
+                logger.warning("  ⚠ No data found in CSV")
                 return Dataset.from_list([])
 
         except Exception as e:
-            logger.warning(f"  ⚠ Error reading thinking data: {e}")
+            logger.warning(f"  ⚠ Error reading CSV: {e}")
             return Dataset.from_list([])
-
-    @staticmethod
-    def has_thinking(text: str) -> bool:
-        """Check if text contains <think> tags."""
-        return '<think>' in text and '</think>' in text
-
-    @staticmethod
-    def split_thinking(text: str) -> Tuple[str, str]:
-        """Split text into (thinking, response) parts."""
-        if not DataPreparer.has_thinking(text):
-            return ('', text)
-        try:
-            thinking = text.split('<think>')[1].split('</think>')[0]
-            response = text.split('</think>')[1].strip()
-            return (thinking, response)
-        except (IndexError, ValueError):
-            return ('', text)
-
-    @staticmethod
-    def extract_response(text: str) -> str:
-        """Extract only the response part, removing <think> blocks."""
-        _, response = DataPreparer.split_thinking(text)
-        return response
 
     def _load_pdf_data(self) -> Dataset:
         """
-        Load text data from PDF files in 'pdfs' directory.
-        
+        Load text data from PDF files in datasets_source/pdf directory.
+
         Returns:
             Hugging Face Dataset with PDF text data
         """
         if PdfReader is None:
             logger.warning("  ⚠ PyPDF2 not installed. Install with: pip install PyPDF2")
             return Dataset.from_list([])
-        
-        pdf_dir = 'pdfs'
-        
+
+        pdf_dir = os.path.join('datasets_source', 'pdf')
+
         # Create pdfs directory if it doesn't exist
         if not os.path.exists(pdf_dir):
             os.makedirs(pdf_dir)
             logger.info(f"  Created directory: {pdf_dir}")
             logger.info(f"  ℹ Place PDF files in '{pdf_dir}' directory to load them")
             return Dataset.from_list([])
-        
+
+        # Get options from args
+        enable_chunking = getattr(self.args, 'enable_chunking', False)
+        max_tokens = getattr(self.args, 'chunk_max_tokens', 512)
+        overlap_tokens = getattr(self.args, 'chunk_overlap', 50)
+        preserve_metadata = getattr(self.args, 'preserve_metadata', False)
+
         pdf_texts = []
         pdf_count = 0
-        
+
         for filename in os.listdir(pdf_dir):
             if filename.lower().endswith('.pdf'):
                 file_path = os.path.join(pdf_dir, filename)
                 try:
                     logger.info(f"  Reading PDF: {filename}...")
-                    
+
+                    # Extract metadata if enabled
+                    metadata = {}
+                    if preserve_metadata:
+                        metadata = extract_pdf_metadata(file_path)
+
                     with open(file_path, 'rb') as f:
                         pdf_reader = PdfReader(f)
                         text = ""
-                        
+
                         # Extract text from all pages
                         for page_num, page in enumerate(pdf_reader.pages):
                             try:
                                 text += page.extract_text() + " "
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting page {page_num} from {filename}: {e}")
-                        
+
                         # Split text by sentences/paragraphs into samples
                         if text.strip():
-                            # Split by periods, keeping reasonable chunk sizes
-                            sentences = text.split('.')
+                            # Use professional sentence tokenization
+                            sentences = split_sentences(text)
                             sentence_count = 0
-                            
+
                             for sentence in sentences:
-                                sentence = sentence.strip()
+                                # Additional cleaning
+                                sentence = clean_text(sentence)
                                 if len(sentence) > 10:  # Skip very short sentences
-                                    pdf_texts.append({'input_ids': sentence})
-                                    sentence_count += 1
-                            
+                                    sample = {'input_ids': sentence}
+
+                                    # Add metadata if enabled
+                                    if preserve_metadata and metadata:
+                                        sample['metadata'] = metadata
+
+                                    # Apply chunking if enabled
+                                    if enable_chunking and len(sentence.split()) > max_tokens:
+                                        chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
+                                        for chunk in chunks:
+                                            chunk_sample = {'input_ids': chunk}
+                                            if preserve_metadata and metadata:
+                                                chunk_sample['metadata'] = metadata
+                                            pdf_texts.append(chunk_sample)
+                                            sentence_count += 1
+                                    else:
+                                        pdf_texts.append(sample)
+                                        sentence_count += 1
+
                             pdf_count += 1
                             logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
                         else:
                             logger.warning(f"  ⚠ No text extracted from {filename}")
-                
+
                 except Exception as e:
                     logger.warning(f"  ⚠ Error loading {filename}: {e}")
-        
+
         if pdf_texts:
             dataset = Dataset.from_list(pdf_texts)
             logger.info(f"\nTotal PDF files processed: {pdf_count}")
@@ -656,73 +1069,108 @@ class DataPreparer:
     def _load_epub_data(self) -> Dataset:
         """
         Load text data from EPUB files (e-books) in 'epub' directory.
-        
+
         Returns:
             Hugging Face Dataset with EPUB text data
         """
         if epub is None:
             logger.warning("  ⚠ ebooklib not installed. Install with: pip install ebooklib")
             return Dataset.from_list([])
-        
-        epub_dir = 'epub'
-        
+
+        epub_dir = os.path.join('datasets_source', 'epub')
+
         # Create epub directory if it doesn't exist
         if not os.path.exists(epub_dir):
             os.makedirs(epub_dir)
             logger.info(f"  Created directory: {epub_dir}")
             logger.info(f"  ℹ Place EPUB files in '{epub_dir}' directory to load them")
             return Dataset.from_list([])
-        
+
+        # Get options from args
+        enable_chunking = getattr(self.args, 'enable_chunking', False)
+        max_tokens = getattr(self.args, 'chunk_max_tokens', 512)
+        overlap_tokens = getattr(self.args, 'chunk_overlap', 50)
+        preserve_metadata = getattr(self.args, 'preserve_metadata', False)
+
         epub_texts = []
         epub_count = 0
-        
+
         for filename in os.listdir(epub_dir):
             if filename.lower().endswith('.epub'):
                 file_path = os.path.join(epub_dir, filename)
                 try:
                     logger.info(f"  Reading EPUB: {filename}...")
-                    
+
+                    # Extract metadata if enabled
+                    metadata = {}
+                    if preserve_metadata:
+                        metadata = extract_epub_metadata(file_path)
+
                     # Open and parse EPUB
                     book = epub.read_epub(file_path)
                     text = ""
-                    
+
                     # Extract text from all chapters
                     for item in book.get_items():
                         if item.get_type() == ebooklib.ITEM_DOCUMENT:
                             try:
                                 # Get chapter content
                                 content = item.get_content().decode('utf-8', errors='ignore')
-                                
+
+                                # Preserve <think> tags before removing HTML
+                                content = re.sub(r'<think>', '§THINKING_START§', content)
+                                content = re.sub(r'</think>', '§THINKING_END§', content)
+
                                 # Remove HTML tags (simple regex approach)
-                                import re
                                 content = re.sub(r'<[^>]+>', '', content)
-                                
+
+                                # Restore <think> tags
+                                content = re.sub(r'§THINKING_START§', '<think>', content)
+                                content = re.sub(r'§THINKING_END§', '</think>', content)
+
                                 # Clean up whitespace
                                 content = re.sub(r'\s+', ' ', content)
                                 text += content + " "
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting chapter from {filename}: {e}")
-                    
+
                     # Split text into samples
                     if text.strip():
-                        # Split by periods, keeping reasonable chunk sizes
-                        sentences = text.split('.')
+                        # Use professional sentence tokenization
+                        sentences = split_sentences(text)
                         sentence_count = 0
-                        
+
                         for sentence in sentences:
-                            sentence = sentence.strip()
+                            # Additional cleaning
+                            sentence = clean_text(sentence)
                             if len(sentence) > 10:  # Skip very short sentences
-                                epub_texts.append({'input_ids': sentence})
-                                sentence_count += 1
-                        
+                                sample = {'input_ids': sentence}
+
+                                # Add metadata if enabled
+                                if preserve_metadata and metadata:
+                                    sample['metadata'] = metadata
+
+                                # Apply chunking if enabled
+                                if enable_chunking and len(sentence.split()) > max_tokens:
+                                    chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
+                                    for chunk in chunks:
+                                        chunk_sample = {'input_ids': chunk}
+                                        if preserve_metadata and metadata:
+                                            chunk_sample['metadata'] = metadata
+                                        epub_texts.append(chunk_sample)
+                                        sentence_count += 1
+                                else:
+                                    epub_texts.append(sample)
+                                    sentence_count += 1
+
                         epub_count += 1
                         logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
                     else:
                         logger.warning(f"  ⚠ No text extracted from {filename}")
-                
+
                 except Exception as e:
                     logger.warning(f"  ⚠ Error loading {filename}: {e}")
-        
+
         if epub_texts:
             dataset = Dataset.from_list(epub_texts)
             logger.info(f"\nTotal EPUB files processed: {epub_count}")
@@ -848,7 +1296,6 @@ class DataPreparer:
         self.cache_metadata = getattr(self, 'cache_metadata', {})
         self.cache_metadata['bpe_vocab_size'] = vocab_size
         self.cache_metadata['bpe_model'] = os.path.basename(model_file)
-        self.cache_metadata['has_thinking_tokens'] = True
         # Move model to canonical path
         try:
             shutil.copyfile(model_file, BPE_MODEL_PATH)
@@ -892,16 +1339,11 @@ class DataPreparer:
             total_samples += len(self.epub_data)
             logger.info(f"  Adding EPUB data: {len(self.epub_data)} samples")
 
-        if self.special_facts_data is not None and len(self.special_facts_data) > 0:
-            datasets_to_combine.append(self.special_facts_data)
-            total_samples += len(self.special_facts_data)
-            logger.info(f"  Adding special facts data: {len(self.special_facts_data)} samples")
+        if self.csv_data is not None and len(self.csv_data) > 0:
+            datasets_to_combine.append(self.csv_data)
+            total_samples += len(self.csv_data)
+            logger.info(f"  Adding CSV data: {len(self.csv_data)} samples")
 
-        if hasattr(self, 'thinking_data') and self.thinking_data is not None and len(self.thinking_data) > 0:
-            datasets_to_combine.append(self.thinking_data)
-            total_samples += len(self.thinking_data)
-            logger.info(f"  Adding thinking data: {len(self.thinking_data)} samples")
-        
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
             return Dataset.from_list([])
@@ -959,6 +1401,107 @@ class DataPreparer:
                 remove_columns=columns_to_remove
             )
 
+    def _apply_deduplication(self):
+        """Apply deduplication to the combined dataset using MinHash LSH."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        original_count = len(self.combined_data)
+        dedup_threshold = getattr(self.args, 'dedup_threshold', 0.8)
+
+        try:
+            # Extract all texts
+            texts = []
+            for item in self.combined_data:
+                text = item.get('input_ids', '')
+                if isinstance(text, str) and text.strip():
+                    texts.append(text)
+
+            if not texts:
+                logger.warning("  ⚠ No texts found for deduplication")
+                return
+
+            # Apply deduplication
+            unique_texts = deduplicate_texts(texts, threshold=dedup_threshold)
+
+            # Recreate dataset with unique texts
+            unique_data = [{'input_ids': text} for text in unique_texts]
+            self.combined_data = Dataset.from_list(unique_data)
+
+            removed_count = original_count - len(self.combined_data)
+            logger.info(f"  ✓ Deduplication complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Deduplication failed: {e}. Continuing with original dataset.")
+
+    def _apply_quality_filter(self):
+        """Apply quality filtering to the combined dataset."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        original_count = len(self.combined_data)
+        min_words = getattr(self.args, 'min_words', 5)
+        max_words = getattr(self.args, 'max_words', 1000)
+
+        try:
+            # Extract all texts
+            texts = []
+            for item in self.combined_data:
+                text = item.get('input_ids', '')
+                if isinstance(text, str) and text.strip():
+                    texts.append(text)
+
+            if not texts:
+                logger.warning("  ⚠ No texts found for quality filtering")
+                return
+
+            # Apply quality filtering
+            filtered_texts = filter_by_quality(texts, min_words=min_words, max_words=max_words)
+
+            # Recreate dataset with filtered texts
+            filtered_data = [{'input_ids': text} for text in filtered_texts]
+            self.combined_data = Dataset.from_list(filtered_data)
+
+            removed_count = original_count - len(self.combined_data)
+            logger.info(f"  ✓ Quality filtering complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Quality filtering failed: {e}. Continuing with original dataset.")
+
+    def _apply_language_filter(self):
+        """Apply language filtering to the combined dataset."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        original_count = len(self.combined_data)
+        allowed_languages = getattr(self.args, 'allowed_languages', ['es', 'en'])
+
+        try:
+            # Extract all texts
+            texts = []
+            for item in self.combined_data:
+                text = item.get('input_ids', '')
+                if isinstance(text, str) and text.strip():
+                    texts.append(text)
+
+            if not texts:
+                logger.warning("  ⚠ No texts found for language filtering")
+                return
+
+            # Apply language filtering
+            filtered_texts = filter_by_language(texts, allowed_languages=allowed_languages)
+
+            # Recreate dataset with filtered texts
+            filtered_data = [{'input_ids': text} for text in filtered_texts]
+            self.combined_data = Dataset.from_list(filtered_data)
+
+            removed_count = original_count - len(self.combined_data)
+            logger.info(f"  ✓ Language filtering complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")
+            logger.info(f"    Allowed languages: {allowed_languages}")
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Language filtering failed: {e}. Continuing with original dataset.")
+
     def _collect_statistics(self) -> Dict:
         """
         Collect statistics about prepared datasets.
@@ -972,7 +1515,7 @@ class DataPreparer:
             'hf_samples': 0,
             'pdf_samples': 0,
             'epub_samples': 0,
-            'special_facts_samples': 0,
+            'csv_samples': 0,
             'avg_text_length': 0,
             'min_text_length': 0,
             'max_text_length': 0,
@@ -999,16 +1542,11 @@ class DataPreparer:
             stats['epub_samples'] = epub_count
             stats['source_breakdown']['EPUB'] = epub_count
 
-        if self.special_facts_data:
-            special_count = len(self.special_facts_data)
-            stats['special_facts_samples'] = special_count
-            stats['source_breakdown']['SpecialFacts'] = special_count
+        if self.csv_data:
+            csv_count = len(self.csv_data)
+            stats['csv_samples'] = csv_count
+            stats['source_breakdown']['CSV'] = csv_count
 
-        if hasattr(self, 'thinking_data') and self.thinking_data:
-            thinking_count = len(self.thinking_data)
-            stats['thinking_samples'] = thinking_count
-            stats['source_breakdown']['Thinking'] = thinking_count
-        
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)
             

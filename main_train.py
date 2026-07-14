@@ -585,12 +585,12 @@ class MainTrain:
         
         return input_tensor, output_tensor
 
-    def _get_special_facts_dataloader(self, batch_size):
-        """Build a dataloader from special facts examples for fine-tuning."""
+    def _get_csv_dataloader(self, batch_size):
+        """Build a dataloader from CSV data for fine-tuning."""
         if getattr(self, 'raw_dataset', None) is None:
             return None
 
-        def special_pair_generator():
+        def csv_pair_generator():
             for item in self.raw_dataset:
                 value = item.get('input_ids', None)
                 if not isinstance(value, str):
@@ -603,7 +603,7 @@ class MainTrain:
                 yield token_seq[:-1], token_seq[1:]
 
         return DataLoader(
-            TokenPairIterableDataset(special_pair_generator),
+            TokenPairIterableDataset(csv_pair_generator),
             batch_size=batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
@@ -807,15 +807,15 @@ class MainTrain:
                 logger.info("\nStop requested; skipping final model save")
                 return
 
-            # Fine-tune on special facts examples if available
-            special_dataloader = self._get_special_facts_dataloader(batch_size=TRAINING_CONFIG['batch_size'])
-            if special_dataloader is not None:
-                logger.info("\nStarting special facts fine-tuning...")
+            # Fine-tune on CSV data if available
+            csv_dataloader = self._get_csv_dataloader(batch_size=TRAINING_CONFIG['batch_size'])
+            if csv_dataloader is not None:
+                logger.info("\nStarting CSV data fine-tuning...")
                 try:
-                    _ = self.train(model, special_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
-                    logger.info("✓ Special facts fine-tuning completed")
+                    _ = self.train(model, csv_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+                    logger.info("✓ CSV data fine-tuning completed")
                 except Exception as e:
-                    logger.warning(f"Special facts fine-tuning failed: {e}")
+                    logger.warning(f"CSV data fine-tuning failed: {e}")
 
             # Save final model + tokenizer state for consistent inference
             logger.info(f"\n{'='*80}")
