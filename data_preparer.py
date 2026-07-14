@@ -583,6 +583,8 @@ class DataPreparer:
         """Extract only the response part, removing <think> blocks."""
         _, response = DataPreparer.split_thinking(text)
         return response
+
+    def _load_pdf_data(self) -> Dataset:
         """
         Load text data from PDF files in 'pdfs' directory.
         
