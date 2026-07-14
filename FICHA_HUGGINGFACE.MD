@@ -20,9 +20,13 @@
   - `n_head`: 4
 
 ## Tokenizador
-- Tokenizador personalizado: `WordTokenizer`
+- Tokenizador BPE multilingüe: `SentencePieceTokenizerWrapper` (módulo `bpe_tokenizer.py`)
+- Único tokenizador del proyecto — no hay fallback a word-level
+- Soporta Español e Inglés de forma nativa, extensible a más idiomas
+- Modelo BPE entrenado en `dataset_cache/sentencepiece.model`
 - Vocabulario cargado desde `checkpoints/tokenizer_vocab.json`
-- Tamaño del vocabulario: 4792
+- Tamaño del vocabulario configurable (default: 8000, flag `--bpe-vocab-size`)
+- Si `sentencepiece` no está instalado, raise `ImportError` (sin fallback)
 
 ## Uso principal
 - Chatbot conversacional local
@@ -54,8 +58,10 @@
 - `main_chat.py` — servidor y lógica de inferencia
 - `chatmodel.py` — definición del modelo
 - `dialogmanager.py` — gestión de diálogo y generación de respuestas
-- `word_tokenizer.py` — tokenizador por palabras
+- `bpe_tokenizer.py` — tokenizador BPE (SentencePiece, único tokenizador)
+- `data_preparer.py` — preparación de datos y entrenamiento BPE
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
+- `dataset_cache/sentencepiece.model` — modelo BPE entrenado
 - `chat_model.pth` — checkpoint del modelo
 
 ## Licencia
@@ -64,3 +70,4 @@
 ## Notas adicionales
 - El modelo funciona localmente y es compatible con Docker/entornos aislados si se adapta el entorno.
 - Se puede mejorar con fine-tuning adicional y mayores fuentes de datos en español.
+- La tokenización BPE permite soporte multilingüe sin cambiar la arquitectura del modelo.

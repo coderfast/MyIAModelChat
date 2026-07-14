@@ -156,29 +156,81 @@ See [CRITICAL-FIXES-APPLIED.md](CRITICAL-FIXES-APPLIED.md) for details on:
 - [BILINGUAL-TOKENIZER-GUIDE.md](BILINGUAL-TOKENIZER-GUIDE.md) - Tokenizer features
 - [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) - Troubleshooting
 
-## 🗂️ Dataset cache and BPE
+## 🗂️ Tokenizador BPE multilingüe
 
-- During `--prepare-data`, the pipeline always trains a SentencePiece BPE model and applies it to the prepared dataset. The cache will include:
-	- `dataset_cache/prepared_dataset/` — prepared dataset (includes `bpe_text` and `token_ids`)
-	- `dataset_cache/dataset_stats.pkl` — statistics
-	- `dataset_cache/cache_metadata.pkl` — metadata including `bpe_model_path` and vocab size
-	- `dataset_cache/sentencepiece.model` — trained SentencePiece BPE model
+El proyecto usa un tokenizador **SentencePiece BPE** (Byte-Pair Encoding) que soporta múltiples idiomas de forma nativa. Esto permite entrenar e inferir en **Español e Inglés** (y cualquier otro idioma) sin cambiar configuración.
 
-Use `--refresh-cache` to rebuild the cache after changing source files or tokenizer settings.
+### Cómo funciona
 
-## Quick verification (BPE + cache smoke test)
+1. Durante `--prepare-data`, se entrena un modelo BPE con `sentencepiece`
+2. El modelo se guarda en `dataset_cache/sentencepiece.model`
+3. Los datos se tokenizan y cachean con `token_ids` pre-calculados
+4. En entrenamiento e inferencia, se cargan los `token_ids` directamente (sin re-tokenizar)
 
-To verify the BPE integration and cached training workflow quickly, run:
+### Fases de uso
+
+**Fase 1 — Preparación de datos (entrena el BPE y genera caché):**
+```bash
+python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
+```
+
+**Fase 2 — Entrenamiento (usa caché tokenizada):**
+```bash
+python main.py --train --use-cache --epochs 30
+```
+
+**Fase 3 — Inferencia (carga modelo BPE automáticamente):**
+```bash
+python main.py --chat
+```
+
+### Flags de BPE
+
+| Flag | Descripción | Valor por defecto |
+|------|-------------|-------------------|
+| `--bpe-vocab-size` | Tamaño del vocabulario BPE | `8000` |
+| `--refresh-cache` | Reconstruir caché desde cero | (no aplica) |
+| `--use-cache` | Cargar dataset cacheado si existe | (no aplica) |
+
+### Archivos generados en caché
+
+```
+dataset_cache/
+├── prepared_dataset/          # Dataset tokenizado (contiene token_ids)
+├── dataset_stats.pkl          # Estadísticas del dataset
+├── cache_metadata.pkl         # Metadata: bpe_model_path, vocab_size
+└── sentencepiece.model        # Modelo BPE entrenado
+```
+
+### Regenerar caché
+
+Cuando se añaden nuevos idiomas o fuentes de datos, regenerar la caché:
+```bash
+python main.py --prepare-data --aiml --hf --pdf --epub --bpe-vocab-size 8000 --refresh-cache
+```
+
+### Archivos del tokenizer
+
+| Archivo | Descripción |
+|---------|-------------|
+| `bpe_tokenizer.py` | Wrapper de SentencePiece (`SentencePieceTokenizerWrapper`) |
+| `checkpoints/tokenizer_vocab.json` | Vocabulario del tokenizador (incluye `sentencepiece_model` path) |
+| `dataset_cache/sentencepiece.model` | Modelo BPE entrenado |
+
+### Smoke test rápido
 
 ```bash
-# Prepare datasets and build a BPE-tokenized cache (small vocab for quick test)
+# Preparar datos con vocabulario pequeño para prueba rápida
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 2000 --refresh-cache
 
-# Run a short training that uses the cached token_ids
+# Entrenar 1 epoch usando caché
 python main.py --train --use-cache --epochs 1
 ```
 
-`main_train.py` will load the `sentencepiece.model` from the cache and use it for tokenization.
+Verificar que:
+- `dataset_cache/sentencepiece.model` existe
+- `dataset_cache/prepared_dataset` contiene `token_ids`
+- `main_train.py` carga el modelo BPE desde caché automáticamente
 
 ## 🛠️ Requirements
 
