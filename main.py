@@ -203,6 +203,7 @@ EXAMPLES:
                             help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
+        parser.add_argument("--show-thinking", action='store_true', help="Show <think> reasoning in chat")
         
         args = parser.parse_args()
 

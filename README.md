@@ -26,6 +26,7 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Autoregressive Generation**: High-quality text generation with sampling controls
 - **Multi-threading Support**: Optimized for CPU training
 - **Model Checkpointing**: Best model saving and tokenizer persistence
+- **Chain-of-Thought Reasoning**: Optional `<think>` reasoning in training and inference
 
 ## 📋 Quick Start
 
@@ -231,6 +232,71 @@ Verificar que:
 - `dataset_cache/sentencepiece.model` existe
 - `dataset_cache/prepared_dataset` contiene `token_ids`
 - `main_train.py` carga el modelo BPE desde caché automáticamente
+
+## 🧠 Chain-of-Thought Reasoning (`<think>`)
+
+El modelo soporta **razonamiento encadenado** usando la etiqueta `<think>`. El modelo aprende a generar su proceso de pensamiento antes de la respuesta final.
+
+### Formato de salida
+
+```
+<think>
+Razonamiento interno del modelo...
+</think>
+Respuesta final limpia
+```
+
+### Generar datos con thinking
+
+```bash
+# Generar desde CSV y AIML
+python generate_thinking_data.py --source all
+
+# Salida: datasets/thinking/thinking_data.csv
+```
+
+### Entrenar con thinking
+
+```bash
+# Preparar datos (incluye thinking automáticamente)
+python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
+
+# Entrenar
+python main.py --train --use-cache --epochs 30
+```
+
+### Inferencia con thinking
+
+**Consola:**
+```bash
+# Con thinking visible
+python main.py --chat --show-thinking
+
+# Sin thinking (respuesta limpia)
+python main.py --chat
+```
+
+**API:**
+```bash
+# Con thinking
+curl -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Hola"}],
+    "include_thinking": true
+  }'
+
+# Respuesta incluye campo "reasoning"
+```
+
+### Flags relacionados
+
+| Flag | Descripción |
+|------|-------------|
+| `--show-thinking` | Muestra reasoning en consola |
+| `include_thinking` | Parámetro en endpoints API |
+
+Ver [THINKING-GUIDE.md](THINKING-GUIDE.md) para documentación completa.
 
 ## 🛠️ Requirements
 

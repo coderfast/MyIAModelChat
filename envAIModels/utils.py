@@ -41,6 +41,23 @@ def normalize_stop(stop: Optional[Any]) -> Optional[List[str]]:
     return [str(stop)]
 
 
+def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
+    """Parse <think> tags from response text.
+
+    Returns:
+        Dict with 'thinking' and 'response' keys.
+        If no thinking tags found, thinking is None and response is the full text.
+    """
+    if '<think>' not in text or '</think>' not in text:
+        return {'thinking': None, 'response': text}
+    try:
+        thinking = text.split('<think>')[1].split('</think>')[0]
+        response = text.split('</think>')[1].strip()
+        return {'thinking': thinking, 'response': response}
+    except (IndexError, ValueError):
+        return {'thinking': None, 'response': text}
+
+
 def truncate_text_by_stop(text: str, stop: Optional[List[str]]) -> str:
     if not text or not stop:
         return text
@@ -284,12 +301,16 @@ def build_text_completion_response(text: str, model_name: str = MODEL_NAME) -> D
     return {"id": None, "object": "text.completion", "model": model_name, "choices": [{"text": text, "index": 0}]}
 
 
-def build_chat_completion_response(text: str, model_name: str = MODEL_NAME) -> Dict[str, Any]:
+def build_chat_completion_response(text: str, model_name: str = MODEL_NAME, include_thinking: bool = False) -> Dict[str, Any]:
+    parsed = parse_thinking_response(text)
+    message = {"role": "assistant", "content": parsed['response']}
+    if include_thinking and parsed['thinking']:
+        message['reasoning'] = parsed['thinking']
     return {
         "id": None,
         "object": "chat.completion",
         "model": model_name,
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+        "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
     }
 
 

@@ -15,6 +15,7 @@ from .utils import (
     model_create_compat_sync,
     build_text_completion_response,
     build_chat_completion_response,
+    parse_thinking_response,
 )
 from .model import MODEL_NAME, OLLAMA_VERSION
 
@@ -82,7 +83,12 @@ async def generate(req: GenerateRequest):
 
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, req.stop)
-    return {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out}
+
+    parsed = parse_thinking_response(text)
+    result = {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": parsed['response'] if not req.include_thinking else text, "index": 0}], "raw": out}
+    if req.include_thinking and parsed['thinking']:
+        result['reasoning'] = parsed['thinking']
+    return result
 
 
 @router.post("/chat")
@@ -102,6 +108,7 @@ async def api_chat(request: Request):
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
     stop = normalize_stop(data.get("stop"))
+    include_thinking = data.get("include_thinking", False)
     if stop is None:
         stop = ["\nuser:", "\nassistant:"]
 
@@ -138,7 +145,7 @@ async def api_chat(request: Request):
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, stop)
     text = remove_excessive_repetition(text)
-    response = build_chat_completion_response(text)
+    response = build_chat_completion_response(text, include_thinking=include_thinking)
     return response
 
 
@@ -185,5 +192,5 @@ async def chat_completions(req: ChatRequest):
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, stop)
     text = remove_excessive_repetition(text)
-    response = build_chat_completion_response(text)
+    response = build_chat_completion_response(text, include_thinking=req.include_thinking)
     return response

@@ -14,6 +14,7 @@ from .utils import (
     model_create_compat_sync,
     build_text_completion_response,
     build_chat_completion_response,
+    parse_thinking_response,
 )
 from .model import MODEL_NAME, OLLAMA_VERSION
 
@@ -59,6 +60,7 @@ async def v1_completions(request: Request):
     top_p = data.get("top_p", 1.0)
     stop = normalize_stop(data.get("stop"))
     stream = data.get("stream", False)
+    include_thinking = data.get("include_thinking", False)
 
     if stream:
         async def event_stream():
@@ -83,7 +85,12 @@ async def v1_completions(request: Request):
 
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, stop)
-    return {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": text, "index": 0}], "raw": out}
+
+    parsed = parse_thinking_response(text)
+    result = {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": parsed['response'] if not include_thinking else text, "index": 0}], "raw": out}
+    if include_thinking and parsed['thinking']:
+        result['reasoning'] = parsed['thinking']
+    return result
 
 
 @router.post("/chat/completions")
@@ -103,6 +110,7 @@ async def v1_chat_completions(request: Request):
     temperature = data.get("temperature", 0.0)
     top_p = data.get("top_p", 1.0)
     stop = normalize_stop(data.get("stop"))
+    include_thinking = data.get("include_thinking", False)
     if stop is None:
         stop = ["\nuser:", "\nassistant:"]
 
@@ -138,5 +146,5 @@ async def v1_chat_completions(request: Request):
 
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, stop)
-    response = build_chat_completion_response(text)
+    response = build_chat_completion_response(text, include_thinking=include_thinking)
     return response

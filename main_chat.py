@@ -66,6 +66,7 @@ class ChatRequest(BaseModel):
     top_p: Optional[float] = 1.0
     stream: Optional[bool] = False
     stop: Optional[List[str]] = None
+    include_thinking: Optional[bool] = False
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -74,6 +75,7 @@ class GenerateRequest(BaseModel):
     top_p: Optional[float] = 1.0
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
+    include_thinking: Optional[bool] = False
 
 class EmbeddingRequest(BaseModel):
     model: Optional[str] = None
@@ -87,6 +89,7 @@ class MainChat:
         self.chat = args.chat
         self.use_cpuonly = getattr(args, 'use_cpuonly', False)
         self.cuda_device = getattr(args, 'cuda_device', None)
+        self.show_thinking = getattr(args, 'show_thinking', False)
 
         if self.cuda_device is not None and not self.use_cpuonly:
             os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_device)
@@ -325,7 +328,15 @@ class MainChat:
                     break
 
                 response = self.dialogue_manager.generate_response(user_input)
-                print("Bot:", response)
+
+                # Parse and display thinking if enabled
+                if self.show_thinking:
+                    parsed = parse_thinking_response(response)
+                    if parsed['thinking']:
+                        print(f"Bot [thinking]: {parsed['thinking']}")
+                    print(f"Bot: {parsed['response']}")
+                else:
+                    print("Bot:", response)
         except KeyboardInterrupt:
             logger.info("Chat terminated by user.")
 
@@ -363,6 +374,23 @@ def truncate_stop_sequences(text: str, stop: Optional[List[str]]) -> str:
         if s and s in text:
             text = text.split(s, 1)[0]
     return text
+
+
+def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
+    """Parse <think> tags from response text.
+
+    Returns:
+        Dict with 'thinking' and 'response' keys.
+        If no thinking tags found, thinking is None and response is the full text.
+    """
+    if '<think>' not in text or '</think>' not in text:
+        return {'thinking': None, 'response': text}
+    try:
+        thinking = text.split('<think>')[1].split('</think>')[0]
+        response = text.split('效益')[1].strip()
+        return {'thinking': thinking, 'response': response}
+    except (IndexError, ValueError):
+        return {'thinking': None, 'response': text}
 
 
 def make_usage(prompt_text: str, completion_text: str) -> Dict[str, int]:
@@ -443,8 +471,19 @@ async def chat_completions(req: ChatRequest):
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
     text = chat.generate_response(prompt)
     text = truncate_stop_sequences(text, req.stop)
+
+    # Parse thinking if requested
+    parsed = parse_thinking_response(text)
+    content = parsed['response'] if not req.include_thinking else text
+    thinking = parsed['thinking']
+
     if req.stream:
-        return StreamingResponse(stream_chat_text(text), media_type='application/json')
+        return StreamingResponse(stream_chat_text(content), media_type='application/json')
+
+    message = {'role': 'assistant', 'content': content}
+    if req.include_thinking and thinking:
+        message['reasoning'] = thinking
+
     response = {
         'id': None,
         'object': 'chat.completion',
@@ -453,7 +492,7 @@ async def chat_completions(req: ChatRequest):
         'choices': [
             {
                 'index': 0,
-                'message': {'role': 'assistant', 'content': text},
+                'message': message,
                 'finish_reason': 'stop'
             }
         ],
@@ -470,8 +509,20 @@ async def api_chat(request: Request):
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
     text = chat.generate_response(prompt)
     text = truncate_stop_sequences(text, data.get('stop'))
+
+    # Parse thinking if requested
+    include_thinking = data.get('include_thinking', False)
+    parsed = parse_thinking_response(text)
+    content = parsed['response'] if not include_thinking else text
+    thinking = parsed['thinking']
+
     if data.get('stream', False):
-        return StreamingResponse(stream_chat_text(text), media_type='application/json')
+        return StreamingResponse(stream_chat_text(content), media_type='application/json')
+
+    message = {'role': 'assistant', 'content': content}
+    if include_thinking and thinking:
+        message['reasoning'] = thinking
+
     response = {
         'id': None,
         'object': 'chat.completion',
@@ -480,7 +531,7 @@ async def api_chat(request: Request):
         'choices': [
             {
                 'index': 0,
-                'message': {'role': 'assistant', 'content': text},
+                'message': message,
                 'finish_reason': 'stop'
             }
         ],
@@ -510,15 +561,24 @@ async def api_generate(req: GenerateRequest):
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
     text = chat.generate_response(req.prompt)
     text = truncate_stop_sequences(text, req.stop)
+
+    # Parse thinking if requested
+    parsed = parse_thinking_response(text)
+
     if req.stream:
-        return StreamingResponse(stream_chat_text(text), media_type='application/json')
-    return {
+        return StreamingResponse(stream_chat_text(parsed['response']), media_type='application/json')
+
+    result = {
         'id': None,
         'model': MODEL_NAME,
         'object': 'text_completion',
-        'text': text,
+        'text': parsed['response'] if not req.include_thinking else text,
         'usage': make_usage(req.prompt, text)
     }
+    if req.include_thinking and parsed['thinking']:
+        result['reasoning'] = parsed['thinking']
+
+    return result
 
 
 def parse_args():
@@ -533,6 +593,7 @@ def parse_args():
     
     parser.add_argument('--use-cpuonly', action='store_true')
     parser.add_argument('--cuda_device', type=int, default=None)
+    parser.add_argument('--show-thinking', action='store_true', help='Show <think> reasoning in console chat')
     
     # CPU configuration
     parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")

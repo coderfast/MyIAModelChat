@@ -53,6 +53,8 @@ CACHE_DATASET_FILE = os.path.join(CACHE_DIR, 'prepared_dataset')
 CACHE_STATS_FILE = os.path.join(CACHE_DIR, 'dataset_stats.pkl')
 CACHE_METADATA_FILE = os.path.join(CACHE_DIR, 'cache_metadata.pkl')
 BPE_MODEL_PATH = os.path.join(CACHE_DIR, 'sentencepiece.model')
+THINKING_DATA_DIR = 'datasets/thinking'
+THINKING_DATA_FILE = os.path.join(THINKING_DATA_DIR, 'thinking_data.csv')
 
 
 class DataPreparer:
@@ -245,6 +247,10 @@ class DataPreparer:
             # Load special facts (curated supplementary dataset)
             logger.info("\n[5/7] Loading special facts (CSV)...")
             self.special_facts_data = self._load_special_facts()
+
+            # Load thinking data (chain-of-thought reasoning)
+            logger.info("\n[5.5/7] Loading thinking data...")
+            self.thinking_data = self._load_thinking_data()
             
             # Combine datasets
             logger.info("\n[6/7] Combining datasets...")
@@ -518,7 +524,65 @@ class DataPreparer:
             logger.warning(f"  ⚠ Error reading special facts CSV: {e}")
             return Dataset.from_list([])
 
-    def _load_pdf_data(self) -> Dataset:
+    def _load_thinking_data(self) -> Dataset:
+        """
+        Load thinking training data from datasets/thinking/thinking_data.csv.
+        This dataset contains QA pairs with <think>...</think> reasoning.
+
+        Returns:
+            Hugging Face Dataset with input_ids column containing thinking format
+        """
+        if not os.path.exists(THINKING_DATA_FILE):
+            logger.info(f"  ℹ Thinking data not found at {THINKING_DATA_FILE}")
+            logger.info(f"    Run: python generate_thinking_data.py to generate thinking data")
+            return Dataset.from_list([])
+
+        thinking_items = []
+        try:
+            import csv as csv_mod
+            with open(THINKING_DATA_FILE, 'r', encoding='utf-8') as f:
+                reader = csv_mod.DictReader(f)
+                for row in reader:
+                    thinking_text = row.get('thinking_text', '')
+                    if thinking_text:
+                        # Add thinking data with higher weight (oversample)
+                        for _ in range(50):
+                            thinking_items.append({'input_ids': thinking_text})
+
+            if thinking_items:
+                ds = Dataset.from_list(thinking_items)
+                logger.info(f"  ✓ Loaded thinking data: {len(ds)} samples")
+                return ds
+            else:
+                logger.warning("  ⚠ No thinking data found in CSV")
+                return Dataset.from_list([])
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Error reading thinking data: {e}")
+            return Dataset.from_list([])
+
+    @staticmethod
+    def has_thinking(text: str) -> bool:
+        """Check if text contains <think> tags."""
+        return '<think>' in text and '</think>' in text
+
+    @staticmethod
+    def split_thinking(text: str) -> Tuple[str, str]:
+        """Split text into (thinking, response) parts."""
+        if not DataPreparer.has_thinking(text):
+            return ('', text)
+        try:
+            thinking = text.split('<think>')[1].split('</think>')[0]
+            response = text.split('</think>')[1].strip()
+            return (thinking, response)
+        except (IndexError, ValueError):
+            return ('', text)
+
+    @staticmethod
+    def extract_response(text: str) -> str:
+        """Extract only the response part, removing <think> blocks."""
+        _, response = DataPreparer.split_thinking(text)
+        return response
         """
         Load text data from PDF files in 'pdfs' directory.
         
@@ -738,7 +802,9 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=0.9995"
+        # Add <think> and </think> as special tokens that won't be split by BPE
+        user_symbols = '--user_defined_symbols=<think>,</think>'
+        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=0.9995 {user_symbols}"
         logger.info(f"  Training SentencePiece BPE model (vocab_size={vocab_size})... this may take a while")
         spm.SentencePieceTrainer.Train(spm_cmd)
 
@@ -780,6 +846,7 @@ class DataPreparer:
         self.cache_metadata = getattr(self, 'cache_metadata', {})
         self.cache_metadata['bpe_vocab_size'] = vocab_size
         self.cache_metadata['bpe_model'] = os.path.basename(model_file)
+        self.cache_metadata['has_thinking_tokens'] = True
         # Move model to canonical path
         try:
             shutil.copyfile(model_file, BPE_MODEL_PATH)
@@ -827,6 +894,11 @@ class DataPreparer:
             datasets_to_combine.append(self.special_facts_data)
             total_samples += len(self.special_facts_data)
             logger.info(f"  Adding special facts data: {len(self.special_facts_data)} samples")
+
+        if hasattr(self, 'thinking_data') and self.thinking_data is not None and len(self.thinking_data) > 0:
+            datasets_to_combine.append(self.thinking_data)
+            total_samples += len(self.thinking_data)
+            logger.info(f"  Adding thinking data: {len(self.thinking_data)} samples")
         
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
@@ -929,6 +1001,11 @@ class DataPreparer:
             special_count = len(self.special_facts_data)
             stats['special_facts_samples'] = special_count
             stats['source_breakdown']['SpecialFacts'] = special_count
+
+        if hasattr(self, 'thinking_data') and self.thinking_data:
+            thinking_count = len(self.thinking_data)
+            stats['thinking_samples'] = thinking_count
+            stats['source_breakdown']['Thinking'] = thinking_count
         
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)

@@ -80,9 +80,9 @@ class TokenPairIterableDataset(IterableDataset):
 
 
 class MainTrain:
-    
+
     def __init__(self, args):
-        
+
         logger.info("MainTrain initializing...")
 
         # Check if the tokenizer and cached dataset exist
@@ -90,13 +90,17 @@ class MainTrain:
         self.tokenized_data = None
         self.loaded_dataset = None
         self.stop_event = threading.Event()
-        
+
         # Device and training configuration tracking
         self.use_gpu = False
         self.use_mixed_precision = False
         self.use_gradient_checkpointing = False
         self.use_cpuonly = False
         self.best_loss = float('inf')
+
+        # Thinking detection
+        self.has_thinking_data = False
+        self.thinking_sample_count = 0
 
         # Memory cap for entire application
         self.max_ram_fraction = getattr(args, 'max_ram_fraction', 0.75)
@@ -187,10 +191,40 @@ class MainTrain:
                     stats = pickle.load(f)
                 logger.info(f"Dataset statistics loaded")
                 logger.info(f"  Total samples: {stats.get('total_samples', 0):,}")
+
+            # Detect thinking data in dataset
+            self._detect_thinking_data()
             
         except Exception as e:
             logger.error(f"❌ Error loading cached dataset: {e}")
             sys.exit(1)
+
+    def _detect_thinking_data(self):
+        """Detect if the dataset contains <think> thinking data."""
+        if self.loaded_dataset is None:
+            return
+
+        # Check cache metadata for thinking flag
+        if isinstance(self.cache_metadata, dict) and self.cache_metadata.get('has_thinking_tokens'):
+            self.has_thinking_data = True
+            logger.info("✓ Thinking data detected (from cache metadata)")
+            return
+
+        # Heuristic: sample first 100 items and check for <think> tags
+        sample_size = min(100, len(self.loaded_dataset))
+        thinking_count = 0
+        for i in range(sample_size):
+            item = self.loaded_dataset[i]
+            value = item.get('input_ids', item.get('token_ids', ''))
+            if isinstance(value, str) and '<think>' in value:
+                thinking_count += 1
+
+        if thinking_count > 0:
+            self.has_thinking_data = True
+            self.thinking_sample_count = thinking_count
+            logger.info(f"✓ Thinking data detected ({thinking_count}/{sample_size} samples contain <think>)")
+        else:
+            logger.info("No thinking data detected in dataset")
 
     def _warn_memory_usage(self, stage="training"):
         """Check and warn about memory usage compared to configured max RAM."""
@@ -383,17 +417,60 @@ class MainTrain:
     def _compute_loss(self, model, inputs, targets, criterion):
         """Unified loss computation for both mixed and standard precision."""
         outputs = model(inputs)
-        
+
         # Reshape outputs and targets
         outputs = outputs.contiguous().view(-1, outputs.size(-1))
         targets = targets.contiguous().view(-1)
-        
+
         # Ignore padded elements
         non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
         outputs = outputs[non_pad_mask]
         targets = targets[non_pad_mask]
-        
+
         return criterion(outputs, targets)
+
+    def _compute_thinking_metrics(self, model, inputs, targets, device):
+        """Compute metrics for thinking token generation if thinking data is present."""
+        if not self.has_thinking_data:
+            return {}
+
+        thinking_id = self.tokenizer.get_thinking_index()
+        thinking_end_id = self.tokenizer.get_thinking_end_index()
+
+        if thinking_id < 0 or thinking_end_id < 0:
+            return {}
+
+        with torch.no_grad():
+            outputs = model(inputs)
+            predictions = outputs.argmax(dim=-1)
+
+            # Count correct thinking open/close predictions
+            thinking_open_correct = 0
+            thinking_close_correct = 0
+            total_thinking_positions = 0
+
+            for i in range(targets.size(0)):
+                for j in range(targets.size(1)):
+                    target_token = targets[i, j].item()
+                    pred_token = predictions[i, j].item()
+
+                    if target_token == thinking_id:
+                        total_thinking_positions += 1
+                        if pred_token == thinking_id:
+                            thinking_open_correct += 1
+                    elif target_token == thinking_end_id:
+                        total_thinking_positions += 1
+                        if pred_token == thinking_end_id:
+                            thinking_close_correct += 1
+
+            metrics = {}
+            if total_thinking_positions > 0:
+                metrics['thinking_token_accuracy'] = (thinking_open_correct + thinking_close_correct) / total_thinking_positions
+                metrics['thinking_open_accuracy'] = thinking_open_correct / max(1, sum(1 for t in targets.flatten() if t.item() == thinking_id))
+                metrics['thinking_close_accuracy'] = thinking_close_correct / max(1, sum(1 for t in targets.flatten() if t.item() == thinking_end_id))
+                metrics['thinking_positions'] = total_thinking_positions
+
+            return metrics
     
     def _backward_pass(self, loss, optimizer, scaler, accumulation_step=1):
         """Unified backward pass handling for mixed and standard precision."""
@@ -410,60 +487,84 @@ class MainTrain:
     # Training function with mixed precision support
     def train(self, model, dataloader, criterion, optimizer, device, scaler=None, accumulation_steps=1):
         """Train function with support for mixed precision training and gradient accumulation."""
-        
+
         total_loss = 0
         total_batches = 0
-        num_batches = len(dataloader)
+        try:
+            num_batches = len(dataloader)
+        except (TypeError, AttributeError):
+            num_batches = float('inf')
         model.train()
         optimizer.zero_grad()
         logger.info("Training loop started; the model is actively processing batches")
-        
+
+        # Thinking metrics accumulators
+        thinking_metrics_accum = {}
+
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             if self.stop_event.is_set():
                 logger.info("Stop requested; exiting current training epoch early")
                 break
 
             if batch_idx == 0 or (batch_idx + 1) % 10 == 0:
-                logger.info(f"Training batch {batch_idx + 1}/{num_batches} in progress...")
+                batch_str = f"{batch_idx + 1}/{num_batches}" if num_batches != float('inf') else f"{batch_idx + 1}"
+                logger.info(f"Training batch {batch_str} in progress...")
 
             total_batches += 1
             inputs = inputs.to(device)
             targets = targets.to(device)
-            
+
             # Forward pass
             if self.use_mixed_precision and scaler is not None:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
                     loss = self._compute_loss(model, inputs, targets, criterion)
             else:
                 loss = self._compute_loss(model, inputs, targets, criterion)
-            
+
+            # Compute thinking metrics periodically
+            if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
+                thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device)
+                for key, value in thinking_metrics.items():
+                    if key not in thinking_metrics_accum:
+                        thinking_metrics_accum[key] = []
+                    thinking_metrics_accum[key].append(value)
+
             # Backward pass
             original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
             total_loss += original_loss.item()
-            
+
             # Optimizer step with gradient accumulation
             if (batch_idx + 1) % accumulation_steps == 0:
                 if self.use_mixed_precision and scaler is not None:
                     scaler.unscale_(optimizer)
-                
+
                 # Gradient clipping for stability
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=TRAINING_CONFIG['grad_clip_norm'])
-                
+
                 if scaler:
                     scaler.step(optimizer)
                     scaler.update()
                 else:
                     optimizer.step()
-                
+
                 optimizer.zero_grad()
-            
+
             # Memory cleanup on GPU
             if self.use_gpu and (batch_idx + 1) % TRAINING_CONFIG['memory_cleanup_interval'] == 0:
                 torch.cuda.empty_cache()
 
         num_batches = max(1, total_batches)
+        avg_loss = total_loss / num_batches
+
+        # Log thinking metrics summary
+        if thinking_metrics_accum:
+            logger.info("\n  Thinking Metrics Summary:")
+            for key, values in thinking_metrics_accum.items():
+                avg_val = sum(values) / len(values) if values else 0
+                logger.info(f"    {key}: {avg_val:.4f}")
+
         logger.info(f"Training loop completed after {num_batches} batches")
-        return total_loss / num_batches
+        return avg_loss
 
 
     def collate_fn(self, batch):
@@ -519,6 +620,12 @@ class MainTrain:
 
             logger.info(f"Dataset size: {len(loaded_dataset)} samples")
             logger.info(f"Dataset columns: {loaded_dataset.column_names}")
+
+            # Log thinking data status
+            if self.has_thinking_data:
+                logger.info(f"✓ Thinking data: ENABLED (model will learn <think>...</think> structure)")
+            else:
+                logger.info(f"ℹ Thinking data: NOT detected (standard training mode)")
 
             # Extract and normalize records from cached dataset in streaming mode
             logger.info("Extracting and validating dataset samples (streaming mode)...")

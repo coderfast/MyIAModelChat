@@ -8,6 +8,7 @@ class GenerateRequest(BaseModel):
     top_p: Optional[float] = 0.9
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
+    include_thinking: Optional[bool] = False
 
 class ChatMessage(BaseModel):
     role: str
@@ -21,3 +22,4 @@ class ChatRequest(BaseModel):
     top_p: Optional[float] = 0.9
     stream: Optional[bool] = False
     stop: Optional[List[str]] = None
+    include_thinking: Optional[bool] = False

@@ -45,6 +45,7 @@
   - `/api/chat/completions`
   - `/v1/embeddings`
   - `/api/generate`
+- Soporte para **chain-of-thought reasoning** (`<think>`) via parámetro `include_thinking`
 
 ## Requisitos principales
 - Python 3.11+ / 3.14
@@ -60,6 +61,7 @@
 - `dialogmanager.py` — gestión de diálogo y generación de respuestas
 - `bpe_tokenizer.py` — tokenizador BPE (SentencePiece, único tokenizador)
 - `data_preparer.py` — preparación de datos y entrenamiento BPE
+- `generate_thinking_data.py` — generador de datos con `<think>`
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
 - `dataset_cache/sentencepiece.model` — modelo BPE entrenado
 - `chat_model.pth` — checkpoint del modelo
@@ -71,3 +73,4 @@
 - El modelo funciona localmente y es compatible con Docker/entornos aislados si se adapta el entorno.
 - Se puede mejorar con fine-tuning adicional y mayores fuentes de datos en español.
 - La tokenización BPE permite soporte multilingüe sin cambiar la arquitectura del modelo.
+- El modelo soporta chain-of-thought reasoning (`<think>`) para mostrar el proceso de razonamiento.

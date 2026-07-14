@@ -39,6 +39,8 @@ class SentencePieceTokenizerWrapper:
         unk_id = _resolve_id('<unk>', '<UNK>')
         bos_id = _resolve_id('<s>', '<BOS>', '<bos>')
         eos_id = _resolve_id('</s>', '<eos>', '<EOS>')
+        thinking_id = _resolve_id('<think>')
+        thinking_end_id = _resolve_id('</think>')
 
         if pad_id < 0:
             pad_id = 0
@@ -53,6 +55,8 @@ class SentencePieceTokenizerWrapper:
         self._unk_id = unk_id
         self._bos_id = bos_id
         self._eos_id = eos_id
+        self._thinking_id = thinking_id
+        self._thinking_end_id = thinking_end_id
 
     def _build_vocab_dicts(self):
         self._idx2word = {}
@@ -143,3 +147,51 @@ class SentencePieceTokenizerWrapper:
         data = {'sentencepiece_model': self.model_path, 'vocab_size': self.vocab_size}
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+    # ── Thinking helpers ──────────────────────────────────────────────
+
+    def get_thinking_index(self) -> int:
+        """Return the token ID for <think>."""
+        self._ensure_special_token_ids()
+        return self._thinking_id
+
+    def get_thinking_end_index(self) -> int:
+        """Return the token ID for </think>."""
+        self._ensure_special_token_ids()
+        return self._thinking_end_id
+
+    def has_thinking(self, text: str) -> bool:
+        """Check if text contains <think> tags."""
+        return '<think>' in text and '</think>' in text
+
+    def split_thinking(self, text: str):
+        """Split text into (thinking, response) parts.
+
+        Returns:
+            Tuple[str, str]: (thinking_content, response_text)
+            If no thinking tags found, returns ('', text).
+        """
+        if not self.has_thinking(text):
+            return ('', text)
+        try:
+            thinking = text.split('<think>')[1].split('</think>')[0]
+            response = text.split('</think>')[1].strip()
+            return (thinking, response)
+        except (IndexError, ValueError):
+            return ('', text)
+
+    def extract_response(self, text: str) -> str:
+        """Extract only the response part, removing <think> blocks."""
+        _, response = self.split_thinking(text)
+        return response
+
+    def encode_with_thinking(self, text: str):
+        """Encode text, returning (thinking_ids, response_ids, all_ids).
+
+        Useful for training where you want to separate thinking from response.
+        """
+        thinking, response = self.split_thinking(text)
+        all_ids = self.encode(text)
+        thinking_ids = self.encode(thinking) if thinking else []
+        response_ids = self.encode(response) if response else []
+        return (thinking_ids, response_ids, all_ids)
