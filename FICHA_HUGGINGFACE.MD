@@ -4,20 +4,27 @@
 - `myiamodelchat-local`
 
 ## Descripción
-- Modelo local basado en GPT-2 pequeño adaptado para chat.
-- Entrenado/fine-tuned para respuestas conversacionales en español.
+- Modelo local basado en GPT-2 adaptado para chat conversacional.
+- Entrenado/fine-tuned para respuestas en español e inglés.
+- Arquitectura Transformer decoder-only (GPT2LMHeadModel).
 
 ## Tipo de modelo
-- `GPT2LMHeadModel`
+- `GPT2LMHeadModel` (Transformer decoder-only)
 - Modelo de lenguaje autoregresivo para generación de texto.
 
 ## Tamaño del modelo
-- Parámetros totales: aproximadamente 4.5 millones
+- Parámetros totales: **5,338,624** (~5.34M)
 - Configuración de arquitectura:
-  - `vocab_size`: 4792
+  - `vocab_size`: 8000 (default BPE, configurable)
   - `n_embd`: 256
   - `n_layer`: 4
   - `n_head`: 4
+  - `n_positions`: 512
+- Desglose:
+  - Embedding token: 2,048,000 (vocab_size × n_embd)
+  - Embedding posición: 131,072 (n_positions × n_embd)
+  - 4 capas Transformer: ~3,013,376
+  - Layer norm final: 512
 
 ## Tokenizador
 - Tokenizador BPE multilingüe: `SentencePieceTokenizerWrapper` (módulo `bpe_tokenizer.py`)
@@ -30,34 +37,42 @@
 
 ## Uso principal
 - Chatbot conversacional local
-- Servicio compatible con API Ollama
+- Servidor compatible con API Ollama y OpenAI
 - Endpoint de inferencia HTTP y chat de consola
 
 ## Entrenamiento
-- No se especifica el dataset exacto en esta ficha
 - Arquitectura definida en `chatmodel.py`
-- El entrenamiento puede realizarse con `main_train.py`
+- Pipeline de entrenamiento en `main_train.py`
+- Datos preparados con `main.py --prepare-data`
+- Soporta cache de datasets para entrenamiento rápido
 
 ## Inferencia
-- Servicio FastAPI en `main_chat.py`
+- Servidor FastAPI en `main_chat.py`
 - Endpoints disponibles:
-  - `/v1/chat/completions`
-  - `/api/chat/completions`
-  - `/v1/embeddings`
-  - `/api/generate`
+  - `POST /v1/chat/completions` — Chat completion (compatible OpenAI)
+  - `POST /api/chat/completions` — Chat completion alternativo
+  - `POST /v1/embeddings` — Embeddings de texto
+  - `POST /api/generate` — Generación de texto
+  - `GET /v1/models` — Lista modelos disponibles
+  - `GET /v1/health` — Health check
+  - `GET /v1/version` — Versión del servidor
 - Soporte para **chain-of-thought reasoning** (`<think>`) via parámetro `include_thinking`
+- Streaming de respuestas soportado
 
 ## Requisitos principales
-- Python 3.11+ / 3.14
+- Python 3.11+ (probado en 3.14)
 - PyTorch
-- Transformers
+- Transformers (Hugging Face)
 - FastAPI
 - Uvicorn
 - psutil
+- sentencepiece
 
 ## Archivos clave
-- `main_chat.py` — servidor y lógica de inferencia
-- `chatmodel.py` — definición del modelo
+- `main.py` — punto de entrada principal (CLI)
+- `main_chat.py` — servidor FastAPI y lógica de inferencia
+- `main_train.py` — pipeline de entrenamiento
+- `chatmodel.py` — definición del modelo GPT2LMHeadModel
 - `dialogmanager.py` — gestión de diálogo y generación de respuestas
 - `bpe_tokenizer.py` — tokenizador BPE (SentencePiece, único tokenizador)
 - `data_preparer.py` — preparación de datos y entrenamiento BPE
@@ -74,3 +89,5 @@
 - Se puede mejorar con fine-tuning adicional y mayores fuentes de datos en español.
 - La tokenización BPE permite soporte multilingüe sin cambiar la arquitectura del modelo.
 - El modelo soporta chain-of-thought reasoning (`<think>`) para mostrar el proceso de razonamiento.
+- El servidor es compatible con clientes Ollama y OpenAI API (formato de mensajes idéntico).
+- Opciones de streaming y pensamiento incluido (`include_thinking`) disponibles en todos los endpoints.
