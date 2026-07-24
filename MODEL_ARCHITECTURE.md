@@ -39,12 +39,12 @@ Output Logits
 
 ### Key Parameters (from chatmodel.py)
 
-- **vocab_size**: Number of unique tokens in vocabulary (up to 50k)
-- **embed_size**: Dimension of embedding vectors (256-512 recommended)
-- **hidden_size**: Hidden state dimension (512 for standard models)
-- **num_layers**: Number of transformer layers (2-4 recommended)
-- **n_head**: Number of attention heads (4-8 recommended)
-- **n_positions**: Maximum sequence length (512 default)
+- **vocab_size**: Number of unique tokens in vocabulary (default: 8000 via BPE)
+- **embed_size**: Dimension of embedding vectors (256)
+- **hidden_size**: Hidden state dimension (512)
+- **num_layers**: Number of transformer layers (4)
+- **n_head**: Number of attention heads (4)
+- **n_positions**: Maximum sequence length (512)
 
 ### Input/Output Specifications
 

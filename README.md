@@ -6,12 +6,13 @@ My First IA Chat Model - Advanced Conversational AI with Multi-Source Data Suppo
 MyIAModelChat is a sophisticated conversational AI system built with PyTorch, featuring:
 
 ### Core Capabilities
-- **Neural Chat Model**: LSTM-based architecture for natural language generation
+- **Neural Chat Model**: GPT-2 Transformer architecture for natural language generation
 - **Bilingual Support**: English/Spanish tokenization with accent handling
 - **Intent Recognition**: BERT-based intent classification for user queries
 - **Sentiment Analysis**: DistilBERT-powered emotion detection
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
+- **Model Library**: Train, combine, and export multiple independent models
 
 ### Data Sources & Processing
 - **AIML Pattern Matching**: Traditional rule-based responses from AIML files
@@ -27,6 +28,8 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Multi-threading Support**: Optimized for CPU training
 - **Model Checkpointing**: Best model saving and tokenizer persistence
 - **Chain-of-Thought Reasoning**: Optional `<think>` reasoning in training and inference
+- **Model Library**: Multiple trained models with merge and export capabilities
+- **GGUF/ONNX Export**: Export models to Ollama, llama.cpp, ONNX Runtime
 
 ### Advanced Text Processing (NEW)
 - **Professional Sentence Tokenization**: spaCy-based sentence splitting (replaces naive `split('.')`)
@@ -37,16 +40,12 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Metadata Preservation**: Extract and preserve document metadata (title, author, etc.)
 - **Language Detection**: Filter texts by detected language (supports 50+ languages)
 
-## 📋 Quick Start
+## 🚀 Quick Start
 
 ### 1. Prepare Your Data
 ```bash
 # Prepare datasets from multiple sources
 python main.py --prepare-data --aiml --pdf --epub
-```
-```bash
-# Prepare datasets with custom BPE vocab size (default: 8000)
-python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 ```
 
 ### 2. Train the Model
@@ -59,6 +58,52 @@ python main.py --train --use-cache --epochs 30
 ```bash
 # Launch interactive chat
 python main.py --chat
+```
+
+## 📚 Model Library
+
+Train multiple independent models and use them individually or combined.
+
+### Train a model
+```bash
+# Train with a custom name and dataset
+python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
+python main.py --train --dataset datasets_source/programacion/ --checkpoint-name programacion --aiml --hf --epochs 30
+```
+
+### List available models
+```bash
+python main.py --list-models
+```
+
+### Chat with a specific model
+```bash
+python main.py --chat --model ciencias_naturales
+python main.py --chat --model programacion
+```
+
+### Combine models (merge)
+```bash
+python main.py --chat --model ciencias_naturales+programacion
+```
+
+### Export models
+```bash
+# Export to GGUF for Ollama/llama.cpp
+python main.py --export ciencias_naturales --formats gguf
+
+# Export to ONNX
+python main.py --export ciencias_naturales --formats onnx,onnx_int8
+
+# Export merged model
+python main.py --export ciencias_naturales+programacion --formats gguf,onnx
+```
+
+### Use with Ollama
+```bash
+# After exporting to GGUF
+ollama create mi-ciencias -f Modelfile.ciencias_naturales
+ollama run mi-ciencias
 ```
 
 ## 📖 Examples
@@ -85,7 +130,7 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 
 ```
 MyIAModelChat/
-├── main.py                 # Main entry point
+├── main.py                 # Main entry point with all CLI commands
 ├── main_train.py          # Training pipeline
 ├── main_chat.py           # Chat interface (API server)
 ├── dialogmanager.py       # Response generation with intent/sentiment
@@ -95,14 +140,18 @@ MyIAModelChat/
 ├── chatdataset.py         # PyTorch Dataset loader
 ├── aimlloder.py           # AIML file processing
 ├── model_downloader.py    # HuggingFace model downloader
+├── model_registry.py      # Model discovery, listing, validation
+├── model_merge.py         # Model merging by weight averaging
+├── model_export.py        # Export to GGUF, ONNX, ONNX quantized
 ├── generate_thinking_data.py  # Chain-of-thought data generation
 ├── manual_test.py         # Manual testing utilities
-├── checkpoints/           # Model checkpoints
+├── checkpoints/           # Model checkpoints (legacy)
+├── models/                # Trained model checkpoints (.pth)
+│   └── exported/          # Exported models (.gguf, .onnx)
+├── datasets_source/       # User-prepared datasets
 ├── dataset_cache/         # Cached datasets
-├── datasets/              # Raw data storage
-├── models/                # Downloaded ML models (sentiment, intent)
 ├── aiml_dev/              # AIML development files
-├── envAIModels/           # API server (FastAPI)
+├── envAIModels/           # API server (FastAPI, GGUF/llama_cpp)
 └── tests/                 # Test suite
 ```
 
@@ -128,20 +177,24 @@ MyIAModelChat/
 
 ### Training Parameters
 ```python
-# Recommended settings
-epochs = 30
-batch_size = 32
+# Actual configuration (main_train.py)
+batch_size = 4                # Micro batch size
+accumulation_steps = 8        # Gradient accumulation (effective batch = 32)
 learning_rate = 1e-3
-max_len = 128
-vocab_size = 50000
+embed_size = 256              # Embedding dimension
+hidden_size = 512             # Hidden state dimension
+num_layers = 4                # Transformer layers
+n_head = 4                    # Attention heads
+n_positions = 512             # Max sequence length
+vocab_size = 8000             # BPE vocabulary size (default)
 ```
 
 ### Generation Settings
 ```python
-# Chat parameters
+# Chat parameters (dialogmanager.py)
 top_k = 50
 top_p = 0.9
-temperature = 0.8
+temperature = 0.7
 min_length = 5
 no_repeat_ngram_size = 3
 ```
@@ -155,22 +208,20 @@ no_repeat_ngram_size = 3
 
 ## 🔧 Recent Improvements
 
-See [CRITICAL-FIXES-APPLIED.md](CRITICAL-FIXES-APPLIED.md) for details on:
-- Fixed LSTM forward pass issues
-- Resolved tokenizer race conditions
-- Improved autoregressive generation
-- Added dynamic n-gram penalization
+- Model library system with merge and export capabilities
+- GGUF/ONNX export for Ollama, llama.cpp, ONNX Runtime
+- SentencePiece BPE multilingual tokenizer
+- Chain-of-thought reasoning support
+- Dynamic n-gram penalization
+- Advanced text processing (chunking, dedup, quality filter)
 
 ## 📖 Documentation
 
-- [TRAINING-GUIDE.md](TRAINING-GUIDE.md) - Complete training setup
-- [QUICK-REFERENCE.md](QUICK-REFERENCE.md) - Command reference
-- [MODEL-ARCHITECTURE.md](MODEL-ARCHITECTURE.md) - Technical architecture
-- [DATASET-CACHING-GUIDE.md](DATASET-CACHING-GUIDE.md) - Caching system
-- [THINKING-GUIDE.md](THINKING-GUIDE.md) - Chain-of-thought reasoning
-- [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) - Troubleshooting
-- [PLAN_TEST_DATASET.md](PLAN_TEST_DATASET.md) - Dataset preparation analysis
-- [PLAN_BPE_TOKENIZER.md](PLAN_BPE_TOKENIZER.md) - BPE tokenizer migration plan
+- [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Command reference
+- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Technical architecture
+- [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning
+- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Troubleshooting
 
 ## 🗂️ Tokenizador BPE multilingüe
 
@@ -311,7 +362,7 @@ curl -X POST http://localhost:11434/v1/chat/completions \
 | `--show-thinking` | Muestra reasoning en consola |
 | `include_thinking` | Parámetro en endpoints API |
 
-Ver [THINKING-GUIDE.md](THINKING-GUIDE.md) para documentación completa.
+Ver [THINKING_GUIDE.md](THINKING_GUIDE.md) para documentación completa.
 
 ## 🔬 Advanced Text Processing
 

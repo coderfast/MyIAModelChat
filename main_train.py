@@ -66,6 +66,7 @@ TRAINING_CONFIG = {
 
 # Model checkpoint configuration
 MODEL_CHECKPOINT_DIR = 'checkpoints'
+MODELS_DIR = 'models'
 TOKENIZER_VOCAB_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'tokenizer_vocab.json')
 LATEST_MODEL_FILE = 'chat_model.pth'
 
@@ -113,6 +114,12 @@ class MainTrain:
         self.epochs = args.epochs
         self.use_cpuonly = getattr(args, 'use_cpuonly', False)
         self.cuda_device = getattr(args, 'cuda_device', None)
+
+        # Dynamic checkpoint naming
+        self.checkpoint_name = getattr(args, 'checkpoint_name', 'chat_model')
+        self.dataset_source = getattr(args, 'dataset', 'dataset_cache')
+        self.model_output_path = os.path.join(MODELS_DIR, f'{self.checkpoint_name}.pth')
+        os.makedirs(MODELS_DIR, exist_ok=True)
 
         # Load cached dataset and metadata (if present)
         self.cache_metadata = {}
@@ -789,9 +796,9 @@ class MainTrain:
                 if loss < self.best_loss:
                     self.best_loss = loss
                     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                    epoch_filename = f"chat_model_epoch_{epoch+1}_{timestamp}.pth"
-                    epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-                    os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+                    epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
+                    epoch_path = os.path.join(MODELS_DIR, epoch_filename)
+                    os.makedirs(MODELS_DIR, exist_ok=True)
                     torch.save({
                         'epoch': epoch + 1,
                         'model_state_dict': model.state_dict(),
@@ -799,6 +806,16 @@ class MainTrain:
                         'scheduler_state_dict': scheduler.state_dict(),
                         'loss': loss,
                         'tokenizer': self.tokenizer,
+                        'model_name': self.checkpoint_name,
+                        'architecture': {
+                            'embed_size': TRAINING_CONFIG['embed_size'],
+                            'hidden_size': TRAINING_CONFIG['hidden_size'],
+                            'num_layers': 4,
+                            'n_head': 4,
+                            'n_positions': 512,
+                            'vocab_size': self.tokenizer.vocab_size,
+                        },
+                        'dataset_source': self.dataset_source,
                     }, epoch_path)
                     logger.info(f"  ✓ Epoch {epoch+1} checkpoint saved to {epoch_path}")
 
@@ -821,7 +838,10 @@ class MainTrain:
             logger.info(f"\n{'='*80}")
             logger.info("Training completed! Saving final model and tokenizer...")
 
-            
+            # Save per-epoch best checkpoint with metadata
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            epoch_filename = f"{self.checkpoint_name}_best_{timestamp}.pth"
+            epoch_path = os.path.join(MODELS_DIR, epoch_filename)
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
@@ -829,8 +849,39 @@ class MainTrain:
                 'scheduler_state_dict': scheduler.state_dict(),
                 'loss': loss,
                 'tokenizer': self.tokenizer,
-            }, LATEST_MODEL_FILE)
-            logger.info("✓ Model + tokenizer saved successfully")
+                'model_name': self.checkpoint_name,
+                'architecture': {
+                    'embed_size': TRAINING_CONFIG['embed_size'],
+                    'hidden_size': TRAINING_CONFIG['hidden_size'],
+                    'num_layers': 4,
+                    'n_head': 4,
+                    'n_positions': 512,
+                    'vocab_size': self.tokenizer.vocab_size,
+                },
+                'dataset_source': self.dataset_source,
+            }, epoch_path)
+            logger.info(f"  Best epoch checkpoint saved to {epoch_path}")
+
+            # Save final model
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'loss': loss,
+                'tokenizer': self.tokenizer,
+                'model_name': self.checkpoint_name,
+                'architecture': {
+                    'embed_size': TRAINING_CONFIG['embed_size'],
+                    'hidden_size': TRAINING_CONFIG['hidden_size'],
+                    'num_layers': 4,
+                    'n_head': 4,
+                    'n_positions': 512,
+                    'vocab_size': self.tokenizer.vocab_size,
+                },
+                'dataset_source': self.dataset_source,
+            }, self.model_output_path)
+            logger.info(f"✓ Model + tokenizer saved to {self.model_output_path}")
 
         except TrainingStopRequested:
             logger.warning("\nTraining interrupted by request")

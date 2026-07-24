@@ -53,21 +53,26 @@ MyIAModelChat/
 ├── aimlloder.py            # AIML file processing
 ├── model_downloader.py     # HuggingFace model downloader
 ├── generate_thinking_data.py  # Chain-of-thought data generation
-├── manual_test.py          # Manual testing utilities
-├── requirements.txt        # Python dependencies
-├── checkpoints/            # Model checkpoints
-├── dataset_cache/          # Cached datasets
-├── models/                 # Downloaded ML models
-├── aiml_dev/               # AIML development files
-├── envAIModels/            # FastAPI server
-│   ├── app.py              # FastAPI application
-│   ├── routers_api.py      # API v1 routes
-│   ├── routers_v1.py       # v1 routes
-│   ├── schemas.py          # Pydantic models
-│   ├── utils.py            # Utility functions
-│   └── model.py            # Model loading utilities
-├── tests/                  # Test suite
-└── .mimocode/              # MiMoCode configuration
+├── model_registry.py      # Model discovery, listing, validation
+├── model_merge.py         # Model merging by weight averaging
+├── model_export.py        # Export to GGUF, ONNX, ONNX quantized
+├── manual_test.py         # Manual testing utilities
+├── requirements.txt       # Python dependencies
+├── checkpoints/           # Model checkpoints (legacy)
+├── models/                # Trained model checkpoints (.pth)
+│   └── exported/          # Exported models (.gguf, .onnx)
+├── datasets_source/       # User-prepared datasets
+├── dataset_cache/         # Cached datasets
+├── aiml_dev/              # AIML development files
+├── envAIModels/           # FastAPI server (GGUF/llama_cpp)
+│   ├── app.py             # FastAPI application
+│   ├── routers_api.py     # API v1 routes
+│   ├── routers_v1.py      # v1 routes
+│   ├── schemas.py         # Pydantic models
+│   ├── utils.py           # Utility functions
+│   └── model.py           # Model loading (GGUF)
+├── tests/                 # Test suite
+└── .mimocode/             # MiMoCode configuration
 ```
 
 ---
@@ -86,6 +91,9 @@ MyIAModelChat/
 | `aimlloder.py` | AIML file parsing and pattern matching |
 | `main_train.py` | Training pipeline with dataset handling and checkpointing |
 | `main_chat.py` | Chat interface + FastAPI API server |
+| `model_registry.py` | Model discovery, listing, validation |
+| `model_merge.py` | Model merging by weight averaging |
+| `model_export.py` | Export to GGUF, ONNX, ONNX quantized |
 
 ### Data Flow
 
@@ -131,11 +139,23 @@ python manual_test.py
 # Prepare data with BPE tokenizer
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
 
-# Train model
+# Train model (default checkpoint name)
 python main.py --train --use-cache --epochs 30
 
-# Start chat
-python main.py --chat
+# Train with custom name and dataset
+python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
+
+# List available models
+python main.py --list-models
+
+# Chat with specific model
+python main.py --chat --model ciencias_naturales
+
+# Chat with merged models
+python main.py --chat --model ciencias_naturales+programacion
+
+# Export model
+python main.py --export ciencias_naturales --formats gguf,onnx
 ```
 
 ### API Server

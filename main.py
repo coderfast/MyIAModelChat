@@ -18,6 +18,9 @@ import torch
 from main_train import MainTrain
 from main_chat import MainChat
 from data_preparer import prepare_datasets_for_training
+from model_registry import list_models_cli
+from model_merge import merge_from_names, parse_merge_spec
+from model_export import export_cli
 
 try:
     import keyboard
@@ -43,8 +46,8 @@ SYSTEM_CONFIG = {
 
 def validate_arguments(args):
     """Validate command-line arguments for consistency."""
-    if not (args.train or args.chat or args.prepare_data or args.clear_cache):
-        return False, "Please specify: --train, --chat, --prepare-data, or --clear-cache"
+    if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.export):
+        return False, "Please specify: --train, --chat, --prepare-data, --clear-cache, --list-models, or --export"
 
     if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub):
         return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, or --epub"
@@ -147,6 +150,14 @@ OPERATIONS:
   --chat               Run interactive chat interface
   --prepare-data       Prepare and validate datasets only
   --clear-cache        Clear cached datasets and exit
+  --list-models        List available trained models
+  --export NAME        Export model to GGUF/ONNX (use NAME+NAME for merge)
+
+MODEL LIBRARY:
+  --model NAME         Load specific model for chat (e.g. ciencias_naturales)
+  --checkpoint-name N  Name for saved checkpoint (default: chat_model)
+  --dataset PATH       Path to dataset directory (default: dataset_cache)
+  --formats F1,F2      Export formats: gguf, onnx, onnx_int8 (default: gguf,onnx)
 
 DATA SOURCES (required with --train or --prepare-data):
   --aiml               Include AIML data from datasets_source/aiml directory
@@ -168,11 +179,15 @@ CPU CONFIGURATION:
 EXAMPLES:
   python main.py --prepare-data --aiml --hf --pdf --epub
 
-  python main.py --train --aiml --hf --epochs 10
+  python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 10
   python main.py --train --aiml --use-cpuonly --num_cores 4 --num_threads 4
 
-  python main.py --chat
+  python main.py --chat --model ciencias_naturales
+  python main.py --chat --model ciencias_naturales+programacion
   python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
+
+  python main.py --list-models
+  python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
             """
         )
         
@@ -181,6 +196,14 @@ EXAMPLES:
         parser.add_argument("--chat", action='store_true', help="Run chat interface")
         parser.add_argument("--prepare-data", action='store_true', help="Prepare datasets only")
         parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets")
+        parser.add_argument("--list-models", action='store_true', help="List available trained models")
+        parser.add_argument("--export", type=str, default=None, help="Export model to GGUF/ONNX (name or name+name for merge)")
+        parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats (default: gguf,onnx)")
+
+        # Model library arguments
+        parser.add_argument("--model", type=str, default=None, help="Model name to load for chat (e.g. ciencias_naturales)")
+        parser.add_argument("--checkpoint-name", type=str, default="chat_model", help="Name for saved checkpoint (default: chat_model)")
+        parser.add_argument("--dataset", type=str, default="dataset_cache", help="Path to dataset directory (default: dataset_cache)")
         
         # CPU configuration
         parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")
@@ -243,6 +266,17 @@ EXAMPLES:
             logger.error(f"Argument error: {error_msg}")
             parser.print_help()
             sys.exit(1)
+
+        # Handle --list-models
+        if args.list_models:
+            list_models_cli()
+            sys.exit(0)
+
+        # Handle --export
+        if args.export:
+            formats = [f.strip() for f in args.formats.split(',')]
+            export_cli(args.export, formats)
+            sys.exit(0)
 
         
         # Garbage collection
@@ -319,6 +353,15 @@ EXAMPLES:
 
         # Chat
         if args.chat:
+            # Handle model merging if + is in model name
+            if args.model and '+' in args.model:
+                from model_merge import merge_from_names, parse_merge_spec
+                names, weights = parse_merge_spec(args.model)
+                logger.info(f"Merging models: {names}")
+                merged_path = merge_from_names(names, weights)
+                # Set the merged path for the chat to load
+                args.model = merged_path.replace('.pth', '')
+
             logger.info("Starting chat interface...")
             main_chat = MainChat(args)
             main_chat.performMainChat()

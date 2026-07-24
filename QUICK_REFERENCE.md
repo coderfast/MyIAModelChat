@@ -13,6 +13,9 @@
 | `main_train.py` | Training pipeline (MainTrain class) |
 | `main_chat.py` | Chat interface + FastAPI server |
 | `main.py` | Primary entry point with argument parsing |
+| `model_registry.py` | Model discovery, listing, validation |
+| `model_merge.py` | Model merging by weight averaging |
+| `model_export.py` | Export to GGUF, ONNX, ONNX quantized |
 | `model_downloader.py` | HuggingFace model downloader |
 | `generate_thinking_data.py` | Chain-of-thought data generation |
 
@@ -22,19 +25,21 @@
 # Activate environment
 .\envMyIAModelChat\Scripts\Activate.ps1
 
+# === DATA PREPARATION ===
 # Prepare data from multiple sources
 python main.py --prepare-data --aiml --pdf --epub
-# Prepare and build a BPE-tokenized cache (requires sentencepiece)
-python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
+# Prepare and build a BPE-tokenized cache
+python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
+# === TRAINING ===
 # Train with cached data (fast)
 python main.py --train --use-cache --epochs 30
 
+# Train with custom checkpoint name and dataset
+python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
+
 # Train without cache (slower)
 python main.py --train --epochs 10 --aiml --pdf --epub
-
-# Use cache for faster iterations
-python main.py --train --use-cache --epochs 5
 
 # Refresh cache after adding new data
 python main.py --prepare-data --aiml --epub --refresh-cache
@@ -42,30 +47,34 @@ python main.py --prepare-data --aiml --epub --refresh-cache
 # Clear old cache
 python main.py --clear-cache
 
-# Prepare data and build BPE-tokenized cache
-python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 8000
-
-# Train with AIML only
-python main.py --train --epochs 10 --aiml
-
 # Tokenize only (no training)
 python main.py --train --onlytokenize
 
+# === MODEL LIBRARY ===
+# List available trained models
+python main.py --list-models
+
+# Chat with a specific model
+python main.py --chat --model ciencias_naturales
+
+# Chat with merged models
+python main.py --chat --model ciencias_naturales+programacion
+
+# Export model to GGUF/ONNX
+python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
+
+# Export merged model
+python main.py --export ciencias_naturales+programacion --formats gguf
+
+# === CHAT / SERVER ===
 # Run chat interface
 python main.py --chat
 
 # Chat with CPU optimization
 python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
 
-# Just preprocess data
-python main.py --prepare-data
-
-# Inspect cache metadata (quick check)
-python - <<'PY'
-import pickle
-md = pickle.load(open('dataset_cache/cache_metadata.pkl','rb'))
-print(md)
-PY
+# Inspect cache metadata
+python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.pkl','rb')))"
 ```
 
 **BPE note:** Use `--use-bpe` to build a SentencePiece BPE-tokenized cache from textual sources (AIML, extracted PDF/EPUB text, Hugging Face datasets). If `sentencepiece` is not installed the prepare step will skip BPE and create a non-tokenized cache (a warning is emitted).
@@ -187,10 +196,13 @@ trainer.train()
 
 | File | Size | Purpose |
 |------|------|---------|
-| `checkpoints/chat_model_best.pth` | ~2GB | Best trained model weights |
-| `checkpoints/tokenizer.pkl` | ~20MB | Bilingual tokenizer with vocab |
+| `models/<name>.pth` | ~37MB | Trained model checkpoint (with metadata) |
+| `models/<a>+<b>.pth` | ~37MB | Merged model (weight average) |
+| `models/exported/<name>.gguf` | ~20MB | GGUF for Ollama/llama.cpp |
+| `models/exported/<name>.onnx` | ~15MB | ONNX for ONNX Runtime |
+| `models/exported/<name>_int8.onnx` | ~10MB | Quantized ONNX |
+| `checkpoints/tokenizer_vocab.json` | ~1KB | Tokenizer metadata |
 | `dataset_cache/` | ~5GB | Cached processed datasets |
-| `pretrained_embeddings.pth` | ~100MB | Pre-trained embeddings (optional) |
 
 ## Caching System
 
@@ -304,8 +316,8 @@ Watch these metrics:
 
 ## Getting Help
 
-1. Check [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) for debugging
-2. See [MODEL-ARCHITECTURE.md](MODEL-ARCHITECTURE.md) for architecture questions
-3. Read [TRAINING-GUIDE.md](TRAINING-GUIDE.md) for training issues
-4. Review [NLP-TRANSFORMERS.md](NLP-TRANSFORMERS.md) for BERT-related questions
-5. Study [AIML-USAGE.md](AIML-USAGE.md) for pattern questions
+1. Check [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) for debugging
+2. See [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) for architecture questions
+3. Read [TRAINING_GUIDE.md](TRAINING_GUIDE.md) for training issues
+4. Review [BERT_NLP_TRANSFORMERS.md](BERT_NLP_TRANSFORMERS.md) for BERT-related questions
+5. Study [AIML_USAGE.md](AIML_USAGE.md) for pattern questions

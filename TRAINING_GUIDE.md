@@ -115,6 +115,8 @@ loader = DataLoader(final_dataset, batch_size=32, num_workers=4)
 ```bash
 python main.py --train \
     --epochs 30 \
+    --dataset datasets_source/my_data/ \
+    --checkpoint-name my_model \
     --use-cache \
     --aiml \
     --pdf \
@@ -127,6 +129,8 @@ python main.py --train \
 | Argument | Purpose | Default |
 |----------|---------|---------|
 | `--epochs` | Number of training epochs | 30 |
+| `--dataset` | Path to dataset directory | `dataset_cache` |
+| `--checkpoint-name` | Name for saved checkpoint | `chat_model` |
 | `--use-cache` | Use cached datasets for speed | False |
 | `--aiml` | Include AIML datasets | False |
 | `--pdf` | Include PDF document datasets | False |
@@ -151,14 +155,14 @@ python main.py --train \
 - Large (128+): Faster training, needs more memory
 
 **Embedding Dimension**
-- 256-512: Recommended for bilingual support
-- 300+: Better for large vocabulary (>50k tokens)
+- 256: Current default (fast, efficient)
+- 512: Better for larger vocabularies
 - <256: Faster inference, less expressive
 
-**LSTM Hidden Size**
-- 512-1024: Standard range for complex data
+**Hidden Size**
+- 512: Current default
 - 256: Faster, lighter model
-- 2048+: More capacity, slower training
+- 1024+: More capacity, slower training
 
 ## Tokenization
 
@@ -332,6 +336,71 @@ tokenizer = checkpoint['tokenizer']  # Load tokenizer from checkpoint
 start_epoch = checkpoint['epoch'] + 1
 ```
 
+## Model Library
+
+### Training Multiple Models
+
+```bash
+# Train each model with its own dataset and name
+python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
+python main.py --train --dataset datasets_source/programacion/ --checkpoint-name programacion --aiml --hf --epochs 30
+python main.py --train --dataset datasets_source/historia/ --checkpoint-name historia --aiml --hf --epochs 30
+```
+
+### Listing Models
+
+```bash
+python main.py --list-models
+```
+
+### Using Models
+
+```bash
+# Chat with a specific model
+python main.py --chat --model ciencias_naturales
+
+# Chat with merged models
+python main.py --chat --model ciencias_naturales+programacion
+```
+
+### Exporting Models
+
+```bash
+# Export to GGUF for Ollama
+python main.py --export ciencias_naturales --formats gguf
+
+# Export to ONNX
+python main.py --export ciencias_naturales --formats onnx,onnx_int8
+
+# Export merged model
+python main.py --export ciencias_naturales+programacion --formats gguf,onnx
+```
+
+### Checkpoint Format
+
+Each checkpoint now includes metadata for validation and export:
+
+```python
+{
+    'epoch': 30,
+    'model_state_dict': ...,
+    'optimizer_state_dict': ...,
+    'scheduler_state_dict': ...,
+    'loss': 0.1234,
+    'tokenizer': ...,
+    'model_name': 'ciencias_naturales',
+    'architecture': {
+        'embed_size': 256,
+        'hidden_size': 512,
+        'num_layers': 4,
+        'n_head': 4,
+        'n_positions': 512,
+        'vocab_size': 8000,
+    },
+    'dataset_source': 'datasets_source/ciencias/',
+}
+```
+
 ## Performance Profiling
 
 ### Identifying Bottlenecks
@@ -350,57 +419,5 @@ print(prof.key_averages().table(sort_by="cpu_time_total"))
 1. Data loading (use `--use-cache` for 12x speedup)
 2. PDF/EPUB parsing (cache extracted text)
 3. GPU transfer (use pinned memory)
-4. Tokenization (use batched encoding with BilingualTokenizer)
+4. Tokenization (use batched encoding with SentencePieceTokenizerWrapper)
 5. AIML parsing (cache parsed files)
-val_size = int(0.15 * dataset_size)
-test_size = dataset_size - train_size - val_size
-
-train_set, val_set, test_set = random_split(
-    dataset, 
-    [train_size, val_size, test_size]
-)
-```
-
-## Checkpointing & Recovery
-
-### Saving Training State
-
-```python
-checkpoint = {
-    'epoch': epoch,
-    'model_state_dict': model.state_dict(),
-    'optimizer_state_dict': optimizer.state_dict(),
-    'loss': loss,
-    'tokenizer': tokenizer
-}
-torch.save(checkpoint, f'checkpoint_epoch_{epoch}.pth')
-```
-
-### Resuming Training
-
-```python
-checkpoint = torch.load('checkpoint_epoch_5.pth')
-model.load_state_dict(checkpoint['model_state_dict'])
-optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-start_epoch = checkpoint['epoch'] + 1
-```
-
-## Performance Profiling
-
-### Identifying Bottlenecks
-
-```python
-import torch.profiler as profiler
-
-with profiler.profile(activities=[profiler.ProfilerActivity.CPU]) as prof:
-    # Your training code
-    pass
-
-print(prof.key_averages().table(sort_by="cpu_time_total"))
-```
-
-### Common Bottlenecks
-1. Data loading (use `--use-cache` for 12x speedup)
-2. GPU transfer (use pinned memory)
-3. AIML parsing (cache parsed files)
-4. Tokenization (use batched encoding with SentencePiece)

@@ -163,7 +163,7 @@ Separar el monolito actual en componentes Python independientes y bien organizad
 ## Carga de modelos entrenados (PyTorch → GGUF → envAIModels)
 
 ### Contexto
-El proyecto MyIAModelChat permite entrenar múltiples modelos independientes con el sistema "librería" (documentado en `ROADMAP.MD` raíz). Estos modelos se exportan a GGUF para usar con Ollama/llama.cpp. `envAIModels` ya usa `llama_cpp` para cargar un GGUF, por lo que **puede cargar los modelos entrenados directamente** sin cambios de arquitectura.
+El proyecto MyIAModelChat permite entrenar múltiples modelos independientes con el sistema "librería". Estos modelos se exportan a GGUF para usar con Ollama/llama.cpp. `envAIModels` ya usa `llama_cpp` para cargar un GGUF, por lo que **puede cargar los modelos entrenados directamente** sin cambios de arquitectura.
 
 ### Flujo completo
 ```

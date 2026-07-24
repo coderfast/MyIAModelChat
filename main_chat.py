@@ -33,6 +33,7 @@ SYSTEM_CONFIG = {
 # Configuración principal
 use_trusted = False  # Cambia a True solo si confías totalmente en el checkpoint
 CKPT_PATH = 'chat_model.pth'
+MODELS_DIR = 'models'
 MAX_RAM_GB = None  # Ej: 4 para limitar a 4GB; None para no aplicar límite
 MODEL_NAME = 'myiamodelchat-local'
 OLLAMA_VERSION = '0.6.4'
@@ -91,6 +92,14 @@ class MainChat:
         self.cuda_device = getattr(args, 'cuda_device', None)
         self.show_thinking = getattr(args, 'show_thinking', False)
 
+        # Dynamic model resolution
+        self.model_name = getattr(args, 'model', None)
+        if self.model_name:
+            self.ckpt_path = self._resolve_model_path(self.model_name)
+        else:
+            self.ckpt_path = CKPT_PATH
+        logger.info(f"Loading model from: {self.ckpt_path}")
+
         if self.cuda_device is not None and not self.use_cpuonly:
             os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_device)
             logger.info("Using CUDA devices limited to: %s", self.cuda_device)
@@ -132,7 +141,7 @@ class MainChat:
                 )
 
         try:
-            ckpt = self.try_load_checkpoint(CKPT_PATH, device, use_trusted)
+            ckpt = self.try_load_checkpoint(self.ckpt_path, device, use_trusted)
             if isinstance(ckpt, dict):
                 # Load tokenizer from checkpoint if included
                 if 'tokenizer' in ckpt and ckpt['tokenizer'] is not None:
@@ -230,6 +239,18 @@ class MainChat:
             default_response="Lo siento, no puedo responder ahora."
         )
 
+    def _resolve_model_path(self, model_name):
+        """Resolve model name to checkpoint file path."""
+        if model_name.endswith('.pth'):
+            return model_name
+        # Check models/ directory first, then root
+        for path in [os.path.join(MODELS_DIR, f'{model_name}.pth'), f'{model_name}.pth']:
+            if os.path.exists(path):
+                return path
+        # Fallback to chat_model.pth
+        logger.warning(f"Model '{model_name}' not found, falling back to {CKPT_PATH}")
+        return CKPT_PATH
+
     def get_device(self):
         if self.use_cpuonly:
             logger.info("CPU-only mode enabled")
@@ -289,6 +310,11 @@ class MainChat:
 
     def performMainChat(self):
         logger.info("Starting chat interface. Type 'exit' or press ESC to exit.")
+        model_display = self.model_name or 'chat_model'
+        print(f"\n{'='*50}")
+        print(f"  Active model: {model_display}")
+        print(f"  Model file: {self.ckpt_path}")
+        print(f"{'='*50}\n")
         try:
             import msvcrt
             use_msvcrt = True
@@ -344,10 +370,10 @@ class MainChat:
         return self.dialogue_manager.generate_response(prompt)
 
 
-def get_main_chat_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None):
+def get_main_chat_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None, model: Optional[str] = None):
     global main_chat_instance
     if main_chat_instance is None:
-        args = argparse.Namespace(chat=False, use_cpuonly=use_cpuonly, cuda_device=cuda_device)
+        args = argparse.Namespace(chat=False, use_cpuonly=use_cpuonly, cuda_device=cuda_device, model=model)
         main_chat_instance = MainChat(args)
     return main_chat_instance
 
