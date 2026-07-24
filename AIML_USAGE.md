@@ -3,7 +3,7 @@
 ## AIML Files in This Project
 
 ### AIML Directory Structure
-The `aiml/` directory contains ~60 AIML files for dialogue patterns and the `aimlloder.py` module loads these files.
+The `datasets_source/aiml/` directory contains ~60 AIML files for dialogue patterns and the `aimlloder.py` module loads these files.
 
 ### Major AIML Files
 

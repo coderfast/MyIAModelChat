@@ -160,18 +160,18 @@ MyIAModelChat/
 ### AIML Files
 - Traditional chatbot patterns from A.L.I.C.E. project
 - Rule-based responses for common queries
-- Located in `aiml/` directory
+- Located in `datasets_source/aiml/` directory
 
 ### PDF Documents
 - Automatic text extraction using PyPDF2
 - Supports complex layouts and formatting
-- Place PDFs in `pdfs/` directory
+- Place PDFs in `datasets_source/pdf/` directory
 
 ### EPUB E-books
 - Full e-book parsing with ebooklib
 - Chapter-by-chapter content extraction
 - Supports metadata and structure
-- Place EPUBs in `epub/` directory
+- Place EPUBs in `datasets_source/epub/` directory
 
 ## ⚙️ Configuration
 

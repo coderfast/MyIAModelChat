@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-1. Put PDF files in `pdfs/` directory
+1. Put PDF files in `datasets_source/pdf/` directory
 2. Run: `python main.py --prepare-data --pdf`
 3. Train: `python main.py --train --aiml --pdf --epochs 10`
 
@@ -36,7 +36,7 @@ python main.py --prepare-data --aiml --pdf --refresh-cache
 
 ```
 project/
-├── pdfs/                    ← Put your PDF files here
+├── datasets_source/pdf/                    ← Put your PDF files here
 │   ├── document1.pdf
 │   ├── document2.pdf
 │   └── document3.pdf
@@ -45,7 +45,7 @@ project/
 └── requirements.txt
 ```
 
-**Note:** `pdfs/` directory is created automatically on first use.
+**Note:** `datasets_source/pdf/` directory is created automatically on first use.
 
 ---
 
@@ -69,7 +69,7 @@ python main.py --chat
 
 ## How It Works
 
-1. **Detect PDFs** - Finds all `.pdf` files in `pdfs/` directory
+1. **Detect PDFs** - Finds all `.pdf` files in `datasets_source/pdf/` directory
 2. **Extract Text** - Reads each PDF file and extracts text
 3. **Split Sentences** - Splits by periods into training samples
 4. **Filter Short** - Removes sentences < 10 characters
@@ -136,7 +136,7 @@ python main.py --chat
 ### Add New PDFs and Train
 
 ```bash
-# 1. Place PDFs in pdfs/ directory
+# 1. Place PDFs in datasets_source/pdf/ directory
 # 2. Refresh cache to include new PDFs
 python main.py --prepare-data --aiml --pdf --refresh-cache
 
@@ -205,7 +205,7 @@ python main.py --prepare-data --aiml --pdf
 
 | Flag | Purpose |
 |------|---------|
-| `--pdf` | Include PDF data from `pdfs/` directory |
+| `--pdf` | Include PDF data from `datasets_source/pdf/` directory |
 | `--prepare-data` | Prepare and validate datasets |
 | `--train` | Train the model |
 | `--epochs N` | Number of training epochs |
@@ -226,7 +226,7 @@ python main.py --prepare-data --aiml --pdf
 ❌ **Avoid:**
 - Scanned PDFs (images) without OCR
 - Corrupted PDF files
-- Non-PDF files in `pdfs/` directory
+- Non-PDF files in `datasets_source/pdf/` directory
 - Very large PDFs (>500 pages) on slow systems
 
 ---
@@ -255,9 +255,8 @@ python main.py --prepare-data --aiml --pdf
 
 ## Related Files
 
-- **[PDF-USAGE-GUIDE.md](PDF-USAGE-GUIDE.md)** - Full documentation
-- **[USAGE.txt](USAGE.txt)** - Complete CLI reference
-- **[DATASET-CACHING-GUIDE.md](DATASET-CACHING-GUIDE.md)** - Cache features
+- **[USAGE.md](USAGE.md)** - Complete CLI reference
+- **[TRAINING_GUIDE.md](TRAINING_GUIDE.md)** - Training and caching details
 - **[data_preparer.py](data_preparer.py)** - Implementation code
 
 ---
@@ -265,8 +264,8 @@ python main.py --prepare-data --aiml --pdf
 ## Quick Start (30 seconds)
 
 ```bash
-# 1. Download a PDF and place in pdfs/ directory
-# (or create pdfs/ directory manually if it doesn't exist)
+# 1. Download a PDF and place in datasets_source/pdf/ directory
+# (or create datasets_source/pdf/ directory manually if it doesn't exist)
 
 # 2. Prepare with PDFs
 python main.py --prepare-data --aiml --pdf
@@ -285,7 +284,7 @@ python main.py --chat
 ## Summary
 
 **PDF Support Added:**
-- ✅ Automatic PDF detection in `pdfs/` directory
+- ✅ Automatic PDF detection in `datasets_source/pdf/` directory
 - ✅ Text extraction from all PDF pages
 - ✅ Sentence splitting and filtering
 - ✅ Integration with existing AIML and HF data

@@ -5,18 +5,18 @@
 ### Supported Dataset Types
 
 1. **AIML-based Datasets**
-   - Source: `aiml/` directory (~60 .aiml files)
+   - Source: `datasets_source/aiml/` directory (~60 .aiml files)
    - Processing: `aimlloder.py` converts patterns to (input, output) pairs
    - Format: XML patterns converted to dialogue examples
 
 2. **PDF Document Datasets**
-   - Source: `pdfs/` directory
+   - Source: `datasets_source/pdf/` directory
    - Processing: `data_preparer.py` uses PyPDF2 for text extraction
    - Format: Automatic page-by-page text extraction
    - Flag: `--pdf` enables PDF processing
 
 3. **EPUB E-book Datasets**
-   - Source: `epub/` directory
+   - Source: `datasets_source/epub/` directory
    - Processing: `data_preparer.py` uses ebooklib for parsing
    - Format: Chapter-by-chapter content extraction with metadata
    - Flag: `--epub` enables EPUB processing
@@ -48,6 +48,7 @@ python main.py --prepare-data --pdf --epub --refresh-cache
 
 # Clear cache to free space
 python main.py --clear-cache
+```
 
 ## Build a BPE-tokenized cache (optional)
 

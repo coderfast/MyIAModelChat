@@ -41,7 +41,7 @@ Primary Mode Arguments (choose one):
     Example: python main.py --train --aiml --epochs 30
     Notes:
         - Loads AIML, PDF, EPUB, and/or Hugging Face datasets
-        - Builds vocabulary from all text data using BilingualTokenizer
+        - Builds vocabulary from all text data using SentencePiece BPE
         - Trains the neural model with LSTM architecture
         - Saves: checkpoints/chat_model_best.pth and checkpoints/tokenizer.pkl
         - Can be interrupted with ESC key
@@ -92,21 +92,15 @@ Primary Mode Arguments (choose one):
         - Use --refresh-cache to update cached data
         - Works with --train and --prepare-data modes
 
---use-bpe
-    Description: Train/apply a SentencePiece BPE tokenizer during data preparation and save tokenized cache
-    Type: Boolean flag (no value needed)
-    Default: False
-    Example: python main.py --prepare-data --aiml --pdf --use-bpe --bpe-vocab-size 8000
-    Notes:
-        - Requires `sentencepiece` package to be installed to train BPE (`pip install sentencepiece`)
-        - When enabled, prepared cache will include `token_ids` per sample and a `sentencepiece.model` in `dataset_cache/`
-        - Use `--bpe-vocab-size` to control vocabulary size (default: 8000)
-
 --bpe-vocab-size <N>
-    Description: Vocabulary size for SentencePiece BPE tokenizer when using --use-bpe
+    Description: Vocabulary size for SentencePiece BPE tokenizer (triggers BPE training automatically)
     Type: Integer
     Default: 8000
-    Example: python main.py --prepare-data --aiml --use-bpe --bpe-vocab-size 16000
+    Example: python main.py --prepare-data --aiml --bpe-vocab-size 8000
+    Notes:
+        - Requires `sentencepiece` package to be installed (`pip install sentencepiece`)
+        - When used, prepared cache will include `token_ids` per sample and a `sentencepiece.model` in `dataset_cache/`
+        - Omit this flag to skip BPE and use raw text
 
 ================================================================================
 
@@ -276,7 +270,7 @@ Typical Cache Workflow:
 
 Quick verification (BPE + cached training smoke test):
     # Prepare data with BPE and build tokenized cache
-    python main.py --prepare-data --aiml --hf --use-bpe --bpe-vocab-size 2000 --refresh-cache
+    python main.py --prepare-data --aiml --hf --bpe-vocab-size 2000 --refresh-cache
 
     # Run a very short training using the cached token_ids to verify integration
     python main.py --train --use-cache --epochs 1
@@ -303,10 +297,10 @@ Data Source Arguments (use with --train or --prepare-data):
     Default: False
     Example: python main.py --train --pdf
     Notes:
-        - Loads PDF files from pdfs/ directory
+        - Loads PDF files from datasets_source/pdf/ directory
         - Uses PyPDF2 for automatic text extraction
         - Supports complex layouts and formatting
-        - Place PDF files in pdfs/ folder
+        - Place PDF files in datasets_source/pdf/ folder
 
 --epub
     Description: Include EPUB e-books in training data
@@ -314,11 +308,11 @@ Data Source Arguments (use with --train or --prepare-data):
     Default: False
     Example: python main.py --train --epub
     Notes:
-        - Loads EPUB files from epub/ directory
+        - Loads EPUB files from datasets_source/epub/ directory
         - Uses ebooklib for e-book parsing
         - Extracts chapter-by-chapter content
         - Supports metadata and structure
-        - Place EPUB files in epub/ folder
+        - Place EPUB files in datasets_source/epub/ folder
 
 --hf
     Description: Include Hugging Face datasets
@@ -470,15 +464,15 @@ Dataset caching enables fast repeated runs without reloading source data.
     python main.py --clear-cache
 
 8. Prepare data and build a BPE-tokenized cache:
-    python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
+    python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
 
-8. Complete workflow with caching (prepare → cache → train → chat):
+9. Complete workflow with caching (prepare → cache → train → chat):
     python main.py --prepare-data --aiml --pdf --epub
     python main.py --train --aiml --pdf --epub --epochs 30 --use-cache
     python main.py --chat
 
-9. Workflow for repeated experiments (use cache to save time):
+10. Workflow for repeated experiments (use cache to save time):
     python main.py --prepare-data --aiml --pdf --epub          (first time: ~30 seconds)
     python main.py --train --aiml --pdf --epub --epochs 10     (uses cache)
     python main.py --train --aiml --pdf --epub --epochs 20     (uses cache)
@@ -577,13 +571,13 @@ Error: "CUDA out of memory"
     → Use --use-cpuonly flag
     → Reduce num_cores: python main.py --train --num_cores 2 --use-cpuonly
 
-Error: Directory "aiml/" not found
+Error: Directory "aiml_dev/" not found
     → Current directory must be project root
-    → Files should be in: G:\PROJECTS\MyIAModelChat\
+    → Files should be in: G:\PROJECTS\MyIAModelChat\aiml_dev\
 
 Error: PDF/EPUB loading fails
     → Install dependencies: pip install PyPDF2 ebooklib
-    → Check files exist in pdfs/ or epub/ directories
+    → Check files exist in datasets_source/pdf/ or datasets_source/epub/ directories
     → Verify file formats are valid
 
 Training too slow:
@@ -607,21 +601,20 @@ Chat produces gibberish:
 
 Modifying Model Architecture:
     Edit in chatmodel.py:
-        embedding_dim: embedding dimension (default 256)
-        hidden_size: LSTM hidden dimension (default 512)
+        embed_size: embedding dimension (default 256)
+        num_layers: Transformer layers (default 2)
     Then retrain: python main.py --train --epochs 30
 
 Changing Tokenizer Settings:
-    Edit in BilingualTokenizer initialization:
-        max_vocab_size: default 50000
-        use_language_tokens: default True
-    Then retrain: python main.py --train --onlytokenize
+    Edit --bpe-vocab-size flag (default: 8000):
+        python main.py --prepare-data --aiml --bpe-vocab-size 16000
+    Then retrain: python main.py --train --use-cache --epochs 30
 
 Using Different Data Directories:
     Place files in:
         aiml_dev/ for AIML files
-        pdfs/ for PDF documents
-        epub/ for EPUB e-books
+        datasets_source/pdf/ for PDF documents
+        datasets_source/epub/ for EPUB e-books
     Then run: python main.py --prepare-data --aiml --pdf --epub
 
 Adjusting Generation Parameters:
@@ -772,6 +765,6 @@ Use these statistics to:
 
 ================================================================================
 
-For more details, see: README.md, CORRECTIONS.md, MODEL-ARCHITECTURE.md
+For more details, see: README.md, MODEL_ARCHITECTURE.md
 
 ================================================================================

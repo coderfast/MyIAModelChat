@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-1. Put EPUB files in `epub/` directory
+1. Put EPUB files in `datasets_source/epub/` directory
 2. Run: `python main.py --prepare-data --epub`
 3. Train: `python main.py --train --aiml --epub --epochs 10`
 
@@ -36,7 +36,7 @@ python main.py --prepare-data --aiml --epub --refresh-cache
 
 ```
 project/
-├── epub/                    ← Put your EPUB e-books here
+├── datasets_source/epub/                    ← Put your EPUB e-books here
 │   ├── novel1.epub
 │   ├── book2.epub
 │   └── ebook3.epub
@@ -45,7 +45,7 @@ project/
 └── requirements.txt
 ```
 
-**Note:** `epub/` directory is created automatically on first use.
+**Note:** `datasets_source/epub/` directory is created automatically on first use.
 
 ---
 
@@ -69,7 +69,7 @@ python main.py --chat
 
 ## How It Works
 
-1. **Detect EPUBs** - Finds all `.epub` files in `epub/` directory
+1. **Detect EPUBs** - Finds all `.epub` files in `datasets_source/epub/` directory
 2. **Extract Text** - Reads each e-book and extracts chapter text
 3. **Remove HTML** - Strips all markup tags for clean text
 4. **Split Sentences** - Splits by periods into training samples
@@ -138,7 +138,7 @@ python main.py --chat
 ### Add New EPUBs and Train
 
 ```bash
-# 1. Place EPUB files in epub/ directory
+# 1. Place EPUB files in datasets_source/epub/ directory
 # 2. Refresh cache to include new EPUBs
 python main.py --prepare-data --aiml --epub --refresh-cache
 
@@ -156,7 +156,7 @@ python main.py --train --epub --epochs 10
 ### Train on Fiction (Narrative Model)
 
 ```bash
-# Place novels in epub/ directory
+# Place novels in datasets_source/epub/ directory
 python main.py --prepare-data --epub
 python main.py --train --epub --epochs 15
 python main.py --chat
@@ -198,7 +198,7 @@ pip install ebooklib
 ### DRM-Protected Kindle Books?
 - Convert using **Calibre** (free tool)
 - Export as EPUB format
-- Place converted file in `epub/` directory
+- Place converted file in `datasets_source/epub/` directory
 - Check local laws before removing DRM
 
 ### Cache still showing old data?
@@ -214,7 +214,7 @@ python main.py --prepare-data --aiml --epub
 
 | Flag | Purpose |
 |------|---------|
-| `--epub` | Include EPUB data from `epub/` directory |
+| `--epub` | Include EPUB data from `datasets_source/epub/` directory |
 | `--prepare-data` | Prepare and validate datasets |
 | `--train` | Train the model |
 | `--epochs N` | Number of training epochs |
@@ -235,7 +235,7 @@ python main.py --prepare-data --aiml --epub
 ❌ **Avoid:**
 - DRM-protected Kindle books (use Calibre to convert)
 - Corrupted EPUB files
-- Non-EPUB files in `epub/` directory
+- Non-EPUB files in `datasets_source/epub/` directory
 - Very large collections (100+ books) on slow systems
 
 ---
@@ -266,9 +266,8 @@ python main.py --prepare-data --aiml --epub
 
 ## Related Files
 
-- **[EPUB-USAGE-GUIDE.md](EPUB-USAGE-GUIDE.md)** - Full documentation
-- **[EPUB-SUPPORT-IMPLEMENTATION.md](EPUB-SUPPORT-IMPLEMENTATION.md)** - Technical details
-- **[USAGE.txt](USAGE.txt)** - Complete CLI reference
+- **[USAGE.md](USAGE.md)** - Complete CLI reference
+- **[TRAINING_GUIDE.md](TRAINING_GUIDE.md)** - Training and caching details
 - **[data_preparer.py](data_preparer.py)** - Implementation code
 
 ---
@@ -301,7 +300,7 @@ python main.py --prepare-data --aiml --epub
 # 1. Download free e-book from Project Gutenberg
 #    (or place your own EPUB files)
 
-# 2. Place in epub/ directory
+# 2. Place in datasets_source/epub/ directory
 
 # 3. Prepare with EPUBs
 python main.py --prepare-data --aiml --epub
@@ -320,7 +319,7 @@ python main.py --chat
 ## Summary
 
 **EPUB Support Added:**
-- ✅ Automatic EPUB detection in `epub/` directory
+- ✅ Automatic EPUB detection in `datasets_source/epub/` directory
 - ✅ Text extraction from all chapters
 - ✅ HTML tag removal for clean text
 - ✅ Sentence splitting and filtering
@@ -342,7 +341,7 @@ python main.py --prepare-data --epub
 1. Go to https://www.gutenberg.org/
 2. Search for your book
 3. Download EPUB format
-4. Place in `epub/` directory
+4. Place in `datasets_source/epub/` directory
 5. Run: `python main.py --prepare-data --epub`
 
 That's all! Your model now learns from the e-book content. 📖

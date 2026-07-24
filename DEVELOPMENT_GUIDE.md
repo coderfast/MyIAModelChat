@@ -57,18 +57,18 @@ model.gradient_checkpointing_enable()
 from aimlloder import *
 
 # Check if AIML files are found
-aiml_files = os.listdir('aiml/')
+aiml_files = os.listdir('datasets_source/aiml/')
 print(f"Found {len(aiml_files)} AIML files")
 
 # Manually load one file
 from python-aiml import Kernel
 k = Kernel()
-k.learn("aiml/ai.aiml")
+k.learn("datasets_source/aiml/ai.aiml")
 print(f"Patterns loaded: {len(k._brain._nodes)}")
 ```
 
 **Prevention**:
-- Verify `aiml/` directory exists and contains .aiml files
+- Verify `datasets_source/aiml/` directory exists and contains .aiml files
 - Check file permissions
 - Test with `--aiml` flag after confirming files present
 

@@ -217,7 +217,7 @@ open → in_progress → done
 ## Common Tasks
 
 ### Adding New AIML Patterns
-1. Add `.aiml` files to `aiml/` directory
+1. Add `.aiml` files to `datasets_source/aiml/` directory
 2. Use standard AIML XML structure
 3. Run `python main.py --prepare-data --aiml` to regenerate cache
 

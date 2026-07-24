@@ -171,8 +171,8 @@ Source Breakdown:
 ================================================================================
 
 For detailed information, see:
-  - USAGE.txt (full command documentation)
-  - DATASET-PREPARATION.md (implementation details)
+  - USAGE.md (full command documentation)
+  - TRAINING_GUIDE.md (training and caching details)
   - README.md (project overview)
 
 ================================================================================

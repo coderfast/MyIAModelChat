@@ -184,7 +184,7 @@ trainer.train()
 
 ## Dataset Sources
 
-1. **AIML** (`aiml/` folder): ~60 AIML pattern files from A.L.I.C.E.
+1. **AIML** (`datasets_source/aiml/` folder): ~60 AIML pattern files from A.L.I.C.E.
 2. **PDF Documents** (`pdfs/` folder): Automatic text extraction via PyPDF2
 3. **EPUB E-books** (`epub/` folder): Full e-book parsing via ebooklib
 4. **Hugging Face**: Dialogue datasets (wikitext, bookcorpus, etc.)
@@ -253,7 +253,6 @@ print(f"Debug response: {response}")
 # Check cache status
 import os
 print(f"Cache exists: {os.path.exists('dataset_cache')}")
-```
 
 # Check tensor shapes
 print(f"Input shape: {input_ids.shape}")
@@ -264,7 +263,7 @@ print(f"Model on: {next(model.parameters()).device}")
 
 # Check AIML loading
 import os
-print(f"AIML files: {len(os.listdir('aiml/'))}")
+print(f"AIML files: {len(os.listdir('datasets_source/aiml/'))}")
 
 # Check GPU availability
 import torch
