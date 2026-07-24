@@ -1,6 +1,7 @@
 import os
 import pickle
 import sys
+import time
 import threading
 import torch
 import torch.nn as nn
@@ -72,11 +73,17 @@ LATEST_MODEL_FILE = 'chat_model.pth'
 
 class TokenPairIterableDataset(IterableDataset):
     """Iterable dataset that yields input-output token pairs without materializing all in memory."""
-    def __init__(self, sequence_generator):
+    def __init__(self, sequence_generator, length=None):
         self.sequence_generator = sequence_generator
+        self._length = length
 
     def __iter__(self):
         return iter(self.sequence_generator())
+
+    def __len__(self):
+        if self._length is not None:
+            return self._length
+        raise TypeError("TokenPairIterableDataset length not set")
 
 
 class MainTrain:
@@ -502,6 +509,7 @@ class MainTrain:
             num_batches = float('inf')
         model.train()
         optimizer.zero_grad()
+        epoch_start_time = time.time()
         logger.info("Training loop started; the model is actively processing batches")
 
         # Thinking metrics accumulators
@@ -514,7 +522,14 @@ class MainTrain:
 
             if batch_idx == 0 or (batch_idx + 1) % 10 == 0:
                 batch_str = f"{batch_idx + 1}/{num_batches}" if num_batches != float('inf') else f"{batch_idx + 1}"
-                logger.info(f"Training batch {batch_str} in progress...")
+                elapsed = time.time() - epoch_start_time
+                if batch_idx > 0 and num_batches != float('inf'):
+                    eta_seconds = (elapsed / (batch_idx + 1)) * (num_batches - batch_idx - 1)
+                    eta_m, eta_s = divmod(int(eta_seconds), 60)
+                    eta_str = f"{eta_m}m {eta_s}s" if eta_m > 0 else f"{eta_s}s"
+                    logger.info(f"Training batch {batch_str} | ETA: {eta_str}")
+                else:
+                    logger.info(f"Training batch {batch_str} in progress...")
 
             total_batches += 1
             inputs = inputs.to(device)
@@ -574,21 +589,27 @@ class MainTrain:
 
 
     def collate_fn(self, batch):
-        """Collate function for DataLoader with proper padding."""
+        """Collate function for DataLoader with proper padding and truncation."""
         input_sequences, output_sequences = zip(*batch)
-        
+
+        max_positions = 512  # n_positions from GPT2Config
+
+        # Truncate sequences that exceed max_positions
+        input_sequences = [seq[:max_positions] for seq in input_sequences]
+        output_sequences = [seq[:max_positions] for seq in output_sequences]
+
         # Find max length across all sequences
         max_len = max(max(len(seq) for seq in input_sequences), max(len(seq) for seq in output_sequences))
-        
+
         # Pad sequences to max length
         pad_idx = self.tokenizer.get_pad_index()
         padded_inputs = [seq + [pad_idx] * (max_len - len(seq)) for seq in input_sequences]
         padded_outputs = [seq + [pad_idx] * (max_len - len(seq)) for seq in output_sequences]
-        
+
         # Convert to tensors
         input_tensor = torch.LongTensor(padded_inputs)
         output_tensor = torch.LongTensor(padded_outputs)
-        
+
         return input_tensor, output_tensor
 
     def _get_csv_dataloader(self, batch_size):
@@ -608,8 +629,9 @@ class MainTrain:
                     continue
                 yield token_seq[:-1], token_seq[1:]
 
+        csv_length = len(self.raw_dataset) if hasattr(self.raw_dataset, '__len__') else None
         return DataLoader(
-            TokenPairIterableDataset(csv_pair_generator),
+            TokenPairIterableDataset(csv_pair_generator, length=csv_length),
             batch_size=batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
@@ -684,7 +706,8 @@ class MainTrain:
                     output_ids = token_seq[1:]
                     yield input_ids, output_ids
 
-            iterable_dataset = TokenPairIterableDataset(token_pair_generator)
+            dataset_length = len(self.loaded_dataset) if hasattr(self.loaded_dataset, '__len__') else None
+            iterable_dataset = TokenPairIterableDataset(token_pair_generator, length=dataset_length)
 
             # Create DataLoader with custom collate function
             logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")

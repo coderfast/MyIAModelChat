@@ -39,6 +39,12 @@ try:
 except ImportError:
     ebooklib = None
     epub = None
+try:
+    from web_scraper import scrape_web_docs, load_urls_from_file, WEB_SCRAPER_DIR
+except ImportError:
+    scrape_web_docs = None
+    load_urls_from_file = None
+    WEB_SCRAPER_DIR = os.path.join('datasets_source', 'web')
 
 # NLP libraries for text processing
 try:
@@ -486,6 +492,7 @@ class DataPreparer:
         self.hf_data = None
         self.pdf_data = None
         self.epub_data = None
+        self.web_data = None
         self.csv_data = None
         self.combined_data = None
         self.statistics = {}
@@ -657,6 +664,11 @@ class DataPreparer:
             if hasattr(self.args, 'epub') and self.args.epub:
                 logger.info("\n[4/7] Loading EPUB files...")
                 self.epub_data = self._load_epub_data()
+
+            # Load Web documentation data
+            if hasattr(self.args, 'web') and self.args.web:
+                logger.info("\n[4.5/7] Scraping web documentation...")
+                self.web_data = self._load_web_data()
 
             # Load CSV data (curated supplementary dataset)
             logger.info("\n[5/7] Loading CSV data...")
@@ -989,6 +1001,97 @@ class DataPreparer:
         except Exception as e:
             logger.warning(f"  ⚠ Error reading CSV files: {e}")
             return Dataset.from_list([])
+
+    def _load_web_data(self) -> Dataset:
+        """
+        Load text data by scraping documentation from web URLs.
+
+        Reads URLs from --web-url flag or datasets_source/web/urls.txt.
+        Saves scraped text to datasets_source/web/.
+
+        Returns:
+            Hugging Face Dataset with web-scraped text data
+        """
+        if scrape_web_docs is None:
+            logger.warning("  ⚠ Web scraper not available. Install: pip install trafilatura beautifulsoup4 requests")
+            return Dataset.from_list([])
+
+        web_url = getattr(self.args, 'web_url', None)
+        urls_file = os.path.join(WEB_SCRAPER_DIR, 'urls.txt')
+
+        # Determine URLs to scrape
+        urls_to_scrape = []
+        if web_url:
+            urls_to_scrape.append(web_url)
+        elif os.path.exists(urls_file):
+            urls_to_scrape = load_urls_from_file(urls_file)
+            if urls_to_scrape:
+                logger.info(f"  Loaded {len(urls_to_scrape)} URLs from {urls_file}")
+        else:
+            logger.warning("  ⚠ No --web-url specified and no datasets_source/web/urls.txt found")
+            return Dataset.from_list([])
+
+        max_pages = getattr(self.args, 'web_max_pages', 50)
+        max_depth = getattr(self.args, 'web_max_depth', 3)
+
+        all_texts = []
+        for seed_url in urls_to_scrape:
+            logger.info(f"\n  Scraping: {seed_url}")
+            try:
+                texts = scrape_web_docs(
+                    url=seed_url,
+                    max_pages=max_pages,
+                    max_depth=max_depth,
+                    rate_limit=1.0,
+                )
+                all_texts.extend(texts)
+            except ImportError as e:
+                logger.warning(f"  ⚠ Web scraping dependencies missing: {e}")
+                logger.warning("    Install with: pip install trafilatura beautifulsoup4 requests")
+                return Dataset.from_list([])
+            except Exception as e:
+                logger.warning(f"  ⚠ Failed to scrape {seed_url}: {e}")
+                continue
+
+        if not all_texts:
+            logger.warning(f"  ⚠ No text extracted from web URLs")
+            return Dataset.from_list([])
+
+        # Get chunking options
+        enable_chunking = getattr(self.args, 'enable_chunking', False)
+        max_tokens = getattr(self.args, 'chunk_max_tokens', 512)
+        overlap_tokens = getattr(self.args, 'chunk_overlap', 50)
+
+        # Process each scraped text into training samples
+        web_items = []
+        for text in all_texts:
+            sentences = split_sentences(text)
+            for sentence in sentences:
+                sentence = clean_text(sentence)
+                if len(sentence) > 10:
+                    if enable_chunking and len(sentence.split()) > max_tokens:
+                        chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
+                        for chunk in chunks:
+                            web_items.append({'input_ids': chunk})
+                    else:
+                        web_items.append({'input_ids': sentence})
+
+        dataset = Dataset.from_list(web_items)
+        logger.info(f"\n  Total web pages scraped: {len(all_texts)}")
+        logger.info(f"  Total web samples: {len(dataset)}")
+
+        # Save scraped text to output directory for inspection
+        os.makedirs(WEB_SCRAPER_DIR, exist_ok=True)
+        output_file = os.path.join(WEB_SCRAPER_DIR, 'scraped_text.txt')
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                for text in all_texts:
+                    f.write(text + '\n\n---\n\n')
+            logger.info(f"  Saved scraped text to {output_file}")
+        except Exception as e:
+            logger.warning(f"  ⚠ Could not save scraped text: {e}")
+
+        return dataset
 
     def _load_pdf_data(self) -> Dataset:
         """
@@ -1360,6 +1463,11 @@ class DataPreparer:
             total_samples += len(self.epub_data)
             logger.info(f"  Adding EPUB data: {len(self.epub_data)} samples")
 
+        if self.web_data is not None and len(self.web_data) > 0:
+            datasets_to_combine.append(self.web_data)
+            total_samples += len(self.web_data)
+            logger.info(f"  Adding Web data: {len(self.web_data)} samples")
+
         if self.csv_data is not None and len(self.csv_data) > 0:
             datasets_to_combine.append(self.csv_data)
             total_samples += len(self.csv_data)
@@ -1536,6 +1644,7 @@ class DataPreparer:
             'hf_samples': 0,
             'pdf_samples': 0,
             'epub_samples': 0,
+            'web_samples': 0,
             'csv_samples': 0,
             'avg_text_length': 0,
             'min_text_length': 0,
@@ -1562,6 +1671,11 @@ class DataPreparer:
             epub_count = len(self.epub_data)
             stats['epub_samples'] = epub_count
             stats['source_breakdown']['EPUB'] = epub_count
+
+        if self.web_data:
+            web_count = len(self.web_data)
+            stats['web_samples'] = web_count
+            stats['source_breakdown']['Web'] = web_count
 
         if self.csv_data:
             csv_count = len(self.csv_data)

@@ -32,8 +32,9 @@ SYSTEM_CONFIG = {
 
 # Configuración principal
 use_trusted = False  # Cambia a True solo si confías totalmente en el checkpoint
-CKPT_PATH = 'chat_model.pth'
+CKPT_PATH = os.path.join('checkpoints', 'chat_model.pth')
 MODELS_DIR = 'models'
+CHECKPOINTS_DIR = 'checkpoints'
 MAX_RAM_GB = None  # Ej: 4 para limitar a 4GB; None para no aplicar límite
 MODEL_NAME = 'myiamodelchat-local'
 OLLAMA_VERSION = '0.6.4'
@@ -243,11 +244,15 @@ class MainChat:
         """Resolve model name to checkpoint file path."""
         if model_name.endswith('.pth'):
             return model_name
-        # Check models/ directory first, then root
-        for path in [os.path.join(MODELS_DIR, f'{model_name}.pth'), f'{model_name}.pth']:
+        # Check checkpoints/ first (where main_train.py saves), then models/, then root
+        for path in [
+            os.path.join(CHECKPOINTS_DIR, f'{model_name}.pth'),
+            os.path.join(MODELS_DIR, f'{model_name}.pth'),
+            f'{model_name}.pth',
+        ]:
             if os.path.exists(path):
                 return path
-        # Fallback to chat_model.pth
+        # Fallback to checkpoints/chat_model.pth
         logger.warning(f"Model '{model_name}' not found, falling back to {CKPT_PATH}")
         return CKPT_PATH
 

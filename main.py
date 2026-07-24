@@ -49,14 +49,14 @@ def validate_arguments(args):
     if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.export):
         return False, "Please specify: --train, --chat, --prepare-data, --clear-cache, --list-models, or --export"
 
-    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub):
-        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, or --epub"
+    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
+        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, or --web"
 
     # Allow --train without source if using cache and dataset is already prepared
-    if args.train and not args.use_cache and not (args.aiml or args.hf or args.pdf or args.epub):
+    if args.train and not args.use_cache and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
         cache_path = os.path.join('dataset_cache', 'prepared_dataset')
         if not os.path.exists(cache_path):
-            return False, "No dataset source specified for --train and no cached dataset found. Use --aiml/--hf/--pdf/--epub or --prepare-data + source to prepare data."    
+            return False, "No dataset source specified for --train and no cached dataset found. Use --aiml/--hf/--pdf/--epub/--web or --prepare-data + source to prepare data."    
 
     if args.num_cores < 0 or args.num_threads < 0:
         return False, "--num_cores and --num_threads must be >= 0"
@@ -164,6 +164,10 @@ DATA SOURCES (required with --train or --prepare-data):
   --hf                 Include Hugging Face datasets
   --pdf                Include PDF data from datasets_source/pdf directory
   --epub               Include EPUB data from datasets_source/epub directory
+  --web                Include web documentation data (scrapes from URL)
+  --web-url URL        Seed URL to scrape (reads datasets_source/web/urls.txt if not set)
+  --web-max-pages N    Max pages per URL (default: 50)
+  --web-max-depth N    Max link-following depth (default: 3)
 
 TRAINING OPTIONS:
   --epochs NUM         Number of training epochs (default: 1)
@@ -178,9 +182,11 @@ CPU CONFIGURATION:
 
 EXAMPLES:
   python main.py --prepare-data --aiml --hf --pdf --epub
+  python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls.txt)
 
   python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 10
   python main.py --train --aiml --use-cpuonly --num_cores 4 --num_threads 4
+  python main.py --train --aiml --hf --web --use-cache
 
   python main.py --chat --model ciencias_naturales
   python main.py --chat --model ciencias_naturales+programacion
@@ -214,6 +220,13 @@ EXAMPLES:
         parser.add_argument("--hf", action='store_true', help="Include HuggingFace data")
         parser.add_argument("--pdf", action='store_true', help="Include PDF data")
         parser.add_argument("--epub", action='store_true', help="Include EPUB data")
+        parser.add_argument("--web", action='store_true', help="Include web documentation data")
+        parser.add_argument("--web-url", type=str, default=None,
+                            help="Seed URL to scrape (reads from datasets_source/web/urls.txt if not set)")
+        parser.add_argument("--web-max-pages", type=int, default=50,
+                            help="Maximum pages to scrape per URL (default: 50)")
+        parser.add_argument("--web-max-depth", type=int, default=3,
+                            help="Maximum link-following depth (default: 3)")
         
         # Training options
         parser.add_argument("--epochs", type=int, default=1, help="Training epochs (default: 1)")
