@@ -10,13 +10,13 @@ El proyecto está refactorizado en módulos independientes para mejor mantenibil
 
 | Módulo | Propósito | Líneas |
 |--------|-----------|--------|
-| **`app.py`** | Punto de entrada, inicialización FastAPI, registro de routers | 24 |
-| **`routers_api.py`** | Endpoints nativos `/api/*` (generate, chat, completions) | 174 |
-| **`routers_v1.py`** | Endpoints OpenAI-compatible `/v1/*` (drop-in replacement para OpenAI) | 166 |
-| **`model.py`** | Carga lazy del modelo para evitar overhead en startup | 18 |
-| **`schemas.py`** | Modelos Pydantic compartidos (validación de requests/responses) | 20 |
-| **`utils.py`** | Funciones centralizadas: builders, streaming, normalizaciones | 310+ |
-| **`model_metadata.py`** | Inspección y metadatos del modelo (capas, tamaño, params) | 200+ |
+| **`app.py`** | Punto de entrada, inicialización FastAPI, registro de routers | 18 |
+| **`routers_api.py`** | Endpoints nativos `/api/*` (generate, chat, completions) | 166 |
+| **`routers_v1.py`** | Endpoints OpenAI-compatible `/v1/*` (drop-in replacement para OpenAI) | 129 |
+| **`model.py`** | Carga lazy del modelo para evitar overhead en startup | 72 |
+| **`schemas.py`** | Modelos Pydantic compartidos (validación de requests/responses) | 22 |
+| **`utils.py`** | Funciones centralizadas: builders, streaming, normalizaciones | 278 |
+| **`model_metadata.py`** | Inspección y metadatos del modelo (capas, tamaño, params) | 173 |
 
 ### Endpoints Disponibles
 

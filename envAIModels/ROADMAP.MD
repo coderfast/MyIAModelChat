@@ -39,7 +39,7 @@ Separar el monolito actual en componentes Python independientes y bien organizad
     - generación de reportes o dicts reutilizables
   - Este módulo no debería exponer endpoints, solo utilidades para debugging y metadata.
 
-- `envAIModels/utils.py`
+- `envAIModels/utils.py` ✅ (COMPLETADO)
   - Guardar helpers compartidos entre endpoints:
     - `normalize_stop`, `get_chat_stop`
     - `truncate_text_by_stop`
@@ -49,7 +49,7 @@ Separar el monolito actual en componentes Python independientes y bien organizad
     - `safe_get_text_from_item`
     - lógica de streaming común
 
-- `envAIModels/schemas.py`
+- `envAIModels/schemas.py` ✅ (COMPLETADO)
   - Definir los modelos Pydantic usados por todos los endpoints:
     - `GenerateRequest`
     - `ChatMessage`
@@ -90,13 +90,13 @@ Separar el monolito actual en componentes Python independientes y bien organizad
 ## Verificación de la Implementación
 
 ### Archivos Creados/Modificados
-1. `envAIModels/app.py` - Arranque FastAPI, logging de modelo, registro de routers (26 líneas)
-2. `envAIModels/model.py` - Carga lazy del modelo GGUF con `MODEL_GGUF_PATH` (90 líneas)
-3. `envAIModels/schemas.py` - Pydantic models compartidos (20 líneas)
-4. `envAIModels/utils.py` - Helpers centralizados (310+ líneas)
-5. `envAIModels/model_metadata.py` - Inspección de metadatos (200+ líneas)
-6. `envAIModels/routers_api.py` - Rutas `/api/*` (174 líneas)
-7. `envAIModels/routers_v1.py` - Rutas `/v1/*` con `/v1/models` mejorado (154 líneas)
+1. `envAIModels/app.py` - Arranque FastAPI, logging de modelo, registro de routers (18 líneas) ✅
+2. `envAIModels/model.py` - Carga lazy del modelo GGUF con `MODEL_GGUF_PATH` (72 líneas) ✅
+3. `envAIModels/schemas.py` - Pydantic models compartidos (22 líneas) ✅
+4. `envAIModels/utils.py` - Helpers centralizados (278 líneas) ✅
+5. `envAIModels/model_metadata.py` - Inspección de metadatos (173 líneas) ✅
+6. `envAIModels/routers_api.py` - Rutas `/api/*` (166 líneas) ✅
+7. `envAIModels/routers_v1.py` - Rutas `/v1/*` con `/v1/models` mejorado (129 líneas) ✅
 
 ### Tests Ejecutados
 - **Unitarias (pytest):** 32/32 passed ✅
@@ -252,9 +252,10 @@ models/
 | Paquete | Estado actual | Necesario para modelos entrenados |
 |---------|---------------|-----------------------------------|
 | `llama-cpp-python` | Ya instalado | Sí (carga GGUF) |
+| `sentencepiece` | Ya instalado | Sí (tokenizador BPE multilingüe) |
 | `onnxruntime` | No instalado | No (solo si se quiere soporte ONNX futuro) |
 
-No se necesitan dependencias adicionales. `llama-cpp-python` ya soporta cualquier GGUF válido.
+No se necesitan dependencias adicionales. `llama-cpp-python` ya soporta cualquier GGUF válido, y `sentencepiece` ya está disponible para tokenización BPE.
 
 ### Mejoras futuras (opcionales)
 
