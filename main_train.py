@@ -66,7 +66,6 @@ TRAINING_CONFIG = {
 
 # Model checkpoint configuration
 MODEL_CHECKPOINT_DIR = 'checkpoints'
-MODELS_DIR = 'models'
 TOKENIZER_VOCAB_FILE = os.path.join(MODEL_CHECKPOINT_DIR, 'tokenizer_vocab.json')
 LATEST_MODEL_FILE = 'chat_model.pth'
 
@@ -118,8 +117,8 @@ class MainTrain:
         # Dynamic checkpoint naming
         self.checkpoint_name = getattr(args, 'checkpoint_name', 'chat_model')
         self.dataset_source = getattr(args, 'dataset', 'dataset_cache')
-        self.model_output_path = os.path.join(MODELS_DIR, f'{self.checkpoint_name}.pth')
-        os.makedirs(MODELS_DIR, exist_ok=True)
+        self.model_output_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}.pth')
+        os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
 
         # Load cached dataset and metadata (if present)
         self.cache_metadata = {}
@@ -797,8 +796,8 @@ class MainTrain:
                     self.best_loss = loss
                     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                     epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
-                    epoch_path = os.path.join(MODELS_DIR, epoch_filename)
-                    os.makedirs(MODELS_DIR, exist_ok=True)
+                    epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
+                    os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
                     torch.save({
                         'epoch': epoch + 1,
                         'model_state_dict': model.state_dict(),
@@ -841,7 +840,7 @@ class MainTrain:
             # Save per-epoch best checkpoint with metadata
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             epoch_filename = f"{self.checkpoint_name}_best_{timestamp}.pth"
-            epoch_path = os.path.join(MODELS_DIR, epoch_filename)
+            epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),

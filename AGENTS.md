@@ -83,8 +83,8 @@ MyIAModelChat/
 
 | Module | Purpose |
 |--------|---------|
-| `chatmodel.py` | GPT-2 Transformer architecture (embedding → LSTM → FC → logits) |
-| `dialogmanager.py` | Intent classification (BERT), sentiment analysis (BERT), context management |
+| `chatmodel.py` | GPT-2 Transformer architecture (embedding → Transformer → logits) |
+| `dialogmanager.py` | Intent classification (BERT), sentiment analysis (BERT), temperature adjustment |
 | `chatdataset.py` | PyTorch Dataset for loading tokenized chat data |
 | `bpe_tokenizer.py` | SentencePiece BPE tokenizer wrapper (multilingual) |
 | `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HuggingFace) |
@@ -104,9 +104,9 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
                 ↓
         Sentiment Analyzer (BERT)
                 ↓
-        Context Manager (deque, max 5 turns)
+        Temperature Adjustment + Prompt Enrichment
                 ↓
-        Persona-Based Response Generation
+        GPT-2 Transformer Generation
 ```
 
 ---
@@ -227,8 +227,8 @@ open → in_progress → done
 3. Retrain with `python main.py --train`
 
 ### Extending Dialogue Context
-1. Modify `max_history` in `dialogmanager.py`
-2. Adjust context window for longer conversations
+1. Modify prompt enrichment in `dialogmanager.py`
+2. Add context window for longer conversations
 3. Retrain model with new context length
 
 ### Adding New Data Source
@@ -265,12 +265,11 @@ open → in_progress → done
 
 ## Recent Improvements
 
-See `CRITICAL-FIXES-APPLIED.md` for details on:
-- Fixed LSTM forward pass issues
-- Resolved tokenizer race conditions
-- Improved autoregressive generation
-- Added dynamic n-gram penalization
+- Model library system with merge and export capabilities
+- GGUF/ONNX export for Ollama, llama.cpp, ONNX Runtime
+- SentencePiece BPE multilingual tokenizer
 - Chain-of-thought reasoning support
+- Dynamic n-gram penalization
 
 ---
 

@@ -81,12 +81,8 @@ print(f"Patterns loaded: {len(k._brain._nodes)}")
 **Solution**:
 ```python
 # Ensure same tokenizer is used everywhere
-# main_train.py
-tokenizer.save('tokenizer.pth')
-
-# main_chat.py
-tokenizer = SimpleTokenizer()
-tokenizer.load('tokenizer.pth')
+# The tokenizer is saved in checkpoints/tokenizer_vocab.json
+# and loaded automatically by main_chat.py
 
 # Verify they're identical
 test_text = "Hello world"
@@ -298,7 +294,10 @@ from chatmodel import ChatModel
 
 class TestChatModel(unittest.TestCase):
     def setUp(self):
-        self.model = ChatModel(vocab_size=1000, embedding_dim=100, hidden_size=256)
+        # ChatModel requires a tokenizer object as first argument
+        from bpe_tokenizer import SentencePieceTokenizerWrapper
+        tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
+        self.model = ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)
     
     def test_forward_shape(self):
         input_tensor = torch.LongTensor([[1, 2, 3, 4]])
@@ -342,17 +341,20 @@ except IOError as e:
 ```python
 # config.py
 class Config:
-    vocab_size = 10000
-    embedding_dim = 100
-    hidden_size = 256
-    batch_size = 32
+    embed_size = 256
+    hidden_size = 512
+    num_layers = 4
+    batch_size = 4
+    accumulation_steps = 8
     learning_rate = 0.001
-    epochs = 10
+    epochs = 1
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Usage
 cfg = Config()
-model = ChatModel(cfg.vocab_size, cfg.embedding_dim, cfg.hidden_size)
+from bpe_tokenizer import SentencePieceTokenizerWrapper
+tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
+model = ChatModel(tokenizer, embed_size=cfg.embed_size, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
 ```
 
 ### Error Recovery

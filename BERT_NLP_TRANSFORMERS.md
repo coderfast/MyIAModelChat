@@ -9,7 +9,7 @@ El proyecto usa **un solo modelo** de HuggingFace para ambas tareas NLP:
 - **Tipo**: BERT multilingual fine-tuned para clasificación de sentimiento por estrellas
 - **Capacidades**: Soporta 6 idiomas (inglés, español, francés, alemán, italiano, neerlandés)
 - **Salida**: Clasificación de 1 a 5 estrellas (1 star, 2 stars, 3 stars, 4 stars, 5 stars)
-- **Tamaño**: ~680M parámetros
+- **Tamaño**: ~110M parámetros (BERT-base)
 - **Uso en el proyecto**: Ambas pipelines (intención y sentimiento) usan este mismo modelo
 
 ```python
@@ -147,7 +147,7 @@ DialogueManager(
     top_p=0.9,             # Nucleus sampling: 90% de probabilidad acumulada
     temperature=0.7,       # Temperatura base (ajustada por sentimiento)
     max_len=128,           # Longitud máxima de respuesta en tokens
-    min_length=5,          # Longitud mínima de respuesta
+    min_length=3,          # Longitud mínima de respuesta
     no_repeat_ngram_size=3 # Penalización de n-gramas repetidos
 )
 ```

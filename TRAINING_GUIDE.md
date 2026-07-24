@@ -52,10 +52,10 @@ python main.py --clear-cache
 ## Build a BPE-tokenized cache (optional)
 
 ```bash
-python main.py --prepare-data --aiml --pdf --epub --use-bpe --bpe-vocab-size 8000
+python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 ```
 
-When using `--use-bpe`, SentencePiece (BPE) is trained on extracted text and the prepared cache will include a `token_ids` column for each sample as well as `dataset_cache/sentencepiece.model` and `dataset_cache/cache_metadata.pkl` containing tokenizer metadata. Note: BPE is applied to textual sources (AIML/PDF/EPUB/HF). If `sentencepiece` is not installed the pipeline will skip BPE and continue preparing a non-tokenized cache (a warning is emitted).
+SentencePiece (BPE) is trained on extracted text and the prepared cache will include a `token_ids` column for each sample as well as `dataset_cache/sentencepiece.model` and `dataset_cache/cache_metadata.pkl` containing tokenizer metadata. Note: BPE is applied to textual sources (AIML/PDF/EPUB/HF). If `sentencepiece` is not installed the pipeline will skip BPE and continue preparing a non-tokenized cache (a warning is emitted).
 
 **Caching Benefits:**
 - 12x faster dataset loading
@@ -123,12 +123,12 @@ python main.py --train \
     --epub \
     --hf \
     --use-cpuonly \
-    --num-cores 4
+    --num_cores 4
 ```
 
 | Argument | Purpose | Default |
 |----------|---------|---------|
-| `--epochs` | Number of training epochs | 30 |
+| `--epochs` | Number of training epochs | 1 |
 | `--dataset` | Path to dataset directory | `dataset_cache` |
 | `--checkpoint-name` | Name for saved checkpoint | `chat_model` |
 | `--use-cache` | Use cached datasets for speed | False |
@@ -137,8 +137,8 @@ python main.py --train \
 | `--epub` | Include EPUB e-book datasets | False |
 | `--hf` | Include Hugging Face datasets | False |
 | `--use-cpuonly` | Force CPU training | False |
-| `--num-cores` | CPU cores for DataLoader workers | 4 |
-| `--num-threads` | Additional threads per worker | 2 |
+| `--num_cores` | CPU cores for DataLoader workers | auto |
+| `--num_threads` | Additional threads per worker | auto |
 | `--onlytokenize` | Run tokenization only, skip training | False |
 
 ### Hyperparameter Tuning
@@ -250,7 +250,7 @@ for epoch in range(epochs):
             'model_state_dict': model.state_dict(),
             'tokenizer': tokenizer,
             'loss': val_loss
-        }, 'checkpoints/chat_model_best.pth')
+        }, f'models/{checkpoint_name}_best_{timestamp}.pth')
 ```
 
 ### Common Training Issues
@@ -315,14 +315,19 @@ checkpoint = {
     'optimizer_state_dict': optimizer.state_dict(),
     'scheduler_state_dict': scheduler.state_dict(),
     'loss': loss,
-    'tokenizer': tokenizer,  # Now saves tokenizer in checkpoint
-    'config': {
-        'vocab_size': vocab_size,
-        'embedding_dim': embedding_dim,
-        'hidden_size': hidden_size
-    }
+    'tokenizer': tokenizer,
+    'model_name': checkpoint_name,
+    'architecture': {
+        'embed_size': 256,
+        'hidden_size': 512,
+        'num_layers': 4,
+        'n_head': 4,
+        'n_positions': 512,
+        'vocab_size': tokenizer.vocab_size,
+    },
+    'dataset_source': dataset_source,
 }
-torch.save(checkpoint, f'checkpoints/checkpoint_epoch_{epoch}.pth')
+torch.save(checkpoint, f'models/{checkpoint_name}.pth')
 ```
 
 ### Resuming Training

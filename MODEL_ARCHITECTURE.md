@@ -135,17 +135,17 @@ User Input String
     ↓
 Intent/Sentiment Analysis (BERT pipeline)
     ↓ (1-5 stars sentiment, intent classification)
-Context Management
-    ↓ (deque maintains last 5 turns)
-Persona Modeling
-    ↓ (adjusts response based on personality)
+Temperature Adjustment
+    ↓ (angry → lower temp, happy → higher temp)
+Prompt Enrichment
+    ↓ (adds context like "El usuario está satisfecho")
 SentencePieceTokenization
     ↓ (string → token IDs, multilingual)
 Model Inference
     ↓ (autoregressive generation with GPT-2)
 Dynamic N-gram Penalization (no_repeat_ngram_size=3)
     ↓
-Min-Length Enforcement (min_length=5)
+Min-Length Enforcement (min_length=3)
     ↓
 Top-K/Top-P Sampling (k=50, p=0.9)
     ↓
@@ -160,12 +160,6 @@ Response String
 - Detects sentiment from 1-5 stars
 - Used for temperature adjustment (angry → lower temp, happy → higher temp)
 
-### Context Window
-- Maintains last 5 user inputs/bot responses (configurable)
-- Combined into single context string
-- Used to condition model predictions
-- Prevents loss of conversation coherence
-
 ### Generation Improvements
 - **Autoregressive Generation**: Proper token-by-token generation
 - **Dynamic N-gram Penalization**: Prevents repetitive 3-grams with logit penalties
@@ -174,21 +168,10 @@ Response String
 
 ## Recent Architecture Improvements
 
-### Forward Pass Fixes
-- **Issue**: LSTM was incorrectly handling batch dimensions
-- **Fix**: Proper tensor reshaping and sequence processing
-- **Impact**: Correct gradient flow and training convergence
-
-### Tokenizer Enhancements
-- **Issue**: Race conditions in SimpleTokenizer.fit()
-- **Fix**: Thread-safe vocabulary building
-- **Addition**: BilingualTokenizer with EN/ES support and accent handling
-- **Performance**: O(1) decoding with idx2word mapping
-
-### Language Support
-- **Automatic Detection**: EN/ES language classification
-- **Accent Handling**: Proper tokenization of Spanish text (español, México, etc.)
-- **Mixed Content**: Handles bilingual conversations seamlessly
+### Tokenizer Migration
+- **Migrated**: From word-level tokenizers to SentencePiece BPE
+- **Multilingual**: Supports any language without configuration
+- **Subword**: Handles out-of-vocabulary words via BPE
 
 ### Generation Quality
 - **Repetition Prevention**: Dynamic penalization instead of hard banning
@@ -198,7 +181,8 @@ Response String
 ## Saved Models
 
 ### Checkpoint Files
-- **chat_model.pth**: Complete ChatModel state_dict
+- **models/<name>.pth**: Complete model checkpoint (state_dict + metadata)
+- **models/<a>+<b>.pth**: Merged model (weight averaging)
 - **checkpoints/tokenizer_vocab.json**: SentencePiece tokenizer vocabulary
 - **dataset_cache/sentencepiece.model**: Trained BPE model
 - **dataset_cache/**: Cached processed datasets for fast loading
@@ -220,25 +204,23 @@ model.eval()  # Set to evaluation mode
 - **Batch Size**: Larger batches = faster training but more memory
 - **Sequence Length**: Longer sequences = more context but slower processing
 - **Embedding Dimension**: Higher = more expressive but more parameters
-- **Hidden Size**: Larger LSTM = more capacity but slower inference
+- **Hidden Size**: Larger = more capacity but slower inference
 - **Multiprocessing**: Use multiple workers in DataLoader for faster data loading
 
 ## Extending the Architecture
 
-### Adding Attention Mechanism
-- Replace LSTM with Transformer encoder
-- Add multi-head attention layers
-- Improves long-range dependency modeling
+### Adding More Layers
+- Increase `num_layers` in GPT2Config
+- More layers = more capacity but slower training
 
-### Adding Bidirectional Processing
-- Set `bidirectional=True` in LSTM
-- Doubles hidden_size output
-- Requires adjusting FC layer input dimension
+### Increasing Hidden Size
+- Increase `n_embd` and `hidden_size` in GPT2Config
+- Larger hidden size = more expressive model
 
 ### Adding Dropout
 - Reduces overfitting
-- Add after embedding and LSTM layers
-- Typical dropout rate: 0.3-0.5
+- Add after embedding and transformer layers
+- Typical dropout rate: 0.1-0.3
 
 ### Ensemble Approaches
 - Train multiple models with different seeds

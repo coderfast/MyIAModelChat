@@ -77,40 +77,40 @@ python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
 python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.pkl','rb')))"
 ```
 
-**BPE note:** Use `--use-bpe` to build a SentencePiece BPE-tokenized cache from textual sources (AIML, extracted PDF/EPUB text, Hugging Face datasets). If `sentencepiece` is not installed the prepare step will skip BPE and create a non-tokenized cache (a warning is emitted).
+**BPE note:** SentencePiece BPE is used automatically during `--prepare-data`. If `sentencepiece` is not installed the prepare step will skip BPE and create a non-tokenized cache (a warning is emitted).
 
 ## Model Config Essentials
 
 ```python
 # chatmodel.py - Key parameters (GPT-2 architecture)
-vocab_size = 50000        # Vocabulary size (from BPE tokenizer)
-embed_size = 256          # Embedding dimension
-hidden_size = 512         # Hidden state size
-num_layers = 2            # Number of transformer layers
-n_head = 4                # Attention heads
-n_positions = 512         # Max sequence length
+vocab_size = 8000           # Vocabulary size (BPE, default)
+embed_size = 256            # Embedding dimension
+hidden_size = 512           # Hidden state size
+num_layers = 4              # Number of transformer layers
+n_head = 4                  # Attention heads
+n_positions = 512           # Max sequence length
 
-# dialogmanager.py - Key settings
-max_history = 5           # Conversation history window
+# dialogmanager.py - Key settings (from main_chat.py)
 intent_model = "nlptown/bert-base-multilingual-uncased-sentiment"
 sentiment_model = "nlptown/bert-base-multilingual-uncased-sentiment"
-top_k = 50               # Sampling parameter
-top_p = 0.9              # Nucleus sampling
-temperature = 0.8        # Generation temperature
-min_length = 5           # Minimum response length
-no_repeat_ngram_size = 3 # N-gram repetition prevention
+top_k = 50                 # Sampling parameter
+top_p = 0.9                # Nucleus sampling
+temperature = 0.7          # Generation temperature
+min_length = 3             # Minimum response length
+no_repeat_ngram_size = 3   # N-gram repetition prevention
 
 # data_preparer.py - Feature flags
-enable_pdf = True        # Enable PDF processing
-enable_epub = True       # Enable EPUB processing
-enable_caching = True    # Enable dataset caching
+enable_pdf = True          # Enable PDF processing
+enable_epub = True         # Enable EPUB processing
+enable_caching = True      # Enable dataset caching
 
 # main_train.py - Training params
-batch_size = 32
+batch_size = 4             # Micro batch size
+accumulation_steps = 8     # Gradient accumulation (effective batch = 32)
 learning_rate = 0.001
-epochs = 30             # Default increased
-num_workers = 4
-use_cache = True        # Use cached datasets
+epochs = 1                 # Default (use --epochs to increase)
+num_workers = 0            # DataLoader workers
+use_cache = False          # Default (use --use-cache to enable)
 ```
 
 ## Model Architecture Flow
@@ -149,11 +149,9 @@ from dialogmanager import DialogueManager
 
 dialog = DialogueManager(model, device, tokenizer,
                          intent_classifier, sentiment_analyzer,
-                         persona, max_history=5, top_k=50, top_p=0.9,
-                         temperature=0.8, min_length=5, no_repeat_ngram_size=3)
+                         persona, top_k=50, top_p=0.9,
+                         temperature=0.7, min_length=3, no_repeat_ngram_size=3)
 response = dialog.generate_response(user_input)
-intent = dialog.detected_intent
-sentiment = dialog.detected_sentiment
 ```
 
 ### SentencePieceTokenizerWrapper
@@ -216,8 +214,8 @@ python main.py --prepare-data --pdf --epub --refresh-cache
 # Clear cache to free space
 python main.py --clear-cache
 
-# Check cache status
-python main.py --cache-status
+# Check cache metadata
+python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.pkl','rb')))"
 ```
 
 ## Common Fixes

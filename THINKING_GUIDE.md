@@ -134,7 +134,7 @@ target_ids: [..., <think>, razonamiento, </think>, respuesta]
 
 - El modelo recibe contexto previo y debe predecir la secuencia completa
 - Se usa teacher forcing: alimentar la secuencia real como input, predecir el siguiente token
-- El LSTM genera tokens secuencialmente, sin cambios necesarios en `chatmodel.py`
+- El modelo GPT-2 genera tokens secuencialmente, sin cambios necesarios en `chatmodel.py`
 
 ### Función de pérdida
 
@@ -328,7 +328,7 @@ python main.py --chat --show-thinking
 # → Muestra razonamiento + respuesta
 
 # 5. Test endpoint
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "¿Qué es Python?"}], "include_thinking": true}'
 # → Respuesta con campo "reasoning"

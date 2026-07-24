@@ -9,7 +9,7 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Neural Chat Model**: GPT-2 Transformer architecture for natural language generation
 - **Bilingual Support**: English/Spanish tokenization with accent handling
 - **Intent Recognition**: BERT-based intent classification for user queries
-- **Sentiment Analysis**: DistilBERT-powered emotion detection
+- **Sentiment Analysis**: BERT-based star rating detection (1-5 stars)
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
 - **Model Library**: Train, combine, and export multiple independent models
@@ -195,7 +195,7 @@ vocab_size = 8000             # BPE vocabulary size (default)
 top_k = 50
 top_p = 0.9
 temperature = 0.7
-min_length = 5
+min_length = 3
 no_repeat_ngram_size = 3
 ```
 

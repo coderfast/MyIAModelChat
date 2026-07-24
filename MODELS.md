@@ -46,7 +46,7 @@ Los modelos encoder-only entienden texto pero no generan. Ideales para clasifica
 ### Arquitectura actual: GPT-2 custom
 
 - **Tipo**: Decoder-only
-- **Params**: ~20M (custom, no 124M estandar)
+- **Params**: ~5.34M (custom, no 124M estandar)
 - **Entrenamiento**: Desde cero con datos propios
 - **Tokenizer**: SentencePiece BPE (multilingue)
 - **Archivo**: `chatmodel.py`
