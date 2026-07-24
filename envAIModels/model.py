@@ -20,12 +20,34 @@ if ENV_PATH.exists():
             key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
 
-MODEL_PATH = str(BASE_DIR / os.environ.get("MODEL_PATH", "models/Qwen2.5-1.5B-Instruct-Q4_0.gguf"))
+# Model path: MODEL_GGUF_PATH takes priority, falls back to MODEL_PATH
+_DEFAULT_GGUF = "models/Qwen2.5-1.5B-Instruct-Q4_0.gguf"
+MODEL_GGUF_PATH = os.environ.get("MODEL_GGUF_PATH", "")
+MODEL_PATH = str(BASE_DIR / (MODEL_GGUF_PATH if MODEL_GGUF_PATH else os.environ.get("MODEL_PATH", _DEFAULT_GGUF)))
 MODEL_NAME = os.environ.get("MODEL_NAME", "local-Qwen2.5-1.5B-Instruct-Q4_0")
 OLLAMA_VERSION = os.environ.get("OLLAMA_VERSION", "0.6.4")
 CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "64"))
 
 logger = logging.getLogger("uvicorn.error")
+
+
+def _resolve_model_name(path: str) -> str:
+    """Derive a human-readable model name from the GGUF filename."""
+    stem = Path(path).stem
+    # Strip common quantization suffixes for a cleaner name
+    for suffix in ("-Q4_0", "-Q4_K_M", "-Q5_0", "-Q5_K_M", "-Q8_0", "-F16"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    return stem
+
+
+def _get_model_file_size(path: str) -> Optional[int]:
+    """Return file size in bytes, or None if inaccessible."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
 
 
 class _LazyModel:
@@ -42,8 +64,15 @@ class _LazyModel:
         if self._real is None:
             if Llama is None:
                 raise RuntimeError("llama_cpp.Llama is not available in this environment")
+            if not os.path.exists(MODEL_PATH):
+                raise FileNotFoundError(
+                    f"Model file not found: {MODEL_PATH}\n"
+                    f"Set MODEL_GGUF_PATH or MODEL_PATH to a valid .gguf file."
+                )
             try:
+                logger.info(f"Loading model: {MODEL_PATH}")
                 self._real = Llama(model_path=MODEL_PATH)
+                logger.info(f"Model loaded successfully: {MODEL_NAME}")
             except Exception:
                 logger.exception("failed loading model")
                 raise

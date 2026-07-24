@@ -89,29 +89,33 @@ Separar el monolito actual en componentes Python independientes y bien organizad
   
 ## Verificación de la Implementación
 
-### Archivos Creados
-1. `envAIModels/model.py` - Carga lazy del modelo (18 líneas)
-2. `envAIModels/schemas.py` - Pydantic models compartidos (20 líneas)
-3. `envAIModels/utils.py` - Helpers centralizados (310+ líneas)
-4. `envAIModels/model_metadata.py` - Inspección de metadatos (200+ líneas)
-5. `envAIModels/routers_api.py` - Rutas `/api/*` (174 líneas)
-6. `envAIModels/routers_v1.py` - Rutas `/v1/*` (166 líneas)
+### Archivos Creados/Modificados
+1. `envAIModels/app.py` - Arranque FastAPI, logging de modelo, registro de routers (26 líneas)
+2. `envAIModels/model.py` - Carga lazy del modelo GGUF con `MODEL_GGUF_PATH` (90 líneas)
+3. `envAIModels/schemas.py` - Pydantic models compartidos (20 líneas)
+4. `envAIModels/utils.py` - Helpers centralizados (310+ líneas)
+5. `envAIModels/model_metadata.py` - Inspección de metadatos (200+ líneas)
+6. `envAIModels/routers_api.py` - Rutas `/api/*` (174 líneas)
+7. `envAIModels/routers_v1.py` - Rutas `/v1/*` con `/v1/models` mejorado (154 líneas)
 
 ### Tests Ejecutados
-- **Unitarias (pytest):** 8/8 passed ✅
-  - Metadata endpoints
-  - Generación con y sin streaming
-  - Chat completions
-  - Text completions
-  
+- **Unitarias (pytest):** 32/32 passed ✅
+  - BPE Tokenizer: 24 tests ✅
+  - envAIModels smoke tests: 8 tests ✅
+    - Metadata endpoints
+    - Generación con y sin streaming
+    - Chat completions
+    - Text completions
+
 - **Manuales (servidor en vivo):** Todos los endpoints respondieron correctamente ✅
   - `/api/generate` → 200 OK, generó texto matemático
   - `/v1/chat/completions` → 200 OK, respondió en chino
   - `/api/generate` (streaming) → 200 OK, chunks NDJSON recibidos
   - `/v1/completions` → 200 OK, completó correctamente
+  - `/v1/models` → 200 OK, devuelve metadatos del modelo incluyendo `model_file` y `file_size_mb`
 
 ### Estado Actual
-✅ **LISTO PARA PRODUCCIÓN**
+✅ **LISTO PARA PRODUCCIÓN** — Soporte de modelos entrenados (GGUF) implementado.
 
 ## Orden sugerido de código dentro de `envAIModels`
 
@@ -153,3 +157,108 @@ Separar el monolito actual en componentes Python independientes y bien organizad
 - Mantener `runserver.bat` o `readme.md` actualizados con el nuevo arranque si cambian los imports.
 - Si `envAIModels` crece más adelante, se puede crear un paquete `envAIModels/routers/__init__.py`.
 - Evitar mover código hasta tener una primera versión de la estructura en el roadmap.
+
+---
+
+## Carga de modelos entrenados (PyTorch → GGUF → envAIModels)
+
+### Contexto
+El proyecto MyIAModelChat permite entrenar múltiples modelos independientes con el sistema "librería" (documentado en `ROADMAP.MD` raíz). Estos modelos se exportan a GGUF para usar con Ollama/llama.cpp. `envAIModels` ya usa `llama_cpp` para cargar un GGUF, por lo que **puede cargar los modelos entrenados directamente** sin cambios de arquitectura.
+
+### Flujo completo
+```
+1. Entrenar modelo         → models/ciencias_naturales.pth
+2. Exportar a GGUF         → models/exported/ciencias_naturales_Q8_0.gguf
+3. Cargar en envAIModels   → model.py lee el .gguf via llama_cpp
+4. Servir via FastAPI      → /v1/chat/completions, /api/chat/completions
+```
+
+### Cambios necesarios en `envAIModels`
+
+#### 1. `model.py` — Carga dinámica del modelo GGUF ✅ (COMPLETADO)
+- **Estado:** Carga un GGUF configurable via variable de entorno `MODEL_GGUF_PATH`.
+- **Implementado:**
+  - Variable de entorno `MODEL_GGUF_PATH` con prioridad sobre `MODEL_PATH`. ✅
+  - Fallback al modelo actual (Qwen) si no se especifica. ✅
+  - Validación de que el archivo `.gguf` existe al iniciar (`FileNotFoundError` claro). ✅
+  - Log informativo al cargar: nombre del modelo y ruta. ✅
+  - Funciones auxiliares `_resolve_model_name()` y `_get_model_file_size()`. ✅
+
+#### 2. `routers_v1.py` — Endpoint `/v1/models` mejorado ✅ (COMPLETADO)
+- **Estado:** Devuelve metadatos completos del modelo cargado.
+- **Implementado:**
+  - Respuesta incluye: `name`, `id`, `description`, `model_file`, `file_size_mb`, `family`, `source`. ✅
+  - Descripción generada dinámicamente desde el nombre del archivo GGUF. ✅
+  - Tamaño del archivo calculado en tiempo real. ✅
+
+#### 3. `app.py` — Configuración extendida ✅ (COMPLETADO)
+- **Estado:** Logging de modelo y ruta al arrancar, endpoint `/` incluye `model_path`.
+- **Implementado:**
+  - Importa `MODEL_PATH` desde `model.py`. ✅
+  - Logging al arrancar: nombre y ruta del modelo. ✅
+  - Endpoint `/` devuelve `model_path` en la respuesta. ✅
+
+### Uso
+
+**Cargar un modelo entrenado:**
+```bash
+# Establecer la variable de entorno antes de arrancar el servidor
+set MODEL_GGUF_PATH=models/exported/ciencias_naturales_Q8_0.gguf
+python envAIModels/app.py
+
+# O usar el modelo original (default)
+python envAIModels/app.py
+```
+
+**Cargar un modelo combinado (merged):**
+```bash
+set MODEL_GGUF_PATH=models/exported/ciencias_naturales_programacion_Q8_0.gguf
+python envAIModels/app.py
+```
+
+**Cambiar de modelo sin reiniciar:**
+- Actualmente `model.py` carga el modelo una vez al inicio. Para cambiar de modelo se necesita reiniciar el servidor.
+- Mejora futura: endpoint `/v1/models/reload` para recargar el modelo sin reiniciar (carga lazy).
+
+### Formatos soportados por `envAIModels`
+
+| Formato | Soportado | Notas |
+|---------|-----------|-------|
+| GGUF (.gguf) | Sí | Formato nativo de `llama_cpp`. Cuantización Q4_0, Q4_1, Q5_0, Q5_1, Q8_0. |
+| PyTorch (.pth) | No | `llama_cpp` no carga PyTorch. Exportar a GGUF primero. |
+| ONNX (.onnx) | No | Requiere `onnxruntime`, no `llama_cpp`. Alternativa futura. |
+| HuggingFace (HF) | No | Requiere `transformers`, no `llama_cpp`. Alternativa futura. |
+
+### Compatibilidad con el sistema "librería"
+
+`envAIModels` se convierte en el **servidor de inferencia formal** (compatible OpenAI/Ollama) del sistema librería:
+
+| Componente | Formato | Uso |
+|------------|---------|-----|
+| `main_chat.py` | .pth (PyTorch) | Interfaz CLI local, carga directa |
+| `envAIModels/` | .gguf (GGUF) | Servidor FastAPI, compatible OpenAI/Ollama |
+| Ollama | .gguf (GGUF) | Servidor externo, compatible OpenAI |
+
+Los tres pueden cargar el **mismo modelo** en formatos diferentes:
+```
+models/
+├── ciencias_naturales.pth          ← main_chat.py
+├── exported/
+│   └── ciencias_naturales_Q8_0.gguf ← envAIModels + Ollama
+```
+
+### Dependencias
+
+| Paquete | Estado actual | Necesario para modelos entrenados |
+|---------|---------------|-----------------------------------|
+| `llama-cpp-python` | Ya instalado | Sí (carga GGUF) |
+| `onnxruntime` | No instalado | No (solo si se quiere soporte ONNX futuro) |
+
+No se necesitan dependencias adicionales. `llama-cpp-python` ya soporta cualquier GGUF válido.
+
+### Mejoras futuras (opcionales)
+
+1. **Hot-reload del modelo**: Endpoint `/v1/models/reload` que recargue el `.gguf` sin reiniciar el servidor.
+2. **Soporte ONNX**: Añadir `onnxruntime` como backend alternativo a `llama_cpp` para modelos `.onnx`.
+3. **Multi-modelo en servidor**: Cargar varios `.gguf` y servir el que el cliente solicite via el campo `model` del request OpenAI.
+4. **Listado de modelos**: Endpoint `/v1/models/available` que escanee `models/exported/` y devuelva los `.gguf` disponibles.

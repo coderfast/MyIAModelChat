@@ -16,7 +16,7 @@ from .utils import (
     build_chat_completion_response,
     parse_thinking_response,
 )
-from .model import MODEL_NAME, OLLAMA_VERSION
+from .model import MODEL_NAME, MODEL_PATH, OLLAMA_VERSION, _resolve_model_name, _get_model_file_size
 
 router = APIRouter(prefix="/v1")
 
@@ -28,13 +28,17 @@ def health():
 
 @router.get("/models")
 def models():
+    file_size = _get_model_file_size(MODEL_PATH)
+    file_size_mb = round(file_size / (1024 * 1024), 1) if file_size else None
     return [
         {
             "name": MODEL_NAME,
-            "description": "Qwen2.5-1.5B Instruct (gguf, quantized)",
             "id": MODEL_NAME,
-            "size": "1.5B",
-            "family": "qwen",
+            "description": f"{_resolve_model_name(MODEL_PATH)} (gguf, quantized)",
+            "model_file": MODEL_PATH,
+            "file_size_mb": file_size_mb,
+            "family": "gguf",
+            "source": "envAIModels",
         }
     ]
 
