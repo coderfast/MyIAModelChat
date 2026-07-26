@@ -164,6 +164,10 @@ class MainTrain:
                 "No BPE model found. Run: python main.py --prepare-data --aiml --hf"
             )
 
+        # Detect thinking data now that tokenizer is available
+        # (must be after tokenizer creation so get_thinking_index works for pre-tokenized data)
+        self._detect_thinking_data()
+
         print(f"MainTrain initialized...")
 
     def request_stop(self):
@@ -208,9 +212,10 @@ class MainTrain:
                 logger.info(f"Dataset statistics loaded")
                 logger.info(f"  Total samples: {stats.get('total_samples', 0):,}")
 
-            # Detect thinking data in dataset
-            self._detect_thinking_data()
-            
+            # NOTE: _detect_thinking_data() is called AFTER tokenizer creation
+            # in __init__ because it needs tokenizer.get_thinking_index() to
+            # detect thinking tokens in pre-tokenized data.
+
         except Exception as e:
             logger.error(f"❌ Error loading cached dataset: {e}")
             sys.exit(1)
@@ -476,7 +481,11 @@ class MainTrain:
 
         # Weighted cross-entropy loss
         token_losses = criterion(outputs, targets)
-        loss = (token_losses * weights).sum() / weights.sum()
+        weight_sum = weights.sum()
+        if weight_sum <= 0:
+            # Fallback: all tokens are padding — return zero loss
+            return torch.tensor(0.0, device=outputs.device, requires_grad=True)
+        loss = (token_losses * weights).sum() / weight_sum
         return loss
 
     def _compute_thinking_metrics(self, model, inputs, targets, device):

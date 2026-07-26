@@ -234,6 +234,10 @@ class DialogueManager:
                             # Stop thinking phase on </think> or max thinking tokens
                             if next_token == self.thinking_end_id or thinking_token_count >= self.thinking_max_tokens:
                                 in_thinking_phase = False
+                                # If we've used most of our generation budget on thinking,
+                                # break to avoid returning thinking-only output
+                                if len(generated) >= self.max_len * 0.75:
+                                    break
                         else:
                             response_tokens.append(next_token)
                     else:
