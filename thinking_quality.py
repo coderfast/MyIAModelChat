@@ -38,10 +38,10 @@ class BatchQualityReport:
 
 
 META_PATTERNS = [
-    re.compile(r'^(el usuario|the user|el humano|the human)', re.IGNORECASE),
-    re.compile(r'^(saludo|greeting|despedida|farewell)', re.IGNORECASE),
-    re.compile(r'^(respondo|i respond|contestando|answering)', re.IGNORECASE),
-    re.compile(r'^(el bot|the bot|asistente|assistant)', re.IGNORECASE),
+    re.compile(r'^(el usuario|the user|el humano|the human)\s*(me\s+)?(saluda|despide|pregunta|pide)', re.IGNORECASE),
+    re.compile(r'^(saludo|greeting|despedida|farewell)$', re.IGNORECASE),
+    re.compile(r'^(respondo|i respond|contestando|answering)\s*(con|with)', re.IGNORECASE),
+    re.compile(r'^(el bot|the bot|asistente|assistant)\s*(responde|answer)', re.IGNORECASE),
 ]
 
 STEP_INDICATORS = [
@@ -71,29 +71,33 @@ def validate_thinking(thinking: str, answer: str = '', question: str = '') -> Qu
         if pattern.match(thinking.strip()):
             is_meta = True
             break
-    if is_meta:
+
+    has_steps = any(ind in thinking.lower() for ind in STEP_INDICATORS)
+    has_answer_derivation = False
+    if answer:
+        answer_words = set(answer.lower().split()[:5])
+        thinking_words = set(thinking.lower().split())
+        has_answer_derivation = bool(answer_words and answer_words.intersection(thinking_words))
+
+    if is_meta and not has_steps and not has_answer_derivation:
         issues.append('meta_commentary')
     else:
         score += 0.3
 
-    if answer:
-        answer_words = set(answer.lower().split()[:5])
-        thinking_words = set(thinking.lower().split())
-        if answer_words and answer_words.intersection(thinking_words):
-            score += 0.3
-        else:
-            issues.append('no_derivation')
+    if has_answer_derivation:
+        score += 0.3
+    elif answer:
+        issues.append('no_derivation')
     else:
         score += 0.2
 
-    has_steps = any(ind in thinking.lower() for ind in STEP_INDICATORS)
     has_length = len(thinking.split()) >= 8
     if has_steps or has_length:
         score += 0.2
     else:
         issues.append('low_reasoning')
 
-    valid = score >= 0.5 and not is_meta
+    valid = score >= 0.5 and not (is_meta and not has_steps and not has_answer_derivation)
     return QualityResult(valid=valid, score=score, issues=issues)
 
 

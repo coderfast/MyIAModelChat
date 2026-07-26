@@ -221,6 +221,7 @@ EXAMPLES:
         parser.add_argument("--pdf", action='store_true', help="Include PDF data")
         parser.add_argument("--epub", action='store_true', help="Include EPUB data")
         parser.add_argument("--web", action='store_true', help="Include web documentation data")
+        parser.add_argument("--csv", action='store_true', help="Include CSV data")
         parser.add_argument("--web-url", type=str, default=None,
                             help="Seed URL to scrape (reads from datasets_source/web/urls.txt if not set)")
         parser.add_argument("--web-max-pages", type=int, default=50,

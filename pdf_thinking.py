@@ -54,10 +54,11 @@ class PDFThinkingGenerator(ThinkingGenerator):
         word_count = len(text.split())
         if title:
             return (
-                f"Este fragmento pertenece a la seccion '{title}'. "
-                f"Contiene aproximadamente {word_count} palabras con informacion tecnica o academica."
+                f"Este fragmento del documento PDF corresponde a la sección '{title}'. "
+                f"El contenido presenta información técnica o académica. "
+                f"El texto contiene {word_count} palabras que cubren aspectos fundamentales del tema."
             )
         return (
             f"Fragmento de documento PDF con {word_count} palabras. "
-            f"Contiene informacion que debe ser procesada para extraer conocimiento relevante."
+            f"El contenido contiene información que debe ser procesada para extraer conocimiento relevante."
         )

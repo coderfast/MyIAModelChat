@@ -62,8 +62,9 @@ class HFThinkingGenerator(ThinkingGenerator):
                 return self._format_thinking_sample(sample, thinking)
 
         thinking = (
-            f"El contexto proporciona informacion relevante. "
-            f"La pregunta se responde basandose en los datos del contexto."
+            f"El contexto proporciona información relevante sobre el tema. "
+            f"La pregunta se responde basándose en los datos del contexto. "
+            f"Por lo tanto, la información es consistente y puede ser utilizada."
         )
         return self._format_thinking_sample(sample, thinking)
 
@@ -73,7 +74,7 @@ class HFThinkingGenerator(ThinkingGenerator):
         if self.teacher and self.teacher.is_available():
             prompt = (
                 f"Texto: {text_str}\n\n"
-                f"Resume y razona sobre la informacion clave (2-3 oraciones):\n"
+                f"Resume y razona sobre la información clave (2-3 oraciones):\n"
                 f"Razonamiento:"
             )
             thinking = self.teacher.generate(prompt, max_tokens=100)
@@ -82,7 +83,7 @@ class HFThinkingGenerator(ThinkingGenerator):
 
         word_count = len(str(text).split())
         thinking = (
-            f"Texto con {word_count} palabras. "
-            f"Contiene informacion que puede ser procesada para entrenamiento."
+            f"Este texto contiene {word_count} palabras con información relevante. "
+            f"El contenido puede ser procesado para extraer conocimiento útil."
         )
         return self._format_thinking_sample(sample, thinking)

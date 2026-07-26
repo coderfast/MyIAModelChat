@@ -83,37 +83,57 @@ class ThinkingGenerator:
             return False
 
         meta_patterns = [
-            r'^(el usuario|the user|el humano|the human)',
-            r'^(saludo|greeting|despedida|farewell)',
-            r'^(respondo|i respond|contestando|answering)',
+            re.compile(r'^(el usuario|the user|el humano|the human)\s*(me\s+)?(saluda|despide|pregunta|pide)', re.IGNORECASE),
+            re.compile(r'^(saludo|greeting|despedida|farewell)$', re.IGNORECASE),
+            re.compile(r'^(respondo|i respond|contestando|answering)\s*(con|with)', re.IGNORECASE),
         ]
+        is_meta = False
         for pattern in meta_patterns:
-            if re.match(pattern, thinking.lower()):
-                return False
+            if pattern.match(thinking.strip()):
+                is_meta = True
+                break
 
         answer_words = set(answer.lower().split()[:5])
         thinking_words = set(thinking.lower().split())
-        if answer_words and not answer_words.intersection(thinking_words):
-            return False
+        has_answer_derivation = bool(answer_words and answer_words.intersection(thinking_words))
 
         step_indicators = [
             'porque', 'por lo tanto', 'primero', 'paso', 'análisis',
-            'entonces', 'sin embargo', 'además', 'en cambio',
+            'entonces', 'sin embargo', 'además', 'en cambio', 'consiste',
             'because', 'therefore', 'first', 'step', 'analysis',
-            'however', 'additionally', 'furthermore',
+            'however', 'additionally', 'furthermore', 'consists',
         ]
         has_steps = any(ind in thinking.lower() for ind in step_indicators)
-        has_reasoning = len(thinking.split()) >= 8
+        has_length = len(thinking.split()) >= 8
 
-        return has_steps or has_reasoning
+        if is_meta and not has_steps and not has_answer_derivation:
+            return False
+
+        score = 0.0
+        if len(thinking) >= 30:
+            score += 0.4
+        elif len(thinking) >= 15:
+            score += 0.2
+        if has_steps:
+            score += 0.3
+        if has_answer_derivation:
+            score += 0.3
+        if has_length:
+            score += 0.2
+
+        return score >= 0.5
 
     def _format_thinking_sample(self, sample: Dict[str, Any], thinking: str) -> Dict[str, Any]:
-        """Format a sample with thinking block."""
+        """Format a sample with thinking block, updating input_ids for training."""
         result = dict(sample)
         result['thinking'] = thinking
 
         answer = sample.get('output', sample.get('input_ids', ''))
         if thinking and answer:
-            result['thinking_text'] = f"<think>{thinking}</think>{answer}"
+            thinking_text = f"<think>{thinking}</think>{answer}"
+            result['thinking_text'] = thinking_text
+            result['input_ids'] = thinking_text
+        elif answer:
+            result['input_ids'] = answer
 
         return result

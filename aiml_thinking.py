@@ -48,40 +48,49 @@ class AIMLThinkingGenerator(ThinkingGenerator):
     def _rule_based_thinking(self, category: str, pattern: str, template: str) -> str:
         rules = {
             'greeting': (
-                f"El usuario hace un saludo con '{pattern}'. "
-                f"Respondo con un saludo amigual y cortes."
+                f"El usuario se dirige a mí con un saludo '{pattern}'. "
+                f"Esto indica que quiere iniciar una conversación. "
+                f"Debo responder de forma amigable y ofrecer mi ayuda."
             ),
             'farewell': (
-                f"El usuario se despide. "
-                f"Respondo con una despedida apropiada y amigable."
+                f"El usuario se despide con '{pattern}'. "
+                f"Esto indica que la conversación está terminando. "
+                f"Debo despedirme de forma amable y dejar la puerta abierta."
             ),
             'identity': (
-                f"El usuario pregunta sobre mi identidad o nombre. "
-                f"Presento al asistente de forma amigable."
+                f"El usuario pregunta sobre mi identidad o nombre con '{pattern}'. "
+                f"Quiere saber quién soy. "
+                f"Debo presentarme de forma clara y amigable."
             ),
             'thanks': (
-                f"El usuario expresa agradecimiento. "
-                f"Acepto las gracias de forma amable."
+                f"El usuario expresa agradecimiento con '{pattern}'. "
+                f"Alguien agradece algo que hice. "
+                f"Debo aceptar las gracias de forma amable."
             ),
             'yes': (
-                f"El usuario da una respuesta afirmativa. "
-                f"Confirmo la información positivamente."
+                f"El usuario da una respuesta afirmativa con '{pattern}'. "
+                f"Esto indica conformidad o acuerdo. "
+                f"Debo confirmar la información positivamente."
             ),
             'no': (
-                f"El usuario da una respuesta negativa. "
-                f"Acepto la respuesta sin insistir."
+                f"El usuario da una respuesta negativa con '{pattern}'. "
+                f"Esto indica desacuerdo o rechazo. "
+                f"Debo aceptar la respuesta sin insistir."
             ),
             'weather': (
-                f"El usuario pregunta sobre el clima o temperatura. "
-                f"Proporciono información meteorológica general."
+                f"El usuario pregunta sobre el clima con '{pattern}'. "
+                f"Quiere información meteorológica. "
+                f"Debo proporcionar datos generales del clima."
             ),
             'time': (
-                f"El usuario pregunta la hora. "
-                f"Indico que no tengo acceso al reloj en tiempo real."
+                f"El usuario pregunta la hora con '{pattern}'. "
+                f"Necesita saber la hora actual. "
+                f"Debo indicar que no tengo acceso al reloj en tiempo real."
             ),
             'help': (
-                f"El usuario necesita ayuda. "
-                f"Ofrezco asistencia de forma amigable."
+                f"El usuario necesita ayuda con '{pattern}'. "
+                f"Está solicitando asistencia. "
+                f"Debo ofrecer ayuda de forma proactiva y clara."
             ),
         }
         return rules.get(category, f"Procesando solicitud del usuario sobre {category}.")
@@ -98,8 +107,20 @@ class AIMLThinkingGenerator(ThinkingGenerator):
     def _fallback_thinking(self, pattern: str, template: str) -> str:
         words = pattern.split()
         if len(words) <= 2:
-            return f"El usuario hace una consulta breve. Respondo de forma directa y clara."
+            return (
+                f"El usuario hace una consulta breve: '{pattern}'. "
+                f"Esto indica que busca información específica. "
+                f"Debo responder de forma directa y clara."
+            )
         elif '?' in pattern:
-            return f"El usuario hace una pregunta. Proporciono una respuesta informativa basada en el contexto."
+            return (
+                f"El usuario hace una pregunta: '{pattern}'. "
+                f"Esto indica que necesita información. "
+                f"Debo proporcionar una respuesta informativa basada en el contexto."
+            )
         else:
-            return f"El usuario envía un mensaje. Proceso la solicitud y respondo de forma apropiada."
+            return (
+                f"El usuario envía un mensaje: '{pattern}'. "
+                f"Esto indica una solicitud o comentario. "
+                f"Debo procesar la solicitud y responder de forma apropiada."
+            )

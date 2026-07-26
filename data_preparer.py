@@ -671,36 +671,39 @@ class DataPreparer:
                 self.web_data = self._load_web_data()
 
             # Load CSV data (curated supplementary dataset)
-            logger.info("\n[5/7] Loading CSV data...")
-            self.csv_data = self._load_csv()
+            if hasattr(self.args, 'csv') and self.args.csv:
+                logger.info("\n[5/7] Loading CSV data...")
+                self.csv_data = self._load_csv()
 
             # Combine datasets
             logger.info("\n[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
 
-            # Validate and clean sources
+            # Validate and clean sources (ANTES de thinking)
             validate_sources = getattr(self.args, 'validate_sources', False)
             if validate_sources:
                 logger.info("\n[6.4/7] Validating and cleaning sources...")
                 self._validate_and_clean_sources()
 
-            # Generate thinking data for each source
+            # Generate thinking data for each source (DESPUÉS de validación)
             generate_thinking = getattr(self.args, 'generate_thinking', False)
             if generate_thinking:
                 logger.info("\n[6.5/7] Generating real thinking data...")
                 self._generate_thinking_for_sources()
+                # Recombine after thinking generation
+                self._recombine_thinking_datasets()
 
             # Apply deduplication if enabled
             enable_dedup = getattr(self.args, 'enable_dedup', False)
             if enable_dedup:
-                logger.info("\n[6.5/7] Applying deduplication...")
+                logger.info("\n[6.6/7] Applying deduplication...")
                 self._apply_deduplication()
 
             # Apply quality filtering if enabled
             enable_quality = getattr(self.args, 'enable_quality_filter', False)
             if enable_quality:
-                logger.info("\n[6.6/7] Applying quality filtering...")
+                logger.info("\n[6.7/7] Applying quality filtering...")
                 self._apply_quality_filter()
 
             # Apply language filtering if enabled
@@ -1327,6 +1330,18 @@ class DataPreparer:
 
         # Ensure we have a textual field to train BPE on (avoid numeric token ids)
         logger.info("\n[7/7] Preparing BPE tokenizer (SentencePiece)...")
+        
+        # Check if dataset contains thinking tokens
+        try:
+            sample = self.combined_data[0]
+            input_text = sample.get('input_ids', '')
+            if isinstance(input_text, str) and '<think>' in input_text:
+                logger.info("  ✓ Dataset contains <think> tokens in input_ids - will use for BPE training")
+            else:
+                logger.info("  ℹ No thinking tokens detected in input_ids - using for BPE training")
+        except Exception:
+            pass
+
         sample = None
         try:
             sample = self.combined_data[0]
@@ -1667,16 +1682,26 @@ class DataPreparer:
             try:
                 samples = [dict(item) for item in dataset]
                 enriched = []
+                source_thinking = 0
                 for sample in samples:
                     result = generator.generate(sample)
                     if result.get('thinking'):
-                        total_thinking += 1
-                    enriched.append(result)
+                        from thinking_quality import validate_thinking
+                        validation = validate_thinking(result['thinking'], result.get('output', ''))
+                        if validation.valid:
+                            source_thinking += 1
+                            enriched.append(result)
+                        else:
+                            result['input_ids'] = result.get('output', '')
+                            enriched.append(result)
+                    else:
+                        enriched.append(result)
                     total_samples += 1
 
+                total_thinking += source_thinking
                 from datasets import Dataset
                 thinking_datasets.append(Dataset.from_list(enriched))
-                logger.info(f"    {source_name}: {total_thinking}/{total_samples} samples with thinking")
+                logger.info(f"    {source_name}: {source_thinking}/{len(samples)} samples with valid thinking")
             except Exception as e:
                 logger.warning(f"    ⚠ Thinking generation failed for {source_name}: {e}")
                 thinking_datasets.append(dataset)
@@ -1686,6 +1711,27 @@ class DataPreparer:
             self.combined_data = concatenate_datasets(thinking_datasets)
 
         logger.info(f"\n  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
+
+    def _recombine_thinking_datasets(self):
+        """Recombine source datasets after thinking generation."""
+        source_datasets = {
+            'aiml': self.aiml_data,
+            'hf': self.hf_data,
+            'pdf': self.pdf_data,
+            'epub': self.epub_data,
+            'web': self.web_data,
+            'csv': self.csv_data,
+        }
+
+        datasets_to_combine = []
+        for source_name, dataset in source_datasets.items():
+            if dataset is not None and len(dataset) > 0:
+                datasets_to_combine.append(dataset)
+
+        if datasets_to_combine:
+            from datasets import concatenate_datasets
+            self.combined_data = concatenate_datasets(datasets_to_combine)
+            logger.info(f"  ✓ Recombined {len(datasets_to_combine)} source datasets after thinking generation")
 
     def _apply_deduplication(self):
         """Apply deduplication to the combined dataset using MinHash LSH."""

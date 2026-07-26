@@ -40,10 +40,11 @@ class EPUBThinkingGenerator(ThinkingGenerator):
         word_count = len(text.split())
         if chapter:
             return (
-                f"Este fragmento pertenece al capitulo '{chapter}'. "
-                f"Contiene {word_count} palabras de contenido narrativo o informativo."
+                f"Este fragmento pertenece al capítulo '{chapter}' del libro. "
+                f"El contenido presenta información narrativa o informativa. "
+                f"El texto contiene {word_count} palabras que describen aspectos relevantes del tema."
             )
         return (
-            f"Fragmento de libro electronico con {word_count} palabras. "
-            f"El contenido debe ser analizado para extraer informacion relevante."
+            f"Fragmento de libro electrónico con {word_count} palabras. "
+            f"El contenido contiene información que debe ser analizada para extraer conocimiento."
         )

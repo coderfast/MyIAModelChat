@@ -42,10 +42,11 @@ class WebThinkingGenerator(ThinkingGenerator):
         word_count = len(text.split())
         if title:
             return (
-                f"Pagina web titulada '{title}' con {word_count} palabras. "
-                f"Contiene informacion que debe ser procesada para extraer conocimiento."
+                f"Esta página web titulada '{title}' contiene información relevante. "
+                f"El contenido incluye {word_count} palabras con datos sobre el tema. "
+                f"La información puede ser utilizada para responder preguntas relacionadas."
             )
         return (
             f"Contenido web de {word_count} palabras. "
-            f"El texto contiene informacion relevante para el entrenamiento."
+            f"El texto contiene información que puede ser procesada para extraer conocimiento."
         )

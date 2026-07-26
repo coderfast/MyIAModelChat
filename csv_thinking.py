@@ -41,10 +41,12 @@ class CSVThinkingGenerator(ThinkingGenerator):
         if '?' in question:
             return (
                 f"La pregunta es: {question[:80]}. "
-                f"La respuesta indica que {answer[:100]}. "
-                f"Por lo tanto, la informacion solicitada se presenta de forma clara."
+                f"La respuesta correcta es: {answer[:100]}. "
+                f"Esto indica que la información solicitada es específica y puede responderse con hechos. "
+                f"Por lo tanto, la respuesta es precisa y completa."
             )
         return (
-            f"Se presenta informacion sobre: {question[:80]}. "
-            f"La respuesta proporciona los detalles relevantes."
+            f"Se presenta información sobre: {question[:80]}. "
+            f"La respuesta contiene los detalles relevantes del tema. "
+            f"Esto permite entender el contexto y la información proporcionada."
         )
