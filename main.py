@@ -243,8 +243,8 @@ EXAMPLES:
         parser.add_argument("--show-thinking", action='store_true', help="Show <think> reasoning in chat")
 
         # Thinking configuration
-        parser.add_argument("--thinking-loss-weight", type=float, default=1.0,
-                            help="Loss weight for thinking tokens (0.0-1.0, default: 1.0)")
+        parser.add_argument("--thinking-loss-weight", type=float, default=0.5,
+                            help="Loss weight for thinking tokens (0.0-1.0, default: 0.5)")
         parser.add_argument("--thinking-enabled", action='store_true', default=True,
                             help="Enable thinking generation (default: True)")
         parser.add_argument("--thinking-no-enabled", dest='thinking_enabled', action='store_false',

@@ -11,8 +11,8 @@ class PDFThinkingGenerator(ThinkingGenerator):
 
     HEADING_PATTERN = re.compile(r'^(#{1,6}\s+.+|[A-Z][A-Z\s]{3,}|.+\n[=\-]{3,})', re.MULTILINE)
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
-        super().__init__(teacher)
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+        super().__init__(teacher, depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         text = sample.get('input_ids', sample.get('text', ''))
@@ -41,14 +41,15 @@ class PDFThinkingGenerator(ThinkingGenerator):
 
     def _teacher_thinking(self, text: str, title: str) -> Optional[str]:
         context = text[:600]
+        max_tokens = self.depth_config['max_tokens']
         prompt = (
             f"Basado en el siguiente texto de un documento PDF, resume y razona "
             f"sobre la informacion clave.\n\n"
             f"{f'Titulo/Seccion: {title}\n' if title else ''}"
             f"Texto: {context}\n\n"
-            f"Razonamiento paso a paso (2-4 oraciones):"
+            f"Razonamiento paso a paso ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):"
         )
-        return self.teacher.generate(prompt, max_tokens=120)
+        return self.teacher.generate(prompt, max_tokens=max_tokens)
 
     def _rule_thinking(self, text: str, title: str) -> str:
         word_count = len(text.split())

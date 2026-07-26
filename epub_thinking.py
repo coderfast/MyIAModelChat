@@ -8,8 +8,8 @@ from thinking_generators import ThinkingGenerator, OllamaTeacher
 class EPUBThinkingGenerator(ThinkingGenerator):
     """Generate thinking for EPUB book content using teacher model."""
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
-        super().__init__(teacher)
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+        super().__init__(teacher, depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         text = sample.get('input_ids', sample.get('text', ''))
@@ -28,13 +28,14 @@ class EPUBThinkingGenerator(ThinkingGenerator):
 
     def _teacher_thinking(self, text: str, chapter: str) -> Optional[str]:
         context = text[:600]
+        max_tokens = self.depth_config['max_tokens']
         prompt = (
             f"Contenido de un libro electronico (EPUB).\n"
             f"{f'Capitulo: {chapter}\n' if chapter else ''}"
             f"Texto: {context}\n\n"
-            f"Resume y razona sobre la informacion clave (2-4 oraciones):"
+            f"Resume y razona sobre la informacion clave ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):"
         )
-        return self.teacher.generate(prompt, max_tokens=120)
+        return self.teacher.generate(prompt, max_tokens=max_tokens)
 
     def _rule_thinking(self, text: str, chapter: str) -> str:
         word_count = len(text.split())

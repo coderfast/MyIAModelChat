@@ -8,8 +8,8 @@ from thinking_generators import ThinkingGenerator, OllamaTeacher
 class HFThinkingGenerator(ThinkingGenerator):
     """Generate thinking for HuggingFace dataset samples."""
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
-        super().__init__(teacher)
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+        super().__init__(teacher, depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         if 'question' in sample and 'answer' in sample:
@@ -29,13 +29,14 @@ class HFThinkingGenerator(ThinkingGenerator):
         answer = sample.get('answer', '')
 
         if self.teacher and self.teacher.is_available():
+            max_tokens = self.depth_config['max_tokens']
             prompt = (
                 f"Pregunta: {question}\n"
                 f"Respuesta: {answer[:300]}\n\n"
                 f"Genera un razonamiento paso a paso que lleve de la pregunta a la respuesta:\n"
                 f"Razonamiento:"
             )
-            thinking = self.teacher.generate(prompt, max_tokens=120)
+            thinking = self.teacher.generate(prompt, max_tokens=max_tokens)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
@@ -51,13 +52,14 @@ class HFThinkingGenerator(ThinkingGenerator):
         question = sample.get('question', sample.get('answer', ''))
 
         if self.teacher and self.teacher.is_available():
+            max_tokens = self.depth_config['max_tokens']
             prompt = (
                 f"Contexto: {context[:400]}\n"
                 f"Pregunta/Respuesta: {question[:200]}\n\n"
-                f"Razona sobre como el contexto respuesta la pregunta (2-3 oraciones):\n"
+                f"Razona sobre como el contexto respuesta la pregunta ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):\n"
                 f"Razonamiento:"
             )
-            thinking = self.teacher.generate(prompt, max_tokens=100)
+            thinking = self.teacher.generate(prompt, max_tokens=max_tokens)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
@@ -72,12 +74,13 @@ class HFThinkingGenerator(ThinkingGenerator):
         text_str = str(text)[:600]
 
         if self.teacher and self.teacher.is_available():
+            max_tokens = self.depth_config['max_tokens']
             prompt = (
                 f"Texto: {text_str}\n\n"
-                f"Resume y razona sobre la información clave (2-3 oraciones):\n"
+                f"Resume y razona sobre la información clave ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):\n"
                 f"Razonamiento:"
             )
-            thinking = self.teacher.generate(prompt, max_tokens=100)
+            thinking = self.teacher.generate(prompt, max_tokens=max_tokens)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 

@@ -692,7 +692,7 @@ class DataPreparer:
                 logger.info("\n[6.5/7] Generating real thinking data...")
                 self._generate_thinking_for_sources()
                 # Recombine after thinking generation
-                self._recombine_thinking_datasets()
+
 
             # Apply deduplication if enabled
             enable_dedup = getattr(self.args, 'enable_dedup', False)
@@ -1577,7 +1577,7 @@ class DataPreparer:
             return
 
         try:
-            from source_validators import get_validator, QualityReport
+            from source_validators import get_validator
         except ImportError:
             logger.warning("  ⚠ source_validators module not found, skipping validation")
             return
@@ -1607,14 +1607,31 @@ class DataPreparer:
 
                 if cleaned_samples:
                     from datasets import Dataset
-                    cleaned_datasets.append(Dataset.from_list(cleaned_samples))
+                    cleaned_ds = Dataset.from_list(cleaned_samples)
+                    cleaned_datasets.append(cleaned_ds)
+                    # Sync source attribute so downstream generators use cleaned data
+                    if source_name == 'aiml':
+                        self.aiml_data = cleaned_ds
+                    elif source_name == 'hf':
+                        self.hf_data = cleaned_ds
+                    elif source_name == 'pdf':
+                        self.pdf_data = cleaned_ds
+                    elif source_name == 'epub':
+                        self.epub_data = cleaned_ds
+                    elif source_name == 'web':
+                        self.web_data = cleaned_ds
+                    elif source_name == 'csv':
+                        self.csv_data = cleaned_ds
             except Exception as e:
                 logger.warning(f"  ⚠ Validation failed for {source_name}: {e}")
                 cleaned_datasets.append(dataset)
 
-        if cleaned_datasets:
-            from datasets import concatenate_datasets
-            self.combined_data = concatenate_datasets(cleaned_datasets)
+        if not cleaned_datasets:
+            logger.warning("  ⚠ No source datasets to validate, keeping combined_data as-is")
+            return
+
+        from datasets import concatenate_datasets
+        self.combined_data = concatenate_datasets(cleaned_datasets)
 
         logger.info("\n--- Source Validation Reports ---")
         for source_name, report in reports.items():
@@ -1634,26 +1651,28 @@ class DataPreparer:
             from epub_thinking import EPUBThinkingGenerator
             from web_thinking import WebThinkingGenerator
             from hf_thinking import HFThinkingGenerator
+            from thinking_quality import validate_thinking
         except ImportError as e:
             logger.warning(f"  ⚠ Thinking generator modules not found: {e}")
             return
 
         thinking_model = getattr(self.args, 'thinking_model', 'qwen2.5:1.5b')
+        thinking_depth = getattr(self.args, 'thinking_depth', 'adaptive')
         teacher = OllamaTeacher(model=thinking_model)
 
-        if not teacher.is_available():
-            logger.warning(f"  ⚠ Ollama not available at localhost:11434")
+        if not teacher.is_model_available():
+            logger.warning(f"  ⚠ Model '{thinking_model}' not available in Ollama")
             logger.warning(f"  ⚠ Install Ollama and pull model: ollama pull {thinking_model}")
             logger.warning(f"  ⚠ Falling back to rule-based thinking only")
             teacher = None
 
         generators = {
-            'aiml': AIMLThinkingGenerator(teacher),
-            'csv': CSVThinkingGenerator(teacher),
-            'pdf': PDFThinkingGenerator(teacher),
-            'epub': EPUBThinkingGenerator(teacher),
-            'web': WebThinkingGenerator(teacher),
-            'hf': HFThinkingGenerator(teacher),
+            'aiml': AIMLThinkingGenerator(teacher, depth=thinking_depth),
+            'csv': CSVThinkingGenerator(teacher, depth=thinking_depth),
+            'pdf': PDFThinkingGenerator(teacher, depth=thinking_depth),
+            'epub': EPUBThinkingGenerator(teacher, depth=thinking_depth),
+            'web': WebThinkingGenerator(teacher, depth=thinking_depth),
+            'hf': HFThinkingGenerator(teacher, depth=thinking_depth),
         }
 
         source_datasets = {
@@ -1686,13 +1705,14 @@ class DataPreparer:
                 for sample in samples:
                     result = generator.generate(sample)
                     if result.get('thinking'):
-                        from thinking_quality import validate_thinking
                         validation = validate_thinking(result['thinking'], result.get('output', ''))
                         if validation.valid:
                             source_thinking += 1
                             enriched.append(result)
                         else:
                             result['input_ids'] = result.get('output', '')
+                            result['thinking'] = ''
+                            result.pop('thinking_text', None)
                             enriched.append(result)
                     else:
                         enriched.append(result)
@@ -1711,27 +1731,6 @@ class DataPreparer:
             self.combined_data = concatenate_datasets(thinking_datasets)
 
         logger.info(f"\n  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
-
-    def _recombine_thinking_datasets(self):
-        """Recombine source datasets after thinking generation."""
-        source_datasets = {
-            'aiml': self.aiml_data,
-            'hf': self.hf_data,
-            'pdf': self.pdf_data,
-            'epub': self.epub_data,
-            'web': self.web_data,
-            'csv': self.csv_data,
-        }
-
-        datasets_to_combine = []
-        for source_name, dataset in source_datasets.items():
-            if dataset is not None and len(dataset) > 0:
-                datasets_to_combine.append(dataset)
-
-        if datasets_to_combine:
-            from datasets import concatenate_datasets
-            self.combined_data = concatenate_datasets(datasets_to_combine)
-            logger.info(f"  ✓ Recombined {len(datasets_to_combine)} source datasets after thinking generation")
 
     def _apply_deduplication(self):
         """Apply deduplication to the combined dataset using MinHash LSH."""

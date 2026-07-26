@@ -8,8 +8,8 @@ from thinking_generators import ThinkingGenerator, OllamaTeacher
 class WebThinkingGenerator(ThinkingGenerator):
     """Generate thinking for web-scraped content using teacher model."""
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
-        super().__init__(teacher)
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+        super().__init__(teacher, depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         text = sample.get('input_ids', sample.get('text', ''))
@@ -29,14 +29,15 @@ class WebThinkingGenerator(ThinkingGenerator):
 
     def _teacher_thinking(self, text: str, title: str, url: str) -> Optional[str]:
         context = text[:700]
+        max_tokens = self.depth_config['max_tokens']
         prompt = (
             f"Documento web.\n"
             f"{f'Titulo: {title}\n' if title else ''}"
             f"{f'URL: {url}\n' if url else ''}"
             f"Contenido: {context}\n\n"
-            f"Resume y razona sobre el contenido principal (2-4 oraciones):"
+            f"Resume y razona sobre el contenido principal ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):"
         )
-        return self.teacher.generate(prompt, max_tokens=120)
+        return self.teacher.generate(prompt, max_tokens=max_tokens)
 
     def _rule_thinking(self, text: str, title: str) -> str:
         word_count = len(text.split())

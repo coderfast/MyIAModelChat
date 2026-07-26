@@ -22,8 +22,8 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         'help': ['help', 'ayuda', 'necesito', 'puedes ayudar'],
     }
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
-        super().__init__(teacher)
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+        super().__init__(teacher, depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         pattern = sample.get('input', '').lower().strip()
@@ -96,13 +96,14 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         return rules.get(category, f"Procesando solicitud del usuario sobre {category}.")
 
     def _teacher_thinking(self, pattern: str, template: str) -> Optional[str]:
+        max_tokens = self.depth_config['max_tokens']
         prompt = (
             f"Analiza esta pregunta de chatbot y genera un razonamiento paso a paso.\n"
             f"Pregunta del usuario: {pattern}\n"
             f"Respuesta del bot: {template[:200]}\n\n"
-            f"Razonamiento (2-4 oraciones, en español):"
+            f"Razonamiento ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones, en español):"
         )
-        return self.teacher.generate(prompt, max_tokens=100)
+        return self.teacher.generate(prompt, max_tokens=max_tokens)
 
     def _fallback_thinking(self, pattern: str, template: str) -> str:
         words = pattern.split()

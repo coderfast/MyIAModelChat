@@ -30,8 +30,6 @@ class DialogueManager:
         self.eos_token_id = eos_token_id if eos_token_id is not None else (getattr(tokenizer, "get_eos_index", lambda: None)() if hasattr(tokenizer, "get_eos_index") else None)
         self.unk_token_id = unk_token_id if unk_token_id is not None else getattr(tokenizer, "get_unk_index", lambda: None)()
 
-        self.min_length = min_length
-        self.no_repeat_ngram_size = no_repeat_ngram_size
         self.default_response = default_response
 
         # Thinking support

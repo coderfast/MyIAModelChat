@@ -64,7 +64,7 @@ TRAINING_CONFIG = {
     'warm_up_ratio': 0.1,  # use 10% of dataset for warm-up
     'warm_up_steps': 100,  # maximum batches for warm-up phase
     # Thinking settings
-    'thinking_loss_weight': 1.0,  # loss weight for thinking tokens (0.0-1.0)
+    'thinking_loss_weight': 0.5,  # loss weight for thinking tokens (0.0-1.0)
 }
 
 # Model checkpoint configuration

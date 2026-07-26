@@ -20,6 +20,7 @@ class OllamaTeacher:
         self.url = url.rstrip('/')
         self.cache: Dict[str, str] = {}
         self._available: Optional[bool] = None
+        self._model_valid: Optional[bool] = None
 
     def is_available(self) -> bool:
         if self._available is not None:
@@ -31,6 +32,26 @@ class OllamaTeacher:
         except Exception:
             self._available = False
         return self._available
+
+    def is_model_available(self) -> bool:
+        """Check if the specific model is available in Ollama."""
+        if self._model_valid is not None:
+            return self._model_valid
+        if not self.is_available():
+            self._model_valid = False
+            return False
+        try:
+            req = urllib.request.Request(f'{self.url}/api/tags', method='GET')
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                available_models = [m.get('name', '') for m in data.get('models', [])]
+                self._model_valid = self.model in available_models
+                if not self._model_valid:
+                    logger.warning(f"Model '{self.model}' not found in Ollama. Available: {available_models}")
+                return self._model_valid
+        except Exception:
+            self._model_valid = False
+            return False
 
     def generate(self, prompt: str, max_tokens: int = 150, temperature: float = 0.7) -> Optional[str]:
         if prompt in self.cache:
@@ -70,58 +91,20 @@ class OllamaTeacher:
 class ThinkingGenerator:
     """Base class for source-specific thinking generators."""
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None):
+    DEPTH_CONFIG = {
+        'basic': {'max_tokens': 80, 'min_sentences': 1, 'max_sentences': 2},
+        'adaptive': {'max_tokens': 120, 'min_sentences': 2, 'max_sentences': 3},
+        'detailed': {'max_tokens': 200, 'min_sentences': 3, 'max_sentences': 5},
+    }
+
+    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
         self.teacher = teacher
+        self.depth = depth
+        self.depth_config = self.DEPTH_CONFIG.get(depth, self.DEPTH_CONFIG['adaptive'])
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         """Generate thinking for a sample. Returns sample with 'thinking' key added."""
         raise NotImplementedError
-
-    def validate_thinking(self, thinking: str, answer: str, question: str = '') -> bool:
-        """Validate that thinking is real reasoning, not meta-commentary."""
-        if not thinking or len(thinking) < 15:
-            return False
-
-        meta_patterns = [
-            re.compile(r'^(el usuario|the user|el humano|the human)\s*(me\s+)?(saluda|despide|pregunta|pide)', re.IGNORECASE),
-            re.compile(r'^(saludo|greeting|despedida|farewell)$', re.IGNORECASE),
-            re.compile(r'^(respondo|i respond|contestando|answering)\s*(con|with)', re.IGNORECASE),
-        ]
-        is_meta = False
-        for pattern in meta_patterns:
-            if pattern.match(thinking.strip()):
-                is_meta = True
-                break
-
-        answer_words = set(answer.lower().split()[:5])
-        thinking_words = set(thinking.lower().split())
-        has_answer_derivation = bool(answer_words and answer_words.intersection(thinking_words))
-
-        step_indicators = [
-            'porque', 'por lo tanto', 'primero', 'paso', 'análisis',
-            'entonces', 'sin embargo', 'además', 'en cambio', 'consiste',
-            'because', 'therefore', 'first', 'step', 'analysis',
-            'however', 'additionally', 'furthermore', 'consists',
-        ]
-        has_steps = any(ind in thinking.lower() for ind in step_indicators)
-        has_length = len(thinking.split()) >= 8
-
-        if is_meta and not has_steps and not has_answer_derivation:
-            return False
-
-        score = 0.0
-        if len(thinking) >= 30:
-            score += 0.4
-        elif len(thinking) >= 15:
-            score += 0.2
-        if has_steps:
-            score += 0.3
-        if has_answer_derivation:
-            score += 0.3
-        if has_length:
-            score += 0.2
-
-        return score >= 0.5
 
     def _format_thinking_sample(self, sample: Dict[str, Any], thinking: str) -> Dict[str, Any]:
         """Format a sample with thinking block, updating input_ids for training."""
