@@ -210,7 +210,9 @@ class DialogueManager:
                         break
 
                     # Enforce min_length: don't stop on EOS until minimum length reached
-                    if self.eos_token_id is not None and next_token == self.eos_token_id and len(generated) >= self.min_length:
+                    # Also don't allow EOS during thinking phase
+                    if (self.eos_token_id is not None and next_token == self.eos_token_id
+                            and len(generated) >= self.min_length and not in_thinking_phase):
                         break
 
                     generated.append(next_token)

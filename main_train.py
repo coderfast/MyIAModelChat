@@ -449,12 +449,13 @@ class MainTrain:
                 in_thinking = False
                 for s in range(seq_len):
                     token = targets[b, s].item()
-                    if token == thinking_id:
-                        in_thinking = True
-                    if in_thinking:
-                        weights[b, s] = self.thinking_loss_weight
                     if token == thinking_end_id:
                         in_thinking = False
+                    if token == thinking_id:
+                        in_thinking = True
+                    # Apply lower weight only to tokens BETWEEN delimiters (not the delimiters themselves)
+                    if in_thinking and token != thinking_id and token != thinking_end_id:
+                        weights[b, s] = self.thinking_loss_weight
 
         # Flatten outputs and targets
         outputs = outputs.contiguous().view(-1, outputs.size(-1))

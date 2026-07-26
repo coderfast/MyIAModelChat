@@ -1577,7 +1577,7 @@ class DataPreparer:
             return
 
         try:
-            from source_validators import get_validator
+            from source_validators import get_validator, QualityReport
         except ImportError:
             logger.warning("  ⚠ source_validators module not found, skipping validation")
             return
@@ -1625,6 +1625,11 @@ class DataPreparer:
             except Exception as e:
                 logger.warning(f"  ⚠ Validation failed for {source_name}: {e}")
                 cleaned_datasets.append(dataset)
+                reports[source_name] = QualityReport(
+                    source=source_name,
+                    total_samples=len(dataset),
+                    good=len(dataset)
+                )
 
         if not cleaned_datasets:
             logger.warning("  ⚠ No source datasets to validate, keeping combined_data as-is")

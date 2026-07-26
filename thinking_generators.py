@@ -18,46 +18,40 @@ class OllamaTeacher:
     def __init__(self, model: str = 'qwen2.5:1.5b', url: str = 'http://localhost:11434'):
         self.model = model
         self.url = url.rstrip('/')
-        self.cache: Dict[str, str] = {}
+        self.cache: Dict[tuple, str] = {}
         self._available: Optional[bool] = None
         self._model_valid: Optional[bool] = None
 
-    def is_available(self) -> bool:
-        if self._available is not None:
-            return self._available
-        try:
-            req = urllib.request.Request(f'{self.url}/api/tags', method='GET')
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                self._available = resp.status == 200
-        except Exception:
-            self._available = False
-        return self._available
-
     def is_model_available(self) -> bool:
-        """Check if the specific model is available in Ollama."""
+        """Check if Ollama is running and the specific model is available (single request)."""
         if self._model_valid is not None:
             return self._model_valid
-        if not self.is_available():
-            self._model_valid = False
-            return False
         try:
             req = urllib.request.Request(f'{self.url}/api/tags', method='GET')
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
+                self._available = True
                 available_models = [m.get('name', '') for m in data.get('models', [])]
                 self._model_valid = self.model in available_models
                 if not self._model_valid:
                     logger.warning(f"Model '{self.model}' not found in Ollama. Available: {available_models}")
                 return self._model_valid
         except Exception:
+            self._available = False
             self._model_valid = False
             return False
 
-    def generate(self, prompt: str, max_tokens: int = 150, temperature: float = 0.7) -> Optional[str]:
-        if prompt in self.cache:
-            return self.cache[prompt]
+    def is_available(self) -> bool:
+        if self._available is not None:
+            return self._available
+        return self.is_model_available()
 
-        if not self.is_available():
+    def generate(self, prompt: str, max_tokens: int = 150, temperature: float = 0.7) -> Optional[str]:
+        cache_key = (prompt, max_tokens, temperature)
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+
+        if not self.is_model_available():
             return None
 
         try:
@@ -81,7 +75,7 @@ class OllamaTeacher:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 result = data.get('response', '').strip()
-                self.cache[prompt] = result
+                self.cache[cache_key] = result
                 return result
         except Exception as e:
             logger.debug(f"Ollama generation failed: {e}")
