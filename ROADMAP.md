@@ -1,16 +1,71 @@
-# ROADMAP - MyIAModelChat Thinking Implementation
+# ROADMAP - MyIAModelChat: Thinking Real + Validación por Fuente
 
 ## Overview
 
-This roadmap defines the implementation of complete chain-of-thought ("thinking") capabilities for the MyIAModelChat system. The system currently has a partial scaffold (tokens, detection, templates) but lacks loss masking, generation control, streaming support, and LLM-powered data generation.
+Este roadmap define la implementación completa de chain-of-thought ("thinking") real para MyIAModelChat. El sistema actual tiene scaffold parcial (tokens, detección, templates) pero el thinking es **falso** (meta-comentarios sin razonamiento). Este plan reemplaza el thinking fake por thinking real con generadores por fuente, más validación/limpieza de datos por fuente para evitar contaminación.
 
-**Status Legend:** `TODO` → `IN_PROGRESS` → `BLOCKED` → `DONE`
+**Leyenda de Estado:** `TODO` → `IN_PROGRESS` → `BLOCKED` → `DONE`
 
-**Priority Legend:**
-- **P0 (MVP)** — Blocking: must be done first, system is broken without it
-- **P1 (High)** — Core: required for thinking to function correctly
-- **P2 (Medium)** — Quality: improves thinking behavior significantly
-- **P3 (Low)** — Polish: nice-to-have, can be deferred
+**Leyenda de Prioridad:**
+- **P0 (MVP)** — Bloqueante: debe hacerse primero, el sistema está roto sin esto
+- **P1 (High)** — Core: requerido para que el thinking funcione correctamente
+- **P2 (Medium)** — Calidad: mejora significativamente el comportamiento del thinking
+- **P3 (Low)** — Pulido: nice-to-have, puede diferirse
+
+---
+
+## Diagnóstico Actual
+
+| Componente | Estado | Problema |
+|-----------|--------|----------|
+| Tokens `<think>`/`</think>` | Registrados correctamente en SentencePiece | Ninguno |
+| Loss masking | Funcional | Peso 0.5 **reduce** aprendizaje de thinking cuando debería mantenerlo |
+| Datos thinking | Templates genéricos, no razonamiento | **CRÍTICO** - el modelo no aprende a razonar |
+| Pipeline thinking | Desconectado de data_preparer | **CRÍTICO** - generate_thinking_data.py nunca se ejecuta |
+| Prompt inferencia | Sin instrucción de thinking | El modelo no sabe que debe "pensar" |
+| Evaluación | Solo accuracy de tokens | No mide calidad del razonamiento |
+| Validación datos | No existe por fuente | Datos contaminados se mezclan |
+
+---
+
+## Flujo Completo del Pipeline (Objetivo)
+
+```
+Raw Sources (AIML, CSV, PDF, EPUB, Web, HF)
+    │
+    ▼
+[1] Per-Source Validator/Cleaner
+    │  Clasifica: bueno / arreglable / descartable
+    │  Arregla lo que se pueda (encoding, HTML, AIML tags)
+    │  Descarta lo que no se pueda arreglar
+    │  Reporta estadísticas de calidad
+    │
+    ▼
+[2] Per-Source Thinking Generator
+    │  Cada fuente genera thinking apropiado:
+    │  - AIML: Rule-based + Teacher model
+    │  - CSV: Teacher model (qwen2.5:1.5b vía Ollama)
+    │  - PDF: Teacher con contexto de sección
+    │  - EPUB: Teacher con contexto de capítulo
+    │  - Web: Teacher con contexto de página
+    │  - HF: Teacher o passthrough
+    │
+    ▼
+[3] Combined Dataset with Thinking
+    │  Formato: <think>reasoning</think>response
+    │  BPE tokenizer entrena con thinking tokens en contexto
+    │
+    ▼
+[4] Training con Loss Masking Real
+    │  thinking_loss_weight = 1.0 (mismo peso que respuesta)
+    │  Metrics: thinking_loss, response_loss, thinking_coverage
+    │
+    ▼
+[5] Inference con Thinking Real
+    │  Prompt: "Pregunta: {q}\nPiensa paso a paso.\n\n"
+    │  Genera: <think>reasoning</think>answer
+    │  Streaming: reasoning + content separados
+```
 
 ---
 
@@ -18,570 +73,880 @@ This roadmap defines the implementation of complete chain-of-thought ("thinking"
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Loss masking breaks training | Training produces NaN or diverges | Rollback: revert `_compute_loss()` to original, keep all other changes |
-| Stop token causes infinite loop | Generation hangs | Add hard max_tokens limit per phase (thinking: 64, response: 128) |
-| LLM models too large for user disk | Phase 6 unusable | Fallback to templates, document min RAM/disk requirements |
-| Streaming format incompatible | Clients break | Keep `stream=false` as default, streaming opt-in only |
-| Thinking reduces response quality | Model confused by thinking tokens | `thinking_loss_weight` tunable, default 0.5 allows partial learning |
+| Ollama no disponible | Generadores por fuente fallan | Fallback a rule-based, modo sin thinking |
+| Teacher model genera thinking bajo calidad | Modelo aprende basura | Validación de calidad + filtrado |
+| Loss masking alto (1.0) confunde al modelo | Training inestable | Monitorear metrics, ajustar si necesario |
+| Datos contaminados pasan validación | Calidad de training baja | Validadores por fuente con reglas específicas |
+| Parsing XML falla en AIML | Se pierden datos AIML | Validador AIML con encoding detection + fallback |
 
 ---
 
 ## Rollback Strategy
 
-Each phase is independently revertible:
+Cada fase es independientemente revertible:
 
 ```bash
-# After any phase, if something breaks:
-git stash           # Save current work
-git checkout -- <file>  # Revert specific file
-# Or revert entire phase:
-git log --oneline   # Find commit before phase
-git revert <commit> # Revert phase
+# Después de cualquier fase, si algo falla:
+git stash
+git checkout -- <archivo>
+# O revertir fase completa:
+git log --oneline
+git revert <commit>
 ```
 
-**Critical rollback points:**
-- After Phase 1: System should work as before (bug fixes only)
-- After Phase 2: Training should still converge (loss masking is additive)
-- After Phase 3: Generation should still work (stop token is additive)
-- After Phase 4: API should still respond (streaming is opt-in)
+---
+
+## Fase 0: Fix Crítico — Loss Weight + Prompt Inferencia — P0 (MVP)
+
+**Prioridad:** P0 — El thinking no funciona sin esto
+**Tiempo estimado:** 1-2 horas
+**Riesgo:** Bajo
+
+### Task 0.1: Cambiar `thinking_loss_weight` de 0.5 a 1.0
+- **Archivo**: `main_train.py`
+- **Ubicación**: `TRAINING_CONFIG` dict
+- **Cambio**: `'thinking_loss_weight': 0.5` → `'thinking_loss_weight': 1.0`
+- **Razón**: Con 0.5 el modelo aprende MENOS thinking que respuesta. Con 1.0 aprende ambos por igual.
+- **Líneas**: ~139-150
+- **Estado**: `TODO`
+
+### Task 0.2: Añadir instrucción de thinking al prompt de inferencia
+- **Archivo**: `dialogmanager.py`
+- **Ubicación**: `generate_response()` línea ~205
+- **Cambio actual**: `prompt_text = f"Pregunta: {user_text}\nRespuesta:"`
+- **Cambio nuevo**: `prompt_text = f"Pregunta: {user_text}\nPiensa paso a paso antes de responder.\n\n"`
+- **Razón**: Sin esta instrucción, el modelo nunca genera `<think>` aunque esté entrenado para ello.
+- **Líneas**: ~205
+- **Estado**: `TODO`
+
+### Verificación Fase 0
+- [ ] Entrenar 1 epoch con thinking loss weight 1.0, verificar que thinking_loss ≈ response_loss
+- [ ] Chat con `--show-thinking`, verificar que el modelo intenta generar `<think>`
 
 ---
 
-## Phase 1: Critical Bug Fixes — P0 (MVP) ✅ DONE
+## Fase 1: Validadores por Fuente — P1 (High)
 
-**Priority:** P0 — System is broken without these fixes
-**Estimated Time:** 1-2 hours
-**Risk:** Low (bug fixes only)
+**Prioridad:** P1 — Sin validación, los datos contaminados arruinan el training
+**Tiempo estimado:** 8-10 horas
+**Riesgo:** Medio (modifica flujo de datos)
 
-### Task 1.1: Fix `parse_thinking_response()` in `main_chat.py`
-- **File**: `main_chat.py:410-424`
-- **Problem**: Line 421 contains corrupted string literal (`效益` instead of `` `)
-- **Fix**: Replace corrupted string with correct `` token
-- **Lines**: 421
-- **Impact**: `parse_thinking_response()` will correctly separate thinking from response
-- **Status**: `DONE`
-- **Testing After:** Run `parse_thinking_response()` with sample thinking text
+### Arquitectura de Validadores
 
-### Task 1.2: Fix `data_preparer.py` cache metadata
-- **File**: `data_preparer.py:568-593` (`_save_to_cache`)
-- **Problem**: `has_thinking_tokens` flag never written to `cache_metadata`
-- **Fix**: Add `has_thinking_tokens` detection and write to metadata during `_save_to_cache()`
-- **Lines**: 584-588
-- **Impact**: `main_train.py:221` detection will work correctly
-- **Status**: `DONE`
-- **Testing After:** Prepare data with thinking, verify `cache_metadata.pkl` contains `has_thinking_tokens=True`
+```
+┌─────────────────────────────────────────────────────────┐
+│                   SourceValidator (Base)                 │
+│  - classify(sample) → good / fixable / discardable      │
+│  - fix(sample) → fixed_sample                           │
+│  - report() → QualityReport                             │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+    ┌──────────────────┼──────────────────────┐
+    │                  │                      │
+    ▼                  ▼                      ▼
+┌─────────┐    ┌─────────────┐    ┌─────────────────┐
+│Generic  │    │Dedicated    │    │Dedicated        │
+│Validator│    │Validators   │    │Validators       │
+│(AIML,   │    │(PDF, Web,   │    │(EPUB)           │
+│ CSV)    │    │ EPUB)       │    │                 │
+└─────────┘    └─────────────┘    └─────────────────┘
+```
 
-### Phase 1 Documentation Update
-- [ ] Update `AGENTS.md` if file structure changed
-- [ ] Update `THINKING_GUIDE.md` with bug fix notes
-
----
-
-## Phase 2: Thinking-Weighted Loss Masking — P1 (High) ✅ DONE
-
-**Priority:** P1 — Core thinking functionality
-**Estimated Time:** 4-6 hours
-**Risk:** Medium (modifies training loop, could affect convergence)
-
-### Task 2.1: Add `thinking_loss_weight` to `TRAINING_CONFIG`
-- **File**: `main_train.py`
-- **Location**: `TRAINING_CONFIG` dict
-- **Change**: Add `'thinking_loss_weight': 0.5`
-- **Lines**: ~139-150
-- **Status**: `DONE`
-
-### Task 2.2: Modify `_compute_loss()` for thinking-aware masking
-- **File**: `main_train.py:430-443`
-- **Current**: Flat CrossEntropyLoss on all non-pad tokens
-- **New**: 
-  - Identify thinking token positions (between `<` and `` token IDs)
-  - Apply `thinking_loss_weight` to thinking token losses
-  - Apply full weight (1.0) to response token losses
-- **Performance**: Vectorized implementation using PyTorch tensors (no Python loops)
-- **Implementation**:
+### Task 1.1: Crear `source_validators.py` — Clase base + Validador Genérico
+- **Archivo**: `source_validators.py` (nuevo)
+- **Clase base**: `SourceValidator`
+  - `classify(sample: dict) → Literal['good', 'fixable', 'discardable']`
+  - `fix(sample: dict) → dict`
+  - `report() → QualityReport`
+  - `validate_batch(samples: list) → list[dict]`
+- **Validador genérico**: `GenericValidator(SourceValidator)`
+  - Validación de campos vacíos
+  - Normalización de encoding (UTF-8)
+  - Detección de duplicados
+  - Filtrado de muestras demasiado cortas (< 5 chars)
+  - Filtrado de muestras demasiado largas (> 2000 chars)
+- **Campos del reporte**:
   ```python
-  def _compute_loss(self, model, inputs, targets, criterion):
-      outputs = model(inputs)
-      outputs = outputs.contiguous().view(-1, outputs.size(-1))
-      targets = targets.contiguous().view(-1)
-
-      # Create weight mask (vectorized)
-      weights = torch.ones_like(targets, dtype=torch.float)
-      thinking_id = self.tokenizer.get_thinking_index()
-      thinking_end_id = self.tokenizer.get_thinking_end_index()
-
-      if thinking_id >= 0 and thinking_end_id >= 0:
-          # Vectorized: find positions of thinking open/close tokens
-          is_open = targets == thinking_id
-          is_close = targets == thinking_end_id
-
-          # Cumulative sum to track in_thinking state per sequence
-          # Reset at sequence boundaries (pad tokens)
-          pad_mask = targets == self.tokenizer.get_pad_index()
-
-          # Build thinking mask per sequence
-          cumsum = torch.cumsum(is_open.long() - is_close.long(), dim=0)
-          in_thinking = cumsum > 0
-
-          # Apply weight to thinking positions
-          weights[in_thinking] = self.thinking_loss_weight
-
-          # Reset at sequence boundaries to prevent cross-sequence contamination
-          seq_starts = torch.where(pad_mask | torch.cat([torch.ones(1, dtype=torch.bool, device=targets.device), targets[1:] == self.tokenizer.get_pad_index()]))[0]
-          # Actually, simpler: just use unfold or manual tracking
-
-          # Per-sequence approach (safe for batched data):
-          batch_size = inputs.size(0)
-          seq_len = inputs.size(1)
-          for b in range(batch_size):
-              seq_targets = targets[b * seq_len:(b + 1) * seq_len]
-              in_think = False
-              for i in range(len(seq_targets)):
-                  if seq_targets[i].item() == thinking_id:
-                      in_think = True
-                  if in_think:
-                      weights[b * seq_len + i] = self.thinking_loss_weight
-                  if seq_targets[i].item() == thinking_end_id:
-                      in_think = False
-
-      non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
-      outputs = outputs[non_pad_mask]
-      targets = targets[non_pad_mask]
-      weights = weights[non_pad_mask]
-
-      loss = criterion(outputs, targets)
-      return (loss * weights).sum() / weights.sum()
+  @dataclass
+  class QualityReport:
+      source: str
+      total_samples: int
+      good: int
+      fixable: int
+      discardable: int
+      fixes_applied: dict  # {fix_type: count}
+      discarded_reasons: dict  # {reason: count}
   ```
-- **Lines**: 430-443
-- **Status**: `DONE`
+- **Estado**: `TODO`
 
-### Phase 2 Testing
-- [ ] Unit test: Verify thinking tokens get weight 0.5, response tokens get 1.0
-- [ ] Unit test: Verify cross-sequence contamination does not occur
-- [ ] Integration test: Train 1 epoch with thinking data, verify loss decreases
-- [ ] Rollback test: Revert `_compute_loss()`, verify training still works
-
-### Phase 2 Documentation Update
-- [ ] Update `THINKING_GUIDE.md` with loss masking explanation
-- [ ] Update `README.md` Configuration section with `thinking_loss_weight`
-
----
-
-## Phase 3: Generation with Thinking Stop Token — P1 (High) ✅ DONE
-
-**Priority:** P1 — Core thinking functionality
-**Estimated Time:** 4-6 hours
-**Risk:** Medium (modifies generation loop)
-
-### Task 3.1: Add thinking stop detection in `dialogmanager.py`
-- **File**: `dialogmanager.py:186-224` (generation loop)
-- **Current**: No stop on `</think>` token
-- **New**: 
-  - Track when `</think>` token is generated
-  - After `</think>`, switch to "response mode"
-  - Continue generating response until EOS or max_len
-  - Return both thinking and response separately
-- **Hard limits** (prevent infinite loops):
-  - Max thinking tokens: 64
-  - Max response tokens: 128
-  - If `</think>` never generated, treat all output as response
-- **Implementation**:
-  - Add `self.thinking_end_id` to `DialogueManager.__init__`
-  - In generation loop: after generating a token, check if it's `</think>`
-  - If `</think>` generated, set `in_response_mode = True`
-  - Continue generating for response tokens
-  - Collect thinking tokens and response tokens separately
-- **Lines**: 186-224
-- **Status**: `DONE`
-
-### Task 3.2: Update `generate_response()` return format
-- **File**: `dialogmanager.py:160-224`
-- **Current**: Returns `str` (response only)
-- **New**: Return `{'thinking': str|None, 'response': str}`
-- **Backward compatible**: Check if return value is dict or str
-- **Lines**: 160-224
-- **Status**: `DONE`
-
-### Phase 3 Testing
-- [ ] Unit test: Generate response with thinking, verify `thinking` and `response` keys
-- [ ] Unit test: Generate response without thinking, verify `thinking` is None
-- [ ] Unit test: Verify max tokens limits are enforced
-- [ ] Integration test: Full chat with `--show-thinking`, verify output format
-
-### Phase 3 Documentation Update
-- [ ] Update `THINKING_GUIDE.md` with generation behavior
-- [ ] Update `README.md` examples with thinking output
-
----
-
-## Phase 4: Streaming with Thinking/Response Separation — P2 (Medium) ✅ DONE
-
-**Priority:** P2 — Quality of life for API consumers
-**Estimated Time:** 4-6 hours
-**Risk:** Low (streaming is opt-in)
-
-### Task 4.1: Update `stream_chat_text()` for thinking streaming
-- **File**: `main_chat.py:437-450`
-- **Current**: Character-level chunking of final text
-- **New**:
-  - Accept pre-parsed `{'thinking': str, 'response': str}`
-  - Send thinking chunks as `{"reasoning": "chunk"}` deltas
-  - Send response chunks as `{"content": "chunk"}` deltas
-  - Use token-level chunking (not character-level)
-- **Lines**: 437-450
-- **Status**: `TODO`
-
-### Task 4.2: Add `reasoning` field to Pydantic schemas
-- **File**: `main_chat.py`
-- **Changes**:
-  - Add `reasoning: Optional[str]` to `ChatRequest`
-  - Add `reasoning: Optional[str]` to response models
-- **Lines**: 71-80 (ChatRequest), ~300-350 (response models)
-- **Status**: `TODO`
-
-### Task 4.3: Update `/v1/chat/completions` endpoint for streaming
-- **File**: `main_chat.py`
-- **Change**: When `stream=True` and `include_thinking=True`:
-  - Send thinking delta chunks first
-  - Then send response delta chunks
-  - Format: OpenAI-compatible with `reasoning` field
-- **Lines**: ~300-360
-- **Status**: `TODO`
-
-### Phase 4 Testing
-- [ ] Unit test: Streaming format contains `reasoning` and `content` deltas
-- [ ] Integration test: SSE stream with thinking, verify chunk order
-- [ ] Compatibility test: Verify `stream=false` still works unchanged
-
-### Phase 4 Documentation Update
-- [ ] Update API docs in `README.md` with streaming format
-
----
-
-## Phase 5: Thinking-Specific Metrics — P2 (Medium) ✅ DONE
-
-**Priority:** P2 — Helps debug and tune thinking behavior
-**Estimated Time:** 3-4 hours
-**Risk:** Low (metrics only, no training impact)
-
-### Task 5.1: Enhance `_compute_thinking_metrics()`
-- **File**: `main_train.py:445-486`
-- **Current**: Only `thinking_token_accuracy`, `thinking_open_accuracy`, `thinking_close_accuracy`
-- **New metrics**:
-  - `thinking_loss` — average loss on thinking tokens
-  - `response_loss` — average loss on response tokens
-  - `thinking_length_avg` — average thinking block length (tokens)
-  - `thinking_coverage` — % of output that is thinking
-  - `thinking_token_accuracy` (existing, keep)
-  - `response_token_accuracy` — accuracy on response tokens only
-- **Lines**: 445-486
-- **Status**: `TODO`
-
-### Task 5.2: Log thinking metrics separately in training loop
-- **File**: `main_train.py:545-585`
-- **Change**: Log thinking vs response loss separately
-- **Lines**: 545-585
-- **Status**: `TODO`
-
-### Phase 5 Testing
-- [ ] Unit test: Verify all new metrics are computed correctly
-- [ ] Unit test: Verify metrics are logged per epoch
-
----
-
-## Phase 6: LLM-Powered Thinking Data Generation — P2 (Medium) ✅ DONE
-
-**Priority:** P2 — Higher quality thinking data
-**Estimated Time:** 6-8 hours
-**Risk:** Medium (external dependencies: HF models, Ollama server)
-
-### Disk Space Requirements
-- HuggingFace models: 1-4 GB per model (Qwen2.5-1.5B = ~1.5GB)
-- Minimum 5 GB free disk space recommended for HF mode
-- Ollama mode: model must be pre-pulled (`ollama pull <model>`)
-
-### Task 6.1: Add HuggingFace integration to `generate_thinking_data.py`
-- **File**: `generate_thinking_data.py`
-- **New function**: `generate_thinking_with_hf(text, answer, model_name)`
-- **Implementation**:
-  - Load model via `transformers.pipeline("text-generation", model=model_name)`
-  - Prompt: Spanish instruction to generate step-by-step reasoning
-  - Parse output to extract thinking content
-  - Fallback to templates if model unavailable
-  - Cache loaded model to avoid re-loading per sample
-- **Lines**: New section after line 103
-- **Status**: `TODO`
-
-### Task 6.2: Add Ollama integration to `generate_thinking_data.py`
-- **File**: `generate_thinking_data.py`
-- **New function**: `generate_thinking_with_ollama(text, answer, model_name)`
-- **Implementation**:
-  - POST to `http://localhost:11434/api/generate`
-  - Prompt: Spanish instruction for chain-of-thought
-  - Parse JSON response for generated text
-  - Fallback to templates if server unavailable
-  - Timeout handling (30s default)
-- **Lines**: New section after HF integration
-- **Status**: `TODO`
-
-### Task 6.3: Update CLI with new modes
-- **File**: `generate_thinking_data.py:194-292`
-- **New CLI args**:
-  - `--mode [template|hf|ollama]` — Generation mode (default: template)
-  - `--model <model_id>` — Model name for HF/Ollama mode
-  - `--validate` — Validate thinking consistency with answer
-  - `--max-samples <int>` — Limit number of samples to process
-- **Lines**: 194-292
-- **Status**: `TODO`
-
-### Task 6.4: Add English thinking templates
-- **File**: `generate_thinking_data.py:29-63`
-- **Change**: Add `THINKING_TEMPLATES_EN` with English equivalents
-- **See**: [THINKING_DATASETS.md](THINKING_DATASETS.md) for template examples
-- **Lines**: 29-63
-- **Status**: `TODO`
-
-### Task 6.5: Add thinking validation
-- **File**: `generate_thinking_data.py`
-- **New function**: `validate_thinking_consistency(text, thinking, answer)`
-- **Implementation**:
-  - Check if thinking mentions key concepts from the question
-  - Check if thinking logically leads to the answer
-  - Return `True`/`False`
-- **Lines**: New section
-- **Status**: `TODO`
-
-### Phase 6 Testing
-- [ ] Unit test: Template mode generates valid thinking text
-- [ ] Integration test: HF mode with small model (if available)
-- [ ] Integration test: Ollama mode (if server running)
-- [ ] Unit test: Validation function with consistent/inconsistent examples
-- [ ] Manual test: Generate 10 samples, inspect quality
-
-### Phase 6 Documentation Update
-- [ ] Update `THINKING_GUIDE.md` with new modes
-- [ ] Update `README.md` with `--thinking-mode` examples
-
----
-
-## Phase 7: CLI and Configuration — P2 (Medium) ✅ DONE
-
-**Priority:** P2 — User-facing configuration
-**Estimated Time:** 2-3 hours
-**Risk:** Low (additive flags)
-
-### Task 7.1: Add thinking-related CLI flags to `main.py`
-- **File**: `main.py`
-- **New flags**:
-  - `--thinking-loss-weight FLOAT` — Weight for thinking token loss (default: 0.5)
-  - `--generate-thinking` — Generate thinking data before training
-  - `--thinking-mode [template|hf|ollama]` — Mode for thinking generation
-  - `--thinking-model <model>` — Model for HF/Ollama thinking generation
-- **Lines**: ~620-650 (argparse section)
-- **Status**: `TODO`
-
-### Task 7.2: Add thinking config to `TRAINING_CONFIG`
-- **File**: `main_train.py`
-- **New entries**:
+### Task 1.2: Crear `aiml_validator.py` — Validador AIML
+- **Archivo**: `aiml_validator.py` (nuevo)
+- **Hereda de**: `GenericValidator`
+- **Problemas específicos AIML**:
+  - XML malformado → detectar con `ElementTree.parse()` try/except
+  - Encoding mixto (ISO-8859-1 vs UTF-8) → detectar con `chardet` o fallback
+  - AIML tags en template text (`<random>`, `<srai>`, `<condition>`, etc.) → limpiar con regex
+  - HTML tags en template (`<br/>`, `<a>`, `<b>`) → limpiar con regex
+  - Patrones wildcard-only (`_`, `_ _`) → descartar
+  - Templates vacíos después de limpiar → descartar
+  - Stale `.datasets` pickle → detectar y regenerar
+- **Regex de limpieza**:
   ```python
-  'thinking_loss_weight': 0.5,
-  'thinking_enabled': True,
-  'thinking_stop_on_end': True,
-  'thinking_metrics_interval': 50,
+  # Limpiar tags AIML funcionales
+  re.sub(r'<(random|srai|condition|set|get|star|bot|topic|that|person|li|learn|eval)[^>]*>.*?</\1>', '', text, flags=re.DOTALL)
+  # Limpiar self-closing AIML tags
+  re.sub(r'<(star|bot|person|br)\s*/?\s*>', '', text)
+  # Limpiar HTML tags
+  re.sub(r'<[^>]+>', '', text)
+  # Filtrar wildcard-only
+  re.match(r'^[_*]+$', pattern_text.strip())
   ```
-- **Lines**: ~139-150
-- **Status**: `TODO`
+- **Estado**: `TODO`
 
-### Task 7.3: Add thinking config to `DialogueManager`
-- **File**: `dialogmanager.py:33-50`
-- **New parameters**:
-  - `thinking_end_id` — Token ID for `</think>`
-  - `thinking_enabled` — Whether to generate thinking
-  - `thinking_max_tokens` — Max tokens for thinking phase (default: 64)
-- **Lines**: 33-50
-- **Status**: `TODO`
+### Task 1.3: Crear `pdf_validator.py` — Validador PDF
+- **Archivo**: `pdf_validator.py` (nuevo)
+- **Hereda de**: `SourceValidator` (dedicado, no genérico)
+- **Problemas específicos PDF**:
+  - Texto garbled/mojibake → detectar con ratio de caracteres de reemplazo (`\ufffd`)
+  - Headers/footers de página → detectar con patrones repetidos cortos
+  - Saltos de línea con guión (`Artifi-\ncial`) → reconstruir con regex
+  - Páginas vacías (PDFs escaneados) → detectar y descartar
+  - Tablas como texto jumbled → detectar con patrones de alineación
+  - Artefactos de salto de página (`\x0c`) → limpiar
+  - Números de página sueltos → detectar con regex `^\s*\d{1,4}\s*$`
+- **Regex de limpieza**:
+  ```python
+  # Reconstruir guiones partidos
+  re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', text)
+  # Limpiar page breaks
+  re.sub(r'\x0c', ' ', text)
+  # Detectar page numbers sueltos
+  re.sub(r'^\s*\d{1,4}\s*$', '', text, flags=re.MULTILINE)
+  # Detectar headers/footers repetidos
+  re.sub(r'^(.{1,30})\n\1\n', '', text, flags=re.MULTILINE)
+  # Detectar mojibake
+  replacement_ratio = text.count('\ufffd') / max(len(text), 1)
+  ```
+- **Estado**: `TODO`
 
-### Phase 7 Testing
+### Task 1.4: Crear `epub_validator.py` — Validador EPUB
+- **Archivo**: `epub_validator.py` (nuevo)
+- **Hereda de**: `SourceValidator` (dedicado)
+- **Problemas específicos EPUB**:
+  - Tags HTML residuales → limpiar con `html.parser` o `BeautifulSoup` lite
+  - Entidades HTML (`&amp;`, `&lt;`, `&nbsp;`, `&#8217;`) → decodificar con `html.unescape()`
+  - Bloques `<style>` y `<script>` → detectar y eliminar contenido
+  - Navegación/TOC inyectado → detectar por tipo de item EPUB
+  - Items vacíos → detectar y descartar
+  - UTF-8 con `errors='ignore'` → detectar bytes perdidos
+- **Estado**: `TODO`
+
+### Task 1.5: Crear `web_validator.py` — Validador Web
+- **Archivo**: `web_validator.py` (nuevo)
+- **Hereda de**: `SourceValidator` (dedicado)
+- **Problemas específicos Web**:
+  - Texto boilerplate (menús, headers, footers) → detectar con patrones de navegación
+  - Contenido de anuncios → detectar con keywords (`ad`, `sponsored`, `click here`)
+  - Texto de cookie notices → detectar con keywords (`cookie`, `privacy`, `accept`)
+  - Contenido duplicado (sidebars, related articles) → deduplicar
+  - URLs rotas / contenido vacío → detectar y descartar
+  - JavaScript residual → limpiar
+- **Estado**: `TODO`
+
+### Task 1.6: Crear `csv_validator.py` — Validador CSV
+- **Archivo**: `csv_validator.py` (nuevo)
+- **Hereda de**: `GenericValidator`
+- **Problemas específicos CSV**:
+  - Encoding incorrecto → detectar con `chardet` o intentar UTF-8/latin-1
+  - Delimitador incorrecto → detectar con `csv.Sniffer`
+  - Campos faltantes (input o output vacío) → descartar
+  - Filas duplicadas → deduplicar
+  - Headers como datos → detectar primera fila
+  - Newlines dentro de campos → normalizar
+- **Estado**: `TODO`
+
+### Task 1.7: Integrar validadores en `data_preparer.py`
+- **Archivo**: `data_preparer.py`
+- **Ubicación**: Después de `_standardize_combined_dataset()` (línea 680)
+- **Nuevo paso**: `_validate_and_clean_sources()` 
+- **Flujo**:
+  ```python
+  def _validate_and_clean_sources(self):
+      validators = {
+          'aiml': AIMLValidator(),
+          'csv': CSVValidator(),
+          'pdf': PDFValidator(),
+          'epub': EPUBValidator(),
+          'web': WebValidator(),
+      }
+      reports = {}
+      for source_name, dataset in self._get_source_datasets():
+          if source_name in validators and dataset:
+              validator = validators[source_name]
+              dataset, report = validator.validate_batch(dataset)
+              reports[source_name] = report
+      self._log_quality_reports(reports)
+  ```
+- **Estado**: `TODO`
+
+### Verificación Fase 1
+- [ ] Unit test: Validador AIML detecta tags HTML y los limpia
+- [ ] Unit test: Validador PDF detecta mojibake y descarta
+- [ ] Unit test: Validador EPUB decodifica entidades HTML
+- [ ] Unit test: Validador Web elimina boilerplate
+- [ ] Unit test: Validador CSV detecta encoding incorrecto
+- [ ] Integration test: Pipeline completo con validación, verificar estadísticas
+- [ ] Manual test: Revisar muestras arregladas vs descartadas
+
+---
+
+## Fase 2: Generadores Thinking por Fuente — P1 (High)
+
+**Prioridad:** P1 — Core del thinking real
+**Tiempo estimado:** 12-15 horas
+**Riesgo:** Medio (depende de Ollama para teacher model)
+
+### Arquitectura de Generadores
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               ThinkingGenerator (Base)                   │
+│  - generate(sample) → SampleWithThinking                 │
+│  - validate_thinking(thinking, answer) → bool            │
+│  - set_teacher_model(model: OllamaTeacher)               │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+    ┌──────────────────┼──────────────────────┐
+    │                  │                      │
+    ▼                  ▼                      ▼
+┌─────────┐    ┌─────────────┐    ┌─────────────────┐
+│Rule-based│    │Teacher-only │    │Hybrid           │
+│Generators│    │Generators   │    │Generators       │
+│(AIML     │    │(CSV, PDF,   │    │(AIML complejas) │
+│ simple)  │    │ Web)        │    │                 │
+└─────────┘    └─────────────┘    └─────────────────┘
+```
+
+### Task 2.1: Crear `thinking_generators.py` — Clase base + OllamaTeacher
+- **Archivo**: `thinking_generators.py` (nuevo)
+- **Clase base**: `ThinkingGenerator`
+  ```python
+  class ThinkingGenerator:
+      def __init__(self, teacher_model: OllamaTeacher = None):
+          self.teacher = teacher_model
+      
+      def generate(self, sample: dict) -> dict:
+          """Genera thinking para un sample. Retorna dict con 'thinking' key."""
+          raise NotImplementedError
+      
+      def validate_thinking(self, thinking: str, answer: str, question: str) -> bool:
+          """Valida que el thinking sea razonamiento real."""
+          checks = {
+              'length': len(thinking) > 20,
+              'no_meta': not thinking.startswith('El usuario'),
+              'derivation': any(w in thinking.lower() for w in answer.lower().split()[:3]),
+              'steps': any(ind in thinking.lower() for ind in ['porque', 'por lo tanto', 'primero', 'paso', 'análisis', 'because', 'therefore', 'first']),
+          }
+          return sum(checks.values()) >= 3
+  ```
+- **Clase**: `OllamaTeacher`
+  ```python
+  class OllamaTeacher:
+      def __init__(self, model: str = 'qwen2.5:1.5b', url: str = 'http://localhost:11434'):
+          self.model = model
+          self.url = url
+          self.cache = {}  # Evitar re-generar el mismo prompt
+      
+      def generate(self, prompt: str, max_tokens: int = 150) -> str:
+          if prompt in self.cache:
+              return self.cache[prompt]
+          # POST a Ollama API
+          # Fallback a None si no disponible
+  ```
+- **Estado**: `TODO`
+
+### Task 2.2: Crear `aiml_thinking.py` — Generador AIML
+- **Archivo**: `aiml_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia híbrida**:
+  ```python
+  class AIMLThinkingGenerator(ThinkingGenerator):
+      # Categorías con rule-based
+      SIMPLE_CATEGORIES = {
+          'greeting': ['hello', 'hi', 'hey', 'hola', 'buenos'],
+          'farewell': ['bye', 'goodbye', 'chao', 'adiós', 'hasta'],
+          'identity': ['who are you', 'what is your name', 'qué eres'],
+          'thanks': ['thank', 'gracias'],
+          'yes': ['yes', 'sí', 'ok'],
+          'no': ['no', 'nah'],
+      }
+      
+      def generate(self, sample):
+          pattern = sample['input'].lower()
+          template = sample['output']
+          
+          # Rule-based para categorías simples
+          for category, keywords in self.SIMPLE_CATEGORIES.items():
+              if any(kw in pattern for kw in keywords):
+                  return {'thinking': self._rule_based_thinking(category, template)}
+          
+          # Teacher model para complejas
+          if self.teacher:
+              thinking = self.teacher.generate(
+                  f"Analiza esta pregunta AIML y genera un razonamiento paso a paso.\n"
+                  f"Pregunta: {sample['input']}\n"
+                  f"Respuesta del bot: {template}\n"
+                  f"Razonamiento:"
+              )
+              return {'thinking': thinking}
+          
+          return {'thinking': None}  # Sin thinking si no hay teacher
+      
+      def _rule_based_thinking(self, category, template):
+          if category == 'greeting':
+              return f"El usuario hace un saludo. Respondo con un saludo amigable: {template[:50]}..."
+          elif category == 'farewell':
+              return f"El usuario se despide. Respondo con una despedida apropiada."
+          # etc.
+  ```
+- **Estado**: `TODO`
+
+### Task 2.3: Crear `csv_thinking.py` — Generador CSV
+- **Archivo**: `csv_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia**: Teacher model siempre
+  ```python
+  class CSVThinkingGenerator(ThinkingGenerator):
+      def generate(self, sample):
+          question = sample.get('input', sample.get('question', ''))
+          answer = sample.get('output', sample.get('answer', ''))
+          
+          prompt = f"""Analiza esta pregunta y respuesta. Genera un razonamiento paso a paso
+que lleve lógicamente de la pregunta a la respuesta.
+
+Pregunta: {question}
+Respuesta correcta: {answer}
+
+Razonamiento (1-3 oraciones, en español):"""
+          
+          thinking = self.teacher.generate(prompt)
+          return {'thinking': thinking}
+  ```
+- **Estado**: `TODO`
+
+### Task 2.4: Crear `pdf_thinking.py` — Generador PDF
+- **Archivo**: `pdf_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia**: Teacher con contexto de chunk
+  ```python
+  class PDFThinkingGenerator(ThinkingGenerator):
+      def generate(self, sample):
+          text = sample.get('input_ids', sample.get('text', ''))
+          # Extraer title del chunk si existe
+          title = self._extract_title(text)
+          
+          prompt = f"""Basado en el siguiente texto, resume y razona sobre la información clave.
+
+Texto: {text[:500]}{'...' if len(text) > 500 else ''}
+{f'Título: {title}' if title else ''}
+
+Razonamiento paso a paso:"""
+          
+          thinking = self.teacher.generate(prompt)
+          return {'thinking': thinking}
+  ```
+- **Estado**: `TODO`
+
+### Task 2.5: Crear `epub_thinking.py` — Generador EPUB
+- **Archivo**: `epub_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia**: Teacher con contexto de capítulo
+  ```python
+  class EPUBThinkingGenerator(ThinkingGenerator):
+      def generate(self, sample):
+          text = sample.get('input_ids', sample.get('text', ''))
+          chapter = sample.get('chapter', 'Unknown')
+          
+          prompt = f"""Contexto del capítulo: {chapter}
+Contenido: {text[:500]}{'...' if len(text) > 500 else ''}
+
+¿Qué información clave contiene este texto? Razona paso a paso:"""
+          
+          thinking = self.teacher.generate(prompt)
+          return {'thinking': thinking}
+  ```
+- **Estado**: `TODO`
+
+### Task 2.6: Crear `web_thinking.py` — Generador Web
+- **Archivo**: `web_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia**: Teacher con contexto de página
+  ```python
+  class WebThinkingGenerator(ThinkingGenerator):
+      def generate(self, sample):
+          text = sample.get('input_ids', sample.get('text', ''))
+          title = sample.get('title', 'Unknown')
+          url = sample.get('url', '')
+          
+          prompt = f"""Documento: {title}
+URL: {url}
+Contenido: {text[:800]}
+
+Resume y razona sobre el contenido principal:"""
+          
+          thinking = self.teacher.generate(prompt)
+          return {'thinking': thinking}
+  ```
+- **Estado**: `TODO`
+
+### Task 2.7: Crear `hf_thinking.py` — Generador HuggingFace
+- **Archivo**: `hf_thinking.py` (nuevo)
+- **Hereda de**: `ThinkingGenerator`
+- **Estrategia**: Teacher o passthrough
+  ```python
+  class HFThinkingGenerator(ThinkingGenerator):
+      def generate(self, sample):
+          # Si ya tiene estructura QA, generar thinking para la pregunta
+          if 'question' in sample and 'answer' in sample:
+              prompt = f"""Pregunta: {sample['question']}
+Respuesta: {sample['answer']}
+Genera un razonamiento paso a paso que lleve de la pregunta a la respuesta:"""
+              thinking = self.teacher.generate(prompt)
+              return {'thinking': thinking}
+          
+          # Texto continuo: generar resumen razonado
+          text = sample.get('text', sample.get('input_ids', ''))
+          prompt = f"""Texto: {text[:500]}
+Resume y razona sobre la información clave:"""
+          thinking = self.teacher.generate(prompt)
+          return {'thinking': thinking}
+  ```
+- **Estado**: `TODO`
+
+### Task 2.8: Integrar generadores en `data_preparer.py`
+- **Archivo**: `data_preparer.py`
+- **Ubicación**: Después de validación (Fase 1), antes de BPE tokenization
+- **Nuevo paso**: `_generate_thinking_for_sources()`
+- **Flujo**:
+  ```python
+  def _generate_thinking_for_sources(self):
+      teacher = OllamaTeacher(model=self.args.thinking_model)
+      generators = {
+          'aiml': AIMLThinkingGenerator(teacher),
+          'csv': CSVThinkingGenerator(teacher),
+          'pdf': PDFThinkingGenerator(teacher),
+          'epub': EPUBThinkingGenerator(teacher),
+          'web': WebThinkingGenerator(teacher),
+          'hf': HFThinkingGenerator(teacher),
+      }
+      
+      for source_name, dataset in self._get_source_datasets():
+          if source_name in generators and dataset:
+              generator = generators[source_name]
+              dataset = dataset.map(generator.generate)
+      
+      # Formatear: <think>thinking</think>response
+      self.combined_data = self._format_thinking_data(self.combined_data)
+  ```
+- **Estado**: `TODO`
+
+### Verificación Fase 2
+- [ ] Unit test: AIML generator produce thinking para greeting
+- [ ] Unit test: CSV generator produce thinking con Ollama
+- [ ] Unit test: PDF generator incluye contexto del chunk
+- [ ] Unit test: EPUB generator incluye título del capítulo
+- [ ] Unit test: Web generator incluye URL y título
+- [ ] Unit test: HF generator detecta formato QA
+- [ ] Unit test: validate_thinking() clasifica correctly
+- [ ] Integration test: Generar thinking para cada fuente, verificar formato
+- [ ] Manual test: Revisar 10 muestras por fuente, verificar calidad del reasoning
+
+---
+
+## Fase 3: Integración Pipeline — P1 (High)
+
+**Prioridad:** P1 — Todo debe conectarse correctamente
+**Tiempo estimado:** 4-6 horas
+**Riesgo:** Bajo (integración)
+
+### Task 3.1: Actualizar `data_preparer.py` — Pipeline completo
+- **Archivo**: `data_preparer.py`
+- **Ubicación**: Método `prepare()` (líneas 605-737)
+- **Nuevo flujo**:
+  ```python
+  def prepare(self):
+      # ... existing steps 1-6 ...
+      
+      # NUEVO: Validación por fuente
+      if hasattr(self.args, 'validate_sources') and self.args.validate_sources:
+          logger.info("\n[6.5/7] Validating and cleaning sources...")
+          self._validate_and_clean_sources()
+      
+      # NUEVO: Generación thinking por fuente
+      if hasattr(self.args, 'generate_thinking') and self.args.generate_thinking:
+          logger.info("\n[6.6/7] Generating real thinking data...")
+          self._generate_thinking_for_sources()
+      
+      # ... existing steps 7+ ...
+  ```
+- **Estado**: `TODO`
+
+### Task 3.2: Actualizar `main.py` — Nuevos flags CLI
+- **Archivo**: `main.py`
+- **Nuevos flags**:
+  ```python
+  # Validación por fuente
+  '--validate-sources'   # Activar validación/limpieza por fuente
+  
+  # Thinking real
+  '--generate-thinking'  # Generar thinking real durante preparación
+  '--thinking-model'     # Modelo teacher para thinking (default: qwen2.5:1.5b)
+  '--thinking-depth'     # Profundidad: basic | adaptive | detailed
+  ```
+- **Líneas**: ~620-650
+- **Estado**: `TODO`
+
+### Task 3.3: Actualizar `main_train.py` — Métricas thinking separadas
+- **Archivo**: `main_train.py`
+- **Cambio**: `_compute_thinking_metrics()` separar thinking_loss de response_loss
+- **Métricas nuevas**:
+  - `thinking_loss` — loss promedio en tokens de thinking
+  - `response_loss` — loss promedio en tokens de respuesta
+  - `thinking_length_avg` — largo promedio del bloque thinking (tokens)
+  - `thinking_coverage` — % del output que es thinking
+  - `response_token_accuracy` — accuracy solo en tokens de respuesta
+- **Líneas**: 445-486
+- **Estado**: `TODO`
+
+### Task 3.4: Actualizar `dialogmanager.py` — Prompt de inferencia
+- **Archivo**: `dialogmanager.py`
+- **Cambio**: Añadir instrucción de thinking al prompt
+- **Línea**: ~205
+- **Estado**: `TODO`
+
+### Verificación Fase 3
+- [ ] Integration test: Pipeline completo `--prepare-data --aiml --csv --generate-thinking --validate-sources`
+- [ ] Integration test: Training con thinking real, verificar loss convergence
+- [ ] Integration test: Chat con thinking real, verificar output
+- [ ] API test: POST con `include_thinking: true`
+
+---
+
+## Fase 4: Validación de Calidad — P2 (Medium)
+
+**Prioridad:** P2 — Asegurar calidad del thinking generado
+**Tiempo estimado:** 3-4 horas
+**Riesgo:** Bajo
+
+### Task 4.1: Crear `thinking_quality.py` — Validador de calidad
+- **Archivo**: `thinking_quality.py` (nuevo)
+- **Funciones**:
+  ```python
+  def validate_thinking_batch(samples: list) -> dict:
+      """Valida un batch de samples con thinking."""
+      results = {
+          'valid': 0,
+          'too_short': 0,
+          'meta_commentary': 0,
+          'no_derivation': 0,
+          'low_quality': 0,
+      }
+      for sample in samples:
+          thinking = sample.get('thinking', '')
+          answer = sample.get('output', '')
+          question = sample.get('input', '')
+          
+          if len(thinking) < 20:
+              results['too_short'] += 1
+          elif thinking.startswith('El usuario') or thinking.startswith('The user'):
+              results['meta_commentary'] += 1
+          elif not any(w in thinking.lower() for w in answer.lower().split()[:3]):
+              results['no_derivation'] += 1
+          else:
+              results['valid'] += 1
+      
+      return results
+  ```
+- **Estado**: `TODO`
+
+### Task 4.2: Integrar validación en pipeline
+- **Archivo**: `data_preparer.py`
+- **Ubicación**: Después de generación thinking
+- **Flujo**: Generar → Validar → Filtrar bajas calidades → Reportar
+- **Estado**: `TODO`
+
+### Verificación Fase 4
+- [ ] Unit test: validate_thinking_batch clasifica correctly
+- [ ] Integration test: Pipeline con validación, verificar filtrado
+
+---
+
+## Fase 5: CLI y Configuración — P2 (Medium)
+
+**Prioridad:** P2 — User-facing configuration
+**Tiempo estimado:** 2-3 horas
+**Riesgo:** Bajo
+
+### Task 5.1: Flags CLI completos
+- **Archivo**: `main.py`
+- **Flags**:
+  ```bash
+  # Preparación con thinking
+  python main.py --prepare-data --aiml --csv --pdf \
+      --generate-thinking \
+      --validate-sources \
+      --thinking-model qwen2.5:1.5b \
+      --thinking-depth adaptive
+  
+  # Solo validación (sin thinking)
+  python main.py --prepare-data --aiml --csv --validate-sources
+  
+  # Training
+  python main.py --train --use-cache --epochs 30 \
+      --thinking-loss-weight 1.0
+  
+  # Chat
+  python main.py --chat --model mymodel --show-thinking
+  ```
+- **Estado**: `TODO`
+
+### Task 5.2: Configuración en TRAINING_CONFIG
+- **Archivo**: `main_train.py`
+- **Entradas nuevas**:
+  ```python
+  TRAINING_CONFIG = {
+      # ... existente ...
+      'thinking_loss_weight': 1.0,  # Cambiado de 0.5
+      'thinking_enabled': True,
+      'thinking_stop_on_end': True,
+      'thinking_metrics_interval': 50,
+  }
+  ```
+- **Estado**: `TODO`
+
+### Verificación Fase 5
 - [ ] Unit test: CLI flags parsed correctly
-- [ ] Integration test: `--thinking-loss-weight 0.3` changes training behavior
-- [ ] Integration test: `--thinking-mode template` generates data
+- [ ] Integration test: Config propagada correctamente
 
 ---
 
-## Phase 8: Integration and Testing — P1 (High) ✅ DONE
+## Fase 6: Testing y Documentación — P2 (Medium)
 
-**Priority:** P1 — Everything must work together
-**Estimated Time:** 4-6 hours
-**Risk:** Low (integration only)
+**Prioridad:** P2 — Todo debe estar documentado y testeado
+**Tiempo estimado:** 4-6 horas
+**Riesgo:** Bajo
 
-### Task 8.1: Update `main.py` training pipeline
-- **File**: `main.py`
-- **Change**: If `--generate-thinking` flag is set, call `generate_thinking_data.py` before training
-- **Lines**: ~350-370 (training dispatch)
-- **Status**: `TODO`
-
-### Task 8.2: Update `main.py` chat pipeline
-- **File**: `main.py`
-- **Change**: Pass `thinking_enabled` and `thinking_loss_weight` to `MainTrain` and `MainChat`
-- **Lines**: ~370-390
-- **Status**: `TODO`
-
-### Task 8.3: Write tests for thinking functionality
-- **File**: `tests/test_thinking.py`
+### Task 6.1: Tests unitarios
+- **Archivo**: `tests/test_source_validators.py` (nuevo)
 - **Tests**:
-  - `test_loss_masking()` — Verify thinking tokens have lower loss weight
-  - `test_thinking_detection()` — Verify `<think>` detection in training data
-  - `test_parse_thinking_response()` — Verify thinking/response separation
-  - `test_thinking_metrics()` — Verify thinking metrics computation
-  - `test_streaming_with_thinking()` — Verify streaming with thinking chunks
-  - `test_stop_token_limits()` — Verify max tokens enforced
-  - `test_backward_compatibility()` — Verify existing behavior unchanged
-- **Status**: `TODO`
+  - `test_aiml_validator_cleans_html_tags()`
+  - `test_pdf_validator_detects_mojibake()`
+  - `test_epub_validator_decodes_entities()`
+  - `test_web_validator_removes_boilerplate()`
+  - `test_csv_validator_detects_encoding()`
+  - `test_generic_validator_classifies_correctly()`
 
-### Phase 8 Final Verification
-- [ ] Full pipeline: prepare data -> train 1 epoch -> chat with thinking
-- [ ] API test: POST to `/v1/chat/completions` with `include_thinking: true`
-- [ ] Streaming test: SSE stream with thinking chunks
-- [ ] Regression test: All existing tests pass
+- **Archivo**: `tests/test_thinking_generators.py` (nuevo)
+- **Tests**:
+  - `test_aiml_generator_rule_based()`
+  - `test_csv_generator_with_teacher()`
+  - `test_pdf_generator_includes_context()`
+  - `test_epub_generator_includes_chapter()`
+  - `test_web_generator_includes_url()`
+  - `test_hf_generator_detects_qa()`
+  - `test_validate_thinking_quality()`
 
-### Phase 8 Documentation Update
-- [ ] Update `AGENTS.md` with thinking capabilities
-- [ ] Update `README.md` with complete thinking documentation
-- [ ] Update `THINKING_GUIDE.md` with all new features
-- [ ] Update `APP_ARCHITECTURE.md` with thinking data flow
+- **Archivo**: `tests/test_thinking.py` (actualizar)
+- **Tests**:
+  - `test_loss_masking_weight_1_0()`
+  - `test_thinking_generation_with_real_data()`
+  - `test_thinking_in_inference_prompt()`
+
+- **Estado**: `TODO`
+
+### Task 6.2: Documentación
+- **Archivos a actualizar**:
+  - `README.md` — Sección de thinking con ejemplos de uso
+  - `THINKING_GUIDE.md` — Guía completa de thinking real
+  - `APP_ARCHITECTURE.md` — Diagrama de flujo actualizado
+  - `AGENTS.md` — Nuevas herramientas por fuente
+
+- **Estado**: `TODO`
+
+### Verificación Fase 6
+- [ ] `pytest tests/` — Todos los tests pasan
+- [ ] `pytest tests/test_source_validators.py -v` — Validadores OK
+- [ ] `pytest tests/test_thinking_generators.py -v` — Generadores OK
+- [ ] Revisar documentación completeness
 
 ---
 
-## Implementation Order
+## Orden de Implementación
 
 ```
-Phase 1 (Bug Fixes) — P0 — 1-2h
-  -> Task 1.1 (parse_thinking_response fix)
-  -> Task 1.2 (cache metadata fix)
+Fase 0 (Fix Crítico) — P0 — 1-2h
+  → Task 0.1 (loss weight 1.0)
+  → Task 0.2 (prompt inference)
+  → [VERIFY] Training + chat
 
-Phase 2 (Loss Masking) — P1 — 4-6h
-  -> Task 2.1 (config)
-  -> Task 2.2 (loss function)
-  -> [TEST] Unit + integration tests
+Fase 1 (Validadores) — P1 — 8-10h
+  → Task 1.1 (clase base + genérico)
+  → Task 1.2 (AIML validator)
+  → Task 1.3 (PDF validator)
+  → Task 1.4 (EPUB validator)
+  → Task 1.5 (Web validator)
+  → Task 1.6 (CSV validator)
+  → Task 1.7 (integrar en data_preparer)
+  → [TEST] Unit + integration
 
-Phase 3 (Generation Control) — P1 — 4-6h
-  -> Task 3.1 (stop token)
-  -> Task 3.2 (return format)
-  -> [TEST] Unit + integration tests
+Fase 2 (Generadores Thinking) — P1 — 12-15h
+  → Task 2.1 (clase base + OllamaTeacher)
+  → Task 2.2 (AIML generator)
+  → Task 2.3 (CSV generator)
+  → Task 2.4 (PDF generator)
+  → Task 2.5 (EPUB generator)
+  → Task 2.6 (Web generator)
+  → Task 2.7 (HF generator)
+  → Task 2.8 (integrar en data_preparer)
+  → [TEST] Unit + integration
 
-Phase 8.1-8.2 (Integration) — P1 — 2-3h
-  -> Task 8.1 (training pipeline)
-  -> Task 8.2 (chat pipeline)
+Fase 3 (Integración Pipeline) — P1 — 4-6h
+  → Task 3.1 (data_preparer pipeline)
+  → Task 3.2 (CLI flags)
+  → Task 3.3 (métricas)
+  → Task 3.4 (prompt inference)
+  → [TEST] Full pipeline
 
-Phase 5 (Metrics) — P2 — 3-4h
-  -> Task 5.1 (enhance metrics)
-  -> Task 5.2 (logging)
-  -> [TEST] Unit tests
+Fase 4 (Validación Calidad) — P2 — 3-4h
+  → Task 4.1 (thinking_quality.py)
+  → Task 4.2 (integrar validación)
+  → [TEST] Quality checks
 
-Phase 7 (CLI/Config) — P2 — 2-3h
-  -> Task 7.1 (main.py flags)
-  -> Task 7.2 (TRAINING_CONFIG)
-  -> Task 7.3 (DialogueManager config)
-  -> [TEST] Unit + integration tests
+Fase 5 (CLI/Config) — P2 — 2-3h
+  → Task 5.1 (flags completos)
+  → Task 5.2 (TRAINING_CONFIG)
+  → [TEST] Config propagation
 
-Phase 6 (LLM Data Generation) — P2 — 6-8h
-  -> Task 6.1 (HF integration)
-  -> Task 6.2 (Ollama integration)
-  -> Task 6.3 (CLI)
-  -> Task 6.4 (English templates)
-  -> Task 6.5 (validation)
-  -> [TEST] Unit + integration tests
-
-Phase 4 (Streaming) — P2 — 4-6h
-  -> Task 4.1 (stream_chat_text)
-  -> Task 4.2 (schemas)
-  -> Task 4.3 (endpoint)
-  -> [TEST] Unit + integration tests
-
-Phase 8.3 (Final Tests) — P1 — 2-3h
-  -> Task 8.3 (all tests)
-  -> [VERIFY] Full pipeline test
+Fase 6 (Testing/Docs) — P2 — 4-6h
+  → Task 6.1 (tests unitarios)
+  → Task 6.2 (documentación)
+  → [TEST] All tests pass
 ```
 
-**Total estimated time: 30-44 hours**
+**Tiempo total estimado: 34-46 horas**
 
 ---
 
 ## Key Files Summary
 
-| File | Tasks | Priority | Total Lines Changed |
-|------|-------|----------|-------------------|
-| `main_train.py` | 2.1, 2.2, 5.1, 5.2, 7.2 | P1 | ~100 lines |
-| `main_chat.py` | 1.1, 4.1, 4.2, 4.3, 7.1 | P1-P2 | ~150 lines |
-| `dialogmanager.py` | 3.1, 3.2, 7.3 | P1 | ~80 lines |
-| `generate_thinking_data.py` | 6.1, 6.2, 6.3, 6.4, 6.5 | P2 | ~300 lines |
-| `data_preparer.py` | 1.2 | P0 | ~10 lines |
-| `bpe_tokenizer.py` | (minor improvements) | P1 | ~20 lines |
-| `main.py` | 7.1, 8.1, 8.2 | P1-P2 | ~50 lines |
-| `tests/test_thinking.py` | 8.3 | P1 | ~200 lines (new file) |
+| Archivo | Tareas | Prioridad | Líneas Cambiadas |
+|---------|--------|-----------|-----------------|
+| `source_validators.py` | 1.1 | P1 | ~300 (nuevo) |
+| `aiml_validator.py` | 1.2 | P1 | ~150 (nuevo) |
+| `pdf_validator.py` | 1.3 | P1 | ~120 (nuevo) |
+| `epub_validator.py` | 1.4 | P1 | ~100 (nuevo) |
+| `web_validator.py` | 1.5 | P1 | ~100 (nuevo) |
+| `csv_validator.py` | 1.6 | P1 | ~80 (nuevo) |
+| `thinking_generators.py` | 2.1 | P1 | ~200 (nuevo) |
+| `aiml_thinking.py` | 2.2 | P1 | ~120 (nuevo) |
+| `csv_thinking.py` | 2.3 | P1 | ~80 (nuevo) |
+| `pdf_thinking.py` | 2.4 | P1 | ~80 (nuevo) |
+| `epub_thinking.py` | 2.5 | P1 | ~80 (nuevo) |
+| `web_thinking.py` | 2.6 | P1 | ~80 (nuevo) |
+| `hf_thinking.py` | 2.7 | P1 | ~80 (nuevo) |
+| `thinking_quality.py` | 4.1 | P2 | ~100 (nuevo) |
+| `data_preparer.py` | 1.7, 2.8, 3.1 | P1 | ~100 |
+| `main.py` | 3.2, 5.1 | P1-P2 | ~50 |
+| `main_train.py` | 0.1, 3.3, 5.2 | P0-P2 | ~50 |
+| `dialogmanager.py` | 0.2, 3.4 | P0-P1 | ~10 |
+| `tests/test_source_validators.py` | 6.1 | P2 | ~200 (nuevo) |
+| `tests/test_thinking_generators.py` | 6.1 | P2 | ~200 (nuevo) |
+| `tests/test_thinking.py` | 6.1 | P2 | ~100 (actualizar) |
 
 ---
 
 ## Dependencies
 
-| Task | Depends On | Priority |
-|------|-----------|----------|
-| 1.1 | (none) | P0 |
-| 1.2 | (none) | P0 |
-| 2.1 | 1.2 | P1 |
+| Tarea | Depende De | Prioridad |
+|-------|-----------|-----------|
+| 0.1 | (ninguna) | P0 |
+| 0.2 | (ninguna) | P0 |
+| 1.1 | (ninguna) | P1 |
+| 1.2 | 1.1 | P1 |
+| 1.3 | 1.1 | P1 |
+| 1.4 | 1.1 | P1 |
+| 1.5 | 1.1 | P1 |
+| 1.6 | 1.1 | P1 |
+| 1.7 | 1.2-1.6 | P1 |
+| 2.1 | (ninguna) | P1 |
 | 2.2 | 2.1 | P1 |
-| 3.1 | 2.2 | P1 |
+| 2.3 | 2.1 | P1 |
+| 2.4 | 2.1 | P1 |
+| 2.5 | 2.1 | P1 |
+| 2.6 | 2.1 | P1 |
+| 2.7 | 2.1 | P1 |
+| 2.8 | 2.2-2.7, 1.7 | P1 |
+| 3.1 | 1.7, 2.8 | P1 |
 | 3.2 | 3.1 | P1 |
-| 4.1 | 3.2 | P2 |
-| 4.2 | 4.1 | P2 |
-| 4.3 | 4.2 | P2 |
-| 5.1 | 2.2 | P2 |
-| 5.2 | 5.1 | P2 |
-| 6.1 | (none) | P2 |
-| 6.2 | (none) | P2 |
-| 6.3 | 6.1, 6.2 | P2 |
-| 6.4 | 6.3 | P2 |
-| 6.5 | 6.3 | P2 |
-| 7.1 | 6.3 | P2 |
-| 7.2 | 2.1 | P2 |
-| 7.3 | 3.1 | P2 |
-| 8.1 | 7.1, 7.2 | P1 |
-| 8.2 | 7.1, 7.3 | P1 |
-| 8.3 | All above | P1 |
+| 3.3 | 3.1 | P1 |
+| 3.4 | 3.1 | P1 |
+| 4.1 | (ninguna) | P2 |
+| 4.2 | 4.1, 3.1 | P2 |
+| 5.1 | 3.2 | P2 |
+| 5.2 | 0.1 | P2 |
+| 6.1 | Todas | P2 |
+| 6.2 | Todas | P2 |
 
 ---
 
 ## Testing Strategy
 
-### Per-Phase Testing
-- **Phase 1:** Manual verification of bug fixes
-- **Phase 2:** Unit test loss masking + integration test training convergence
-- **Phase 3:** Unit test stop token + integration test chat output
-- **Phase 4:** Unit test streaming format + compatibility test
-- **Phase 5:** Unit test metrics computation
-- **Phase 6:** Unit test template generation + integration test LLM modes
-- **Phase 7:** Unit test CLI parsing + integration test config propagation
+### Por Fase
+- **Fase 0:** Verificación manual de fix crítico
+- **Fase 1:** Unit tests por validador + integration test pipeline
+- **Fase 2:** Unit tests por generador + integration test generación
+- **Fase 3:** Integration test pipeline completo
+- **Fase 4:** Unit test quality validation
+- **Fase 5:** Unit test CLI parsing
+- **Fase 6:** All tests + documentación
 
-### Final Validation Checklist
+### Checklist Validación Final
 ```bash
-# 1. Prepare data with thinking
-python main.py --prepare-data --aiml --generate-thinking --thinking-mode template
+# 1. Preparar datos con validación + thinking
+python main.py --prepare-data --aiml --csv --pdf \
+    --validate-sources --generate-thinking \
+    --thinking-model qwen2.5:1.5b
 
-# 2. Train with thinking
-python main.py --train --use-cache --epochs 1 --thinking-loss-weight 0.5
+# 2. Entrenar con thinking real
+python main.py --train --use-cache --epochs 30 \
+    --thinking-loss-weight 1.0
 
-# 3. Chat with thinking
-python main.py --chat --show-thinking
+# 3. Chat con thinking real
+python main.py --chat --model mymodel --show-thinking
 
 # 4. API test
-curl -X POST http://localhost:11434/v1/chat/completions \
+curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Hola"}],"include_thinking":true}'
+  -d '{"messages":[{"role":"user","content":"¿Qué es Python?"}],"include_thinking":true}'
 
-# 5. Run all tests
-pytest tests/test_thinking.py -v
+# 5. Ejecutar todos los tests
+pytest tests/ -v
 ```
 
 ---
 
-*Generated from codebase analysis - reflects the current state and planned improvements.*
+## Comparación: Thinking Fake vs Thinking Real
+
+| Aspecto | Thinking Fake (Actual) | Thinking Real (Objetivo) |
+|---------|----------------------|------------------------|
+| **Generador** | Templates genéricos | Teacher model por fuente |
+| **Contenido** | Meta-comentarios ("El usuario saluda") | Razonamiento real ("La pregunta es sobre... porque... por lo tanto...") |
+| **Pérdida** | 0.5 (reduce aprendizaje) | 1.0 (mantiene peso) |
+| **Prompt** | Sin instrucción de thinking | "Piensa paso a paso antes de responder" |
+| **Validación** | No existe | Por fuente + calidad |
+| **Largo** | 5-15 tokens | 30-100 tokens |
+| **Calidad** | Baja (no razona) | Alta (razonamiento auténtico) |
+
+---
+
+*Generado desde análisis del código base — refleja el estado actual y las mejoras planificadas.*
