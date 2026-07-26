@@ -241,6 +241,23 @@ EXAMPLES:
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
         parser.add_argument("--show-thinking", action='store_true', help="Show <think> reasoning in chat")
 
+        # Thinking configuration
+        parser.add_argument("--thinking-loss-weight", type=float, default=0.5,
+                            help="Loss weight for thinking tokens (0.0-1.0, default: 0.5)")
+        parser.add_argument("--thinking-enabled", action='store_true', default=True,
+                            help="Enable thinking generation (default: True)")
+        parser.add_argument("--thinking-no-enabled", dest='thinking_enabled', action='store_false',
+                            help="Disable thinking generation")
+        parser.add_argument("--thinking-max-tokens", type=int, default=64,
+                            help="Max tokens for thinking phase (default: 64)")
+        parser.add_argument("--generate-thinking", action='store_true',
+                            help="Generate thinking data before training")
+        parser.add_argument("--thinking-mode", type=str, default='template',
+                            choices=['template', 'hf', 'ollama'],
+                            help="Mode for thinking generation (default: template)")
+        parser.add_argument("--thinking-model", type=str, default=None,
+                            help="Model for HF/Ollama thinking generation")
+
         # Text processing options
         parser.add_argument("--enable-chunking", action='store_true',
                             help="Enable text chunking by tokens (for PDF/EPUB)")

@@ -1427,6 +1427,20 @@ class DataPreparer:
         except Exception:
             self.cache_metadata['bpe_model_path'] = model_file
 
+        # Detect thinking tokens in the dataset
+        has_thinking = False
+        if self.combined_data is not None and len(self.combined_data) > 0:
+            sample_size = min(100, len(self.combined_data))
+            for i in range(sample_size):
+                sample = self.combined_data[i]
+                text = sample.get('input_ids', '') if isinstance(sample.get('input_ids'), str) else str(sample.get('input_ids', ''))
+                if '<think>' in text and '</think>' in text:
+                    has_thinking = True
+                    break
+        self.cache_metadata['has_thinking_tokens'] = has_thinking
+        if has_thinking:
+            logger.info("  ✓ Detected thinking tokens (<think>/</think>) in dataset")
+
         # Cleanup temporary corpus
         try:
             os.remove(tmp_corpus)

@@ -10,7 +10,8 @@ class DialogueManager:
                  top_k=12, top_p=0.8, temperature=0.65, max_len=128,
                  min_length=5, no_repeat_ngram_size=3,
                  pad_token_id=None, eos_token_id=None, unk_token_id=None,
-                 default_response="Lo siento, no puedo responder ahora."):
+                 default_response="Lo siento, no puedo responder ahora.",
+                 thinking_enabled=True, thinking_max_tokens=64):
         self.model = model
         self.device = device
         self.tokenizer = tokenizer
@@ -32,6 +33,12 @@ class DialogueManager:
         self.min_length = min_length
         self.no_repeat_ngram_size = no_repeat_ngram_size
         self.default_response = default_response
+
+        # Thinking support
+        self.thinking_enabled = thinking_enabled
+        self.thinking_max_tokens = thinking_max_tokens
+        self.thinking_end_id = getattr(tokenizer, "get_thinking_end_index", lambda: -1)()
+        self.thinking_id = getattr(tokenizer, "get_thinking_index", lambda: -1)()
 
     def top_k_top_p_filtering(self, logits, top_k=0, top_p=1.0, filter_value=-float("Inf")):
         logits = logits.clone()
@@ -88,14 +95,12 @@ class DialogueManager:
                 n = int(parts[1]) if len(parts) > 1 else 20
             except Exception:
                 n = 20
-            n = max(1, min(n, 200))  # límite razonable
+            n = max(1, min(n, 200))
 
-            # Intentar obtener vocab list desde tokenizer
             vocab_items = []
             if hasattr(self.tokenizer, "vocab") and isinstance(self.tokenizer.vocab, dict):
                 vocab_items = list(self.tokenizer.vocab.items())
             elif hasattr(self.tokenizer, "vocab_size"):
-                # Fallback: sample ids and attempt to decode each id to a token string
                 vocab_items = []
                 for i in range(self.tokenizer.vocab_size):
                     token_str = None
@@ -106,11 +111,8 @@ class DialogueManager:
                             token_str = self.tokenizer.convert_ids_to_tokens([i])[0]
                         except Exception:
                             token_str = None
-
-                    # If still empty or None, mark as <empty:id>
                     if token_str is None or (isinstance(token_str, str) and token_str.strip() == ""):
                         token_str = f"<empty:{i}>"
-
                     vocab_items.append((token_str, i))
             else:
                 vocab_items = []
@@ -119,9 +121,9 @@ class DialogueManager:
             if vocab_items:
                 sample = random.sample(vocab_items, min(n, len(vocab_items)))
                 lines = [f"{tok} -> {idx}" for tok, idx in sample]
-                return "DEBUG VOCAB SAMPLE:\n" + "\n".join(lines)
+                return {'thinking': None, 'response': "DEBUG VOCAB SAMPLE:\n" + "\n".join(lines)}
             else:
-                return "DEBUG: tokenizer vocabulary not accessible."
+                return {'thinking': None, 'response': "DEBUG: tokenizer vocabulary not accessible."}
 
         # --- intent/sentiment analysis ---
         intent_label = None
@@ -183,6 +185,11 @@ class DialogueManager:
         src = torch.LongTensor([input_ids]).to(self.device)
 
         generated = []
+        in_thinking_phase = False
+        thinking_tokens = []
+        response_tokens = []
+        thinking_token_count = 0
+
         try:
             with torch.no_grad():
                 for step in range(self.max_len):
@@ -193,7 +200,7 @@ class DialogueManager:
 
                     # Apply dynamic penalization for repeated n-grams
                     if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size - 1:
-                        penalty = 5.0  # Adjustable penalty value
+                        penalty = 5.0
                         for token_id in range(logits.size(-1)):
                             cand_seq = generated + [token_id]
                             if self._is_repeated_ngram(cand_seq, self.no_repeat_ngram_size):
@@ -210,6 +217,23 @@ class DialogueManager:
 
                     generated.append(next_token)
 
+                    # Thinking phase detection
+                    if self.thinking_enabled and self.thinking_end_id >= 0:
+                        if not in_thinking_phase and next_token == self.thinking_id and self.thinking_id >= 0:
+                            in_thinking_phase = True
+                            thinking_token_count = 0
+
+                        if in_thinking_phase:
+                            thinking_tokens.append(next_token)
+                            thinking_token_count += 1
+                            # Stop thinking phase on </think> or max thinking tokens
+                            if next_token == self.thinking_end_id or thinking_token_count >= self.thinking_max_tokens:
+                                in_thinking_phase = False
+                        else:
+                            response_tokens.append(next_token)
+                    else:
+                        response_tokens.append(next_token)
+
                     # Append token to context for autoregressive generation
                     next_token_tensor = torch.LongTensor([[next_token]]).to(self.device)
                     src = torch.cat([src, next_token_tensor], dim=1)
@@ -225,12 +249,12 @@ class DialogueManager:
 
         except Exception as e:
             logger.exception("Error during generation: %s", e)
-            return self.default_response
+            return {'thinking': None, 'response': self.default_response}
 
         logger.debug(f"Raw generated tokens ({len(generated)}): {generated[:20]}...")
 
         if not generated:
-            return self.default_response
+            return {'thinking': None, 'response': self.default_response}
 
         # Ensure no repeated n-grams in output
         if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size:
@@ -244,27 +268,42 @@ class DialogueManager:
                 return False
 
             if has_repeated_ngram(generated, self.no_repeat_ngram_size):
-                return self.default_response
+                return {'thinking': None, 'response': self.default_response}
+
+        # Decode thinking and response separately
+        thinking_text = None
+        response_text = None
 
         try:
-            text = self.tokenizer.decode(generated)
+            if thinking_tokens and self.thinking_enabled:
+                # Decode thinking (skip the opening <think> token if present)
+                think_start = 0
+                if thinking_tokens and thinking_tokens[0] == self.thinking_id:
+                    think_start = 1
+                thinking_text = self.tokenizer.decode(thinking_tokens[think_start:])
+
+            if response_tokens:
+                response_text = self.tokenizer.decode(response_tokens)
+            else:
+                # Fallback: decode all generated tokens
+                response_text = self.tokenizer.decode(generated)
         except Exception:
             try:
-                text = " ".join(self.tokenizer.convert_ids_to_tokens(generated))
+                response_text = " ".join(self.tokenizer.convert_ids_to_tokens(response_tokens or generated))
             except Exception:
-                text = " ".join(str(t) for t in generated)
+                response_text = " ".join(str(t) for t in (response_tokens or generated))
 
-        logger.debug(f"Decoded text ({len(text)} chars): '{text[:100]}'")
+        logger.debug(f"Decoded response ({len(response_text or '')} chars): '{(response_text or '')[:100]}'")
 
-        if not text or text.strip() == "":
-            return self.default_response
+        if not response_text or response_text.strip() == "":
+            return {'thinking': thinking_text, 'response': self.default_response}
 
         # Ensure minimum response length
-        tokens = text.split()
+        tokens = response_text.split()
         if self.min_length is not None and len(tokens) < self.min_length:
-            return self.default_response
+            return {'thinking': thinking_text, 'response': self.default_response}
 
-        return text
+        return {'thinking': thinking_text, 'response': response_text}
 
     def _is_repeated_ngram(self, seq, n):
         if n < 1 or len(seq) < n * 2:

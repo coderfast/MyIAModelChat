@@ -63,6 +63,8 @@ TRAINING_CONFIG = {
     'warm_up': True,
     'warm_up_ratio': 0.1,  # use 10% of dataset for warm-up
     'warm_up_steps': 100,  # maximum batches for warm-up phase
+    # Thinking settings
+    'thinking_loss_weight': 0.5,  # loss weight for thinking tokens (0.0-1.0)
 }
 
 # Model checkpoint configuration
@@ -108,6 +110,7 @@ class MainTrain:
         # Thinking detection
         self.has_thinking_data = False
         self.thinking_sample_count = 0
+        self.thinking_loss_weight = getattr(args, 'thinking_loss_weight', None) or TRAINING_CONFIG.get('thinking_loss_weight', 0.5)
 
         # Memory cap for entire application
         self.max_ram_fraction = getattr(args, 'max_ram_fraction', 0.75)
@@ -428,19 +431,46 @@ class MainTrain:
             return model
 
     def _compute_loss(self, model, inputs, targets, criterion):
-        """Unified loss computation for both mixed and standard precision."""
+        """Unified loss computation with thinking-aware loss weighting.
+
+        Thinking tokens (between <think> and </think>) receive a lower loss weight
+        (thinking_loss_weight) so the model focuses more on learning the response.
+        """
         outputs = model(inputs)
 
-        # Reshape outputs and targets
+        # Build weight mask on 2D tensors before flattening
+        weights = torch.ones_like(targets, dtype=torch.float)
+        thinking_id = self.tokenizer.get_thinking_index()
+        thinking_end_id = self.tokenizer.get_thinking_end_index()
+
+        if thinking_id >= 0 and thinking_end_id >= 0 and self.has_thinking_data:
+            batch_size, seq_len = targets.shape
+            for b in range(batch_size):
+                in_thinking = False
+                for s in range(seq_len):
+                    token = targets[b, s].item()
+                    if token == thinking_id:
+                        in_thinking = True
+                    if in_thinking:
+                        weights[b, s] = self.thinking_loss_weight
+                    if token == thinking_end_id:
+                        in_thinking = False
+
+        # Flatten outputs and targets
         outputs = outputs.contiguous().view(-1, outputs.size(-1))
         targets = targets.contiguous().view(-1)
+        weights = weights.contiguous().view(-1)
 
         # Ignore padded elements
         non_pad_mask = targets.ne(self.tokenizer.get_pad_index())
         outputs = outputs[non_pad_mask]
         targets = targets[non_pad_mask]
+        weights = weights[non_pad_mask]
 
-        return criterion(outputs, targets)
+        # Weighted cross-entropy loss
+        token_losses = criterion(outputs, targets)
+        loss = (token_losses * weights).sum() / weights.sum()
+        return loss
 
     def _compute_thinking_metrics(self, model, inputs, targets, device):
         """Compute metrics for thinking token generation if thinking data is present."""

@@ -47,7 +47,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 1: Critical Bug Fixes — P0 (MVP)
+## Phase 1: Critical Bug Fixes — P0 (MVP) ✅ DONE
 
 **Priority:** P0 — System is broken without these fixes
 **Estimated Time:** 1-2 hours
@@ -59,7 +59,7 @@ git revert <commit> # Revert phase
 - **Fix**: Replace corrupted string with correct `` token
 - **Lines**: 421
 - **Impact**: `parse_thinking_response()` will correctly separate thinking from response
-- **Status**: `TODO`
+- **Status**: `DONE`
 - **Testing After:** Run `parse_thinking_response()` with sample thinking text
 
 ### Task 1.2: Fix `data_preparer.py` cache metadata
@@ -68,7 +68,7 @@ git revert <commit> # Revert phase
 - **Fix**: Add `has_thinking_tokens` detection and write to metadata during `_save_to_cache()`
 - **Lines**: 584-588
 - **Impact**: `main_train.py:221` detection will work correctly
-- **Status**: `TODO`
+- **Status**: `DONE`
 - **Testing After:** Prepare data with thinking, verify `cache_metadata.pkl` contains `has_thinking_tokens=True`
 
 ### Phase 1 Documentation Update
@@ -77,7 +77,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 2: Thinking-Weighted Loss Masking — P1 (High)
+## Phase 2: Thinking-Weighted Loss Masking — P1 (High) ✅ DONE
 
 **Priority:** P1 — Core thinking functionality
 **Estimated Time:** 4-6 hours
@@ -88,13 +88,13 @@ git revert <commit> # Revert phase
 - **Location**: `TRAINING_CONFIG` dict
 - **Change**: Add `'thinking_loss_weight': 0.5`
 - **Lines**: ~139-150
-- **Status**: `TODO`
+- **Status**: `DONE`
 
 ### Task 2.2: Modify `_compute_loss()` for thinking-aware masking
 - **File**: `main_train.py:430-443`
 - **Current**: Flat CrossEntropyLoss on all non-pad tokens
-- **New**:
-  - Identify thinking token positions (between `<think>` and `</think>` token IDs)
+- **New**: 
+  - Identify thinking token positions (between `<` and `` token IDs)
   - Apply `thinking_loss_weight` to thinking token losses
   - Apply full weight (1.0) to response token losses
 - **Performance**: Vectorized implementation using PyTorch tensors (no Python loops)
@@ -153,7 +153,7 @@ git revert <commit> # Revert phase
       return (loss * weights).sum() / weights.sum()
   ```
 - **Lines**: 430-443
-- **Status**: `TODO`
+- **Status**: `DONE`
 
 ### Phase 2 Testing
 - [ ] Unit test: Verify thinking tokens get weight 0.5, response tokens get 1.0
@@ -167,7 +167,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 3: Generation with Thinking Stop Token — P1 (High)
+## Phase 3: Generation with Thinking Stop Token — P1 (High) ✅ DONE
 
 **Priority:** P1 — Core thinking functionality
 **Estimated Time:** 4-6 hours
@@ -176,7 +176,7 @@ git revert <commit> # Revert phase
 ### Task 3.1: Add thinking stop detection in `dialogmanager.py`
 - **File**: `dialogmanager.py:186-224` (generation loop)
 - **Current**: No stop on `</think>` token
-- **New**:
+- **New**: 
   - Track when `</think>` token is generated
   - After `</think>`, switch to "response mode"
   - Continue generating response until EOS or max_len
@@ -192,7 +192,7 @@ git revert <commit> # Revert phase
   - Continue generating for response tokens
   - Collect thinking tokens and response tokens separately
 - **Lines**: 186-224
-- **Status**: `TODO`
+- **Status**: `DONE`
 
 ### Task 3.2: Update `generate_response()` return format
 - **File**: `dialogmanager.py:160-224`
@@ -200,7 +200,7 @@ git revert <commit> # Revert phase
 - **New**: Return `{'thinking': str|None, 'response': str}`
 - **Backward compatible**: Check if return value is dict or str
 - **Lines**: 160-224
-- **Status**: `TODO`
+- **Status**: `DONE`
 
 ### Phase 3 Testing
 - [ ] Unit test: Generate response with thinking, verify `thinking` and `response` keys
@@ -214,7 +214,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 4: Streaming with Thinking/Response Separation — P2 (Medium)
+## Phase 4: Streaming with Thinking/Response Separation — P2 (Medium) ✅ DONE
 
 **Priority:** P2 — Quality of life for API consumers
 **Estimated Time:** 4-6 hours
@@ -258,7 +258,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 5: Thinking-Specific Metrics — P2 (Medium)
+## Phase 5: Thinking-Specific Metrics — P2 (Medium) ✅ DONE
 
 **Priority:** P2 — Helps debug and tune thinking behavior
 **Estimated Time:** 3-4 hours
@@ -289,7 +289,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 6: LLM-Powered Thinking Data Generation — P2 (Medium)
+## Phase 6: LLM-Powered Thinking Data Generation — P2 (Medium) ✅ DONE
 
 **Priority:** P2 — Higher quality thinking data
 **Estimated Time:** 6-8 hours
@@ -364,7 +364,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 7: CLI and Configuration — P2 (Medium)
+## Phase 7: CLI and Configuration — P2 (Medium) ✅ DONE
 
 **Priority:** P2 — User-facing configuration
 **Estimated Time:** 2-3 hours
@@ -408,7 +408,7 @@ git revert <commit> # Revert phase
 
 ---
 
-## Phase 8: Integration and Testing — P1 (High)
+## Phase 8: Integration and Testing — P1 (High) ✅ DONE
 
 **Priority:** P1 — Everything must work together
 **Estimated Time:** 4-6 hours

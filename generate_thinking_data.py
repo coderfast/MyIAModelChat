@@ -61,6 +61,41 @@ THINKING_PATTERNS_ES = [
     "Analizo la consulta: {context}. Proporciono la respuesta correcta.",
 ]
 
+# English thinking templates
+THINKING_TEMPLATES_EN = {
+    'identity': [
+        "The user is asking about my identity. I should respond with information about my creator.",
+        "This is a question about who created me. I'll give a direct answer.",
+        "Identity question. I respond clearly and directly.",
+    ],
+    'greeting': [
+        "The user is greeting me. I should respond in a friendly manner and ask how I can help.",
+        "User greeting. I respond warmly and offer my assistance.",
+        "The user starts the conversation with a greeting. I maintain a friendly tone.",
+    ],
+    'question': [
+        "The user is asking a question. I'll analyze the available information and give a clear answer.",
+        "User question. I should give a complete and accurate response.",
+        "This is a direct question. I provide the most relevant information.",
+    ],
+    'farewell': [
+        "The user is saying goodbye. I should respond politely.",
+        "User farewell. I respond with kindness and close the conversation.",
+    ],
+    'default': [
+        "The user is writing to me. I'll analyze the message and prepare an appropriate response.",
+        "Processing the user's message. I'll generate a relevant and helpful response.",
+        "I received the message. I'll evaluate the content and formulate my response.",
+    ],
+}
+
+THINKING_PATTERNS_EN = [
+    "Let me analyze this: {context}. My answer will be: {answer}",
+    "The user is asking about {topic}. {context} I'll respond directly.",
+    "{context} Here's what I know: {answer}",
+    "Analyzing the query: {context}. Providing the correct answer.",
+]
+
 
 def detect_category(text: str) -> str:
     """Detect the category of a text for thinking generation."""
@@ -86,21 +121,96 @@ def detect_category(text: str) -> str:
     return 'default'
 
 
-def generate_thinking(text: str, answer: str, category: str) -> str:
+def generate_thinking(text: str, answer: str, category: str, lang: str = 'es') -> str:
     """Generate a thinking block for a given text and answer."""
-    templates = THINKING_TEMPLATES.get(category, THINKING_TEMPLATES['default'])
+    if lang == 'en':
+        templates = THINKING_TEMPLATES_EN.get(category, THINKING_TEMPLATES_EN.get('default', []))
+        patterns = THINKING_PATTERNS_EN
+    else:
+        templates = THINKING_TEMPLATES.get(category, THINKING_TEMPLATES['default'])
+        patterns = THINKING_PATTERNS_ES
+
+    if not templates:
+        return "Analyzing the message..."
+
     template = random.choice(templates)
 
     # Add variety with patterns
     if random.random() > 0.5 and category == 'question':
         context = text[:80] + ('...' if len(text) > 80 else '')
         topic = text[:40]
-        pattern = random.choice(THINKING_PATTERNS_ES)
+        pattern = random.choice(patterns)
         thinking = pattern.format(context=context, topic=topic, answer=answer[:60])
     else:
         thinking = template
 
     return thinking
+
+
+def generate_thinking_with_hf(text: str, answer: str, pipeline_instance) -> str:
+    """Generate thinking using a HuggingFace text-generation model."""
+    prompt = (
+        f"Genera un breve razonamiento interno (1-3 oraciones) para esta pregunta y respuesta. "
+        f"Formato: solo el razonamiento, sin etiquetas.\n"
+        f"Pregunta: {text}\nRespuesta: {answer}\nRazonamiento:"
+    )
+    try:
+        result = pipeline_instance(prompt, max_new_tokens=100, num_return_sequences=1,
+                                   do_sample=True, temperature=0.7, top_p=0.9)
+        generated = result[0].get('generated_text', '')
+        # Extract only the reasoning part after the prompt
+        if 'Razonamiento:' in generated:
+            reasoning = generated.split('Razonamiento:')[-1].strip()
+        else:
+            reasoning = generated[len(prompt):].strip()
+        return reasoning if reasoning else "Analizo la consulta del usuario."
+    except Exception as e:
+        logger.warning(f"  HF generation failed: {e}. Falling back to template.")
+        return generate_thinking(text, answer, detect_category(text))
+
+
+def generate_thinking_with_ollama(text: str, answer: str, model: str = 'llama3.2') -> str:
+    """Generate thinking using Ollama API."""
+    import requests as req_lib
+    prompt = (
+        f"Genera un breve razonamiento interno (1-3 oraciones) para esta pregunta y respuesta. "
+        f"Formato: solo el razonamiento, sin etiquetas.\n"
+        f"Pregunta: {text}\nRespuesta: {answer}\nRazonamiento:"
+    )
+    try:
+        response = req_lib.post(
+            'http://localhost:11434/api/generate',
+            json={'model': model, 'prompt': prompt, 'stream': False},
+            timeout=30
+        )
+        if response.status_code == 200:
+            data = response.json()
+            reasoning = data.get('response', '').strip()
+            return reasoning if reasoning else "Analizo la consulta del usuario."
+        else:
+            logger.warning(f"  Ollama returned status {response.status_code}")
+            return generate_thinking(text, answer, detect_category(text))
+    except Exception as e:
+        logger.warning(f"  Ollama generation failed: {e}. Falling back to template.")
+        return generate_thinking(text, answer, detect_category(text))
+
+
+def validate_thinking_consistency(text: str, thinking: str, answer: str) -> bool:
+    """Validate that thinking is logically consistent with the answer."""
+    if not thinking or not answer:
+        return False
+    # Basic validation: thinking should mention some words from the answer
+    import re
+    answer_words = set(re.findall(r'\w+', answer.lower()))
+    thinking_words = set(re.findall(r'\w+', thinking.lower()))
+    overlap = answer_words & thinking_words
+    # At least some overlap between answer and thinking
+    if len(answer_words) > 0 and len(overlap) / len(answer_words) < 0.05:
+        return False
+    # Thinking should not be too short
+    if len(thinking.strip()) < 10:
+        return False
+    return True
 
 
 def load_csv_data(filepath: str) -> List[Dict[str, str]]:
@@ -156,8 +266,16 @@ def load_aiml_data(aiml_dir: str) -> List[Dict[str, str]]:
     return pairs
 
 
-def generate_thinking_dataset(pairs: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Generate thinking dataset from QA pairs."""
+def generate_thinking_dataset(pairs: List[Dict[str, str]], lang: str = 'es', generator: str = 'template', hf_pipeline=None, ollama_model: str = 'llama3.2') -> List[Dict[str, str]]:
+    """Generate thinking dataset from QA pairs.
+
+    Args:
+        pairs: List of dicts with 'input' and 'output' keys
+        lang: Language for templates ('es' or 'en')
+        generator: Generation mode ('template', 'hf', 'ollama')
+        hf_pipeline: HuggingFace pipeline instance (required if generator='hf')
+        ollama_model: Ollama model name (used if generator='ollama')
+    """
     thinking_pairs = []
 
     for pair in pairs:
@@ -165,9 +283,15 @@ def generate_thinking_dataset(pairs: List[Dict[str, str]]) -> List[Dict[str, str
         answer = pair['output']
 
         category = detect_category(text)
-        thinking = generate_thinking(text, answer, category)
 
-        thinking_text = f"<think>{thinking}</think>{answer}"
+        if generator == 'hf' and hf_pipeline is not None:
+            thinking = generate_thinking_with_hf(text, answer, hf_pipeline)
+        elif generator == 'ollama':
+            thinking = generate_thinking_with_ollama(text, answer, ollama_model)
+        else:
+            thinking = generate_thinking(text, answer, category, lang)
+
+        thinking_text = f"{thinking}</think>{answer}"
         thinking_pairs.append({
             'input': text,
             'output': answer,
@@ -210,6 +334,16 @@ Examples:
                         help='Output CSV path (default: datasets/thinking/thinking_data.csv)')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for reproducibility (default: 42)')
+    parser.add_argument('--lang', type=str, default='es', choices=['es', 'en'],
+                        help='Language for templates (default: es)')
+    parser.add_argument('--mode', type=str, default='template', choices=['template', 'hf', 'ollama'],
+                        help='Generation mode (default: template)')
+    parser.add_argument('--model', type=str, default=None,
+                        help='Model name for HF or Ollama mode')
+    parser.add_argument('--validate', action='store_true',
+                        help='Validate thinking consistency with answers')
+    parser.add_argument('--max-samples', type=int, default=None,
+                        help='Limit number of samples to process')
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -245,6 +379,11 @@ Examples:
         logger.error("No data pairs loaded. Nothing to generate.")
         return
 
+    # Limit samples if requested
+    if args.max_samples and args.max_samples > 0:
+        all_pairs = all_pairs[:args.max_samples]
+        logger.info(f"  Limited to {len(all_pairs)} samples")
+
     # Remove duplicates
     seen = set()
     unique_pairs = []
@@ -256,9 +395,42 @@ Examples:
 
     logger.info(f"\nTotal unique pairs: {len(unique_pairs)}")
 
+    # Initialize HF pipeline if needed
+    hf_pipeline = None
+    if args.mode == 'hf':
+        model_name = args.model or 'Qwen/Qwen2.5-1.5B-Instruct'
+        logger.info(f"\nLoading HuggingFace model: {model_name}")
+        try:
+            from transformers import pipeline as hf_pipeline_fn
+            hf_pipeline = hf_pipeline_fn('text-generation', model=model_name, trust_remote_code=True)
+            logger.info(f"  Model loaded successfully")
+        except Exception as e:
+            logger.warning(f"  Could not load model: {e}. Falling back to template mode.")
+            args.mode = 'template'
+
     # Generate thinking data
     logger.info("\nGenerating <think> data...")
-    thinking_data = generate_thinking_dataset(unique_pairs)
+    thinking_data = generate_thinking_dataset(
+        unique_pairs,
+        lang=args.lang,
+        generator=args.mode,
+        hf_pipeline=hf_pipeline,
+        ollama_model=args.model or 'llama3.2'
+    )
+
+    # Validate if requested
+    if args.validate:
+        logger.info("\nValidating thinking consistency...")
+        valid_count = 0
+        invalid_count = 0
+        for item in thinking_data:
+            if validate_thinking_consistency(item['input'], item['thinking'], item['output']):
+                valid_count += 1
+            else:
+                invalid_count += 1
+        logger.info(f"  Valid: {valid_count}, Invalid: {invalid_count}")
+        if invalid_count > 0:
+            logger.info(f"  ({invalid_count} samples had weak thinking-answer consistency)")
 
     # Save
     save_thinking_data(thinking_data, args.output)

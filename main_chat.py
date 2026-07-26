@@ -69,6 +69,7 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = False
     stop: Optional[List[str]] = None
     include_thinking: Optional[bool] = False
+    reasoning: Optional[str] = None
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -78,6 +79,7 @@ class GenerateRequest(BaseModel):
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
     include_thinking: Optional[bool] = False
+    reasoning: Optional[str] = None
 
 class EmbeddingRequest(BaseModel):
     model: Optional[str] = None
@@ -237,7 +239,9 @@ class MainChat:
             max_len=128,
             min_length=3,
             no_repeat_ngram_size=3,
-            default_response="Lo siento, no puedo responder ahora."
+            default_response="Lo siento, no puedo responder ahora.",
+            thinking_enabled=getattr(args, 'thinking_enabled', True),
+            thinking_max_tokens=getattr(args, 'thinking_max_tokens', 64),
         )
 
     def _resolve_model_path(self, model_name):
@@ -361,18 +365,31 @@ class MainChat:
                 response = self.dialogue_manager.generate_response(user_input)
 
                 # Parse and display thinking if enabled
-                if self.show_thinking:
-                    parsed = parse_thinking_response(response)
-                    if parsed['thinking']:
-                        print(f"Bot [thinking]: {parsed['thinking']}")
-                    print(f"Bot: {parsed['response']}")
+                if isinstance(response, dict):
+                    thinking = response.get('thinking')
+                    resp_text = response.get('response', '')
+                    if self.show_thinking and thinking:
+                        print(f"Bot [thinking]: {thinking}")
+                    print(f"Bot: {resp_text}")
                 else:
-                    print("Bot:", response)
+                    # Backward compatibility: string response
+                    if self.show_thinking:
+                        parsed = parse_thinking_response(response)
+                        if parsed['thinking']:
+                            print(f"Bot [thinking]: {parsed['thinking']}")
+                        print(f"Bot: {parsed['response']}")
+                    else:
+                        print("Bot:", response)
         except KeyboardInterrupt:
             logger.info("Chat terminated by user.")
 
-    def generate_response(self, prompt: str) -> str:
-        return self.dialogue_manager.generate_response(prompt)
+    def generate_response(self, prompt: str, full: bool = False) -> Union[str, Dict[str, Optional[str]]]:
+        result = self.dialogue_manager.generate_response(prompt)
+        if isinstance(result, dict):
+            if full:
+                return result
+            return result.get('response', '')
+        return result
 
 
 def get_main_chat_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None, model: Optional[str] = None):
@@ -418,7 +435,7 @@ def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
         return {'thinking': None, 'response': text}
     try:
         thinking = text.split('<think>')[1].split('</think>')[0]
-        response = text.split('效益')[1].strip()
+        response = text.split('</think>')[1].strip()
         return {'thinking': thinking, 'response': response}
     except (IndexError, ValueError):
         return {'thinking': None, 'response': text}
@@ -439,6 +456,35 @@ def stream_chat_text(text: str, request_id: Optional[str] = None):
         chunk_size = 64
         for i in range(0, len(text), chunk_size):
             chunk = text[i:i+chunk_size]
+            payload = {
+                'id': request_id,
+                'object': 'chat.completion.chunk',
+                'delta': {'role': 'assistant', 'content': chunk}
+            }
+            yield json.dumps(payload) + '\n'
+            time.sleep(0.01)
+        yield json.dumps({'id': request_id, 'object': 'chat.completion.complete'}) + '\n'
+    return gen()
+
+
+def stream_chat_with_thinking(thinking: str, response: str, request_id: Optional[str] = None):
+    """Stream thinking chunks first, then response chunks."""
+    def gen():
+        chunk_size = 64
+        # Stream thinking as reasoning chunks
+        if thinking:
+            for i in range(0, len(thinking), chunk_size):
+                chunk = thinking[i:i+chunk_size]
+                payload = {
+                    'id': request_id,
+                    'object': 'chat.completion.chunk',
+                    'delta': {'role': 'assistant', 'reasoning': chunk}
+                }
+                yield json.dumps(payload) + '\n'
+                time.sleep(0.01)
+        # Stream response as content chunks
+        for i in range(0, len(response), chunk_size):
+            chunk = response[i:i+chunk_size]
             payload = {
                 'id': request_id,
                 'object': 'chat.completion.chunk',
@@ -500,18 +546,19 @@ def v1_version():
 async def chat_completions(req: ChatRequest):
     prompt = build_prompt_from_messages([m.dict() for m in req.messages])
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
-    text = chat.generate_response(prompt)
-    text = truncate_stop_sequences(text, req.stop)
+    result = chat.generate_response(prompt, full=True)
+    text = truncate_stop_sequences(result.get('response', ''), req.stop)
 
     # Parse thinking if requested
-    parsed = parse_thinking_response(text)
-    content = parsed['response'] if not req.include_thinking else text
-    thinking = parsed['thinking']
+    thinking = result.get('thinking')
+    content = text if not req.include_thinking else (thinking + "\n\n" + text if thinking else text)
 
     if req.stream:
+        if req.include_thinking and thinking:
+            return StreamingResponse(stream_chat_with_thinking(thinking, text), media_type='application/json')
         return StreamingResponse(stream_chat_text(content), media_type='application/json')
 
-    message = {'role': 'assistant', 'content': content}
+    message = {'role': 'assistant', 'content': text}
     if req.include_thinking and thinking:
         message['reasoning'] = thinking
 
@@ -538,19 +585,20 @@ async def api_chat(request: Request):
     messages = data.get('messages', [])
     prompt = build_prompt_from_messages(messages)
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
-    text = chat.generate_response(prompt)
-    text = truncate_stop_sequences(text, data.get('stop'))
+    result = chat.generate_response(prompt, full=True)
+    text = truncate_stop_sequences(result.get('response', ''), data.get('stop'))
 
     # Parse thinking if requested
     include_thinking = data.get('include_thinking', False)
-    parsed = parse_thinking_response(text)
-    content = parsed['response'] if not include_thinking else text
-    thinking = parsed['thinking']
+    thinking = result.get('thinking')
+    content = text if not include_thinking else (thinking + "\n\n" + text if thinking else text)
 
     if data.get('stream', False):
+        if include_thinking and thinking:
+            return StreamingResponse(stream_chat_with_thinking(thinking, text), media_type='application/json')
         return StreamingResponse(stream_chat_text(content), media_type='application/json')
 
-    message = {'role': 'assistant', 'content': content}
+    message = {'role': 'assistant', 'content': text}
     if include_thinking and thinking:
         message['reasoning'] = thinking
 
@@ -590,26 +638,27 @@ async def v1_embeddings(req: EmbeddingRequest):
 @app.post('/api/generate')
 async def api_generate(req: GenerateRequest):
     chat = get_main_chat_instance(use_cpuonly=os.getenv('USE_CPUONLY', 'false').lower() in ('1', 'true', 'yes'))
-    text = chat.generate_response(req.prompt)
-    text = truncate_stop_sequences(text, req.stop)
+    result = chat.generate_response(req.prompt, full=True)
+    text = truncate_stop_sequences(result.get('response', ''), req.stop)
 
-    # Parse thinking if requested
-    parsed = parse_thinking_response(text)
+    thinking = result.get('thinking')
 
     if req.stream:
-        return StreamingResponse(stream_chat_text(parsed['response']), media_type='application/json')
+        if req.include_thinking and thinking:
+            return StreamingResponse(stream_chat_with_thinking(thinking, text), media_type='application/json')
+        return StreamingResponse(stream_chat_text(text), media_type='application/json')
 
-    result = {
+    out = {
         'id': None,
         'model': MODEL_NAME,
         'object': 'text_completion',
-        'text': parsed['response'] if not req.include_thinking else text,
+        'text': text if not req.include_thinking else (thinking + "\n\n" + text if thinking else text),
         'usage': make_usage(req.prompt, text)
     }
-    if req.include_thinking and parsed['thinking']:
-        result['reasoning'] = parsed['thinking']
+    if req.include_thinking and thinking:
+        out['reasoning'] = thinking
 
-    return result
+    return out
 
 
 def parse_args():
