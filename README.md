@@ -1,9 +1,12 @@
 # MyIAModelChat
-My First IA Chat Model - Advanced Conversational AI with Multi-Source Data Support
 
-## 🚀 Features
+Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reasoning, and Bilingual Capabilities.
 
-MyIAModelChat is a sophisticated conversational AI system built with PyTorch, featuring:
+> **Note:** This is an experimental/educational project. Not intended for production use.
+
+---
+
+## Features
 
 ### Core Capabilities
 - **Neural Chat Model**: GPT-2 Transformer architecture for natural language generation
@@ -12,6 +15,7 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Sentiment Analysis**: BERT-based star rating detection (1-5 stars)
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
+- **Chain-of-Thought Reasoning**: Optional `<think>` reasoning in training and inference
 - **Model Library**: Train, combine, and export multiple independent models
 
 ### Data Sources & Processing
@@ -23,17 +27,7 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **CSV Datasets**: Curated QA pairs from CSV files
 - **Dataset Caching**: 12x faster training with intelligent caching system
 
-### Advanced Features
-- **Dynamic N-gram Penalization**: Prevents repetitive responses
-- **Min-Length Enforcement**: Ensures meaningful response lengths
-- **Autoregressive Generation**: High-quality text generation with sampling controls
-- **Multi-threading Support**: Optimized for CPU training
-- **Model Checkpointing**: Best model saving and tokenizer persistence
-- **Chain-of-Thought Reasoning**: Optional `<think>` reasoning in training and inference
-- **Model Library**: Multiple trained models with merge and export capabilities
-- **GGUF/ONNX Export**: Export models to Ollama, llama.cpp, ONNX Runtime
-
-### Advanced Text Processing (NEW)
+### Advanced Text Processing
 - **Professional Sentence Tokenization**: spaCy-based sentence splitting (replaces naive `split('.')`)
 - **Unicode Normalization**: NFKC normalization for consistent text
 - **Text Chunking**: Split long documents into overlapping token windows
@@ -42,33 +36,40 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **Metadata Preservation**: Extract and preserve document metadata (title, author, etc.)
 - **Language Detection**: Filter texts by detected language (supports 50+ languages)
 
-## 🚀 Quick Start
+### Generation & Export
+- **Dynamic N-gram Penalization**: Prevents repetitive responses
+- **Min-Length Enforcement**: Ensures meaningful response lengths
+- **Autoregressive Generation**: High-quality text generation with sampling controls
+- **GGUF/ONNX Export**: Export models to Ollama, llama.cpp, ONNX Runtime
+- **Model Merging**: Combine multiple trained models by weight averaging
+
+---
+
+## Quick Start
 
 ### 1. Prepare Your Data
 ```bash
-# Prepare datasets from multiple sources
 python main.py --prepare-data --aiml --pdf --epub
 ```
 
 ### 2. Train the Model
 ```bash
-# Train with cached data for speed
 python main.py --train --use-cache --epochs 30
 ```
 
 ### 3. Start Chatting
 ```bash
-# Launch interactive chat
 python main.py --chat
 ```
 
-## 📚 Model Library
+---
+
+## Model Library
 
 Train multiple independent models and use them individually or combined.
 
 ### Train a model
 ```bash
-# Train with a custom name and dataset
 python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
 python main.py --train --dataset datasets_source/programacion/ --checkpoint-name programacion --aiml --hf --epochs 30
 ```
@@ -81,7 +82,6 @@ python main.py --list-models
 ### Chat with a specific model
 ```bash
 python main.py --chat --model ciencias_naturales
-python main.py --chat --model programacion
 ```
 
 ### Combine models (merge)
@@ -103,12 +103,91 @@ python main.py --export ciencias_naturales+programacion --formats gguf,onnx
 
 ### Use with Ollama
 ```bash
-# After exporting to GGUF
 ollama create mi-ciencias -f Modelfile.ciencias_naturales
 ollama run mi-ciencias
 ```
 
-## 📖 Examples
+---
+
+## API Server
+
+MyIAModelChat provides an Ollama-compatible REST API server built with FastAPI.
+
+### PyTorch GPT-2 Server (main_chat.py)
+
+```bash
+python main_chat.py --port 11434
+```
+
+**Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/health` | GET | Health check |
+| `/v1/models` | GET | List available models |
+| `/v1/version` | GET | Version info |
+| `/v1/chat/completions` | POST | OpenAI-compatible chat completion |
+| `/api/chat/completions` | POST | Alias for above |
+| `/api/chat` | POST | Legacy chat endpoint |
+| `/v1/embeddings` | POST | Text embeddings (mean pooling) |
+| `/api/generate` | POST | Text generation |
+
+**Example request:**
+```bash
+curl -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ciencias_naturales",
+    "messages": [{"role": "user", "content": "Hola"}],
+    "max_tokens": 128,
+    "temperature": 0.7
+  }'
+```
+
+**Streaming:**
+```bash
+curl -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ciencias_naturales",
+    "prompt": "Hola",
+    "stream": true
+  }'
+```
+
+### GGUF Server (envAIModels/)
+
+Separate inference server for GGUF models using llama-cpp-python.
+
+```bash
+cd envAIModels
+# Set MODEL_GGUF_PATH in .env or environment variable
+uvicorn app:app --host 0.0.0.0 --port 11435
+```
+
+**Configuration:**
+- `MODEL_GGUF_PATH` — Path to `.gguf` model file (fallback: `models/Qwen2.5-1.5B-Instruct-Q4_0.gguf`)
+- Uses lazy-loading: model loads on first request, not at startup
+
+**Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/version` | GET | Version info |
+| `/api/models` | GET | List models |
+| `/api/tags` | GET | Model tags |
+| `/api/generate` | POST | Text generation (streaming) |
+| `/api/chat` | POST | Chat (streaming) |
+| `/api/chat/completions` | POST | OpenAI-compatible chat |
+| `/v1/health` | GET | Health check |
+| `/v1/models` | GET | Models with file sizes |
+| `/v1/completions` | POST | Text completion |
+| `/v1/chat/completions` | POST | Chat completion |
+
+---
+
+## Examples
 
 ### Basic Conversation
 ```
@@ -128,18 +207,33 @@ User: ¿Qué es el aprendizaje automático?
 AI: El aprendizaje automático es un campo fascinante de la inteligencia artificial...
 ```
 
-## 🏗️ Project Structure
+### Chain-of-Thought Reasoning
+```
+User: What is 2+2?
+
+<think>
+The user is asking a simple arithmetic question.
+I need to add the numbers 2 and 2.
+2 + 2 = 4
+</think>
+
+4
+```
+
+---
+
+## Project Structure
 
 ```
 MyIAModelChat/
 ├── main.py                 # Main entry point with all CLI commands
 ├── main_train.py           # Training pipeline
-├── main_chat.py            # Chat interface (API server)
+├── main_chat.py            # Chat interface + FastAPI server
 ├── dialogmanager.py        # Response generation with intent/sentiment
 ├── data_preparer.py        # Multi-source data loading (AIML, PDF, EPUB, HF, Web, CSV)
 ├── bpe_tokenizer.py        # SentencePiece BPE tokenizer (multilingual)
 ├── chatmodel.py            # GPT-2 model architecture
-├── chatdataset.py          # PyTorch Dataset loader
+├── chatdataset.py          # PyTorch Dataset loader (legacy)
 ├── aimlloder.py            # AIML file processing
 ├── model_downloader.py     # HuggingFace model downloader
 ├── model_registry.py       # Model discovery, listing, validation
@@ -148,238 +242,174 @@ MyIAModelChat/
 ├── generate_thinking_data.py  # Chain-of-thought data generation
 ├── web_scraper.py          # Web crawling and scraping
 ├── manual_test.py          # Manual testing utilities
+├── requirements.txt        # Python dependencies
 ├── APP_ARCHITECTURE.md     # System architecture documentation
 ├── APP_TECHNICALSTACK.md   # Technology stack documentation
+├── ROADMAP.md              # Thinking implementation roadmap
 ├── checkpoints/            # Model checkpoints (legacy)
 ├── models/                 # Trained model checkpoints (.pth)
 │   └── exported/           # Exported models (.gguf, .onnx)
 ├── datasets_source/        # User-prepared datasets (aiml/, csv/, pdf/, epub/, web/)
-├── dataset_cache/          # Cached datasets
+├── dataset_cache/          # Cached datasets (tokenized HF Dataset + BPE model)
 ├── aiml_dev/               # AIML development files
-├── envAIModels/            # API server (FastAPI, GGUF/llama_cpp)
-└── tests/                  # Test suite
+├── envAIModels/            # GGUF inference server (FastAPI + llama-cpp-python)
+│   ├── app.py              # FastAPI application
+│   ├── routers_api.py      # /api routes
+│   ├── routers_v1.py       # /v1 routes
+│   ├── schemas.py          # Pydantic models
+│   ├── model.py            # GGUF model loading (lazy)
+│   └── utils.py            # Prompt formatting, streaming, response building
+├── tests/                  # Test suite
+└── .mimocode/              # MiMoCode configuration
 ```
 
-## 📚 Data Sources
+---
+
+## Data Sources
 
 ### AIML Files
 - Traditional chatbot patterns from A.L.I.C.E. project
 - Rule-based responses for common queries
-- Located in `datasets_source/aiml/` directory
+- Place `.aiml` files in `datasets_source/aiml/`
 
 ### PDF Documents
 - Automatic text extraction using PyPDF2
 - Supports complex layouts and formatting
-- Place PDFs in `datasets_source/pdf/` directory
+- Place PDFs in `datasets_source/pdf/`
 
 ### EPUB E-books
 - Full e-book parsing with ebooklib
 - Chapter-by-chapter content extraction
 - Supports metadata and structure
-- Place EPUBs in `datasets_source/epub/` directory
+- Place EPUBs in `datasets_source/epub/`
 
-## ⚙️ Configuration
+### Web Scraping
+- Crawls documentation sites with configurable depth and rate limit
+- Uses trafilatura for main content extraction, BeautifulSoup as fallback
+- Create `datasets_source/web/urls.txt` with one URL per line
+- Scraped output saved to `datasets_source/web/`
 
-### Training Parameters
+### CSV Datasets
+- Curated QA pairs with `input`/`output` columns
+- Automatically oversampled 20x during training
+- Place CSVs in `datasets_source/csv/`
+
+### Hugging Face Datasets
+- Integration with any HF dataset via `load_dataset()`
+- Default: wikitext, first 1000 samples
+
+---
+
+## Configuration
+
+### Training Parameters (`main_train.py`)
+
 ```python
-# Actual configuration (main_train.py)
-batch_size = 4                # Micro batch size
-accumulation_steps = 8        # Gradient accumulation (effective batch = 32)
-learning_rate = 1e-3
-embed_size = 256              # Embedding dimension
-hidden_size = 512             # Hidden state dimension
-num_layers = 4                # Transformer layers
-n_head = 4                    # Attention heads
-n_positions = 512             # Max sequence length
-vocab_size = 8000             # BPE vocabulary size (default)
+TRAINING_CONFIG = {
+    'batch_size': 4,                # Micro batch size
+    'accumulation_steps': 8,        # Gradient accumulation (effective batch = 32)
+    'learning_rate': 1e-3,          # Adam learning rate
+    'embed_size': 256,              # Embedding dimension
+    'hidden_size': 512,             # Hidden state dimension
+    'num_layers': 4,                # Transformer layers
+    'n_head': 4,                    # Attention heads
+    'n_positions': 512,             # Max sequence length
+    'grad_clip_norm': 1.0,          # Gradient clipping
+    'warm_up': True,                # Learning rate warm-up
+    'warm_up_ratio': 0.1,           # Warm-up fraction
+    'warm_up_steps': 100,           # Warm-up steps
+}
 ```
 
-### Generation Settings
+### Generation Settings (`dialogmanager.py`)
+
 ```python
-# Chat parameters (dialogmanager.py)
-top_k = 50
-top_p = 0.9
-temperature = 0.7
-min_length = 3
-no_repeat_ngram_size = 3
+DEFAULT_CONFIG = {
+    'top_k': 50,                    # Top-k sampling
+    'top_p': 0.9,                   # Nucleus sampling
+    'temperature': 0.7,             # Sampling temperature
+    'max_len': 128,                 # Max generation tokens
+    'min_length': 3,                # Min generated tokens
+    'no_repeat_ngram_size': 3,      # N-gram repetition penalty
+}
 ```
 
-## 📊 Performance
+### BPE Tokenizer Flags
 
-- **Dataset Caching**: 12x faster training iterations
-- **Memory Efficient**: Optimized for CPU training
-- **Multi-threaded**: Parallel data processing
-- **GPU Support**: CUDA acceleration available
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--bpe-vocab-size` | BPE vocabulary size | `8000` |
+| `--refresh-cache` | Rebuild cache from scratch | (flag) |
+| `--use-cache` | Load cached dataset if exists | (flag) |
 
-## 🔧 Recent Improvements
+### System Resources (`main.py`)
 
-- Model library system with merge and export capabilities
-- GGUF/ONNX export for Ollama, llama.cpp, ONNX Runtime
-- SentencePiece BPE multilingual tokenizer
-- Chain-of-thought reasoning support
-- Dynamic n-gram penalization
-- Advanced text processing (chunking, dedup, quality filter)
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--num_cores` | CPU cores to use | 50% of available |
+| `--num_threads` | Training threads | Auto |
+| `--max-ram-fraction` | Max RAM usage (0.0-1.0) | `0.75` |
 
-## 📖 Documentation
+---
 
-- [APP_ARCHITECTURE.md](APP_ARCHITECTURE.md) - Complete system architecture
-- [APP_TECHNICALSTACK.md](APP_TECHNICALSTACK.md) - Technology stack and dependencies
-- [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Command reference
-- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Neural network architecture
-- [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning
-- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Troubleshooting
+## Chain-of-Thought Reasoning (`<think>`)
 
-## 🗂️ Tokenizador BPE multilingüe
+The model supports **chain-of-thought reasoning** using the `<think>` tag. The model learns to generate its reasoning process before the final response.
 
-El proyecto usa un tokenizador **SentencePiece BPE** (Byte-Pair Encoding) como único sistema de tokenización. SentencePiece es nativamente multilingüe — soporta cualquier idioma (Español, Inglés, Francés, etc.) sin configuración adicional.
-
-### Cómo funciona
-
-1. Durante `--prepare-data`, se entrena un modelo BPE con `sentencepiece`
-2. El modelo se guarda en `dataset_cache/sentencepiece.model`
-3. Los datos se tokenizan y cachean con `token_ids` pre-calculados
-4. En entrenamiento e inferencia, se cargan los `token_ids` directamente (sin re-tokenizar)
-
-### Fases de uso
-
-**Fase 1 — Preparación de datos (entrena el BPE y genera caché):**
-```bash
-python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
-```
-
-**Fase 2 — Entrenamiento (usa caché tokenizada):**
-```bash
-python main.py --train --use-cache --epochs 30
-```
-
-**Fase 3 — Inferencia (carga modelo BPE automáticamente):**
-```bash
-python main.py --chat
-```
-
-### Flags de BPE
-
-| Flag | Descripción | Valor por defecto |
-|------|-------------|-------------------|
-| `--bpe-vocab-size` | Tamaño del vocabulario BPE | `8000` |
-| `--refresh-cache` | Reconstruir caché desde cero | (no aplica) |
-| `--use-cache` | Cargar dataset cacheado si existe | (no aplica) |
-
-### Archivos generados en caché
-
-```
-dataset_cache/
-├── prepared_dataset/          # Dataset tokenizado (contiene token_ids)
-├── dataset_stats.pkl          # Estadísticas del dataset
-├── cache_metadata.pkl         # Metadata: bpe_model_path, vocab_size
-└── sentencepiece.model        # Modelo BPE entrenado
-```
-
-### Regenerar caché
-
-Cuando se añaden nuevos idiomas o fuentes de datos, regenerar la caché:
-```bash
-python main.py --prepare-data --aiml --hf --pdf --epub --bpe-vocab-size 8000 --refresh-cache
-```
-
-### Archivos del tokenizer
-
-| Archivo | Descripción |
-|---------|-------------|
-| `bpe_tokenizer.py` | Wrapper de SentencePiece (`SentencePieceTokenizerWrapper`) |
-| `checkpoints/tokenizer_vocab.json` | Vocabulario del tokenizador (incluye `sentencepiece_model` path) |
-| `dataset_cache/sentencepiece.model` | Modelo BPE entrenado |
-
-### Smoke test rápido
-
-```bash
-# Preparar datos con vocabulario pequeño para prueba rápida
-python main.py --prepare-data --aiml --hf --bpe-vocab-size 2000 --refresh-cache
-
-# Entrenar 1 epoch usando caché
-python main.py --train --use-cache --epochs 1
-```
-
-Verificar que:
-- `dataset_cache/sentencepiece.model` existe
-- `dataset_cache/prepared_dataset` contiene `token_ids`
-- `main_train.py` carga el modelo BPE desde caché automáticamente
-
-## 🧠 Chain-of-Thought Reasoning (`<think>`)
-
-El modelo soporta **razonamiento encadenado** usando la etiqueta `<think>`. El modelo aprende a generar su proceso de pensamiento antes de la respuesta final.
-
-### Formato de salida
+### Output Format
 
 ```
 <think>
-Razonamiento interno del modelo...
+Reasoning process here...
 </think>
-Respuesta final limpia
+Final clean response
 ```
 
-### Generar datos con thinking
+### Generate Thinking Data
 
 ```bash
-# Generar desde CSV y AIML
+# From CSV and AIML sources
 python generate_thinking_data.py --source all
 
-# Salida: datasets/thinking/thinking_data.csv
+# Output: datasets/thinking/thinking_data.csv
 ```
 
-### Entrenar con thinking
+### Train with Thinking
 
 ```bash
-# Preparar datos (incluye thinking automáticamente)
 python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
-
-# Entrenar
 python main.py --train --use-cache --epochs 30
 ```
 
-### Inferencia con thinking
+### Inference with Thinking
 
-**Consola:**
+**Console:**
 ```bash
-# Con thinking visible
-python main.py --chat --show-thinking
-
-# Sin thinking (respuesta limpia)
-python main.py --chat
+python main.py --chat --show-thinking    # With thinking visible
+python main.py --chat                     # Response only
 ```
 
 **API:**
 ```bash
-# Con thinking
 curl -X POST http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [{"role": "user", "content": "Hola"}],
     "include_thinking": true
   }'
-
-# Respuesta incluye campo "reasoning"
 ```
 
-### Flags relacionados
+See [THINKING_GUIDE.md](THINKING_GUIDE.md) for full documentation.
 
-| Flag | Descripción |
-|------|-------------|
-| `--show-thinking` | Muestra reasoning en consola |
-| `include_thinking` | Parámetro en endpoints API |
+---
 
-Ver [THINKING_GUIDE.md](THINKING_GUIDE.md) para documentación completa.
-
-## 🔬 Advanced Text Processing
+## Advanced Text Processing
 
 MyIAModelChat includes professional text processing features for high-quality dataset preparation.
 
-### Key Features
-
 | Feature | Description | Flag |
 |---------|-------------|------|
-| **Sentence Tokenization** | spaCy-based sentence splitting | Automatic (uses spaCy if available) |
+| **Sentence Tokenization** | spaCy-based sentence splitting | Automatic |
 | **Unicode Normalization** | NFKC normalization for consistency | Automatic |
 | **Text Chunking** | Split long texts into overlapping windows | `--enable-chunking` |
 | **Deduplication** | Remove duplicate texts with MinHash LSH | `--enable-dedup` |
@@ -387,87 +417,85 @@ MyIAModelChat includes professional text processing features for high-quality da
 | **Metadata Preservation** | Extract document metadata | `--preserve-metadata` |
 | **Language Detection** | Filter by detected language | `--enable-lang-filter` |
 
-### Usage Examples
-
-```bash
-# Full advanced workflow with all features
-python main.py --prepare-data --aiml --pdf --epub \
-    --enable-chunking \
-    --enable-dedup \
-    --enable-quality-filter \
-    --preserve-metadata \
-    --enable-lang-filter \
-    --allowed-languages es en
-
-# Prepare PDF with chunking for long documents
-python main.py --prepare-data --pdf \
-    --enable-chunking \
-    --chunk-max-tokens 256 \
-    --chunk-overlap 50
-
-# Prepare data with quality filtering
-python main.py --prepare-data --pdf --epub \
-    --enable-quality-filter \
-    --min-words 10 \
-    --max-words 500
-
-# Prepare data with deduplication
-python main.py --prepare-data --aiml --pdf \
-    --enable-dedup \
-    --dedup-threshold 0.9
-
-# Prepare data with language filtering (Spanish only)
-python main.py --prepare-data --pdf \
-    --enable-lang-filter \
-    --allowed-languages es
-```
-
 ### Text Processing Pipeline
 
 ```
-Raw Text → Unicode Normalization → Sentence Tokenization → Quality Filtering
-    → Deduplication → Language Filtering → Chunking (optional) → Dataset
+Raw Text -> Unicode Normalization -> Sentence Tokenization -> Quality Filtering
+    -> Deduplication -> Language Filtering -> Chunking (optional) -> Dataset
 ```
-
-### Benefits
-
-1. **Higher Quality Data**: Professional sentence splitting avoids breaking URLs, abbreviations, decimals
-2. **Consistent Formatting**: Unicode normalization ensures consistent text across sources
-3. **Reduced Redundancy**: Deduplication removes duplicate texts that could bias the model
-4. **Cleaner Dataset**: Quality filtering removes noise, spam, and low-quality texts
-5. **Better Context**: Chunking preserves context with overlapping windows
-6. **Multilingual Support**: Language detection enables filtering by language
 
 ### Dependencies (Optional)
 
 ```bash
-# For professional sentence tokenization
+# Professional sentence tokenization
 pip install spacy
 python -m spacy download en_core_web_sm
 python -m spacy download es_core_news_sm
 
-# For language detection
+# Language detection
 pip install langdetect
 
-# For MinHash deduplication
+# MinHash deduplication
 pip install datasketch
 ```
 
-## 🛠️ Requirements
+---
 
+## Performance
+
+- **Dataset Caching**: 12x faster training iterations
+- **Memory Efficient**: Optimized for CPU training with configurable RAM limits
+- **Multi-threaded**: Parallel data processing
+- **GPU Support**: CUDA acceleration with mixed precision (AMP)
+- **Lazy Loading**: GGUF server loads models on first request
+
+---
+
+## Documentation
+
+- [APP_ARCHITECTURE.md](APP_ARCHITECTURE.md) - Complete system architecture
+- [APP_TECHNICALSTACK.md](APP_TECHNICALSTACK.md) - Technology stack and dependencies
+- [ROADMAP.md](ROADMAP.md) - Thinking implementation roadmap and task plan
+- [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Command reference
+- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Neural network architecture
+- [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning
+- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Troubleshooting
+
+---
+
+## Requirements
+
+### Core
 - Python 3.8+
 - PyTorch 2.0+
 - Transformers (Hugging Face)
+- sentencepiece
+- datasets
+- numpy
+
+### API Server
+- fastapi
+- uvicorn
+- pydantic
+
+### Data Processing
 - PyPDF2
 - ebooklib
-- datasets
-- sentencepiece (optional, required for BPE/tokenization during preparation)
-- numpy, pandas
-- spacy (optional, for professional sentence tokenization)
-- langdetect (optional, for language detection)
-- datasketch (optional, for MinHash deduplication)
+- beautifulsoup4
+- trafilatura
+- requests
 
-## 🚀 Installation
+### Optional
+- spacy (professional sentence tokenization)
+- langdetect (language detection)
+- datasketch (MinHash deduplication)
+- llama-cpp-python (GGUF inference)
+- onnxruntime (ONNX quantization)
+
+---
+
+## Installation
 
 ```bash
 # Clone repository
@@ -483,7 +511,9 @@ envMyIAModelChat\Scripts\activate  # Windows
 pip install -r requirements.txt
 ```
 
-## 🤝 Contributing
+---
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -491,12 +521,26 @@ pip install -r requirements.txt
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+---
+
+## Security
+
+- Never commit `.env` files or API keys
+- Model weights in `checkpoints/` and `models/` are large; use `.gitignore`
+- Virtual environments (`envMyIAModelChat/`) are excluded from version control
+- API servers are local-only by default (no auth)
+
+---
+
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+---
+
+## Acknowledgments
 
 - A.L.I.C.E. AIML project for pattern data
 - Hugging Face for transformers and datasets
 - PyTorch community for neural network framework
+- llama.cpp project for GGUF inference
