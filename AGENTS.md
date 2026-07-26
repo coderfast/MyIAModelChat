@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, and multi-source data processing (AIML, PDF, EPUB, HuggingFace).
+MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, chain-of-thought reasoning, and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
 
 ---
 
@@ -49,28 +49,31 @@ MyIAModelChat/
 ├── dialogmanager.py        # Dialogue management with intent/sentiment
 ├── chatdataset.py          # PyTorch Dataset loader
 ├── bpe_tokenizer.py        # SentencePiece BPE tokenizer (multilingual)
-├── data_preparer.py        # Multi-source data loading (AIML, PDF, EPUB, HF)
+├── data_preparer.py        # Multi-source data loading (AIML, PDF, EPUB, HF, Web, CSV)
 ├── aimlloder.py            # AIML file processing
 ├── model_downloader.py     # HuggingFace model downloader
 ├── generate_thinking_data.py  # Chain-of-thought data generation
 ├── model_registry.py      # Model discovery, listing, validation
 ├── model_merge.py         # Model merging by weight averaging
 ├── model_export.py        # Export to GGUF, ONNX, ONNX quantized
+├── web_scraper.py         # Web crawling and scraping
 ├── manual_test.py         # Manual testing utilities
 ├── requirements.txt       # Python dependencies
+├── APP_ARCHITECTURE.md    # System architecture documentation
+├── APP_TECHNICALSTACK.md  # Technology stack documentation
 ├── checkpoints/           # Model checkpoints (legacy)
 ├── models/                # Trained model checkpoints (.pth)
 │   └── exported/          # Exported models (.gguf, .onnx)
-├── datasets_source/       # User-prepared datasets
-├── dataset_cache/         # Cached datasets
+├── datasets_source/       # User-prepared datasets (aiml/, csv/, pdf/, epub/, web/)
+├── dataset_cache/         # Cached datasets (tokenized HF Dataset + BPE model)
 ├── aiml_dev/              # AIML development files
 ├── envAIModels/           # FastAPI server (GGUF/llama_cpp)
 │   ├── app.py             # FastAPI application
-│   ├── routers_api.py     # API v1 routes
-│   ├── routers_v1.py      # v1 routes
+│   ├── routers_api.py     # API routes (/api)
+│   ├── routers_v1.py      # v1 routes (/v1)
 │   ├── schemas.py         # Pydantic models
 │   ├── utils.py           # Utility functions
-│   └── model.py           # Model loading (GGUF)
+│   └── model.py           # GGUF model loading (llama-cpp-python)
 ├── tests/                 # Test suite
 └── .mimocode/             # MiMoCode configuration
 ```

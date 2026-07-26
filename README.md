@@ -19,6 +19,8 @@ MyIAModelChat is a sophisticated conversational AI system built with PyTorch, fe
 - **PDF Text Extraction**: Automatic content extraction from PDF documents
 - **EPUB E-Book Support**: Full e-book parsing and integration
 - **Hugging Face Datasets**: Integration with pre-trained datasets
+- **Web Scraping**: Documentation crawling with trafilatura + BeautifulSoup
+- **CSV Datasets**: Curated QA pairs from CSV files
 - **Dataset Caching**: 12x faster training with intelligent caching system
 
 ### Advanced Features
@@ -131,28 +133,31 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 ```
 MyIAModelChat/
 ├── main.py                 # Main entry point with all CLI commands
-├── main_train.py          # Training pipeline
-├── main_chat.py           # Chat interface (API server)
-├── dialogmanager.py       # Response generation with intent/sentiment
-├── data_preparer.py       # Multi-source data loading (AIML, PDF, EPUB, HF)
-├── bpe_tokenizer.py       # SentencePiece BPE tokenizer (multilingual)
-├── chatmodel.py           # GPT-2 model architecture
-├── chatdataset.py         # PyTorch Dataset loader
-├── aimlloder.py           # AIML file processing
-├── model_downloader.py    # HuggingFace model downloader
-├── model_registry.py      # Model discovery, listing, validation
-├── model_merge.py         # Model merging by weight averaging
-├── model_export.py        # Export to GGUF, ONNX, ONNX quantized
+├── main_train.py           # Training pipeline
+├── main_chat.py            # Chat interface (API server)
+├── dialogmanager.py        # Response generation with intent/sentiment
+├── data_preparer.py        # Multi-source data loading (AIML, PDF, EPUB, HF, Web, CSV)
+├── bpe_tokenizer.py        # SentencePiece BPE tokenizer (multilingual)
+├── chatmodel.py            # GPT-2 model architecture
+├── chatdataset.py          # PyTorch Dataset loader
+├── aimlloder.py            # AIML file processing
+├── model_downloader.py     # HuggingFace model downloader
+├── model_registry.py       # Model discovery, listing, validation
+├── model_merge.py          # Model merging by weight averaging
+├── model_export.py         # Export to GGUF, ONNX, ONNX quantized
 ├── generate_thinking_data.py  # Chain-of-thought data generation
-├── manual_test.py         # Manual testing utilities
-├── checkpoints/           # Model checkpoints (legacy)
-├── models/                # Trained model checkpoints (.pth)
-│   └── exported/          # Exported models (.gguf, .onnx)
-├── datasets_source/       # User-prepared datasets
-├── dataset_cache/         # Cached datasets
-├── aiml_dev/              # AIML development files
-├── envAIModels/           # API server (FastAPI, GGUF/llama_cpp)
-└── tests/                 # Test suite
+├── web_scraper.py          # Web crawling and scraping
+├── manual_test.py          # Manual testing utilities
+├── APP_ARCHITECTURE.md     # System architecture documentation
+├── APP_TECHNICALSTACK.md   # Technology stack documentation
+├── checkpoints/            # Model checkpoints (legacy)
+├── models/                 # Trained model checkpoints (.pth)
+│   └── exported/           # Exported models (.gguf, .onnx)
+├── datasets_source/        # User-prepared datasets (aiml/, csv/, pdf/, epub/, web/)
+├── dataset_cache/          # Cached datasets
+├── aiml_dev/               # AIML development files
+├── envAIModels/            # API server (FastAPI, GGUF/llama_cpp)
+└── tests/                  # Test suite
 ```
 
 ## 📚 Data Sources
@@ -217,9 +222,11 @@ no_repeat_ngram_size = 3
 
 ## 📖 Documentation
 
+- [APP_ARCHITECTURE.md](APP_ARCHITECTURE.md) - Complete system architecture
+- [APP_TECHNICALSTACK.md](APP_TECHNICALSTACK.md) - Technology stack and dependencies
 - [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Command reference
-- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Technical architecture
+- [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Neural network architecture
 - [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning
 - [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Troubleshooting
 
