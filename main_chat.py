@@ -79,7 +79,6 @@ class GenerateRequest(BaseModel):
     stop: Optional[List[str]] = None
     stream: Optional[bool] = False
     include_thinking: Optional[bool] = False
-    include_thinking: Optional[bool] = False
     reasoning: Optional[str] = None
 
 class EmbeddingRequest(BaseModel):
