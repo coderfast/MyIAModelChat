@@ -172,7 +172,7 @@ class DialogueManager:
             intent_desc = intent_map.get(intent_label, f'Tono: {intent_label}')
             prompt_parts.append(f"Contexto: {intent_desc}")
 
-        prompt_text = "\n".join(prompt_parts) + "\nRespuesta:"
+        prompt_text = "\n".join(prompt_parts) + "\nPiensa paso a paso antes de responder.\n\nRespuesta:"
         try:
             input_ids = self.tokenizer.encode(prompt_text)
         except Exception:

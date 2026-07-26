@@ -108,7 +108,7 @@ git revert <commit>
 - **Cambio**: `'thinking_loss_weight': 0.5` → `'thinking_loss_weight': 1.0`
 - **Razón**: Con 0.5 el modelo aprende MENOS thinking que respuesta. Con 1.0 aprende ambos por igual.
 - **Líneas**: ~139-150
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 0.2: Añadir instrucción de thinking al prompt de inferencia
 - **Archivo**: `dialogmanager.py`
@@ -117,7 +117,7 @@ git revert <commit>
 - **Cambio nuevo**: `prompt_text = f"Pregunta: {user_text}\nPiensa paso a paso antes de responder.\n\n"`
 - **Razón**: Sin esta instrucción, el modelo nunca genera `<think>` aunque esté entrenado para ello.
 - **Líneas**: ~205
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 0
 - [ ] Entrenar 1 epoch con thinking loss weight 1.0, verificar que thinking_loss ≈ response_loss
@@ -177,7 +177,7 @@ git revert <commit>
       fixes_applied: dict  # {fix_type: count}
       discarded_reasons: dict  # {reason: count}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.2: Crear `aiml_validator.py` — Validador AIML
 - **Archivo**: `aiml_validator.py` (nuevo)
@@ -201,7 +201,7 @@ git revert <commit>
   # Filtrar wildcard-only
   re.match(r'^[_*]+$', pattern_text.strip())
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.3: Crear `pdf_validator.py` — Validador PDF
 - **Archivo**: `pdf_validator.py` (nuevo)
@@ -227,7 +227,7 @@ git revert <commit>
   # Detectar mojibake
   replacement_ratio = text.count('\ufffd') / max(len(text), 1)
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.4: Crear `epub_validator.py` — Validador EPUB
 - **Archivo**: `epub_validator.py` (nuevo)
@@ -239,7 +239,7 @@ git revert <commit>
   - Navegación/TOC inyectado → detectar por tipo de item EPUB
   - Items vacíos → detectar y descartar
   - UTF-8 con `errors='ignore'` → detectar bytes perdidos
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.5: Crear `web_validator.py` — Validador Web
 - **Archivo**: `web_validator.py` (nuevo)
@@ -251,7 +251,7 @@ git revert <commit>
   - Contenido duplicado (sidebars, related articles) → deduplicar
   - URLs rotas / contenido vacío → detectar y descartar
   - JavaScript residual → limpiar
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.6: Crear `csv_validator.py` — Validador CSV
 - **Archivo**: `csv_validator.py` (nuevo)
@@ -263,7 +263,7 @@ git revert <commit>
   - Filas duplicadas → deduplicar
   - Headers como datos → detectar primera fila
   - Newlines dentro de campos → normalizar
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 1.7: Integrar validadores en `data_preparer.py`
 - **Archivo**: `data_preparer.py`
@@ -287,7 +287,7 @@ git revert <commit>
               reports[source_name] = report
       self._log_quality_reports(reports)
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 1
 - [ ] Unit test: Validador AIML detecta tags HTML y los limpia
@@ -363,7 +363,7 @@ git revert <commit>
           # POST a Ollama API
           # Fallback a None si no disponible
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.2: Crear `aiml_thinking.py` — Generador AIML
 - **Archivo**: `aiml_thinking.py` (nuevo)
@@ -409,7 +409,7 @@ git revert <commit>
               return f"El usuario se despide. Respondo con una despedida apropiada."
           # etc.
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.3: Crear `csv_thinking.py` — Generador CSV
 - **Archivo**: `csv_thinking.py` (nuevo)
@@ -432,7 +432,7 @@ Razonamiento (1-3 oraciones, en español):"""
           thinking = self.teacher.generate(prompt)
           return {'thinking': thinking}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.4: Crear `pdf_thinking.py` — Generador PDF
 - **Archivo**: `pdf_thinking.py` (nuevo)
@@ -455,7 +455,7 @@ Razonamiento paso a paso:"""
           thinking = self.teacher.generate(prompt)
           return {'thinking': thinking}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.5: Crear `epub_thinking.py` — Generador EPUB
 - **Archivo**: `epub_thinking.py` (nuevo)
@@ -475,7 +475,7 @@ Contenido: {text[:500]}{'...' if len(text) > 500 else ''}
           thinking = self.teacher.generate(prompt)
           return {'thinking': thinking}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.6: Crear `web_thinking.py` — Generador Web
 - **Archivo**: `web_thinking.py` (nuevo)
@@ -497,7 +497,7 @@ Resume y razona sobre el contenido principal:"""
           thinking = self.teacher.generate(prompt)
           return {'thinking': thinking}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.7: Crear `hf_thinking.py` — Generador HuggingFace
 - **Archivo**: `hf_thinking.py` (nuevo)
@@ -521,7 +521,7 @@ Resume y razona sobre la información clave:"""
           thinking = self.teacher.generate(prompt)
           return {'thinking': thinking}
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 2.8: Integrar generadores en `data_preparer.py`
 - **Archivo**: `data_preparer.py`
@@ -548,7 +548,7 @@ Resume y razona sobre la información clave:"""
       # Formatear: <think>thinking</think>response
       self.combined_data = self._format_thinking_data(self.combined_data)
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 2
 - [ ] Unit test: AIML generator produce thinking para greeting
@@ -589,7 +589,7 @@ Resume y razona sobre la información clave:"""
       
       # ... existing steps 7+ ...
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 3.2: Actualizar `main.py` — Nuevos flags CLI
 - **Archivo**: `main.py`
@@ -604,7 +604,7 @@ Resume y razona sobre la información clave:"""
   '--thinking-depth'     # Profundidad: basic | adaptive | detailed
   ```
 - **Líneas**: ~620-650
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 3.3: Actualizar `main_train.py` — Métricas thinking separadas
 - **Archivo**: `main_train.py`
@@ -616,13 +616,13 @@ Resume y razona sobre la información clave:"""
   - `thinking_coverage` — % del output que es thinking
   - `response_token_accuracy` — accuracy solo en tokens de respuesta
 - **Líneas**: 445-486
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 3.4: Actualizar `dialogmanager.py` — Prompt de inferencia
 - **Archivo**: `dialogmanager.py`
 - **Cambio**: Añadir instrucción de thinking al prompt
 - **Línea**: ~205
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 3
 - [ ] Integration test: Pipeline completo `--prepare-data --aiml --csv --generate-thinking --validate-sources`
@@ -667,13 +667,13 @@ Resume y razona sobre la información clave:"""
       
       return results
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 4.2: Integrar validación en pipeline
 - **Archivo**: `data_preparer.py`
 - **Ubicación**: Después de generación thinking
 - **Flujo**: Generar → Validar → Filtrar bajas calidades → Reportar
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 4
 - [ ] Unit test: validate_thinking_batch clasifica correctly
@@ -708,7 +708,7 @@ Resume y razona sobre la información clave:"""
   # Chat
   python main.py --chat --model mymodel --show-thinking
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 5.2: Configuración en TRAINING_CONFIG
 - **Archivo**: `main_train.py`
@@ -722,7 +722,7 @@ Resume y razona sobre la información clave:"""
       'thinking_metrics_interval': 50,
   }
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Verificación Fase 5
 - [ ] Unit test: CLI flags parsed correctly
@@ -762,7 +762,7 @@ Resume y razona sobre la información clave:"""
   - `test_thinking_generation_with_real_data()`
   - `test_thinking_in_inference_prompt()`
 
-- **Estado**: `TODO`
+- **Estado**: `DONE` ✅
 
 ### Task 6.2: Documentación
 - **Archivos a actualizar**:

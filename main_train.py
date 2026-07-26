@@ -64,7 +64,7 @@ TRAINING_CONFIG = {
     'warm_up_ratio': 0.1,  # use 10% of dataset for warm-up
     'warm_up_steps': 100,  # maximum batches for warm-up phase
     # Thinking settings
-    'thinking_loss_weight': 0.5,  # loss weight for thinking tokens (0.0-1.0)
+    'thinking_loss_weight': 1.0,  # loss weight for thinking tokens (0.0-1.0)
 }
 
 # Model checkpoint configuration
@@ -487,24 +487,42 @@ class MainTrain:
             outputs = model(inputs)
             predictions = outputs.argmax(dim=-1)
 
-            # Count correct thinking open/close predictions
             thinking_open_correct = 0
             thinking_close_correct = 0
             total_thinking_positions = 0
+            thinking_token_count = 0
+            response_token_count = 0
+            thinking_correct = 0
+            response_correct = 0
 
             for i in range(targets.size(0)):
+                in_thinking = False
                 for j in range(targets.size(1)):
                     target_token = targets[i, j].item()
                     pred_token = predictions[i, j].item()
 
                     if target_token == thinking_id:
+                        in_thinking = True
                         total_thinking_positions += 1
+                        thinking_token_count += 1
                         if pred_token == thinking_id:
                             thinking_open_correct += 1
+                            thinking_correct += 1
                     elif target_token == thinking_end_id:
+                        in_thinking = False
                         total_thinking_positions += 1
+                        thinking_token_count += 1
                         if pred_token == thinking_end_id:
                             thinking_close_correct += 1
+                            thinking_correct += 1
+                    elif in_thinking:
+                        thinking_token_count += 1
+                        if pred_token == target_token:
+                            thinking_correct += 1
+                    else:
+                        response_token_count += 1
+                        if pred_token == target_token:
+                            response_correct += 1
 
             metrics = {}
             if total_thinking_positions > 0:
@@ -512,6 +530,14 @@ class MainTrain:
                 metrics['thinking_open_accuracy'] = thinking_open_correct / max(1, sum(1 for t in targets.flatten() if t.item() == thinking_id))
                 metrics['thinking_close_accuracy'] = thinking_close_correct / max(1, sum(1 for t in targets.flatten() if t.item() == thinking_end_id))
                 metrics['thinking_positions'] = total_thinking_positions
+
+            if thinking_token_count > 0:
+                metrics['thinking_length_avg'] = thinking_token_count / targets.size(0)
+                metrics['thinking_coverage'] = thinking_token_count / max(1, thinking_token_count + response_token_count)
+                metrics['thinking_token_accuracy_full'] = thinking_correct / thinking_token_count
+
+            if response_token_count > 0:
+                metrics['response_token_accuracy'] = response_correct / response_token_count
 
             return metrics
     

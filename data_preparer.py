@@ -679,6 +679,18 @@ class DataPreparer:
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
 
+            # Validate and clean sources
+            validate_sources = getattr(self.args, 'validate_sources', False)
+            if validate_sources:
+                logger.info("\n[6.4/7] Validating and cleaning sources...")
+                self._validate_and_clean_sources()
+
+            # Generate thinking data for each source
+            generate_thinking = getattr(self.args, 'generate_thinking', False)
+            if generate_thinking:
+                logger.info("\n[6.5/7] Generating real thinking data...")
+                self._generate_thinking_for_sources()
+
             # Apply deduplication if enabled
             enable_dedup = getattr(self.args, 'enable_dedup', False)
             if enable_dedup:
@@ -1543,6 +1555,137 @@ class DataPreparer:
                 num_proc=1,
                 remove_columns=columns_to_remove
             )
+
+    def _validate_and_clean_sources(self):
+        """Validate and clean each source dataset using source-specific validators."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        try:
+            from source_validators import get_validator, QualityReport
+        except ImportError:
+            logger.warning("  ⚠ source_validators module not found, skipping validation")
+            return
+
+        original_count = len(self.combined_data)
+        reports = {}
+
+        source_datasets = {
+            'aiml': self.aiml_data,
+            'hf': self.hf_data,
+            'pdf': self.pdf_data,
+            'epub': self.epub_data,
+            'web': self.web_data,
+            'csv': self.csv_data,
+        }
+
+        cleaned_datasets = []
+        for source_name, dataset in source_datasets.items():
+            if dataset is None or len(dataset) == 0:
+                continue
+
+            try:
+                validator = get_validator(source_name)
+                samples = [dict(item) for item in dataset]
+                cleaned_samples, report = validator.validate_batch(samples)
+                reports[source_name] = report
+
+                if cleaned_samples:
+                    from datasets import Dataset
+                    cleaned_datasets.append(Dataset.from_list(cleaned_samples))
+            except Exception as e:
+                logger.warning(f"  ⚠ Validation failed for {source_name}: {e}")
+                cleaned_datasets.append(dataset)
+
+        if cleaned_datasets:
+            from datasets import concatenate_datasets
+            self.combined_data = concatenate_datasets(cleaned_datasets)
+
+        logger.info("\n--- Source Validation Reports ---")
+        for source_name, report in reports.items():
+            logger.info(f"  {report.summary()}")
+        logger.info(f"  Total: {original_count} -> {len(self.combined_data)} samples")
+
+    def _generate_thinking_for_sources(self):
+        """Generate real thinking data for each source using source-specific generators."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        try:
+            from thinking_generators import OllamaTeacher
+            from aiml_thinking import AIMLThinkingGenerator
+            from csv_thinking import CSVThinkingGenerator
+            from pdf_thinking import PDFThinkingGenerator
+            from epub_thinking import EPUBThinkingGenerator
+            from web_thinking import WebThinkingGenerator
+            from hf_thinking import HFThinkingGenerator
+        except ImportError as e:
+            logger.warning(f"  ⚠ Thinking generator modules not found: {e}")
+            return
+
+        thinking_model = getattr(self.args, 'thinking_model', 'qwen2.5:1.5b')
+        teacher = OllamaTeacher(model=thinking_model)
+
+        if not teacher.is_available():
+            logger.warning(f"  ⚠ Ollama not available at localhost:11434")
+            logger.warning(f"  ⚠ Install Ollama and pull model: ollama pull {thinking_model}")
+            logger.warning(f"  ⚠ Falling back to rule-based thinking only")
+            teacher = None
+
+        generators = {
+            'aiml': AIMLThinkingGenerator(teacher),
+            'csv': CSVThinkingGenerator(teacher),
+            'pdf': PDFThinkingGenerator(teacher),
+            'epub': EPUBThinkingGenerator(teacher),
+            'web': WebThinkingGenerator(teacher),
+            'hf': HFThinkingGenerator(teacher),
+        }
+
+        source_datasets = {
+            'aiml': self.aiml_data,
+            'hf': self.hf_data,
+            'pdf': self.pdf_data,
+            'epub': self.epub_data,
+            'web': self.web_data,
+            'csv': self.csv_data,
+        }
+
+        thinking_datasets = []
+        total_thinking = 0
+        total_samples = 0
+
+        for source_name, dataset in source_datasets.items():
+            if dataset is None or len(dataset) == 0:
+                continue
+
+            generator = generators.get(source_name)
+            if not generator:
+                continue
+
+            logger.info(f"  Generating thinking for {source_name} ({len(dataset)} samples)...")
+
+            try:
+                samples = [dict(item) for item in dataset]
+                enriched = []
+                for sample in samples:
+                    result = generator.generate(sample)
+                    if result.get('thinking'):
+                        total_thinking += 1
+                    enriched.append(result)
+                    total_samples += 1
+
+                from datasets import Dataset
+                thinking_datasets.append(Dataset.from_list(enriched))
+                logger.info(f"    {source_name}: {total_thinking}/{total_samples} samples with thinking")
+            except Exception as e:
+                logger.warning(f"    ⚠ Thinking generation failed for {source_name}: {e}")
+                thinking_datasets.append(dataset)
+
+        if thinking_datasets:
+            from datasets import concatenate_datasets
+            self.combined_data = concatenate_datasets(thinking_datasets)
+
+        logger.info(f"\n  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
 
     def _apply_deduplication(self):
         """Apply deduplication to the combined dataset using MinHash LSH."""
