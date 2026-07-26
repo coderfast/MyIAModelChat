@@ -99,9 +99,11 @@ def test_stream_chat_with_thinking():
     assert len(chunks) >= 3
     first = json.loads(chunks[0])
     assert 'reasoning' in first.get('delta', {}), f"Missing reasoning in first chunk delta"
-    last = json.loads(chunks[-1])
-    assert last.get('object') == 'chat.completion.complete'
-    content_chunks = [json.loads(c) for c in chunks[:-1] if 'content' in json.loads(c).get('delta', {})]
+    # Last two chunks: finish_reason stop + [DONE]
+    finish_chunk = json.loads(chunks[-2])
+    assert finish_chunk.get('finish_reason') == 'stop', f"Expected finish_reason stop, got {finish_chunk}"
+    assert chunks[-1].strip() == 'data: [DONE]', f"Expected [DONE], got {chunks[-1]}"
+    content_chunks = [json.loads(c) for c in chunks[:-2] if 'content' in json.loads(c).get('delta', {})]
     assert len(content_chunks) > 0
     print("PASS: stream_chat_with_thinking yields correct format")
 

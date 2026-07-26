@@ -291,7 +291,7 @@ def generate_thinking_dataset(pairs: List[Dict[str, str]], lang: str = 'es', gen
         else:
             thinking = generate_thinking(text, answer, category, lang)
 
-        thinking_text = f"{thinking}</think>{answer}"
+        thinking_text = f"<think>{thinking}</think>{answer}"
         thinking_pairs.append({
             'input': text,
             'output': answer,

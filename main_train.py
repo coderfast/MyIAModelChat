@@ -229,11 +229,17 @@ class MainTrain:
         # Heuristic: sample first 100 items and check for <think> tags
         sample_size = min(100, len(self.loaded_dataset))
         thinking_count = 0
+        # Get thinking token IDs for detecting pre-tokenized thinking data
+        thinking_id = getattr(self.tokenizer, 'get_thinking_index', lambda: -1)()
+        thinking_end_id = getattr(self.tokenizer, 'get_thinking_end_index', lambda: -1)()
         for i in range(sample_size):
             item = self.loaded_dataset[i]
             value = item.get('input_ids', item.get('token_ids', ''))
             if isinstance(value, str) and '<think>' in value:
                 thinking_count += 1
+            elif isinstance(value, list) and thinking_id >= 0 and thinking_end_id >= 0:
+                if thinking_id in value and thinking_end_id in value:
+                    thinking_count += 1
 
         if thinking_count > 0:
             self.has_thinking_data = True
@@ -829,7 +835,7 @@ class MainTrain:
                 def warmup_pair_generator():
                     idx = 0
                     for input_ids, output_ids in token_pair_generator():
-                        if idx >= warmup_limit or idx >= warm_up_steps:
+                        if idx >= warmup_limit:
                             break
                         yield input_ids, output_ids
                         idx += 1
@@ -889,9 +895,9 @@ class MainTrain:
                         'architecture': {
                             'embed_size': TRAINING_CONFIG['embed_size'],
                             'hidden_size': TRAINING_CONFIG['hidden_size'],
-                            'num_layers': 4,
-                            'n_head': 4,
-                            'n_positions': 512,
+                            'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                            'n_head': TRAINING_CONFIG.get('n_head', 4),
+                            'n_positions': TRAINING_CONFIG.get('n_positions', 512),
                             'vocab_size': self.tokenizer.vocab_size,
                         },
                         'dataset_source': self.dataset_source,
@@ -917,29 +923,29 @@ class MainTrain:
             logger.info(f"\n{'='*80}")
             logger.info("Training completed! Saving final model and tokenizer...")
 
-            # Save per-epoch best checkpoint with metadata
+            # Save final checkpoint with metadata
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            epoch_filename = f"{self.checkpoint_name}_best_{timestamp}.pth"
+            epoch_filename = f"{self.checkpoint_name}_final_{timestamp}.pth"
             epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
-                'loss': loss,
+                'loss': self.best_loss,
                 'tokenizer': self.tokenizer,
                 'model_name': self.checkpoint_name,
                 'architecture': {
                     'embed_size': TRAINING_CONFIG['embed_size'],
                     'hidden_size': TRAINING_CONFIG['hidden_size'],
-                    'num_layers': 4,
-                    'n_head': 4,
-                    'n_positions': 512,
+                    'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                    'n_head': TRAINING_CONFIG.get('n_head', 4),
+                    'n_positions': TRAINING_CONFIG.get('n_positions', 512),
                     'vocab_size': self.tokenizer.vocab_size,
                 },
                 'dataset_source': self.dataset_source,
             }, epoch_path)
-            logger.info(f"  Best epoch checkpoint saved to {epoch_path}")
+            logger.info(f"  Final epoch checkpoint saved to {epoch_path}")
 
             # Save final model
             torch.save({
@@ -947,15 +953,15 @@ class MainTrain:
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
-                'loss': loss,
+                'loss': self.best_loss,
                 'tokenizer': self.tokenizer,
                 'model_name': self.checkpoint_name,
                 'architecture': {
                     'embed_size': TRAINING_CONFIG['embed_size'],
                     'hidden_size': TRAINING_CONFIG['hidden_size'],
-                    'num_layers': 4,
-                    'n_head': 4,
-                    'n_positions': 512,
+                    'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                    'n_head': TRAINING_CONFIG.get('n_head', 4),
+                    'n_positions': TRAINING_CONFIG.get('n_positions', 512),
                     'vocab_size': self.tokenizer.vocab_size,
                 },
                 'dataset_source': self.dataset_source,

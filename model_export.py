@@ -35,7 +35,11 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     if tokenizer is None:
         raise RuntimeError("No tokenizer found in checkpoint. Cannot export to ONNX.")
 
-    model = ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)
+    arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
+    model = ChatModel(tokenizer,
+        embed_size=arch.get('embed_size', 256),
+        hidden_size=arch.get('hidden_size', 512),
+        num_layers=arch.get('num_layers', 4))
     model.load_state_dict(new_state)
     model.eval()
 

@@ -108,7 +108,10 @@ def setup_cpu_configuration(args):
     os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
     torch.set_num_threads(args.num_threads)
     os.environ["MKL_NUM_THREADS"] = str(args.num_cores)
-    torch.set_num_interop_threads(args.num_cores)
+    try:
+        torch.set_num_interop_threads(args.num_cores)
+    except RuntimeError:
+        pass  # already set in this process
     
     # Enforce memory limit (75% of system RAM by default)
     args.max_ram_bytes = get_memory_limit_bytes(getattr(args, 'max_ram_fraction', SYSTEM_CONFIG['max_ram_fraction']))

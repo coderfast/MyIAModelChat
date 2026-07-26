@@ -199,9 +199,14 @@ class DialogueManager:
                     # Apply dynamic penalization for repeated n-grams
                     if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size - 1:
                         penalty = 5.0
-                        for token_id in range(logits.size(-1)):
-                            cand_seq = generated + [token_id]
-                            if self._is_repeated_ngram(cand_seq, self.no_repeat_ngram_size):
+                        ngram_size = self.no_repeat_ngram_size
+                        prefix = tuple(generated[-(ngram_size - 1):])
+                        banned_tokens = set()
+                        for i in range(len(generated) - ngram_size + 1):
+                            if tuple(generated[i:i + ngram_size - 1]) == prefix:
+                                banned_tokens.add(generated[i + ngram_size - 1])
+                        for token_id in banned_tokens:
+                            if token_id < logits.size(-1):
                                 logits[0, token_id] -= penalty
 
                     next_token = self.sample_next_token(logits.squeeze(0), temperature=adjusted_temperature)

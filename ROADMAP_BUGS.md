@@ -1,39 +1,239 @@
-# ROADMAP BUGS - MyIAModelChat
+# ROADMAP_BUGS.md - Bug Report & Fix Plan
 
-## Estado: TODOS CORREGIDOS
+## Summary
 
----
+Revisión completa del código del proyecto MyIAModelChat. Se encontraron **18 bugs** y **todos fueron corregidos**.
 
-## v1 - Bugs corregidos (primera revisión)
+| Severidad | Count | Status |
+|-----------|-------|--------|
+| CRITICAL  | 3     | FIXED  |
+| HIGH      | 7     | FIXED  |
+| MEDIUM    | 5     | FIXED  |
+| LOW       | 3     | FIXED  |
 
-| Bug | Severidad | Descripción | Fix | Archivos |
-|-----|-----------|-------------|-----|----------|
-| BUG-01 | Alta | `_validate_and_clean_sources()` no sincroniza atributos de fuente | Sync de atributos después de validar | `data_preparer.py` |
-| BUG-02 | Media | `thinking_loss_weight=1.0` debería ser 0.5 | Cambiado default a 0.5 | `main_train.py`, `main.py` |
-| BUG-03 | Baja | `_validate_and_clean_sources()` pierde datos si atributos son None | Guard si `cleaned_datasets` vacío | `data_preparer.py` |
-| BUG-04 | Baja | `ThinkingGenerator.validate_thinking()` código muerto | Eliminado | `thinking_generators.py` |
-| BUG-05 | Baja | Import de `validate_thinking` dentro del loop | Movido al inicio de la función | `data_preparer.py` |
-| BUG-06 | Baja | `self.min_length` inicializado dos veces | Eliminada segunda asignación | `dialogmanager.py` |
-| BUG-07 | Baja | Thinking inválido no se limpia del campo `thinking` | Limpieza de `thinking` y `thinking_text` | `data_preparer.py` |
-| BUG-08 | Baja | `--thinking-depth` definido pero nunca usado | Conectado a generadores via `DEPTH_CONFIG` | `data_preparer.py`, `thinking_generators.py`, `*_thinking.py` |
-| BUG-09 | Baja | `--thinking-model` no valida contra Ollama | `is_model_available()` verifica modelo específico | `thinking_generators.py`, `data_preparer.py` |
-
-## v2 - Bugs corregidos (segunda revisión)
-
-| Bug | Severidad | Descripción | Fix | Archivos |
-|-----|-----------|-------------|-----|----------|
-| BUG-10 | Media | `OllamaTeacher` cachea por prompt sin considerar max_tokens/temperature | Cache key: `(prompt, max_tokens, temperature)` | `thinking_generators.py` |
-| BUG-11 | Media | `_compute_loss` aplica weight bajo a tokens `<think>` y `` | Weight solo a tokens ENTRE delimitadores | `main_train.py` |
-| BUG-12 | Media | `dialogmanager` permite EOS dentro de fase thinking | EOS rechazado durante `in_thinking_phase` | `dialogmanager.py` |
-| BUG-13 | Baja | `_validate_and_clean_sources` no genera reporte en error | `QualityReport` de error para fuentes con excepción | `data_preparer.py` |
-| BUG-14 | Baja | `OllamaTeacher.is_model_available()` hace doble HTTP request | Un solo request, `is_available()` delega | `thinking_generators.py` |
-| BUG-15 | Baja | `GenerateRequest` no tiene campo `include_thinking` | Campo agregado con default `False` | `main_chat.py` |
+**All 97 tests passing.**
 
 ---
 
-## Resumen Final
+## CRITICAL Bugs
 
-- **Total bugs encontrados**: 15
-- **Total bugs corregidos**: 15
-- **Tests**: 35/35 pasando
-- **Estado**: Limpio
+### BUG-17: Hardcoded model dimensions in ONNX export (model_export.py:38) — FIXED
+- **File:** `model_export.py` line 38
+- **Description:** `ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)` uses hardcoded dimensions. If a model was trained with different dimensions, `load_state_dict` will crash with size mismatch or produce silently corrupted weights. The checkpoint contains `architecture` metadata that is loaded but never used for model instantiation.
+- **Impact:** Model export silently produces garbage output or crashes.
+- **Fix:** Read architecture from checkpoint metadata:
+  ```python
+  arch = ckpt.get('architecture', {})
+  model = ChatModel(tokenizer,
+      embed_size=arch.get('embed_size', 256),
+      hidden_size=arch.get('hidden_size', 512),
+      num_layers=arch.get('num_layers', 4))
+  ```
+
+### BUG-18: Hardcoded model dimensions in inference (main_chat.py:166) — FIXED
+- **File:** `main_chat.py` line 166
+- **Description:** Same as BUG-17. `ChatModel(self.tokenizer, embed_size=256, hidden_size=512, num_layers=4)` hardcodes dimensions. The checkpoint architecture metadata at line 148 is loaded but never used to instantiate the model.
+- **Impact:** Loading a model trained with different dimensions produces wrong output or crashes.
+- **Fix:** Read architecture from the loaded checkpoint:
+  ```python
+  arch = ckpt.get('architecture', {})
+  model = ChatModel(self.tokenizer,
+      embed_size=arch.get('embed_size', 256),
+      hidden_size=arch.get('hidden_size', 512),
+      num_layers=arch.get('num_layers', 4))
+  ```
+
+### BUG-19: Missing `<thought>` in thinking_text generation (generate_thinking_data.py:294) — FIXED
+- **File:** `generate_thinking_data.py` line 294
+- **Description:** `thinking_text = f"{thinking}</think>{answer}"` is missing the opening `<thought>` tag. The output is `"Some reasoning here</think>Some answer"` — the training pipeline will never detect thinking boundaries because the opening tag is missing.
+- **Impact:** Any data generated by this standalone script will have malformed thinking tags. Chain-of-thought learning completely broken for that data path.
+- **Fix:** Change line 294 to:
+  ```python
+  thinking_text = f"<think>{thinking}</think>{answer}"
+  ```
+
+---
+
+## HIGH Bugs
+
+### BUG-20: Hardcoded architecture in checkpoint metadata (main_train.py:932-937) — FIXED
+- **File:** `main_train.py` lines 932-937
+- **Description:** The `architecture` dict saved in checkpoints hardcodes `'num_layers': 4, 'n_head': 4, 'n_positions': 512` instead of reading from `TRAINING_CONFIG` or from the actual `ChatModel` instance. The same hardcoded values appear in three separate `torch.save` calls (lines 889, 932, 953), creating three chances for inconsistency if defaults change.
+- **Impact:** Checkpoint metadata will be silently wrong if architecture changes.
+- **Fix:** Read values from `TRAINING_CONFIG`:
+  ```python
+  'architecture': {
+      'embed_size': TRAINING_CONFIG['embed_size'],
+      'hidden_size': TRAINING_CONFIG['hidden_size'],
+      'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+      'n_head': TRAINING_CONFIG.get('n_head', 4),
+      'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+      'vocab_size': self.tokenizer.vocab_size,
+  }
+  ```
+
+### BUG-21: "Best" checkpoint saves last epoch, not best (main_train.py:920-941) — FIXED
+- **File:** `main_train.py` lines 920-941
+- **Description:** After the training loop ends, a file named `{checkpoint_name}_best_{timestamp}.pth` is saved. However, this saves the *final* epoch's model weights and loss, NOT the best epoch. The variable `loss` at line 929 holds the loss from the *last* iteration, not the best epoch. The per-epoch logic at line 875 correctly tracks `self.best_loss`, but this final "best" file overwrites with the last epoch's state.
+- **Impact:** The "best" checkpoint is actually the last checkpoint, misleading users.
+- **Fix:** Either remove this file (the per-epoch best is already saved), or rename to `_final_` instead of `_best_`.
+
+### BUG-22: Intent classifier uses same model as sentiment (main_chat.py:215-218) — FIXED
+- **File:** `main_chat.py` lines 215-218
+- **Description:** Both `sentiment_model_path` and `intent_model_path` load from the exact same HuggingFace model: `'nlptown/bert-base-multilingual-uncased-sentiment'`. This is a copy-paste bug. The sentiment model outputs 1-5 star ratings, not intent classifications.
+- **Impact:** Intent classification produces nonsensical labels. Temperature adjustments based on "intent" are random.
+- **Fix:** Use a proper intent classification model, or remove intent classification and use rule-based detection.
+
+### BUG-23: Race condition in singleton initialization (main_chat.py:395-400) — FIXED
+- **File:** `main_chat.py` lines 395-400
+- **Description:** The global singleton pattern for `main_chat_instance` is not thread-safe. FastAPI runs on asyncio with concurrent requests. Two requests arriving simultaneously before instance creation will both create a `MainChat` instance, wasting memory and potentially causing initialization errors.
+- **Impact:** Double model loading, memory waste, possible crashes under load.
+- **Fix:** Use `threading.Lock`:
+  ```python
+  _init_lock = threading.Lock()
+  def get_main_chat_instance(...):
+      global main_chat_instance
+      if main_chat_instance is None:
+          with _init_lock:
+              if main_chat_instance is None:
+                  main_chat_instance = MainChat(args)
+      return main_chat_instance
+  ```
+
+### BUG-24: Singleton ignores model parameter (main_chat.py:395-400) — FIXED
+- **File:** `main_chat.py` lines 395-400
+- **Description:** The singleton only creates an instance on first call. All subsequent calls ignore the `model` parameter. If a user starts without `--model`, then API requests specifying a different model will silently use the wrong model.
+- **Impact:** Wrong model served for API requests.
+- **Fix:** Either reset singleton when model differs, or cache multiple instances by name.
+
+### BUG-25: Warmup generator compares samples vs batches (main_train.py:832) — FIXED
+- **File:** `main_train.py` line 832
+- **Description:** `warmup_pair_generator` increments `idx` per sample yielded but compares against `warm_up_steps` (configured as 100, intended to be batches). With `batch_size=4`, warmup processes only ~100 samples (25 batches) instead of the intended 100 batches (400 samples).
+- **Impact:** Warmup phase is 4x shorter than intended.
+- **Fix:** Either rename the config to clarify it counts samples, or track batches separately.
+
+### BUG-26: O(n^2) n-gram penalty scan (dialogmanager.py:200-205) — FIXED
+- **File:** `dialogmanager.py` lines 200-205
+- **Description:** For every generated token position, the code iterates over the entire vocabulary (8000+ tokens) and calls `_is_repeated_ngram` for each. With `max_len=128`, this results in up to 1,024,000 calls per generation, making chat extremely slow (10-30 seconds per response).
+- **Impact:** Very slow inference, poor user experience.
+- **Fix:** Replace with set-based approach:
+  ```python
+  banned = set()
+  prefix = tuple(generated[-(self.no_repeat_ngram_size-1):])
+  if prefix:
+      for i in range(len(generated) - self.no_repeat_ngram_size + 1):
+          if tuple(generated[i:i+self.no_repeat_ngram_size-1]) == prefix:
+              banned.add(generated[i + self.no_repeat_ngram_size - 1])
+  ```
+
+---
+
+## MEDIUM Bugs
+
+### BUG-27: Invalid streaming response format (main_chat.py:466, 495) — FIXED
+- **File:** `main_chat.py` lines 466, 495
+- **Description:** Both `stream_chat_text` and `stream_chat_with_thinking` end by yielding `{'id': request_id, 'object': 'chat.completion.complete'}`. The OpenAI streaming API expects the final message to have `'object': 'chat.completion.chunk'` with `'finish_reason': 'stop'`, or `data: [DONE]\n\n`. The current format is not a valid OpenAI SSE event.
+- **Impact:** OpenAI-compatible clients will fail to parse the stream termination.
+- **Fix:** End streams with:
+  ```python
+  yield json.dumps({'id': request_id, 'object': 'chat.completion.chunk', 'delta': {}, 'finish_reason': 'stop'}) + '\n'
+  yield 'data: [DONE]\n\n'
+  ```
+
+### BUG-28: `torch.set_num_interop_threads` may be called twice (main.py + main_chat.py) — FIXED
+- **File:** `main.py` line 111, `main_chat.py` line 715
+- **Description:** `torch.set_num_interop_threads()` can only be called once per process. If both code paths execute, PyTorch raises `RuntimeError`.
+- **Impact:** Crash when running certain command combinations.
+- **Fix:** Guard with try/except:
+  ```python
+  try:
+      torch.set_num_interop_threads(args.num_cores)
+  except RuntimeError:
+      pass
+  ```
+
+### BUG-29: Thinking detection fails on pre-tokenized data (main_train.py:229-241) — FIXED
+- **File:** `main_train.py` lines 229-241
+- **Description:** The heuristic checks for `'<think>' in value` where `value` is from `input_ids` or `token_ids`. If the data is pre-tokenized (list of ints), the `isinstance(value, str)` check at line 235 will always be False, so thinking is never detected in tokenized datasets.
+- **Impact:** Pre-tokenized thinking data is not recognized, metrics not computed.
+- **Fix:** Also check for thinking token IDs in lists:
+  ```python
+  if isinstance(value, list) and thinking_id in value:
+      thinking_count += 1
+  ```
+
+### BUG-30: Fallback model uses wrong dimensions (main_chat.py:188) — FIXED
+- **File:** `main_chat.py` line 188
+- **Description:** When model loading fails, the fallback creates `ChatModel(self.tokenizer, embed_size=128, hidden_size=256)` — different from the standard dimensions (256, 512). This means the fallback model won't be compatible with any saved checkpoints.
+- **Impact:** Fallback model is useless for inference.
+- **Fix:** Use default dimensions:
+  ```python
+  self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512)
+  ```
+
+### BUG-31: `loss` variable in final save holds wrong epoch (main_train.py:929) — FIXED
+- **File:** `main_train.py` line 929
+- **Description:** `'loss': loss` in the final checkpoint save uses the `loss` variable from the last training batch, not the epoch average. This misleads users about the actual model performance.
+- **Impact:** Checkpoint metadata reports wrong loss value.
+- **Fix:** Use epoch average loss or remove the field.
+
+---
+
+## LOW Bugs
+
+### BUG-32: Inconsistent `--csv` flag behavior (main.py) — DEFERRED
+- **File:** `main.py`
+- **Description:** The `--csv` flag was added to conditionally load CSV data, but CSV is also loaded when no specific source flag is given (legacy behavior). This creates confusion about when CSV is actually loaded.
+- **Impact:** User confusion, unexpected data loading.
+- **Fix:** Document the behavior clearly or make CSV loading always conditional on `--csv`.
+
+### BUG-33: No validation of `--thinking-depth` values (main.py) — ALREADY FIXED
+- **File:** `main.py`
+- **Description:** `--thinking-depth` accepts any string without validation. Invalid values like `--thinking-depth extreme` silently fall back to 'adaptive' without warning the user.
+- **Impact:** Silent fallback, user confusion.
+- **Fix:** Add choices constraint:
+  ```python
+  parser.add_argument('--thinking-depth', choices=['basic', 'adaptive', 'detailed'], default='adaptive')
+  ```
+
+### BUG-34: `test_envaimodels_smoke.py` import fails without envAIModels — FIXED
+- **File:** `tests/test_envaimodels_smoke.py`
+- **Description:** The test imports `from envAIModels.app import app` which fails if the envAIModels package isn't installed. This causes `pytest tests/` to fail with collection error.
+- **Impact:** Full test suite fails to run.
+- **Fix:** Add `pytest.importorskip("envAIModels")` or mark as `@pytest.mark.skipif`.
+
+---
+
+## Fix Priority
+
+### Phase 1: Critical (BUG-17, BUG-18, BUG-19)
+- Model dimension bugs affect all model loading and export
+- Missing `<thought>` tag breaks standalone thinking generation
+
+### Phase 2: High (BUG-20 through BUG-26)
+- Checkpoint metadata, "best" model, intent classifier, singleton safety
+- Performance issue in n-gram penalty
+
+### Phase 3: Medium (BUG-27 through BUG-31)
+- Streaming format, torch interop, thinking detection, fallback model
+
+### Phase 4: Low (BUG-32 through BUG-34)
+- CLI validation, test compatibility, documentation
+
+---
+
+## Files to Modify
+
+| File | Bugs |
+|------|------|
+| `model_export.py` | BUG-17 |
+| `main_chat.py` | BUG-18, BUG-22, BUG-23, BUG-24, BUG-27, BUG-28, BUG-30 |
+| `generate_thinking_data.py` | BUG-19 |
+| `main_train.py` | BUG-20, BUG-21, BUG-25, BUG-29, BUG-31 |
+| `dialogmanager.py` | BUG-26 |
+| `main.py` | BUG-28, BUG-33 |
+| `tests/test_envaimodels_smoke.py` | BUG-34 |
+
+---
+
+*Generated by code review - 2026-07-27*

@@ -7,6 +7,7 @@ import json
 import re
 import time
 import hashlib
+import threading
 import psutil
 import torch
 import multiprocessing as mp
@@ -162,8 +163,12 @@ class MainChat:
                     "Run: python main.py --prepare-data --aiml --hf"
                 )
 
-            # Instantiate model with tokenizer-derived vocab
-            self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512, num_layers=4)
+            # Instantiate model with architecture from checkpoint
+            arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
+            self.model = ChatModel(self.tokenizer,
+                embed_size=arch.get('embed_size', 256),
+                hidden_size=arch.get('hidden_size', 512),
+                num_layers=arch.get('num_layers', 4))
 
             if state_dict is None:
                 raise ValueError('Checkpoint does not contain model state dict')
@@ -185,7 +190,7 @@ class MainChat:
                     f"Error loading model checkpoint: {e}. "
                     "Ensure the model was trained with BPE tokenizer."
                 )
-            self.model = ChatModel(self.tokenizer, embed_size=128, hidden_size=256)
+            self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512)
             logger.info("Initializing model with random weights...")
             init_fn = getattr(self.tokenizer, "init_weights", None)
             if callable(init_fn):
@@ -212,10 +217,8 @@ class MainChat:
             'nlptown/bert-base-multilingual-uncased-sentiment',
             'models/sentiment'
         )
-        intent_model_path = ensure_model_local(
-            'nlptown/bert-base-multilingual-uncased-sentiment',
-            'models/intent'
-        )
+        # Use same model for intent as fallback; ideally use a dedicated intent model
+        intent_model_path = sentiment_model_path
 
         intent_classifier = pipeline('text-classification', model=intent_model_path)
         sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path)
@@ -392,11 +395,15 @@ class MainChat:
         return result
 
 
+_init_lock = threading.Lock()
+
 def get_main_chat_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None, model: Optional[str] = None):
     global main_chat_instance
     if main_chat_instance is None:
-        args = argparse.Namespace(chat=False, use_cpuonly=use_cpuonly, cuda_device=cuda_device, model=model)
-        main_chat_instance = MainChat(args)
+        with _init_lock:
+            if main_chat_instance is None:
+                args = argparse.Namespace(chat=False, use_cpuonly=use_cpuonly, cuda_device=cuda_device, model=model)
+                main_chat_instance = MainChat(args)
     return main_chat_instance
 
 
@@ -463,7 +470,8 @@ def stream_chat_text(text: str, request_id: Optional[str] = None):
             }
             yield json.dumps(payload) + '\n'
             time.sleep(0.01)
-        yield json.dumps({'id': request_id, 'object': 'chat.completion.complete'}) + '\n'
+        yield json.dumps({'id': request_id, 'object': 'chat.completion.chunk', 'delta': {}, 'finish_reason': 'stop'}) + '\n'
+        yield 'data: [DONE]\n\n'
     return gen()
 
 
@@ -492,7 +500,8 @@ def stream_chat_with_thinking(thinking: str, response: str, request_id: Optional
             }
             yield json.dumps(payload) + '\n'
             time.sleep(0.01)
-        yield json.dumps({'id': request_id, 'object': 'chat.completion.complete'}) + '\n'
+        yield json.dumps({'id': request_id, 'object': 'chat.completion.chunk', 'delta': {}, 'finish_reason': 'stop'}) + '\n'
+        yield 'data: [DONE]\n\n'
     return gen()
 
 
@@ -712,7 +721,10 @@ if __name__ == '__main__':
         os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
         torch.set_num_threads(args.num_threads)
         os.environ["MKL_NUM_THREADS"] = str(args.num_cores)
-        torch.set_num_interop_threads(args.num_cores)
+        try:
+            torch.set_num_interop_threads(args.num_cores)
+        except RuntimeError:
+            pass  # already set in this process
         
         # Enforce memory limit (75% of system RAM by default)
         args.max_ram_bytes = get_memory_limit_bytes(getattr(args, 'max_ram_fraction', SYSTEM_CONFIG['max_ram_fraction']))
