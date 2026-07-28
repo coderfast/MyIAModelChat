@@ -5,14 +5,14 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from thinking_generators import ThinkingGenerator, OllamaTeacher
-from aiml_thinking import AIMLThinkingGenerator
-from csv_thinking import CSVThinkingGenerator
-from pdf_thinking import PDFThinkingGenerator
-from epub_thinking import EPUBThinkingGenerator
-from web_thinking import WebThinkingGenerator
-from hf_thinking import HFThinkingGenerator
-from thinking_quality import validate_thinking, validate_thinking_batch
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.aiml.thinking import AIMLThinkingGenerator
+from dataset_preparer.csv.thinking import CSVThinkingGenerator
+from dataset_preparer.pdf.thinking import PDFThinkingGenerator
+from dataset_preparer.epub.thinking import EPUBThinkingGenerator
+from dataset_preparer.web.thinking import WebThinkingGenerator
+from dataset_preparer.hf.thinking import HFThinkingGenerator
+from dataset_preparer.thinking_quality import validate_thinking, validate_thinking_batch
 
 
 def test_aiml_generator_greeting():

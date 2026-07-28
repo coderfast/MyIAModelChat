@@ -2,7 +2,7 @@
 Web thinking generator: teacher model with page context.
 """
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class WebThinkingGenerator(ThinkingGenerator):

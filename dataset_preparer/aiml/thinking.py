@@ -4,7 +4,7 @@ Simple patterns use rules, complex patterns use Ollama teacher.
 """
 import re
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class AIMLThinkingGenerator(ThinkingGenerator):

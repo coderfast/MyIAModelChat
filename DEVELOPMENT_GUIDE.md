@@ -53,9 +53,10 @@ model.gradient_checkpointing_enable()
 
 **Solution**:
 ```python
-# Debug aimlloder.py
-from aimlloder import *
+# Debug aiml/loader.py
+from dataset_preparer.aiml.loader import AIMLLoader
 
+loader = AIMLLoader()
 # Check if AIML files are found
 aiml_files = os.listdir('datasets_source/aiml/')
 print(f"Found {len(aiml_files)} AIML files")
@@ -82,7 +83,7 @@ print(f"Patterns loaded: {len(k._brain._nodes)}")
 ```python
 # Ensure same tokenizer is used everywhere
 # The tokenizer is saved in checkpoints/tokenizer_vocab.json
-# and loaded automatically by main_chat.py
+# and loaded automatically by inference/chat_engine.py
 
 # Verify they're identical
 test_text = "Hello world"
@@ -105,7 +106,7 @@ assert train_ids == inference_ids, "Tokenizers don't match!"
 **Solution**:
 ```python
 # For SentencePiece BPE tokenizer:
-from bpe_tokenizer import SentencePieceTokenizerWrapper
+from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
 tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 
@@ -269,11 +270,11 @@ def expensive_function():
 pip install pylint black flake8
 
 # Check code style
-pylint main_train.py
-flake8 chatmodel.py
+pylint main.py
+flake8 commons/model/chatmodel.py
 
 # Auto-format code
-black chatmodel.py
+black commons/model/chatmodel.py
 ```
 
 ### Type Checking
@@ -282,7 +283,7 @@ black chatmodel.py
 pip install mypy
 
 # Check type hints
-mypy main_train.py
+mypy main.py
 ```
 
 ### Testing
@@ -290,12 +291,12 @@ mypy main_train.py
 ```python
 # Create test_chatmodel.py
 import unittest
-from chatmodel import ChatModel
+from commons.model.chatmodel import ChatModel
 
 class TestChatModel(unittest.TestCase):
     def setUp(self):
         # ChatModel requires a tokenizer object as first argument
-        from bpe_tokenizer import SentencePieceTokenizerWrapper
+        from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
         tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
         self.model = ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)
     
@@ -339,22 +340,31 @@ except IOError as e:
 ### Configuration Management
 
 ```python
-# config.py
-class Config:
-    embed_size = 256
-    hidden_size = 512
-    num_layers = 4
-    batch_size = 4
-    accumulation_steps = 8
-    learning_rate = 0.001
-    epochs = 1
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# Using TrainingConfig dataclass
+from training.trainer import TrainingConfig, Trainer
 
-# Usage
-cfg = Config()
-from bpe_tokenizer import SentencePieceTokenizerWrapper
-tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
-model = ChatModel(tokenizer, embed_size=cfg.embed_size, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
+config = TrainingConfig(
+    epochs=10,
+    dataset_path='datasets_source/ciencias/',
+    checkpoint_name='ciencias_naturales',
+    use_cache=True,
+    aiml=True,
+    hf=True
+)
+
+# Create trainer and run
+trainer = Trainer(config)
+trainer.run()
+
+# Using ChatConfig dataclass
+from inference.chat_engine import ChatConfig, ChatEngine
+
+chat_config = ChatConfig(
+    show_thinking=True,
+    model_path='models/ciencias_naturales.pth'
+)
+
+engine = ChatEngine(chat_config)
 ```
 
 ### Error Recovery
@@ -387,16 +397,17 @@ def robust_inference(model, input_tensor, max_retries=3):
             "name": "Train Model",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/main_train.py",
+            "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": ["--epochs", "10", "--aiml", "--hf"]
+            "args": ["--train", "--epochs", "10", "--aiml", "--hf"]
         },
         {
             "name": "Chat Interface",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/main_chat.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": ["--chat"]
         }
     ]
 }
@@ -412,7 +423,7 @@ def robust_inference(model, input_tensor, max_retries=3):
             "label": "Train Model",
             "type": "shell",
             "command": "python",
-            "args": ["main_train.py", "--epochs", "10"],
+            "args": ["main.py", "--train", "--epochs", "10"],
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -433,7 +444,7 @@ def robust_inference(model, input_tensor, max_retries=3):
 git status
 
 # Stage changes
-git add main_train.py
+git add main.py
 
 # Commit with descriptive message
 git commit -m "Fix intent detection in DialogueManager"
@@ -442,10 +453,10 @@ git commit -m "Fix intent detection in DialogueManager"
 git log --oneline -10
 
 # Diff before committing
-git diff main_train.py
+git diff main.py
 
 # Revert changes
-git checkout main_train.py
+git checkout main.py
 ```
 
 ### .gitignore Best Practices
@@ -465,3 +476,7 @@ datasets/large_data/
 # IDE files
 .vscode/
 ```
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*

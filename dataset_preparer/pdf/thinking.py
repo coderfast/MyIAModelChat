@@ -3,7 +3,7 @@ PDF thinking generator: teacher model with section/chunk context.
 """
 import re
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class PDFThinkingGenerator(ThinkingGenerator):

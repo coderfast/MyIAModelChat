@@ -10,7 +10,7 @@ from typing import List, Optional
 
 import torch
 
-from model_registry import load_model_metadata, MODELS_DIR, EXPORTED_DIR
+from commons.registry.model_registry import load_model_metadata, MODELS_DIR, EXPORTED_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: int = 512) -> str:
     """Export a .pth checkpoint to ONNX format."""
     try:
-        from chatmodel import ChatModel
+        from commons.model.chatmodel import ChatModel
     except ImportError:
         raise RuntimeError("Cannot import ChatModel. Ensure chatmodel.py is in the project root.")
 
@@ -106,7 +106,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     to GGUF using llama.cpp's convert.py script.
     """
     try:
-        from chatmodel import ChatModel
+        from commons.model.chatmodel import ChatModel
     except ImportError:
         raise RuntimeError("Cannot import ChatModel. Ensure chatmodel.py is in the project root.")
 

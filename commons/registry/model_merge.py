@@ -8,7 +8,7 @@ from pathlib import Path
 
 import torch
 
-from model_registry import load_model_metadata, validate_compatibility, MODELS_DIR
+from commons.registry.model_registry import load_model_metadata, validate_compatibility, MODELS_DIR
 
 logger = logging.getLogger(__name__)
 

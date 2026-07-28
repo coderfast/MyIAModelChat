@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pickle
 import sys
 import time
@@ -11,9 +11,13 @@ import multiprocessing as mp
 from torch.utils.data import DataLoader, IterableDataset
 from torch.amp import GradScaler
 from datasets import Dataset
-from chatmodel import ChatModel
+from commons.model.chatmodel import ChatModel
 import logging
 import shutil
+
+from dataclasses import dataclass, field
+from typing import Optional, List
+
 from datetime import datetime
 
 # Optional SentencePiece support
@@ -25,7 +29,7 @@ except Exception:
     SP_AVAILABLE = False
 
 try:
-    from bpe_tokenizer import SentencePieceTokenizerWrapper
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 except ImportError:
     SentencePieceTokenizerWrapper = None
 
@@ -88,11 +92,31 @@ class TokenPairIterableDataset(IterableDataset):
         raise TypeError("TokenPairIterableDataset length not set")
 
 
-class MainTrain:
 
-    def __init__(self, args):
+@dataclass
+class TrainingConfig:
+    """Configuration for model training (no CLI args)."""
+    epochs: int = 1
+    checkpoint_name: str = 'chat_model'
+    dataset_source: str = 'dataset_cache'
+    use_cpuonly: bool = False
+    cuda_device: Optional[int] = None
+    num_cores: int = 0
+    num_threads: int = 0
+    max_ram_fraction: float = 0.75
+    max_ram_bytes: Optional[int] = None
+    thinking_loss_weight: float = 0.5
+    thinking_enabled: bool = True
+    thinking_max_tokens: int = 64
+
+class Trainer:
+
+    def __init__(self, config: TrainingConfig):
 
         logger.info("MainTrain initializing...")
+
+        # Store config
+        self.config = config
 
         # Check if the tokenizer and cached dataset exist
         self.tokenizer = None
@@ -110,23 +134,20 @@ class MainTrain:
         # Thinking detection
         self.has_thinking_data = False
         self.thinking_sample_count = 0
-        self.thinking_loss_weight = getattr(args, 'thinking_loss_weight', None) or TRAINING_CONFIG.get('thinking_loss_weight', 0.5)
+        self.thinking_loss_weight = getattr(self.config, 'thinking_loss_weight', None) or TRAINING_CONFIG.get('thinking_loss_weight', 0.5)
 
         # Memory cap for entire application
-        self.max_ram_fraction = getattr(args, 'max_ram_fraction', 0.75)
-        self.max_ram_bytes = getattr(args, 'max_ram_bytes', None)
+        self.max_ram_fraction = getattr(self.config, 'max_ram_fraction', 0.75)
+        self.max_ram_bytes = getattr(self.config, 'max_ram_bytes', None)
 
-        # Parse command-line arguments
-        self.aiml = args.aiml
-        self.hf = args.hf
-        self.onlytokenize = args.onlytokenize
-        self.epochs = args.epochs
-        self.use_cpuonly = getattr(args, 'use_cpuonly', False)
-        self.cuda_device = getattr(args, 'cuda_device', None)
+        # Training parameters
+        self.epochs = self.config.epochs
+        self.use_cpuonly = getattr(self.config, 'use_cpuonly', False)
+        self.cuda_device = getattr(self.config, 'cuda_device', None)
 
         # Dynamic checkpoint naming
-        self.checkpoint_name = getattr(args, 'checkpoint_name', 'chat_model')
-        self.dataset_source = getattr(args, 'dataset', 'dataset_cache')
+        self.checkpoint_name = getattr(self.config, 'checkpoint_name', 'chat_model')
+        self.dataset_source = getattr(self.config, 'dataset', 'dataset_cache')
         self.model_output_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}.pth')
         os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
 
@@ -161,7 +182,11 @@ class MainTrain:
                     "Install it: pip install sentencepiece"
                 )
             raise RuntimeError(
-                "No BPE model found. Run: python main.py --prepare-data --aiml --hf"
+                "No BPE model found. Run prepare-data first:\n"
+                "  python main.py --prepare-data --aiml\n"
+                "  python main.py --prepare-data --aiml --hf --pdf --epub\n"
+                "  python main.py --prepare-data --aiml --bpe-vocab-size 8000\n"
+                "Run 'python main.py --prepare-data --help' for all options."
             )
 
         # Detect thinking data now that tokenizer is available
@@ -180,12 +205,17 @@ class MainTrain:
             if not os.path.exists(CACHE_DATASET_FILE):
                 raise FileNotFoundError(
                     f"Cached dataset not found at {CACHE_DATASET_FILE}\n"
-                    f"Please run: python main.py --prepare-data --aiml --hf"
+                    "No cached dataset available for training.\n\n"
+                    "Prepare your dataset first:\n"
+                    "  python main.py --prepare-data --aiml\n"
+                    "  python main.py --prepare-data --aiml --hf --pdf --epub\n"
+                    "  python main.py --prepare-data --aiml --bpe-vocab-size 8000\n\n"
+                    "Run 'python main.py --prepare-data --help' for all options."
                 )
             
             logger.info(f"Loading cached dataset from: {CACHE_DATASET_FILE}")
             self.loaded_dataset = Dataset.load_from_disk(CACHE_DATASET_FILE)
-            logger.info(f"✓ Loaded cached dataset: {len(self.loaded_dataset)} samples")
+            logger.info(f"Loaded cached dataset: {len(self.loaded_dataset)} samples")
             
             # Load cache metadata if available
             if os.path.exists(CACHE_METADATA_FILE):
@@ -217,7 +247,7 @@ class MainTrain:
             # detect thinking tokens in pre-tokenized data.
 
         except Exception as e:
-            logger.error(f"❌ Error loading cached dataset: {e}")
+            logger.error(f"âŒ Error loading cached dataset: {e}")
             sys.exit(1)
 
     def _detect_thinking_data(self):
@@ -228,7 +258,7 @@ class MainTrain:
         # Check cache metadata for thinking flag
         if isinstance(self.cache_metadata, dict) and self.cache_metadata.get('has_thinking_tokens'):
             self.has_thinking_data = True
-            logger.info("✓ Thinking data detected (from cache metadata)")
+            logger.info("Thinking data detected (from cache metadata)")
             return
 
         # Heuristic: sample first 100 items and check for <think> tags
@@ -249,7 +279,7 @@ class MainTrain:
         if thinking_count > 0:
             self.has_thinking_data = True
             self.thinking_sample_count = thinking_count
-            logger.info(f"✓ Thinking data detected ({thinking_count}/{sample_size} samples contain <think>)")
+            logger.info(f"Thinking data detected ({thinking_count}/{sample_size} samples contain <think>)")
         else:
             logger.info("No thinking data detected in dataset")
 
@@ -363,14 +393,14 @@ class MainTrain:
             
             # Check for Tesla K80
             if "K80" in device_name or "Tesla" in device_name:
-                logger.info("✓ Tesla K80 GPU detected - using optimized configuration")
+                logger.info(" Tesla K80 GPU detected - using optimized configuration")
                 self.use_gpu = True
                 self.use_mixed_precision = True
                 self.use_gradient_checkpointing = True
                 # Tesla K80 has 24GB per GPU, enable memory efficient training
                 torch.cuda.set_per_process_memory_fraction(0.9)
             else:
-                logger.info("✓ CUDA GPU detected - using optimized configuration")
+                logger.info(" CUDA GPU detected - using optimized configuration")
                 self.use_gpu = True
                 self.use_mixed_precision = True
                 self.use_gradient_checkpointing = False
@@ -389,7 +419,7 @@ class MainTrain:
         if cuda_available:
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.enabled = True
-            logger.info("✓ CuDNN optimization enabled")
+            logger.info(" CuDNN optimization enabled")
         
         logger.info(f"Mixed Precision Training: {'ENABLED' if self.use_mixed_precision else 'DISABLED'}")
         logger.info(f"Gradient Checkpointing: {'ENABLED' if self.use_gradient_checkpointing else 'DISABLED'}")
@@ -415,7 +445,7 @@ class MainTrain:
             # Enable gradient checkpointing if available
             if self.use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
                 model.gradient_checkpointing_enable()
-                logger.info("✓ Gradient checkpointing enabled for memory efficiency")
+                logger.info(" Gradient checkpointing enabled for memory efficiency")
             
             # For very large models, we can implement layer-wise CPU-GPU distribution
             # This is useful for models that don't fit in GPU memory
@@ -483,7 +513,7 @@ class MainTrain:
         token_losses = criterion(outputs, targets)
         weight_sum = weights.sum()
         if weight_sum <= 0:
-            # Fallback: all tokens are padding — return zero loss
+            # Fallback: all tokens are padding â€” return zero loss
             return torch.tensor(0.0, device=outputs.device, requires_grad=True)
         loss = (token_losses * weights).sum() / weight_sum
         return loss
@@ -570,15 +600,19 @@ class MainTrain:
         return loss * accumulation_step  # Return original loss for tracking
 
     # Training function with mixed precision support
-    def train(self, model, dataloader, criterion, optimizer, device, scaler=None, accumulation_steps=1):
+    def train(self, model, dataloader, criterion, optimizer, device, scaler=None, accumulation_steps=1, num_batches_override=None, is_warmup=False):
         """Train function with support for mixed precision training and gradient accumulation."""
 
         total_loss = 0
         total_batches = 0
-        try:
-            num_batches = len(dataloader)
-        except (TypeError, AttributeError):
-            num_batches = float('inf')
+        phase_label = "Light training (warm-up)" if is_warmup else "Training"
+        if num_batches_override is not None:
+            num_batches = num_batches_override
+        else:
+            try:
+                num_batches = len(dataloader)
+            except (TypeError, AttributeError):
+                num_batches = float('inf')
         model.train()
         optimizer.zero_grad()
         epoch_start_time = time.time()
@@ -599,9 +633,9 @@ class MainTrain:
                     eta_seconds = (elapsed / (batch_idx + 1)) * (num_batches - batch_idx - 1)
                     eta_m, eta_s = divmod(int(eta_seconds), 60)
                     eta_str = f"{eta_m}m {eta_s}s" if eta_m > 0 else f"{eta_s}s"
-                    logger.info(f"Training batch {batch_str} | ETA: {eta_str}")
+                    logger.info(f"{phase_label} batch {batch_str} | ETA: {eta_str}")
                 else:
-                    logger.info(f"Training batch {batch_str} in progress...")
+                    logger.info(f"{phase_label} batch {batch_str} in progress...")
 
             total_batches += 1
             inputs = inputs.to(device)
@@ -723,9 +757,9 @@ class MainTrain:
 
             # Log thinking data status
             if self.has_thinking_data:
-                logger.info(f"✓ Thinking data: ENABLED (model will learn <think>...</think> structure)")
+                logger.info(f" Thinking data: ENABLED (model will learn <think>...</think> structure)")
             else:
-                logger.info(f"ℹ Thinking data: NOT detected (standard training mode)")
+                logger.info(f"â„¹ Thinking data: NOT detected (standard training mode)")
 
             # Extract and normalize records from cached dataset in streaming mode
             logger.info("Extracting and validating dataset samples (streaming mode)...")
@@ -753,13 +787,13 @@ class MainTrain:
                 logger.error("No valid text/token sequences found in cached dataset")
                 sys.exit(1)
 
-            logger.info(f"✓ Processed {sample_count} samples for tokenizer fitting")
-            logger.info(f"✓ Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
+            logger.info(f" Processed {sample_count} samples for tokenizer fitting")
+            logger.info(f" Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
             # Save tokenizer vocabulary for chat loading inside checkpoints
             os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
             self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
-            logger.info(f"✓ Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
+            logger.info(f" Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
 
             # Preserve raw dataset text for special facts fine-tuning before tokenization
             self.raw_dataset = loaded_dataset
@@ -795,7 +829,7 @@ class MainTrain:
                 num_workers=0
             )
 
-            logger.info("✓ DataLoader created")
+            logger.info(" DataLoader created")
         
         except Exception as e:
             logger.error(f"Error in data preparation: {e}", exc_info=True)
@@ -814,7 +848,7 @@ class MainTrain:
             logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
             model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'], num_layers=4)
             model = self._setup_model_with_device_strategy(model, device)
-            logger.info(f"✓ Model initialized and deployed")
+            logger.info(f" Model initialized and deployed")
 
             # Define loss and optimizer
             criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
@@ -822,16 +856,16 @@ class MainTrain:
             
             # Add learning rate scheduler
             scheduler = lr_scheduler.StepLR(optimizer, step_size=max(1, self.epochs // 3), gamma=0.1)
-            logger.info(f"✓ Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
+            logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
 
             # Initialize gradient scaler for mixed precision training
             scaler = GradScaler() if self.use_mixed_precision else None
             if scaler:
-                logger.info("✓ Gradient scaler initialized for mixed precision training")
+                logger.info(" Gradient scaler initialized for mixed precision training")
 
             # Create checkpoint directory
             os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
-            logger.info(f"✓ Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
+            logger.info(f" Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
 
             # Warm-up phase (optional light training)
             if TRAINING_CONFIG.get('warm_up', False):
@@ -858,8 +892,9 @@ class MainTrain:
                     num_workers=0
                 )
 
-                _ = self.train(model, warmup_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
-                logger.info("✓ Warm-up phase completed")
+                warmup_num_batches = max(1, warmup_limit // TRAINING_CONFIG['batch_size'])
+                _ = self.train(model, warmup_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'], num_batches_override=warmup_num_batches, is_warmup=True)
+                logger.info(" Warm-up phase completed")
 
             # Main training loop
             logger.info(f"\nStarting main training phase ({self.epochs} epochs)...")
@@ -911,7 +946,7 @@ class MainTrain:
                         },
                         'dataset_source': self.dataset_source,
                     }, epoch_path)
-                    logger.info(f"  ✓ Epoch {epoch+1} checkpoint saved to {epoch_path}")
+                    logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():
@@ -924,7 +959,7 @@ class MainTrain:
                 logger.info("\nStarting CSV data fine-tuning...")
                 try:
                     _ = self.train(model, csv_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
-                    logger.info("✓ CSV data fine-tuning completed")
+                    logger.info(" CSV data fine-tuning completed")
                 except Exception as e:
                     logger.warning(f"CSV data fine-tuning failed: {e}")
 
@@ -975,7 +1010,7 @@ class MainTrain:
                 },
                 'dataset_source': self.dataset_source,
             }, self.model_output_path)
-            logger.info(f"✓ Model + tokenizer saved to {self.model_output_path}")
+            logger.info(f" Model + tokenizer saved to {self.model_output_path}")
 
         except TrainingStopRequested:
             logger.warning("\nTraining interrupted by request")
@@ -1061,7 +1096,7 @@ class MainTrain:
         if os.path.exists(CACHE_TOKENIZED_DATASET_DIR):
             logger.info(f"Loading tokenized dataset from cache: {CACHE_TOKENIZED_DATASET_DIR}")
             tokenized_ds = Dataset.load_from_disk(CACHE_TOKENIZED_DATASET_DIR)
-            logger.info(f"✓ Loaded tokenized dataset with {len(tokenized_ds)} samples")
+            logger.info(f" Loaded tokenized dataset with {len(tokenized_ds)} samples")
             return tokenized_ds
 
         if 'token_ids' in self.loaded_dataset.column_names:
@@ -1092,5 +1127,6 @@ class MainTrain:
 
         os.makedirs(CACHE_TOKENIZED_DATASET_DIR, exist_ok=True)
         tokenized_ds.save_to_disk(CACHE_TOKENIZED_DATASET_DIR)
-        logger.info(f"✓ Saved tokenized dataset to {CACHE_TOKENIZED_DATASET_DIR}")
+        logger.info(f" Saved tokenized dataset to {CACHE_TOKENIZED_DATASET_DIR}")
         return tokenized_ds
+

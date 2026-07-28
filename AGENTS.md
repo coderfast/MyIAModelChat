@@ -1,4 +1,4 @@
-# AGENTS.md - MyIAModelChat Project Agents & Roles
+﻿# AGENTS.md - MyIAModelChat Project Agents & Roles
 
 ## Project Overview
 
@@ -6,77 +6,86 @@ MyIAModelChat is an advanced conversational AI system built with PyTorch, featur
 
 ---
 
-## Agent Roles
-
-### Primary Agents
-
-#### Build Agent (Default)
-- **Purpose**: Full tool access for implementation tasks
-- **Permissions**: Read, write, edit, bash, search, orchestration
-- **Use Case**: Writing code, fixing bugs, adding features, running tests
-- **When to Use**: Most development tasks
-
-#### Plan Agent
-- **Purpose**: Read-only design mode for planning
-- **Permissions**: Read-only (except plan files in `.mimocode/plans/`)
-- **Use Case**: Architecture decisions, multi-file refactoring, design specifications
-- **When to Use**: Non-trivial implementation work requiring planning first
-
-### Subagents
-
-#### Explore Agent
-- **Purpose**: Fast, read-only codebase exploration
-- **Permissions**: grep, glob, list, bash (read-only), webfetch, read
-- **Use Case**: Finding files, searching code patterns, answering codebase questions
-- **When to Use**: Search tasks requiring more than 3 queries
-
-#### General Agent
-- **Purpose**: General-purpose multi-step worker
-- **Permissions**: Full tool access within project scope
-- **Use Case**: Complex delegated tasks, parallel work
-- **When to Use**: Heavy lifting that should be isolated from main context
-
----
-
 ## Project Structure
 
-```
+`
 MyIAModelChat/
-├── main.py                 # Primary entry point (CLI)
-├── main_train.py           # Training pipeline
-├── main_chat.py            # Chat interface + FastAPI server
-├── chatmodel.py            # GPT-2 Transformer model architecture
-├── dialogmanager.py        # Dialogue management with intent/sentiment
-├── chatdataset.py          # PyTorch Dataset loader
-├── bpe_tokenizer.py        # SentencePiece BPE tokenizer (multilingual)
-├── data_preparer.py        # Multi-source data loading (AIML, PDF, EPUB, HF, Web, CSV)
-├── aimlloder.py            # AIML file processing
-├── model_downloader.py     # HuggingFace model downloader
-├── generate_thinking_data.py  # Chain-of-thought data generation
-├── model_registry.py      # Model discovery, listing, validation
-├── model_merge.py         # Model merging by weight averaging
-├── model_export.py        # Export to GGUF, ONNX, ONNX quantized
-├── web_scraper.py         # Web crawling and scraping
-├── manual_test.py         # Manual testing utilities
-├── requirements.txt       # Python dependencies
-├── APP_ARCHITECTURE.md    # System architecture documentation
-├── APP_TECHNICALSTACK.md  # Technology stack documentation
-├── checkpoints/           # Model checkpoints (legacy)
-├── models/                # Trained model checkpoints (.pth)
-│   └── exported/          # Exported models (.gguf, .onnx)
-├── datasets_source/       # User-prepared datasets (aiml/, csv/, pdf/, epub/, web/)
-├── dataset_cache/         # Cached datasets (tokenized HF Dataset + BPE model)
-├── aiml_dev/              # AIML development files
-├── envAIModels/           # FastAPI server (GGUF/llama_cpp)
-│   ├── app.py             # FastAPI application
-│   ├── routers_api.py     # API routes (/api)
-│   ├── routers_v1.py      # v1 routes (/v1)
-│   ├── schemas.py         # Pydantic models
-│   ├── utils.py           # Utility functions
-│   └── model.py           # GGUF model loading (llama-cpp-python)
-├── tests/                 # Test suite
-└── .mimocode/             # MiMoCode configuration
-```
+├── main.py                              # Primary entry point (CLI) - ONLY file that processes args
+├── commons/                             # Shared code (reusable across projects)
+│   ├── __init__.py
+│   ├── model/                           # Model architecture
+│   │   ├── __init__.py
+│   │   └── chatmodel.py                 # GPT-2 Transformer
+│   ├── tokenizer/                       # Tokenization
+│   │   ├── __init__.py
+│   │   └── bpe_tokenizer.py             # SentencePiece BPE
+│   ├── dialogue/                        # Dialogue management
+│   │   ├── __init__.py
+│   │   └── dialogmanager.py             # DialogueManager with intent/sentiment
+│   ├── dataset/                         # PyTorch datasets
+│   │   ├── __init__.py
+│   │   └── chatdataset.py               # ChatDataset
+│   └── registry/                        # Model management
+│       ├── __init__.py
+│       ├── model_registry.py            # Model discovery, listing
+│       ├── model_merge.py               # Model merging
+│       ├── model_export.py              # Export to GGUF/ONNX
+│       └── model_downloader.py          # HuggingFace downloader
+│
+├── dataset_preparer/                    # Data preparation
+│   ├── __init__.py
+│   ├── data_preparer.py                 # Main data preparer
+│   ├── source_validators.py             # Data quality validators
+│   ├── thinking_generators.py           # Thinking generation base
+│   ├── thinking_quality.py              # Quality validation
+│   ├── generate_thinking_data.py        # Thinking data generation
+│   ├── aiml/
+│   │   ├── __init__.py
+│   │   ├── loader.py                    # AIML file processing
+│   │   └── thinking.py                  # AIML thinking
+│   ├── pdf/
+│   │   ├── __init__.py
+│   │   └── thinking.py                  # PDF thinking
+│   ├── epub/
+│   │   ├── __init__.py
+│   │   └── thinking.py                  # EPUB thinking
+│   ├── csv/
+│   │   ├── __init__.py
+│   │   └── thinking.py                  # CSV thinking
+│   ├── hf/
+│   │   ├── __init__.py
+│   │   └── thinking.py                  # HuggingFace thinking
+│   └── web/
+│       ├── __init__.py
+│       ├── scraper.py                   # Web crawling
+│       └── thinking.py                  # Web thinking
+│
+├── training/                            # Training
+│   ├── __init__.py
+│   └── trainer.py                       # Trainer class + TrainingConfig
+│
+├── inference/                           # Inference
+│   ├── __init__.py
+│   └── chat_engine.py                   # ChatEngine class + ChatConfig
+│
+├── envAIModels/                         # FastAPI server (unchanged)
+│   ├── __init__.py
+│   ├── app.py
+│   ├── routers_api.py
+│   ├── routers_v1.py
+│   ├── schemas.py
+│   ├── utils.py
+│   ├── model.py
+│   └── model_metadata.py
+│
+├── manual_test.py                       # Manual testing
+├── tests/                               # Test suite
+├── checkpoints/                         # Model checkpoints
+├── models/                              # Trained models
+│   └── exported/                        # Exported models
+├── dataset_cache/                       # Cached datasets
+└── datasets_source/                     # Data sources
+`
 
 ---
 
@@ -86,21 +95,22 @@ MyIAModelChat/
 
 | Module | Purpose |
 |--------|---------|
-| `chatmodel.py` | GPT-2 Transformer architecture (embedding → Transformer → logits) |
-| `dialogmanager.py` | Intent classification (BERT), sentiment analysis (BERT), temperature adjustment |
-| `chatdataset.py` | PyTorch Dataset for loading tokenized chat data |
-| `bpe_tokenizer.py` | SentencePiece BPE tokenizer wrapper (multilingual) |
-| `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HuggingFace) |
-| `aimlloder.py` | AIML file parsing and pattern matching |
-| `main_train.py` | Training pipeline with dataset handling and checkpointing |
-| `main_chat.py` | Chat interface + FastAPI API server |
-| `model_registry.py` | Model discovery, listing, validation |
-| `model_merge.py` | Model merging by weight averaging |
-| `model_export.py` | Export to GGUF, ONNX, ONNX quantized |
+| main.py | CLI entry point - parses args, orchestrates operations |
+| commons/model/chatmodel.py | GPT-2 Transformer architecture |
+| commons/dialogue/dialogmanager.py | Intent/sentiment analysis, temperature adjustment |
+| commons/dataset/chatdataset.py | PyTorch Dataset for tokenized chat data |
+| commons/tokenizer/bpe_tokenizer.py | SentencePiece BPE tokenizer (multilingual) |
+| commons/registry/model_registry.py | Model discovery and listing |
+| commons/registry/model_merge.py | Model merging by weight averaging |
+| commons/registry/model_export.py | Export to GGUF, ONNX |
+| dataset_preparer/data_preparer.py | Multi-source data loading |
+| dataset_preparer/aiml/loader.py | AIML file parsing |
+| 	raining/trainer.py | Training pipeline with checkpointing |
+| inference/chat_engine.py | Chat interface and inference |
 
 ### Data Flow
 
-```
+`
 User Input → Tokenizer → Model → Logits → Decoding → Response
                 ↓
         Intent Classifier (BERT)
@@ -110,7 +120,7 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
         Temperature Adjustment + Prompt Enrichment
                 ↓
         GPT-2 Transformer Generation
-```
+`
 
 ---
 
@@ -125,7 +135,7 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
 
 ### Testing
 
-```bash
+`ash
 # Run all tests
 pytest tests/
 
@@ -134,11 +144,11 @@ pytest tests/test_chatmodel.py
 
 # Manual testing
 python manual_test.py
-```
+`
 
 ### Training Commands
 
-```bash
+`ash
 # Prepare data with BPE tokenizer
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
 
@@ -159,85 +169,92 @@ python main.py --chat --model ciencias_naturales+programacion
 
 # Export model
 python main.py --export ciencias_naturales --formats gguf,onnx
-```
+`
 
 ### API Server
 
-```bash
+`ash
 # Start FastAPI server
 python main_chat.py
 
 # API endpoints
 POST /v1/chat/completions  # Chat completion
 GET  /v1/models            # List available models
-```
+`
+
+---
+
+## Architecture Patterns
+
+### Configuration Dataclasses
+- TrainingConfig: All training parameters (no CLI args)
+- ChatConfig: All inference parameters (no CLI args)
+
+### Class Inheritance
+- ThinkingGenerator base class with source-specific implementations
+- ChatEngine encapsulates all inference logic
+- Trainer encapsulates all training logic
+
+### Module Organization
+- commons/: Reusable code (model, tokenizer, dialogue, registry)
+- dataset_preparer/: Data loading and preprocessing
+- 	raining/: Training pipeline
+- inference/: Inference and chat
+- envAIModels/: FastAPI server (separate concern)
 
 ---
 
 ## Task Management
 
 ### Task Lifecycle
-```
+`
 open → in_progress → done
            ↓
         blocked → open
            ↓
         abandoned
-```
+`
 
 ### Task Best Practices
-- Mark task `start` before working
-- Mark task `done` immediately after completion
-- Keep one task `in_progress` when working solo
-- Use `block` when waiting on external dependency
-
-### When to Create Tasks
-- Multi-step work (3+ steps)
-- Spans multiple turns
-- Will be referenced again
-- Needs to be visible in session
+- Mark task start before working
+- Mark task done immediately after completion
+- Keep one task in_progress when working solo
+- Use lock when waiting on external dependency
 
 ---
 
 ## Memory System
 
 ### Project Memory
-- **Location**: `~/.mimocode/memory/projects/<project-id>/MEMORY.md`
+- **Location**: ~/.mimocode/memory/projects/<project-id>/MEMORY.md
 - **Purpose**: Persistent cross-session knowledge
 - **Content**: Architecture decisions, rules, durable facts
 
 ### Session Checkpoint
-- **Location**: `~/.mimocode/memory/sessions/<session-id>/checkpoint.md`
+- **Location**: ~/.mimocode/memory/sessions/<session-id>/checkpoint.md
 - **Purpose**: Current session state
 - **Content**: Active intent, task tree, current work, files, learnings
-
-### Global Memory
-- **Location**: `~/.mimocode/memory/global/MEMORY.md`
-- **Purpose**: User preferences across all projects
 
 ---
 
 ## Common Tasks
 
-### Adding New AIML Patterns
-1. Add `.aiml` files to `datasets_source/aiml/` directory
-2. Use standard AIML XML structure
-3. Run `python main.py --prepare-data --aiml` to regenerate cache
+### Adding New Data Source
+1. Create subfolder in `dataset_preparer/` (e.g., `dataset_preparer/newsource/`)
+2. Add loader in `dataset_preparer/newsource/loader.py`
+3. Add thinking generator in `dataset_preparer/newsource/thinking.py`
+4. Add CLI flag in `main.py`
+5. Integrate with training pipeline
 
 ### Modifying Model Architecture
-1. Edit `chatmodel.py` ChatModel class
-2. Update `chatdataset.py` if input format changes
-3. Retrain with `python main.py --train`
+1. Edit commons/model/chatmodel.py
+2. Update commons/dataset/chatdataset.py if input format changes
+3. Retrain with python main.py --train
 
 ### Extending Dialogue Context
-1. Modify prompt enrichment in `dialogmanager.py`
+1. Modify prompt enrichment in commons/dialogue/dialogmanager.py
 2. Add context window for longer conversations
 3. Retrain model with new context length
-
-### Adding New Data Source
-1. Add loader in `data_preparer.py`
-2. Add CLI flag for new source
-3. Integrate with training pipeline
 
 ---
 
@@ -260,20 +277,19 @@ open → in_progress → done
 
 ## Security Notes
 
-- Never commit `.env` files or API keys
-- Model weights in `checkpoints/` are large; use `.gitignore`
-- Virtual environments (`envMyIAModelChat/`) excluded from version control
+- Never commit .env files or API keys
+- Model weights in checkpoints/ are large; use .gitignore
+- Virtual environments (envMyIAModelChat/) excluded from version control
 
 ---
 
 ## Recent Improvements
 
-- Model library system with merge and export capabilities
-- GGUF/ONNX export for Ollama, llama.cpp, ONNX Runtime
-- SentencePiece BPE multilingual tokenizer
-- Chain-of-thought reasoning support
-- Dynamic n-gram penalization
+- Restructured codebase into modular packages (commons, dataset_preparer, training, inference)
+- Dataclass-based configuration (TrainingConfig, ChatConfig)
+- Removed CLI dependency from training/inference modules
+- Improved code organization for better maintainability
 
 ---
 
-*Last updated: Auto-generated by MiMoCode*
+*Last updated: 2026-07-28*

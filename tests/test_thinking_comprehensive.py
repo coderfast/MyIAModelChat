@@ -18,7 +18,7 @@ DATASET_CACHE = os.path.join(os.path.dirname(__file__), '..', 'dataset_cache')
 
 def test_bpe_thinking_symbols_registered():
     """Verify <thought> and </thought> are in the BPE vocabulary."""
-    from bpe_tokenizer import SentencePieceTokenizerWrapper
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
     if not os.path.exists(model_path):
@@ -44,7 +44,7 @@ def test_bpe_thinking_symbols_registered():
 
 def test_bpe_encode_preserves_thinking_tags():
     """Verify BPE encode preserves <think> tags in text."""
-    from bpe_tokenizer import SentencePieceTokenizerWrapper
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
     if not os.path.exists(model_path):
@@ -73,7 +73,7 @@ def test_bpe_encode_preserves_thinking_tags():
 
 def test_bpe_has_thinking_method():
     """Verify has_thinking and split_thinking methods work."""
-    from bpe_tokenizer import SentencePieceTokenizerWrapper
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
     if not os.path.exists(model_path):
@@ -100,7 +100,7 @@ def test_bpe_has_thinking_method():
 
 def test_validate_thinking_good_reasoning():
     """Verify good reasoning thinking passes validation."""
-    from thinking_quality import validate_thinking
+    from dataset_preparer.thinking_quality import validate_thinking
 
     result = validate_thinking(
         "La pregunta es sobre sumar 2+2. Python es un lenguaje interpretado.",
@@ -113,7 +113,7 @@ def test_validate_thinking_good_reasoning():
 
 def test_validate_thinking_meta_commentary_rejected():
     """Verify pure meta-commentary thinking is rejected."""
-    from thinking_quality import validate_thinking
+    from dataset_preparer.thinking_quality import validate_thinking
 
     result = validate_thinking(
         "El usuario me saluda",
@@ -125,7 +125,7 @@ def test_validate_thinking_meta_commentary_rejected():
 
 def test_validate_thinking_too_short():
     """Verify very short thinking is rejected."""
-    from thinking_quality import validate_thinking
+    from dataset_preparer.thinking_quality import validate_thinking
 
     result = validate_thinking("ok", "Respuesta")
     assert result.valid is False, f"Expected invalid for too short, got {result}"
@@ -134,7 +134,7 @@ def test_validate_thinking_too_short():
 
 def test_validate_thinking_with_steps():
     """Verify thinking with step indicators passes."""
-    from thinking_quality import validate_thinking
+    from dataset_preparer.thinking_quality import validate_thinking
 
     result = validate_thinking(
         "Paso 1: Analizo la pregunta. Paso 2: Identifico el tema. Paso 3: Formulo respuesta.",
@@ -146,7 +146,7 @@ def test_validate_thinking_with_steps():
 
 def test_filter_low_quality():
     """Verify low quality thinking samples are filtered."""
-    from thinking_quality import filter_low_quality
+    from dataset_preparer.thinking_quality import filter_low_quality
 
     samples = [
         {'thinking': 'The user asks about Python. Python is a language. The answer is 42.', 'output': '42'},
@@ -169,7 +169,7 @@ def test_filter_low_quality():
 
 def test_generic_validator_fixes_encoding():
     """Verify GenericValidator detects encoding issues as fixable."""
-    from source_validators import GenericValidator
+    from dataset_preparer.source_validators import GenericValidator
 
     validator = GenericValidator('test')
     sample = {'input': 'El texto tiene caracteres raros\ufffd aqu\u00ed', 'output': 'respuesta'}
@@ -180,7 +180,7 @@ def test_generic_validator_fixes_encoding():
 
 def test_generic_validator_discards_empty():
     """Verify GenericValidator discards empty samples."""
-    from source_validators import GenericValidator
+    from dataset_preparer.source_validators import GenericValidator
 
     validator = GenericValidator('test')
     result = validator.classify({'input': '', 'output': ''})
@@ -190,7 +190,7 @@ def test_generic_validator_discards_empty():
 
 def test_aiml_validator_good_sample():
     """Verify AIMLValidator accepts valid samples."""
-    from source_validators import AIMLValidator
+    from dataset_preparer.source_validators import AIMLValidator
 
     validator = AIMLValidator()
     sample = {'input': 'hello', 'output': 'Hi there! How can I help you?'}
@@ -201,7 +201,7 @@ def test_aiml_validator_good_sample():
 
 def test_pdf_validator_fixes_hyphens():
     """Verify PDFValidator fixes hyphen line breaks."""
-    from source_validators import PDFValidator
+    from dataset_preparer.source_validators import PDFValidator
 
     validator = PDFValidator()
     # Test with a hyphen line break pattern (word-\nword)
@@ -214,7 +214,7 @@ def test_pdf_validator_fixes_hyphens():
 
 def test_epub_validator_removes_navigation():
     """Verify EPUBValidator discards navigation samples."""
-    from source_validators import EPUBValidator
+    from dataset_preparer.source_validators import EPUBValidator
 
     validator = EPUBValidator()
     sample = {'input': 'Table of Contents', 'output': 'Chapter 1'}
@@ -225,7 +225,7 @@ def test_epub_validator_removes_navigation():
 
 def test_web_validator_cleans_html():
     """Verify WebValidator cleans HTML content."""
-    from source_validators import WebValidator
+    from dataset_preparer.source_validators import WebValidator
 
     validator = WebValidator()
     sample = {'input': '<p>Hello</p> <script>alert(1)</script> World', 'output': 'content'}
@@ -241,7 +241,7 @@ def test_web_validator_cleans_html():
 
 def test_csv_validator_discards_missing_fields():
     """Verify CSVValidator discards samples with missing fields."""
-    from source_validators import CSVValidator
+    from dataset_preparer.source_validators import CSVValidator
 
     validator = CSVValidator()
     sample = {'input': '', 'output': 'respuesta'}
@@ -256,7 +256,7 @@ def test_csv_validator_discards_missing_fields():
 
 def test_aiml_generator_greeting():
     """Verify AIML generator produces reasoning for greetings."""
-    from aiml_thinking import AIMLThinkingGenerator
+    from dataset_preparer.aiml.thinking import AIMLThinkingGenerator
 
     generator = AIMLThinkingGenerator()
     result = generator.generate({'input': 'hola', 'output': 'Hola! ¿Cómo estás?'})
@@ -271,7 +271,7 @@ def test_aiml_generator_greeting():
 
 def test_thinking_generator_base_depth_config():
     """Verify ThinkingGenerator base has DEPTH_CONFIG."""
-    from thinking_generators import ThinkingGenerator
+    from dataset_preparer.thinking_generators import ThinkingGenerator
 
     assert hasattr(ThinkingGenerator, 'DEPTH_CONFIG'), "ThinkingGenerator should have DEPTH_CONFIG"
     config = ThinkingGenerator.DEPTH_CONFIG
@@ -287,7 +287,7 @@ def test_thinking_generator_base_depth_config():
 
 def test_ollama_teacher_is_model_available():
     """Verify OllamaTeacher.is_model_available works without hanging."""
-    from thinking_generators import OllamaTeacher
+    from dataset_preparer.thinking_generators import OllamaTeacher
 
     teacher = OllamaTeacher()
     # This should return False quickly if Ollama isn't running
@@ -298,7 +298,7 @@ def test_ollama_teacher_is_model_available():
 
 def test_aiml_generator_depth():
     """Verify AIML generator respects depth parameter."""
-    from aiml_thinking import AIMLThinkingGenerator
+    from dataset_preparer.aiml.thinking import AIMLThinkingGenerator
 
     generator_basic = AIMLThinkingGenerator(depth='basic')
     generator_detailed = AIMLThinkingGenerator(depth='detailed')
@@ -328,7 +328,7 @@ def test_thinking_detection_in_dataset():
 
 def test_thinking_loss_weight_in_config():
     """Verify thinking_loss_weight is 0.5 in TRAINING_CONFIG."""
-    from main_train import TRAINING_CONFIG
+    from training.trainer import TRAINING_CONFIG
 
     assert 'thinking_loss_weight' in TRAINING_CONFIG, "thinking_loss_weight not in config"
     assert TRAINING_CONFIG['thinking_loss_weight'] == 0.5, \
@@ -415,7 +415,7 @@ def test_thinking_loss_weight_application():
 
 def test_format_thinking_sample_structure():
     """Verify _format_thinking_sample produces correct structure."""
-    from thinking_generators import ThinkingGenerator
+    from dataset_preparer.thinking_generators import ThinkingGenerator
 
     sample = {'input': 'hola', 'output': 'Hola! ¿Cómo estás?'}
     result = ThinkingGenerator._format_thinking_sample(None, sample, "El usuario me despuda amablemente.")

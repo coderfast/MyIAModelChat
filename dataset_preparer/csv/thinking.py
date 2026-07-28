@@ -2,7 +2,7 @@
 CSV thinking generator: teacher model for structured QA pairs.
 """
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class CSVThinkingGenerator(ThinkingGenerator):

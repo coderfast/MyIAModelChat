@@ -11,7 +11,7 @@ def sp_tokenizer():
     """Load SentencePiece tokenizer if model exists."""
     if not os.path.exists(SP_MODEL_PATH):
         pytest.skip("sentencepiece.model not found; run --prepare-data first")
-    from bpe_tokenizer import SentencePieceTokenizerWrapper
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
     return SentencePieceTokenizerWrapper(SP_MODEL_PATH)
 
 

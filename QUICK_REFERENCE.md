@@ -4,20 +4,20 @@
 
 | File | Purpose |
 |------|---------|
-| `chatmodel.py` | GPT-2 model architecture (HuggingFace) |
-| `chatdataset.py` | PyTorch Dataset loader |
-| `dialogmanager.py` | Dialogue flow, intent/sentiment, persona modeling |
-| `bpe_tokenizer.py` | SentencePiece BPE tokenizer (multilingual) |
-| `aimlloder.py` | Loads AIML files for training |
-| `data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HF) |
-| `main_train.py` | Training pipeline (MainTrain class) |
-| `main_chat.py` | Chat interface + FastAPI server |
 | `main.py` | Primary entry point with argument parsing |
-| `model_registry.py` | Model discovery, listing, validation |
-| `model_merge.py` | Model merging by weight averaging |
-| `model_export.py` | Export to GGUF, ONNX, ONNX quantized |
-| `model_downloader.py` | HuggingFace model downloader |
-| `generate_thinking_data.py` | Chain-of-thought data generation |
+| `commons/model/chatmodel.py` | GPT-2 model architecture (HuggingFace) |
+| `commons/tokenizer/bpe_tokenizer.py` | SentencePiece BPE tokenizer (multilingual) |
+| `commons/dialogue/dialogmanager.py` | Dialogue flow, intent/sentiment, persona modeling |
+| `commons/dataset/chatdataset.py` | PyTorch Dataset loader |
+| `commons/registry/model_registry.py` | Model discovery, listing, validation |
+| `commons/registry/model_merge.py` | Model merging by weight averaging |
+| `commons/registry/model_export.py` | Export to GGUF, ONNX, ONNX quantized |
+| `commons/registry/model_downloader.py` | HuggingFace model downloader |
+| `dataset_preparer/data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HF) |
+| `dataset_preparer/aiml/loader.py` | Loads AIML files for training |
+| `dataset_preparer/thinking_generators.py` | Chain-of-thought data generation |
+| `training/trainer.py` | Training pipeline (Trainer class + TrainingConfig) |
+| `inference/chat_engine.py` | Chat interface + inference (ChatEngine class) |
 
 ## Command Cheat Sheet
 
@@ -82,7 +82,7 @@ python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.p
 ## Model Config Essentials
 
 ```python
-# chatmodel.py - Key parameters (GPT-2 architecture)
+# commons/model/chatmodel.py - Key parameters (GPT-2 architecture)
 vocab_size = 8000           # Vocabulary size (BPE, default)
 embed_size = 256            # Embedding dimension
 hidden_size = 512           # Hidden state size
@@ -90,7 +90,7 @@ num_layers = 4              # Number of transformer layers
 n_head = 4                  # Attention heads
 n_positions = 512           # Max sequence length
 
-# dialogmanager.py - Key settings (from main_chat.py)
+# commons/dialogue/dialogmanager.py - Key settings
 intent_model = "nlptown/bert-base-multilingual-uncased-sentiment"
 sentiment_model = "nlptown/bert-base-multilingual-uncased-sentiment"
 top_k = 50                 # Sampling parameter
@@ -99,12 +99,12 @@ temperature = 0.7          # Generation temperature
 min_length = 3             # Minimum response length
 no_repeat_ngram_size = 3   # N-gram repetition prevention
 
-# data_preparer.py - Feature flags
+# dataset_preparer/data_preparer.py - Feature flags
 enable_pdf = True          # Enable PDF processing
 enable_epub = True         # Enable EPUB processing
 enable_caching = True      # Enable dataset caching
 
-# main_train.py - Training params
+# training/trainer.py - Training params
 batch_size = 4             # Micro batch size
 accumulation_steps = 8     # Gradient accumulation (effective batch = 32)
 learning_rate = 0.001
@@ -136,7 +136,7 @@ SentencePieceTokenizerWrapper.decode() → Response text
 
 ### ChatModel
 ```python
-from chatmodel import ChatModel
+from commons.model.chatmodel import ChatModel
 
 model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
 output = model(input_ids)  # Forward pass
@@ -145,7 +145,7 @@ model.to(device)  # Move to GPU/CPU
 
 ### DialogueManager
 ```python
-from dialogmanager import DialogueManager
+from commons.dialogue.dialogmanager import DialogueManager
 
 dialog = DialogueManager(model, device, tokenizer,
                          intent_classifier, sentiment_analyzer,
@@ -156,7 +156,7 @@ response = dialog.generate_response(user_input)
 
 ### SentencePieceTokenizerWrapper
 ```python
-from bpe_tokenizer import SentencePieceTokenizerWrapper
+from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
 tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 token_ids = tokenizer.encode("hello world")
@@ -166,29 +166,63 @@ text = tokenizer.decode(token_ids)
 
 ### DataPreparer
 ```python
-from data_preparer import DataPreparer
+from dataset_preparer.data_preparer import DataPreparer
 
-preparer = DataPreparer(enable_pdf=True, enable_epub=True, enable_caching=True)
+preparer = DataPreparer(args)
 datasets = preparer.load_all_data()
 cached_dataset = preparer.cache_dataset(datasets)
 ```
 
-### MainTrain
+### Trainer
 ```python
-from main_train import MainTrain
+from training.trainer import Trainer, TrainingConfig
 
-trainer = MainTrain(args)
-trainer.prepare_datasets()  # Load AIML + PDF + EPUB + HF datasets
-trainer.train()
+config = TrainingConfig(aiml=True, hf=True, epochs=30)
+trainer = Trainer(config)
+trainer.performMainTrain()
+```
+
+### ChatEngine
+```python
+from inference.chat_engine import ChatEngine, ChatConfig
+
+config = ChatConfig(model_name="my_model")
+engine = ChatEngine(config)
+response = engine.generate_response("Hello!")
+engine.start_chat_loop()
+```
+
+### Model Registry
+```python
+from commons.registry.model_registry import scan_models, list_models_cli
+
+models = scan_models()  # Returns dict of available models
+list_models_cli()       # Prints models to console
+```
+
+### Model Merge
+```python
+from commons.registry.model_merge import merge_models, merge_from_names
+
+merged_path = merge_from_names(["model1", "model2"], [0.5, 0.5])
+```
+
+### Model Export
+```python
+from commons.registry.model_export import export_to_onnx, export_to_gguf
+
+export_to_onnx("model.pth")
+export_to_gguf("model.pth")
 ```
 
 ## Dataset Sources
 
 1. **AIML** (`datasets_source/aiml/` folder): ~60 AIML pattern files from A.L.I.C.E.
-2. **PDF Documents** (`pdfs/` folder): Automatic text extraction via PyPDF2
-3. **EPUB E-books** (`epub/` folder): Full e-book parsing via ebooklib
+2. **PDF Documents** (`datasets_source/pdf/` folder): Automatic text extraction via PyPDF2
+3. **EPUB E-books** (`datasets_source/epub/` folder): Full e-book parsing via ebooklib
 4. **Hugging Face**: Dialogue datasets (wikitext, bookcorpus, etc.)
-5. **Custom**: User-provided data in `datasets/` folder
+5. **CSV** (`datasets_source/csv/` folder): Curated QA pairs
+6. **Web** (`datasets_source/web/` folder): Documentation scraping
 
 ## Model Files
 

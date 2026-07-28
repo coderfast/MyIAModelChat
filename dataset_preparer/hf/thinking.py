@@ -2,7 +2,7 @@
 HuggingFace thinking generator: teacher model or passthrough for QA datasets.
 """
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class HFThinkingGenerator(ThinkingGenerator):

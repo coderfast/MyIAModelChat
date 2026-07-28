@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Check if main_chat imports work
 MAIN_CHAT_AVAILABLE = False
 try:
-    from main_chat import stream_chat_with_thinking, stream_chat_text, parse_thinking_response
+    from inference.chat_engine import stream_chat_with_thinking, stream_chat_text, parse_thinking_response
     MAIN_CHAT_AVAILABLE = True
 except (RuntimeError, ModuleNotFoundError):
     pass
@@ -31,7 +31,7 @@ class FakeTokenizerPhase3:
 
 def test_dialogue_manager_dict_return():
     """Verify DialogueManager.generate_response returns dict format."""
-    from dialogmanager import DialogueManager
+    from commons.dialogue.dialogmanager import DialogueManager
 
     tokenizer = FakeTokenizerPhase3()
 
@@ -61,7 +61,7 @@ def test_dialogue_manager_dict_return():
 
 def test_thinking_enabled_flag():
     """Verify thinking_enabled flag is stored."""
-    from dialogmanager import DialogueManager
+    from commons.dialogue.dialogmanager import DialogueManager
 
     tokenizer = FakeTokenizerPhase3()
     model = nn.Embedding(10, 10)
@@ -164,7 +164,7 @@ def test_thinking_metrics_computation():
 
 def test_thinking_generation_english():
     """Verify English thinking templates exist and work."""
-    from generate_thinking_data import generate_thinking, THINKING_TEMPLATES_EN
+    from dataset_preparer.generate_thinking_data import generate_thinking, THINKING_TEMPLATES_EN
 
     assert 'identity' in THINKING_TEMPLATES_EN
     assert 'greeting' in THINKING_TEMPLATES_EN
@@ -180,7 +180,7 @@ def test_thinking_generation_english():
 
 def test_thinking_generation_spanish():
     """Verify Spanish thinking templates work."""
-    from generate_thinking_data import generate_thinking
+    from dataset_preparer.generate_thinking_data import generate_thinking
 
     thinking = generate_thinking("quien eres", "soy Eduardo", "identity", lang='es')
     assert isinstance(thinking, str)
@@ -190,7 +190,7 @@ def test_thinking_generation_spanish():
 
 def test_validate_thinking_consistency():
     """Verify thinking validation function."""
-    from generate_thinking_data import validate_thinking_consistency
+    from dataset_preparer.generate_thinking_data import validate_thinking_consistency
 
     # Good: thinking mentions answer words
     assert validate_thinking_consistency(
@@ -210,7 +210,7 @@ def test_validate_thinking_consistency():
 
 def test_generate_thinking_dataset_with_lang():
     """Verify dataset generation with language parameter."""
-    from generate_thinking_data import generate_thinking_dataset
+    from dataset_preparer.generate_thinking_data import generate_thinking_dataset
 
     pairs = [
         {'input': 'hello', 'output': 'hi there'},
@@ -249,14 +249,14 @@ def test_cli_flags_exist():
 
 
 def test_main_chat_thinking_flags():
-    """Verify MainChat passes thinking params to DialogueManager."""
+    """Verify ChatEngine passes thinking params to DialogueManager."""
     import ast
-    with open('main_chat.py', encoding='utf-8') as f:
+    with open('inference/chat_engine.py', encoding='utf-8') as f:
         content = f.read()
 
     assert 'thinking_enabled' in content
     assert 'thinking_max_tokens' in content
-    print("PASS: MainChat passes thinking params")
+    print("PASS: ChatEngine passes thinking params")
 
 
 # ============================================================
@@ -265,7 +265,7 @@ def test_main_chat_thinking_flags():
 
 def test_backward_compatibility():
     """Verify old code paths still work (string return from generate_response)."""
-    from dialogmanager import DialogueManager
+    from commons.dialogue.dialogmanager import DialogueManager
 
     tokenizer = FakeTokenizerPhase3()
 

@@ -57,13 +57,13 @@
 
 | Library | Purpose | Used In |
 |---------|---------|---------|
-| **datasets** (HuggingFace) | Dataset loading, caching, and saving | `data_preparer.py`, `main_train.py`, `aimlloder.py` |
-| **PyPDF2** | PDF text extraction | `data_preparer.py` |
-| **ebooklib** | EPUB e-book parsing | `data_preparer.py` |
-| **beautifulsoup4** | HTML parsing (EPUB/web) | `data_preparer.py`, `web_scraper.py` |
-| **trafilatura** | Web content extraction | `web_scraper.py` |
-| **requests** | HTTP fetching | `web_scraper.py` |
-| **csv** (stdlib) | CSV file parsing | `data_preparer.py` |
+| **datasets** (HuggingFace) | Dataset loading, caching, and saving | `dataset_preparer/data_preparer.py`, `training/trainer.py`, `dataset_preparer/aiml/loader.py` |
+| **PyPDF2** | PDF text extraction | `dataset_preparer/data_preparer.py` |
+| **ebooklib** | EPUB e-book parsing | `dataset_preparer/data_preparer.py` |
+| **beautifulsoup4** | HTML parsing (EPUB/web) | `dataset_preparer/data_preparer.py`, `dataset_preparer/web/scraper.py` |
+| **trafilatura** | Web content extraction | `dataset_preparer/web/scraper.py` |
+| **requests** | HTTP fetching | `dataset_preparer/web/scraper.py` |
+| **csv** (stdlib) | CSV file parsing | `dataset_preparer/data_preparer.py` |
 
 ### 3.2 Text Processing
 
@@ -172,7 +172,7 @@
 
 ### 7.2 Endpoints Summary
 
-**main_chat.py server (PyTorch GPT-2):**
+**inference/chat_engine.py server (PyTorch GPT-2):**
 | Endpoint | Method | OpenAI Compatible |
 |----------|--------|-------------------|
 | `/v1/health` | GET | - |
@@ -216,7 +216,7 @@
 
 ```bash
 # Start PyTorch GPT-2 server
-python main_chat.py --port 11434
+python -m envAIModels.app --port 11434
 
 # Start GGUF server
 cd envAIModels

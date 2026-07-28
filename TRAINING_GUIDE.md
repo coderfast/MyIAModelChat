@@ -6,18 +6,18 @@
 
 1. **AIML-based Datasets**
    - Source: `datasets_source/aiml/` directory (~60 .aiml files)
-   - Processing: `aimlloder.py` converts patterns to (input, output) pairs
+   - Processing: `dataset_preparer/aiml/loader.py` converts patterns to (input, output) pairs
    - Format: XML patterns converted to dialogue examples
 
 2. **PDF Document Datasets**
    - Source: `datasets_source/pdf/` directory
-   - Processing: `data_preparer.py` uses PyPDF2 for text extraction
+   - Processing: `dataset_preparer/data_preparer.py` uses PyPDF2 for text extraction
    - Format: Automatic page-by-page text extraction
    - Flag: `--pdf` enables PDF processing
 
 3. **EPUB E-book Datasets**
    - Source: `datasets_source/epub/` directory
-   - Processing: `data_preparer.py` uses ebooklib for parsing
+   - Processing: `dataset_preparer/data_preparer.py` uses ebooklib for parsing
    - Format: Chapter-by-chapter content extraction with metadata
    - Flag: `--epub` enables EPUB processing
 
@@ -27,10 +27,17 @@
    - Examples: wikitext, bookcorpus, common_voice, opus_100
    - Flag: `--hf` in training enables this
 
-5. **Custom Local Datasets**
-   - Place data in `datasets/` directory
-   - Can be .json, .txt, .csv format
-   - Must be tokenized before training
+5. **CSV Datasets**
+   - Source: `datasets_source/csv/` directory
+   - Processing: `dataset_preparer/data_preparer.py` uses csv.reader
+   - Format: Curated QA pairs with `input`/`output` columns
+   - Flag: `--csv` enables CSV processing
+
+6. **Web Scraping Datasets**
+   - Source: `datasets_source/web/` directory
+   - Processing: `dataset_preparer/web/scraper.py` crawls documentation
+   - Format: Cleaned text from documentation sites
+   - Flag: `--web` enables web scraping
 
 ### Dataset Caching System
 
@@ -64,9 +71,11 @@ SentencePiece (BPE) is trained on extracted text and the prepared cache will inc
 - Automatic schema alignment for concatenation
 - Memory-efficient storage
 
-### ChatDataset Class (chatdataset.py)
+### ChatDataset Class (commons/dataset/chatdataset.py)
 
 ```python
+from commons.dataset.chatdataset import ChatDataset
+
 class ChatDataset(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
@@ -85,9 +94,9 @@ class ChatDataset(Dataset):
 
 ```python
 # Load multiple datasets with caching
-from data_preparer import DataPreparer
+from dataset_preparer.data_preparer import DataPreparer
 
-preparer = DataPreparer(enable_pdf=True, enable_epub=True, enable_caching=True)
+preparer = DataPreparer(args)
 
 # Load from cache if available
 if use_cache and os.path.exists('dataset_cache'):
@@ -137,6 +146,8 @@ python main.py --train \
 | `--pdf` | Include PDF document datasets | False |
 | `--epub` | Include EPUB e-book datasets | False |
 | `--hf` | Include Hugging Face datasets | False |
+| `--csv` | Include CSV datasets | False |
+| `--web` | Include web scraping datasets | False |
 | `--use-cpuonly` | Force CPU training | False |
 | `--num_cores` | CPU cores for DataLoader workers | auto |
 | `--num_threads` | Additional threads per worker | auto |
@@ -173,7 +184,7 @@ The system uses SentencePiece BPE for multilingual tokenization:
 
 ```python
 # Training phase (during --prepare-data)
-from bpe_tokenizer import SentencePieceTokenizerWrapper
+from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
 # BPE model is trained automatically and saved to:
 # dataset_cache/sentencepiece.model
@@ -427,3 +438,7 @@ print(prof.key_averages().table(sort_by="cpu_time_total"))
 3. GPU transfer (use pinned memory)
 4. Tokenization (use batched encoding with SentencePieceTokenizerWrapper)
 5. AIML parsing (cache parsed files)
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*

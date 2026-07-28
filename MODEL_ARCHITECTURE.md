@@ -37,7 +37,7 @@ Language Model Head
 Output Logits
 ```
 
-### Key Parameters (from chatmodel.py)
+### Key Parameters (from commons/model/chatmodel.py)
 
 - **vocab_size**: Number of unique tokens in vocabulary (default: 8000 via BPE)
 - **embed_size**: Dimension of embedding vectors (256)
@@ -58,12 +58,12 @@ Output Logits
 - Type: `torch.Tensor` (logits)
 - Represents: Probability distribution over vocabulary for each position
 
-## Training Pipeline (main_train.py)
+## Training Pipeline (training/trainer.py)
 
 ### DataLoading with Multiple Sources
-1. Load AIML data via `aimlloder.py`
-2. Load PDF documents via `data_preparer.py` (PyPDF2)
-3. Load EPUB e-books via `data_preparer.py` (ebooklib)
+1. Load AIML data via `dataset_preparer/aiml/loader.py`
+2. Load PDF documents via `dataset_preparer/data_preparer.py` (PyPDF2)
+3. Load EPUB e-books via `dataset_preparer/data_preparer.py` (ebooklib)
 4. Load Hugging Face datasets
 5. Combine datasets using `concatenate_datasets()` with schema alignment
 6. Cache processed datasets for 12x faster loading
@@ -72,42 +72,31 @@ Output Logits
 
 ### Training Loop with Best Model Saving
 ```python
-best_val_loss = float('inf')
-for epoch in range(epochs):
-    for batch in dataloader:
-        # Forward pass
-        output = model(input_ids)
+from training.trainer import Trainer, TrainingConfig
 
-        # Compute loss (CrossEntropyLoss typical)
-        loss = criterion(output.view(-1, vocab_size), target_ids.view(-1))
+config = TrainingConfig(
+    epochs=30,
+    dataset_path='datasets_source/ciencias/',
+    checkpoint_name='ciencias_naturales',
+    use_cache=True,
+    aiml=True,
+    hf=True
+)
 
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-    # Validation and checkpointing
-    val_loss = validate(model, val_loader)
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'tokenizer': tokenizer,
-            'loss': val_loss
-        }, 'checkpoints/chat_model_best.pth')
+trainer = Trainer(config)
+trainer.run()
 ```
 
 ### Key Training Classes
 
-**MainTrain**
+**Trainer** (training/trainer.py)
 - Initializes training pipeline
 - Manages SentencePieceTokenizerWrapper and datasets
 - Handles multiprocessing for data loading
 - Supports AIML, PDF, EPUB, and Hugging Face datasets
 - Implements best model checkpointing
 
-**DataPreparer**
+**DataPreparer** (dataset_preparer/data_preparer.py)
 - Multi-source data loading and processing
 - PDF text extraction with PyPDF2
 - EPUB parsing with ebooklib
@@ -115,13 +104,13 @@ for epoch in range(epochs):
 - Schema alignment for concatenation
 - Advanced text processing (chunking, dedup, quality filtering)
 
-**ChatDataset**
+**ChatDataset** (commons/dataset/chatdataset.py)
 - PyTorch Dataset subclass
 - Loads chat dialogue data from multiple sources
 - Handles SentencePieceTokenizerWrapper
 - Returns (input_ids, target_ids) pairs
 
-**SentencePieceTokenizerWrapper**
+**SentencePieceTokenizerWrapper** (commons/tokenizer/bpe_tokenizer.py)
 - BPE tokenization (multilingual, language-agnostic)
 - Automatic subword tokenization
 - Supports any language via SentencePiece
@@ -190,8 +179,8 @@ Response String
 
 ### Loading Models
 ```python
-from bpe_tokenizer import SentencePieceTokenizerWrapper
-from chatmodel import ChatModel
+from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+from commons.model.chatmodel import ChatModel
 
 tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
 model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
@@ -226,3 +215,7 @@ model.eval()  # Set to evaluation mode
 - Train multiple models with different seeds
 - Average predictions for robustness
 - Useful for production deployments
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*

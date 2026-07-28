@@ -49,7 +49,7 @@ Los modelos encoder-only entienden texto pero no generan. Ideales para clasifica
 - **Params**: ~5.34M (custom, no 124M estandar)
 - **Entrenamiento**: Desde cero con datos propios
 - **Tokenizer**: SentencePiece BPE (multilingue)
-- **Archivo**: `chatmodel.py`
+- **Archivo**: `commons/model/chatmodel.py`
 
 ### Ventajas del modelo actual
 

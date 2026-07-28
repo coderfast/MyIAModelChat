@@ -17,22 +17,23 @@ MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transforme
           v                    v                    v
 +------------------+  +------------------+  +------------------+
 |  Data Pipeline   |  |  Training Engine |  |  Inference       |
-| (data_preparer)  |->| (main_train)     |  | (main_chat)      |
+| (dataset_preparer)|->| (training/)     |  | (inference/)     |
 |                  |  |                  |  |                  |
 | AIML  HF  PDF    |  | GPT-2 Transformer|  | BERT Intent/Sent |
 | EPUB  Web  CSV   |  | GPU/CPU          |  | Top-K/P Sampling |
 | Chunking  Dedup  |  | Mixed Precision  |  | Streaming API    |
 | Quality Filter   |  | Gradient Accum.  |  | Ollama-compat    |
 +------------------+  +------------------+  +------------------+
-                              |                    |
-                              v                    v
-                     +------------------+  +------------------+
-                     |  Model Library   |  |  GGUF Server     |
-                     |  (models/*.pth)  |  | (envAIModels/)   |
-                     |                  |  |                  |
-                     | Merge | Export   |  | llama.cpp        |
-                     | ONNX | GGUF      |  | Ollama-API       |
-                     +------------------+  +------------------+
+         |                      |                    |
+         v                      v                    v
++------------------+  +------------------+  +------------------+
+| commons/         |  |  Model Library   |  |  GGUF Server     |
+| (shared code)    |  |  (models/*.pth)  |  | (envAIModels/)   |
+|                  |  |                  |  |                  |
+| model|tokenizer  |  | Merge | Export   |  | llama.cpp        |
+| dialogue|dataset |  | ONNX | GGUF      |  | Ollama-API       |
+| registry         |  |                  |  |                  |
++------------------+  +------------------+  +------------------+
 ```
 
 ---
@@ -46,32 +47,53 @@ Central orchestrator that parses CLI arguments and dispatches to submodules.
 **Dispatch Logic:**
 ```
 main.py
-  ├── --list-models  -> model_registry.list_models_cli()
-  ├── --export       -> model_export.export_cli()
-  ├── --clear-cache  -> DataPreparer._clear_cache()
-  ├── --prepare-data -> data_preparer.prepare_datasets_for_training()
-  ├── --train        -> MainTrain (daemon thread + ESC/Ctrl+C interrupt)
-  └── --chat         -> MainChat (interactive loop or FastAPI server)
+  ├── --list-models  -> commons.registry.model_registry.list_models_cli()
+  ├── --export       -> commons.registry.model_export.export_cli()
+  ├── --clear-cache  -> dataset_preparer.data_preparer.DataPreparer._clear_cache()
+  ├── --prepare-data -> dataset_preparer.data_preparer.prepare_datasets_for_training()
+  ├── --train        -> training.trainer.Trainer (daemon thread + ESC/Ctrl+C interrupt)
+  └── --chat         -> inference.chat_engine.ChatEngine (interactive loop)
 ```
 
 **Key CLI Flags:**
 | Category | Flags |
 |----------|-------|
 | Operations | `--train`, `--chat`, `--prepare-data`, `--clear-cache`, `--list-models`, `--export` |
-| Data Sources | `--aiml`, `--hf`, `--pdf`, `--epub`, `--web`, `--web-url`, `--web-max-pages` |
+| Data Sources | `--aiml`, `--hf`, `--pdf`, `--epub`, `--web`, `--csv` |
 | Training | `--epochs`, `--use-cache`, `--refresh-cache`, `--bpe-vocab-size`, `--cuda-device` |
 | Text Processing | `--enable-chunking`, `--enable-dedup`, `--enable-quality-filter`, `--enable-lang-filter` |
 | Model | `--model`, `--checkpoint-name`, `--dataset`, `--formats` |
 | CPU/RAM | `--num_cores`, `--num_threads`, `--max-ram-fraction` |
 
-### 2.2 Data Pipeline (`data_preparer.py`)
+### 2.2 Shared Code (`commons/`)
+
+Reusable modules organized by domain:
+
+```
+commons/
+├── model/
+│   └── chatmodel.py          # GPT-2 Transformer architecture
+├── tokenizer/
+│   └── bpe_tokenizer.py      # SentencePiece BPE wrapper
+├── dialogue/
+│   └── dialogmanager.py      # Dialogue management with intent/sentiment
+├── dataset/
+│   └── chatdataset.py        # PyTorch Dataset for tokenized data
+└── registry/
+    ├── model_registry.py     # Model discovery, listing, validation
+    ├── model_merge.py        # Model merging by weight averaging
+    ├── model_export.py       # Export to GGUF, ONNX
+    └── model_downloader.py   # HuggingFace model downloader
+```
+
+### 2.3 Data Pipeline (`dataset_preparer/`)
 
 Multi-source data ingestion, processing, and caching pipeline.
 
 **Data Sources:**
 ```
 AIML Files (.aiml)
-  -> aimlloder.py -> .datasets pickles (HuggingFace Dataset)
+  -> aiml/loader.py -> .datasets pickles (HuggingFace Dataset)
 
 HuggingFace Datasets
   -> load_dataset() -> first 1000 samples
@@ -83,7 +105,7 @@ EPUB E-Books
   -> ebooklib -> HTML stripping -> text
 
 Web Scraping
-  -> WebDocScraper (trafilatura + BeautifulSoup) -> sentences
+  -> web/scraper.py (trafilatura + BeautifulSoup) -> sentences
 
 CSV Files
   -> csv.reader() -> oversampled 20x
@@ -103,6 +125,23 @@ Raw Text
   -> Save HuggingFace Dataset to disk cache
 ```
 
+**Thinking Generation:**
+```
+dataset_preparer/
+├── thinking_generators.py    # Base class + OllamaTeacher
+├── aiml/
+│   ├── loader.py             # AIML file processing
+│   └── thinking.py           # AIML-specific thinking
+├── pdf/thinking.py           # PDF-specific thinking
+├── epub/thinking.py          # EPUB-specific thinking
+├── csv/thinking.py           # CSV-specific thinking
+├── hf/thinking.py            # HuggingFace-specific thinking
+├── web/
+│   ├── scraper.py            # Web crawling
+│   └── thinking.py           # Web-specific thinking
+└── thinking_quality.py       # Quality validation
+```
+
 **Cache Structure:**
 ```
 dataset_cache/
@@ -113,7 +152,7 @@ dataset_cache/
   sentencepiece.vocab        # SentencePiece vocabulary
 ```
 
-### 2.3 Tokenizer (`bpe_tokenizer.py`)
+### 2.4 Tokenizer (`commons/tokenizer/bpe_tokenizer.py`)
 
 **Class:** `SentencePieceTokenizerWrapper`
 
@@ -139,9 +178,9 @@ Wraps a SentencePiece BPE model with special token support.
 
 **Vocab Size:** Configurable via `--bpe-vocab-size` (default: 8000)
 
-### 2.4 Training Engine (`main_train.py`)
+### 2.5 Training Engine (`training/trainer.py`)
 
-**Class:** `MainTrain`
+**Classes:** `Trainer`, `TrainingConfig`
 
 **Training Flow:**
 ```
@@ -165,7 +204,44 @@ Cached Dataset (HuggingFace)
   -> Save final checkpoint
 ```
 
-**Training Configuration:**
+**TrainingConfig Dataclass:**
+```python
+@dataclass
+class TrainingConfig:
+    aiml: bool = False
+    hf: bool = False
+    pdf: bool = False
+    epub: bool = False
+    web: bool = False
+    csv: bool = False
+    epochs: int = 1
+    use_cache: bool = False
+    checkpoint_name: str = 'chat_model'
+    dataset_source: str = 'dataset_cache'
+    use_cpuonly: bool = False
+    cuda_device: Optional[int] = None
+    num_cores: int = 0
+    num_threads: int = 0
+    max_ram_fraction: float = 0.75
+    thinking_loss_weight: float = 0.5
+    thinking_enabled: bool = True
+    thinking_max_tokens: int = 64
+    bpe_vocab_size: int = 8000
+    onlytokenize: bool = False
+    enable_chunking: bool = False
+    chunk_max_tokens: int = 512
+    chunk_overlap: int = 50
+    enable_dedup: bool = False
+    dedup_threshold: float = 0.8
+    enable_quality_filter: bool = False
+    min_words: int = 5
+    max_words: int = 1000
+    preserve_metadata: bool = False
+    enable_lang_filter: bool = False
+    allowed_languages: List[str] = field(default_factory=lambda: ['es', 'en'])
+```
+
+**Training Configuration Constants:**
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | `batch_size` | 4 | Micro batch size |
@@ -196,7 +272,7 @@ Cached Dataset (HuggingFace)
 }
 ```
 
-### 2.5 Model Architecture (`chatmodel.py`)
+### 2.6 Model Architecture (`commons/model/chatmodel.py`)
 
 **Class:** `ChatModel(nn.Module)`
 
@@ -219,7 +295,7 @@ Input Tokens (vocab_size)
 
 **Forward:** `input_ids -> logits` (batch, seq_len, vocab_size)
 
-### 2.6 Dialogue Management (`dialogmanager.py`)
+### 2.7 Dialogue Management (`commons/dialogue/dialogmanager.py`)
 
 **Class:** `DialogueManager`
 
@@ -255,59 +331,23 @@ def sample_next_token(logits, banned_tokens, temperature=0.7):
     # Fallback to argmax if sampling fails
 ```
 
-**Persona (configurable):**
+### 2.8 Inference Engine (`inference/chat_engine.py`)
+
+**Classes:** `ChatEngine`, `ChatConfig`
+
+Chat interface and inference engine.
+
+**ChatConfig Dataclass:**
 ```python
-{
-    "name": "Eduardo Piñera Aznárez",
-    "age": 52,
-    "occupation": "AI assistant",
-    "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
-}
+@dataclass
+class ChatConfig:
+    model_name: Optional[str] = None
+    use_cpuonly: bool = False
+    cuda_device: Optional[int] = None
+    show_thinking: bool = False
+    thinking_enabled: bool = True
+    thinking_max_tokens: int = 64
 ```
-
-### 2.7 Inference Server (`main_chat.py`)
-
-**Class:** `MainChat`
-
-Dual-mode: interactive CLI chat or Ollama-compatible FastAPI HTTP server.
-
-**Singleton Pattern for API Mode:**
-```python
-_main_chat_instance: Optional[MainChat] = None
-
-def get_main_chat_instance(args) -> MainChat:
-    if _main_chat_instance is None:
-        _main_chat_instance = MainChat(args)
-    return _main_chat_instance
-```
-
-**API Endpoints (Port 11434):**
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/health` | GET | Health check |
-| `/v1/models` | GET | List available models |
-| `/v1/version` | GET | Version string |
-| `/v1/chat/completions` | POST | OpenAI-compatible chat |
-| `/api/chat/completions` | POST | Alias |
-| `/api/chat` | POST | Legacy chat |
-| `/v1/embeddings` | POST | Text embeddings (mean pooling) |
-| `/api/generate` | POST | Text generation |
-
-**Chat Request Format:**
-```json
-{
-    "model": "ciencias_naturales",
-    "messages": [{"role": "user", "content": "Hola"}],
-    "max_tokens": 128,
-    "temperature": 0.7,
-    "top_p": 0.9,
-    "stream": false,
-    "stop": [],
-    "include_thinking": false
-}
-```
-
-**Streaming:** SSE-based streaming with 64-char chunks.
 
 **Model Loading:**
 1. Resolve model path (searches `checkpoints/`, `models/`, root)
@@ -315,28 +355,38 @@ def get_main_chat_instance(args) -> MainChat:
 3. Load model state dict (with `weights_only=True` safety)
 4. Initialize BERT pipelines for intent and sentiment
 
-### 2.8 Model Library
+**Singleton Pattern for API Mode:**
+```python
+_chat_engine_instance: Optional[ChatEngine] = None
 
-#### Registry (`model_registry.py`)
+def get_chat_engine_instance(use_cpuonly, cuda_device, model) -> ChatEngine:
+    if _chat_engine_instance is None:
+        _chat_engine_instance = ChatEngine(config)
+    return _chat_engine_instance
+```
+
+### 2.9 Model Library
+
+#### Registry (`commons/registry/model_registry.py`)
 - Scans `models/` for `.pth` files
 - Loads metadata without full weights
 - Validates architecture compatibility
 - CLI pretty-print
 
-#### Merging (`model_merge.py`)
+#### Merging (`commons/registry/model_merge.py`)
 - Weighted state dict averaging
 - Architecture compatibility validation
 - On-the-fly merge (model name with `+` syntax)
 - Parser for `model_a:0.6+model_b:0.4`
 
-#### Export (`model_export.py`)
+#### Export (`commons/registry/model_export.py`)
 | Format | Method | Output |
 |--------|--------|--------|
 | ONNX | `export_to_onnx()` | `.onnx` with dynamic axes |
 | ONNX Int8 | `export_to_onnx_quantized()` | Quantized `.onnx` |
 | GGUF | `export_to_gguf()` | HF format + converter script |
 
-### 2.9 GGUF Inference Server (`envAIModels/`)
+### 2.10 GGUF Inference Server (`envAIModels/`)
 
 Parallel inference server for GGUF models via `llama-cpp-python`.
 
@@ -358,18 +408,6 @@ Parallel inference server for GGUF models via `llama-cpp-python`.
 | `/v1/models` | GET | Models with file size |
 | `/v1/completions` | POST | Text completion |
 | `/v1/chat/completions` | POST | Chat completion |
-
-### 2.10 Chain-of-Thought (`generate_thinking_data.py`)
-
-Generates synthetic `<think>` reasoning blocks for QA pairs.
-
-**Categories:** identity, greeting, question, farewell, default
-
-**Output Format:** CSV with columns: `input`, `output`, `thinking`, `thinking_text`, `category`
-
-**Training Integration:**
-- `MainTrain._detect_thinking_data()` samples first 100 items for `<think>` tags
-- `_compute_thinking_metrics()` tracks `<think>` and `</think>` token prediction accuracy
 
 ---
 
@@ -459,46 +497,47 @@ Generates synthetic `<think>` reasoning blocks for QA pairs.
 
 ```
 main.py
-  ├── data_preparer.py
-  │     ├── aimlloder.py
-  │     ├── web_scraper.py
-  │     ├── bpe_tokenizer.py
-  │     ├── PyPDF2
-  │     ├── ebooklib
-  │     ├── spacy (optional)
-  │     ├── langdetect (optional)
-  │     └── datasketch (optional)
+  ├── commons/
+  │   ├── model/chatmodel.py
+  │   │     └── transformers.GPT2LMHeadModel
+  │   ├── tokenizer/bpe_tokenizer.py
+  │   ├── dialogue/dialogmanager.py
+  │   ├── dataset/chatdataset.py
+  │   └── registry/
+  │       ├── model_registry.py
+  │       ├── model_merge.py
+  │       ├── model_export.py
+  │       └── model_downloader.py
   │
-  ├── main_train.py
-  │     ├── chatmodel.py
-  │     │     └── transformers.GPT2LMHeadModel
-  │     └── bpe_tokenizer.py
+  ├── dataset_preparer/
+  │   ├── data_preparer.py
+  │   ├── source_validators.py
+  │   ├── thinking_generators.py
+  │   ├── generate_thinking_data.py
+  │   ├── aiml/
+  │   │   ├── loader.py
+  │   │   └── thinking.py
+  │   ├── pdf/thinking.py
+  │   ├── epub/thinking.py
+  │   ├── csv/thinking.py
+  │   ├── hf/thinking.py
+  │   └── web/
+  │       ├── scraper.py
+  │       └── thinking.py
   │
-  ├── main_chat.py
-  │     ├── chatmodel.py
-  │     ├── dialogmanager.py
-  │     ├── bpe_tokenizer.py
-  │     ├── model_downloader.py (BERT models)
-  │     ├── model_merge.py
-  │     │     └── model_registry.py
-  │     └── FastAPI / uvicorn
+  ├── training/
+  │   └── trainer.py
   │
-  ├── model_registry.py
-  ├── model_merge.py
-  ├── model_export.py
-  │     ├── onnxruntime
-  │     └── transformers (HF format)
-  ├── generate_thinking_data.py
-  └── manual_test.py
-
-envAIModels/
-  ├── app.py
-  │     ├── routers_api.py
-  │     ├── routers_v1.py
-  │     ├── schemas.py
-  │     ├── model.py (llama-cpp-python)
-  │     └── utils.py
-  └── FastAPI / uvicorn
+  ├── inference/
+  │   └── chat_engine.py
+  │
+  └── envAIModels/
+        ├── app.py
+        ├── routers_api.py
+        ├── routers_v1.py
+        ├── schemas.py
+        ├── model.py (llama-cpp-python)
+        └── utils.py
 ```
 
 ---
@@ -515,7 +554,7 @@ SYSTEM_CONFIG = {
 }
 ```
 
-### Training Configuration (`main_train.py`)
+### Training Configuration (`training/trainer.py`)
 ```python
 TRAINING_CONFIG = {
     'batch_size': 4,
@@ -531,7 +570,7 @@ TRAINING_CONFIG = {
 }
 ```
 
-### Generation Configuration (`dialogmanager.py`)
+### Generation Configuration (`commons/dialogue/dialogmanager.py`)
 ```python
 DEFAULT_CONFIG = {
     'top_k': 50,
@@ -581,4 +620,4 @@ DEFAULT_CONFIG = {
 
 ---
 
-*Generated from codebase analysis - reflects the current state of the project.*
+*Updated: 2026-07-28 - Reflects new modular project structure*

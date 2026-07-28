@@ -2,7 +2,7 @@
 EPUB thinking generator: teacher model with chapter context.
 """
 from typing import Dict, Any, Optional
-from thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 
 class EPUBThinkingGenerator(ThinkingGenerator):

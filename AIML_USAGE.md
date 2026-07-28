@@ -3,7 +3,7 @@
 ## AIML Files in This Project
 
 ### AIML Directory Structure
-The `datasets_source/aiml/` directory contains ~60 AIML files for dialogue patterns and the `aimlloder.py` module loads these files.
+The `datasets_source/aiml/` directory contains ~60 AIML files for dialogue patterns and the `dataset_preparer/aiml/loader.py` module loads these files.
 
 ### Major AIML Files
 
@@ -63,8 +63,8 @@ With context:
 
 ## Integrating AIML with the Model
 
-### Current Integration (main_train.py)
-- AIML files are loaded via `aimlloder.py`
+### Current Integration (main.py)
+- AIML files are loaded via `dataset_preparer/aiml/loader.py`
 - Patterns converted to training data
 - Combined with Hugging Face datasets
 - Used to train the neural model
@@ -91,3 +91,7 @@ The `aiml_dev/` directory contains AIML files with associated `.datasets` files:
 - Used for development and testing
 - Allows dataset tracking with patterns
 - Enables iteration on patterns before moving to production
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*

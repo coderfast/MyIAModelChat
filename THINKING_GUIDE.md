@@ -32,7 +32,7 @@ Cada par de entrenamiento tiene esta estructura:
 
 ```
 1. Generar datos con thinking
-   python generate_thinking_data.py --source all
+   python dataset_preparer/generate_thinking_data.py --source all
 
 2. Preparar datos (incluye thinking en el dataset)
    python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
@@ -48,7 +48,7 @@ Cada par de entrenamiento tiene esta estructura:
 
 ## Generar datos con thinking
 
-El script `generate_thinking_data.py` lee el dataset actual (AIML, HuggingFace, etc.) y genera ejemplos enriquecidos con `<think>`.
+El script `dataset_preparer/generate_thinking_data.py` lee el dataset actual (AIML, HuggingFace, etc.) y genera ejemplos enriquecidos con `<think>`.
 
 ### Estrategia
 
@@ -59,7 +59,7 @@ El script `generate_thinking_data.py` lee el dataset actual (AIML, HuggingFace, 
 ### Desde CSV y AIML
 
 ```bash
-python generate_thinking_data.py --source all
+python dataset_preparer/generate_thinking_data.py --source all
 ```
 
 Esto genera `datasets/thinking/thinking_data.csv` con el formato:
@@ -72,13 +72,13 @@ input,output,thinking,thinking_text,category
 ### Desde un CSV personalizado
 
 ```bash
-python generate_thinking_data.py --source csv --input mi_dataset.csv --output datasets/thinking/mi_thinking.csv
+python dataset_preparer/generate_thinking_data.py --source csv --input mi_dataset.csv --output datasets/thinking/mi_thinking.csv
 ```
 
 ### Desde directorio AIML
 
 ```bash
-python generate_thinking_data.py --source aiml --input aiml_dev
+python dataset_preparer/generate_thinking_data.py --source aiml --input aiml_dev
 ```
 
 ---
@@ -134,7 +134,7 @@ target_ids: [..., <think>, razonamiento, </think>, respuesta]
 
 - El modelo recibe contexto previo y debe predecir la secuencia completa
 - Se usa teacher forcing: alimentar la secuencia real como input, predecir el siguiente token
-- El modelo GPT-2 genera tokens secuencialmente, sin cambios necesarios en `chatmodel.py`
+- El modelo GPT-2 genera tokens secuencialmente, sin cambios necesarios en `commons/model/chatmodel.py`
 
 ### Función de pérdida
 
@@ -187,6 +187,8 @@ python main.py --chat
 ### Lógica de parsing
 
 ```python
+from inference.chat_engine import ChatEngine
+
 def parse_thinking_response(raw_output):
     if '<think>' in raw_output and '</think>' in raw_output:
         thinking = raw_output.split('<think>')[1].split('</think>')[0]
@@ -272,16 +274,16 @@ curl -X POST http://localhost:11434/api/generate \
 ### Archivos nuevos
 | Archivo | Descripción |
 |---------|-------------|
-| `generate_thinking_data.py` | Genera datos con `<think>` |
+| `dataset_preparer/generate_thinking_data.py` | Genera datos con `<think>` |
 | `datasets/thinking/thinking_data.csv` | Datos generados |
 
 ### Archivos modificados
 | Archivo | Descripción |
 |---------|-------------|
-| `bpe_tokenizer.py` | Helpers: `has_thinking()`, `split_thinking()`, `extract_response()` |
-| `data_preparer.py` | Carga datos thinking, tokens `<think>`/`</think>` en BPE |
-| `main_train.py` | Detecta thinking, métricas de entrenamiento |
-| `main_chat.py` | Parsing de thinking en inferencia |
+| `commons/tokenizer/bpe_tokenizer.py` | Helpers: `has_thinking()`, `split_thinking()`, `extract_response()` |
+| `dataset_preparer/data_preparer.py` | Carga datos thinking, tokens `<think>`/`</think>` en BPE |
+| `training/trainer.py` | Detecta thinking, métricas de entrenamiento |
+| `inference/chat_engine.py` | Parsing de thinking en inferencia |
 | `main.py` | Flag `--show-thinking` |
 | `envAIModels/schemas.py` | Campo `include_thinking` en requests |
 | `envAIModels/utils.py` | `parse_thinking_response()` |
@@ -313,7 +315,7 @@ curl -X POST http://localhost:11434/api/generate \
 
 ```bash
 # 1. Preparar datos con thinking
-python generate_thinking_data.py --source aiml --output datasets/thinking/
+python dataset_preparer/generate_thinking_data.py --source aiml --output datasets/thinking/
 
 # 2. Entrenar con datos de thinking
 python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
@@ -333,3 +335,7 @@ curl -X POST http://localhost:11434/v1/chat/completions \
   -d '{"messages": [{"role": "user", "content": "¿Qué es Python?"}], "include_thinking": true}'
 # → Respuesta con campo "reasoning"
 ```
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*

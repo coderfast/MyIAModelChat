@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from source_validators import (
+from dataset_preparer.source_validators import (
     GenericValidator, AIMLValidator, PDFValidator,
     EPUBValidator, WebValidator, CSVValidator, get_validator
 )

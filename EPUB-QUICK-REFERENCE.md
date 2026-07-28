@@ -268,7 +268,7 @@ python main.py --prepare-data --aiml --epub
 
 - **[USAGE.md](USAGE.md)** - Complete CLI reference
 - **[TRAINING_GUIDE.md](TRAINING_GUIDE.md)** - Training and caching details
-- **[data_preparer.py](data_preparer.py)** - Implementation code
+- **[dataset_preparer/data_preparer.py](dataset_preparer/data_preparer.py)** - Implementation code
 
 ---
 

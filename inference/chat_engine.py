@@ -1,0 +1,486 @@
+﻿"""
+Inference module for MyIAModelChat.
+
+Provides the ChatEngine class and ChatConfig dataclass for chat/inference.
+Refactored from main_chat.py to remove CLI and FastAPI dependencies.
+"""
+
+import os
+import warnings
+import logging
+import importlib
+import re
+import json
+import time
+import hashlib
+import threading
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
+
+import psutil
+import torch
+
+from commons.model.chatmodel import ChatModel
+from commons.dialogue.dialogmanager import DialogueManager
+try:
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+except ImportError:
+    SentencePieceTokenizerWrapper = None
+from transformers import pipeline
+
+# Configuration constants
+CKPT_PATH = os.path.join('checkpoints', 'chat_model.pth')
+MODELS_DIR = 'models'
+CHECKPOINTS_DIR = 'checkpoints'
+MAX_RAM_GB = None
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ChatConfig:
+    """Configuration for chat/inference (no CLI args)."""
+    model_name: Optional[str] = None
+    use_cpuonly: bool = False
+    cuda_device: Optional[int] = None
+    show_thinking: bool = False
+    thinking_enabled: bool = True
+    thinking_max_tokens: int = 64
+
+
+def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
+    """Parse <think> tags from response text."""
+    if '<think>' not in text or '</think>' not in text:
+        return {'thinking': None, 'response': text}
+    try:
+        thinking = text.split('<think>')[1].split('</think>')[0]
+        response = text.split('</think>')[1].strip()
+        return {'thinking': thinking, 'response': response}
+    except (IndexError, ValueError):
+        return {'thinking': None, 'response': text}
+
+
+def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
+    """Build prompt from message list."""
+    parts: List[str] = []
+    for message in messages:
+        role = str(message.get('role', 'user')).lower()
+        content = str(message.get('content', ''))
+        if role == 'system':
+            parts.append(f"System: {content}")
+        elif role == 'assistant':
+            parts.append(f"Assistant: {content}")
+        else:
+            parts.append(f"User: {content}")
+    parts.append('Assistant:')
+    return '\n'.join(parts)
+
+
+def truncate_stop_sequences(text: str, stop: Optional[List[str]]) -> str:
+    """Truncate text at stop sequences."""
+    if not stop:
+        return text
+    for s in stop:
+        if s and s in text:
+            text = text.split(s, 1)[0]
+    return text
+
+
+class ChatEngine:
+    """Chat inference engine."""
+    
+    def __init__(self, config: ChatConfig):
+        warnings.filterwarnings("ignore", message=".*clean_up_tokenization_spaces.*", category=FutureWarning)
+
+        self.config = config
+        self.use_cpuonly = config.use_cpuonly
+        self.cuda_device = config.cuda_device
+        self.show_thinking = config.show_thinking
+
+        # Dynamic model resolution
+        self.model_name = config.model_name
+        if self.model_name:
+            self.ckpt_path = self._resolve_model_path(self.model_name)
+        else:
+            self.ckpt_path = CKPT_PATH
+        logger.info(f"Loading model from: {self.ckpt_path}")
+
+        if self.cuda_device is not None and not self.use_cpuonly:
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_device)
+            logger.info("Using CUDA devices limited to: %s", self.cuda_device)
+
+        device = self.get_device()
+
+        # Optional memory limit
+        if MAX_RAM_GB is not None:
+            try:
+                p = psutil.Process()
+                mem_bytes = MAX_RAM_GB * 1024**3
+                p.rlimit(psutil.RLIMIT_AS, (mem_bytes, mem_bytes))
+                logger.info("Applied RAM limit: %s GB", MAX_RAM_GB)
+            except Exception as e:
+                logger.warning("Could not enforce RAM limit via psutil: %s", e)
+
+        # Tokenizer and model
+        self.tokenizer = None
+        vocab_file = os.path.join('checkpoints', 'tokenizer_vocab.json')
+
+        if os.path.exists(vocab_file):
+            try:
+                import json as _json
+                with open(vocab_file, 'r', encoding='utf-8') as _f:
+                    _vocab_meta = _json.load(_f)
+                sp_path = _vocab_meta.get('sentencepiece_model') if isinstance(_vocab_meta, dict) else None
+                if sp_path and SentencePieceTokenizerWrapper is not None and os.path.exists(sp_path):
+                    self.tokenizer = SentencePieceTokenizerWrapper(sp_path)
+                    logger.info(f"Loaded SentencePiece BPE tokenizer from {sp_path}, vocab_size: {self.tokenizer.vocab_size}")
+                else:
+                    raise RuntimeError(
+                        f"No SentencePiece model found in {vocab_file}. "
+                        "Run: python main.py --prepare-data --aiml --hf"
+                    )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error loading tokenizer from {vocab_file}: {e}. "
+                    "Run: python main.py --prepare-data --aiml --hf"
+                )
+
+        try:
+            ckpt = self.try_load_checkpoint(self.ckpt_path, device, False)
+            if isinstance(ckpt, dict):
+                if 'tokenizer' in ckpt and ckpt['tokenizer'] is not None:
+                    self.tokenizer = ckpt['tokenizer']
+                    logger.info(f"Loaded tokenizer from checkpoint, vocab_size: {self.tokenizer.vocab_size}")
+                state_dict = ckpt.get('model_state_dict', ckpt.get('state_dict', None))
+            else:
+                state_dict = ckpt
+
+            if self.tokenizer is None:
+                raise RuntimeError(
+                    "No tokenizer found in checkpoint or vocab file. "
+                    "Run: python main.py --prepare-data --aiml --hf"
+                )
+
+            arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
+            self.model = ChatModel(self.tokenizer,
+                embed_size=arch.get('embed_size', 256),
+                hidden_size=arch.get('hidden_size', 512),
+                num_layers=arch.get('num_layers', 4))
+
+            if state_dict is None:
+                raise ValueError('Checkpoint does not contain model state dict')
+
+            new_state = {}
+            for k, v in state_dict.items():
+                new_key = k.replace('module.', '') if k.startswith('module.') else k
+                new_state[new_key] = v
+
+            self.model.load_state_dict(new_state)
+            self.model.to(device)
+            self.model.eval()
+            logger.info("Pre-trained model loaded successfully.")
+
+        except Exception as e:
+            logger.exception("Error loading pre-trained model: %s", e)
+            if self.tokenizer is None:
+                raise RuntimeError(
+                    f"Error loading model checkpoint: {e}. "
+                    "Ensure the model was trained with BPE tokenizer."
+                )
+            self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512)
+            logger.info("Initializing model with random weights...")
+            init_fn = getattr(self.tokenizer, "init_weights", None)
+            if callable(init_fn):
+                self.model.apply(init_fn)
+            else:
+                def default_init(m):
+                    if hasattr(m, "weight") and m.weight is not None:
+                        try:
+                            torch.nn.init.xavier_uniform_(m.weight)
+                        except Exception:
+                            pass
+                    if hasattr(m, "bias") and m.bias is not None:
+                        torch.nn.init.zeros_(m.bias)
+                self.model.apply(default_init)
+            self.model.to(device)
+            self.model.eval()
+
+        logger.info("Using device: %s", device)
+
+        # Load auxiliary pipelines
+        from commons.registry.model_downloader import ensure_model_local
+
+        sentiment_model_path = ensure_model_local(
+            'nlptown/bert-base-multilingual-uncased-sentiment',
+            'models/sentiment'
+        )
+        intent_model_path = sentiment_model_path
+
+        intent_classifier = pipeline('text-classification', model=intent_model_path)
+        sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path)
+
+        self.dialogue_manager = DialogueManager(
+            model=self.model,
+            device=device,
+            tokenizer=self.tokenizer,
+            intent_classifier=intent_classifier,
+            sentiment_analyzer=sentiment_analyzer,
+            persona={
+                "name": "Eduardo Piñera Aznárez",
+                "age": 52,
+                "occupation": "AI assistant",
+                "interests": ["IT technology", "MS Office", "Libre Office", "Games", "Humanity simulation"]
+            },
+            top_k=50,
+            top_p=0.9,
+            temperature=0.7,
+            max_len=128,
+            min_length=3,
+            no_repeat_ngram_size=3,
+            default_response="Lo siento, no puedo responder ahora.",
+            thinking_enabled=config.thinking_enabled,
+            thinking_max_tokens=config.thinking_max_tokens,
+        )
+
+    def _resolve_model_path(self, model_name):
+        """Resolve model name to checkpoint file path."""
+        if model_name.endswith('.pth'):
+            return model_name
+        for path in [
+            os.path.join(CHECKPOINTS_DIR, f'{model_name}.pth'),
+            os.path.join(MODELS_DIR, f'{model_name}.pth'),
+            f'{model_name}.pth',
+        ]:
+            if os.path.exists(path):
+                return path
+        logger.warning(f"Model '{model_name}' not found, falling back to {CKPT_PATH}")
+        return CKPT_PATH
+
+    def get_device(self):
+        """Get appropriate device."""
+        if self.use_cpuonly:
+            logger.info("CPU-only mode enabled")
+            return torch.device('cpu')
+        if torch.cuda.is_available():
+            try:
+                name = torch.cuda.get_device_name(0)
+                logger.info("Using CUDA: %s", name)
+            except Exception:
+                logger.info("Using CUDA")
+            return torch.device('cuda')
+        if torch.backends.mps.is_available():
+            logger.info("Using MPS")
+            return torch.device('mps')
+        logger.info("Using CPU")
+        return torch.device('cpu')
+
+    def try_load_checkpoint(self, path, device, trusted):
+        """Load model checkpoint with safety measures."""
+        try:
+            if trusted:
+                return torch.load(path, map_location=device, weights_only=False)
+            else:
+                try:
+                    return torch.load(path, map_location=device, weights_only=True)
+                except Exception:
+                    return torch.load(path, map_location=device, weights_only=False)
+        except Exception as e:
+            msg = str(e)
+            m = re.search(r"Unsupported global: GLOBAL\s+([\w\.]+)\s+was", msg)
+            if m:
+                full_name = m.group(1)
+                try:
+                    module_name, class_name = full_name.rsplit('.', 1)
+                    mod = importlib.import_module(module_name)
+                    cls = getattr(mod, class_name)
+                    with torch.serialization.safe_globals([cls]):
+                        return torch.load(path, map_location=device, weights_only=False)
+                except Exception:
+                    logger.exception("Allowlisting failed for %s", full_name)
+                    raise
+
+            try:
+                allowed = []
+                if SentencePieceTokenizerWrapper is not None:
+                    allowed.append(SentencePieceTokenizerWrapper)
+                if allowed:
+                    with torch.serialization.safe_globals(allowed):
+                        return torch.load(path, map_location=device, weights_only=False)
+            except Exception:
+                pass
+
+            raise
+
+    def start_chat_loop(self):
+        """Start interactive chat loop."""
+        logger.info("Starting chat interface. Type 'exit' or press ESC to exit.")
+        model_display = self.model_name or 'chat_model'
+        print(f"\n{'='*50}")
+        print(f"  Active model: {model_display}")
+        print(f"  Model file: {self.ckpt_path}")
+        print(f"{'='*50}\n")
+        try:
+            import msvcrt
+            use_msvcrt = True
+        except ImportError:
+            use_msvcrt = False
+
+        try:
+            while True:
+                try:
+                    if use_msvcrt:
+                        print("You: ", end="", flush=True)
+                        chars = []
+                        while True:
+                            if msvcrt.kbhit():
+                                ch = msvcrt.getwch()
+                                if ord(ch) == 27:
+                                    print("\nExiting chat loop.")
+                                    return
+                                elif ch == '\r':
+                                    print()
+                                    break
+                                elif ch == '\b':
+                                    if chars:
+                                        chars.pop()
+                                        print('\b \b', end="", flush=True)
+                                else:
+                                    chars.append(ch)
+                                    print(ch, end="", flush=True)
+                        user_input = "".join(chars)
+                    else:
+                        user_input = input("You: ")
+                except (EOFError, KeyboardInterrupt):
+                    logger.info("Exiting chat loop.")
+                    break
+
+                if user_input.lower() in ('quit', 'exit'):
+                    break
+
+                response = self.dialogue_manager.generate_response(user_input)
+
+                if isinstance(response, dict):
+                    thinking = response.get('thinking')
+                    resp_text = response.get('response', '')
+                    if self.show_thinking and thinking:
+                        print(f"Bot [thinking]: {thinking}")
+                    print(f"Bot: {resp_text}")
+                else:
+                    if self.show_thinking:
+                        parsed = parse_thinking_response(response)
+                        if parsed['thinking']:
+                            print(f"Bot [thinking]: {parsed['thinking']}")
+                        print(f"Bot: {parsed['response']}")
+                    else:
+                        print("Bot:", response)
+        except KeyboardInterrupt:
+            logger.info("Chat terminated by user.")
+
+    def generate_response(self, prompt: str, full: bool = False) -> Union[str, Dict[str, Optional[str]]]:
+        """Generate response for a prompt."""
+        result = self.dialogue_manager.generate_response(prompt)
+        if isinstance(result, dict):
+            if full:
+                return result
+            return result.get('response', '')
+        return result
+
+
+# Streaming helper functions for SSE format
+def stream_chat_with_thinking(thinking: str, response: str):
+    """Generate SSE chunks for streaming with thinking/reasoning.
+    
+    Yields JSON strings for Server-Sent Events format.
+    """
+    import hashlib
+    request_id = hashlib.md5(f"{thinking}{response}".encode()).hexdigest()[:12]
+    
+    # First chunk with reasoning
+    yield json.dumps({
+        'id': request_id,
+        'object': 'chat.completion.chunk',
+        'delta': {'reasoning': thinking},
+        'finish_reason': None
+    }) + '\n'
+    
+    # Content chunks (split response into words for demo)
+    words = response.split()
+    for i, word in enumerate(words):
+        content = word + (' ' if i < len(words) - 1 else '')
+        yield json.dumps({
+            'id': request_id,
+            'object': 'chat.completion.chunk',
+            'delta': {'content': content},
+            'finish_reason': None
+        }) + '\n'
+    
+    # Finish chunk
+    yield json.dumps({
+        'id': request_id,
+        'object': 'chat.completion.chunk',
+        'delta': {},
+        'finish_reason': 'stop'
+    }) + '\n'
+    
+    # Done marker
+    yield 'data: [DONE]\n\n'
+
+
+def stream_chat_text(text: str):
+    """Generate SSE chunks for streaming text content.
+    
+    Yields JSON strings for Server-Sent Events format.
+    """
+    import hashlib
+    request_id = hashlib.md5(text.encode()).hexdigest()[:12]
+    
+    # Content chunks
+    words = text.split()
+    for i, word in enumerate(words):
+        content = word + (' ' if i < len(words) - 1 else '')
+        yield json.dumps({
+            'id': request_id,
+            'object': 'chat.completion.chunk',
+            'delta': {'content': content},
+            'finish_reason': None
+        }) + '\n'
+    
+    # Finish chunk
+    yield json.dumps({
+        'id': request_id,
+        'object': 'chat.completion.chunk',
+        'delta': {},
+        'finish_reason': 'stop'
+    }) + '\n'
+    
+    # Done marker
+    yield 'data: [DONE]\n\n'
+
+
+def parse_thinking_response(raw_output: str):
+    """Parse thinking from model output.
+    
+    Returns (thinking, response) tuple.
+    If no thinking tags found, returns (None, raw_output).
+    """
+    if '<think>' in raw_output and '</think>' in raw_output:
+        thinking = raw_output.split('<think>')[1].split('</think>')[0]
+        response = raw_output.split('</think>')[1].strip()
+        return thinking, response
+    return None, raw_output
+
+
+# Singleton for FastAPI integration
+_init_lock = threading.Lock()
+_chat_engine_instance = None
+
+def get_chat_engine_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None, model: Optional[str] = None):
+    """Get or create singleton ChatEngine instance."""
+    global _chat_engine_instance
+    if _chat_engine_instance is None:
+        with _init_lock:
+            if _chat_engine_instance is None:
+                config = ChatConfig(use_cpuonly=use_cpuonly, cuda_device=cuda_device, model_name=model)
+                _chat_engine_instance = ChatEngine(config)
+    return _chat_engine_instance

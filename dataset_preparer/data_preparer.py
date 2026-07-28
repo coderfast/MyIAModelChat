@@ -16,7 +16,7 @@ import shutil
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from collections import Counter
-from aimlloder import AIMLLoader
+from dataset_preparer.aiml.loader import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
 import sys
 import multiprocessing as mp
@@ -40,7 +40,7 @@ except ImportError:
     ebooklib = None
     epub = None
 try:
-    from web_scraper import scrape_web_docs, load_urls_from_file, WEB_SCRAPER_DIR
+    from dataset_preparer.web.scraper import scrape_web_docs, load_urls_from_file, WEB_SCRAPER_DIR
 except ImportError:
     scrape_web_docs = None
     load_urls_from_file = None
@@ -1577,7 +1577,7 @@ class DataPreparer:
             return
 
         try:
-            from source_validators import get_validator, QualityReport
+            from dataset_preparer.source_validators import get_validator, QualityReport
         except ImportError:
             logger.warning("  ⚠ source_validators module not found, skipping validation")
             return
@@ -1649,14 +1649,14 @@ class DataPreparer:
             return
 
         try:
-            from thinking_generators import OllamaTeacher
-            from aiml_thinking import AIMLThinkingGenerator
-            from csv_thinking import CSVThinkingGenerator
-            from pdf_thinking import PDFThinkingGenerator
-            from epub_thinking import EPUBThinkingGenerator
-            from web_thinking import WebThinkingGenerator
-            from hf_thinking import HFThinkingGenerator
-            from thinking_quality import validate_thinking
+            from dataset_preparer.thinking_generators import OllamaTeacher
+            from dataset_preparer.aiml.thinking import AIMLThinkingGenerator
+            from dataset_preparer.csv.thinking import CSVThinkingGenerator
+            from dataset_preparer.pdf.thinking import PDFThinkingGenerator
+            from dataset_preparer.epub.thinking import EPUBThinkingGenerator
+            from dataset_preparer.web.thinking import WebThinkingGenerator
+            from dataset_preparer.hf.thinking import HFThinkingGenerator
+            from dataset_preparer.thinking_quality import validate_thinking
         except ImportError as e:
             logger.warning(f"  ⚠ Thinking generator modules not found: {e}")
             return

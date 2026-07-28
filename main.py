@@ -1,3 +1,10 @@
+﻿"""
+MyIAModelChat - Main Entry Point
+
+This is the only CLI entry point for the application.
+All operations (training, chat, data preparation, etc.) are controlled from here.
+"""
+
 import os
 import gc
 import argparse
@@ -6,7 +13,6 @@ import threading
 import logging
 import multiprocessing as mp
 
-# Memory information
 try:
     import psutil
 except ImportError:
@@ -14,13 +20,13 @@ except ImportError:
 
 import torch
 
-# Import project modules
-from main_train import MainTrain
-from main_chat import MainChat
-from data_preparer import prepare_datasets_for_training
-from model_registry import list_models_cli
-from model_merge import merge_from_names, parse_merge_spec
-from model_export import export_cli
+# Import from new module structure
+from commons.registry.model_registry import list_models_cli
+from commons.registry.model_merge import merge_from_names, parse_merge_spec
+from commons.registry.model_export import export_cli
+from dataset_preparer.data_preparer import prepare_datasets_for_training, DataPreparer
+from training.trainer import Trainer, TrainingConfig
+from inference.chat_engine import ChatEngine, ChatConfig
 
 try:
     import keyboard
@@ -52,11 +58,17 @@ def validate_arguments(args):
     if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
         return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, or --web"
 
-    # Allow --train without source if using cache and dataset is already prepared
-    if args.train and not args.use_cache and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
+    if args.train:
         cache_path = os.path.join('dataset_cache', 'prepared_dataset')
         if not os.path.exists(cache_path):
-            return False, "No dataset source specified for --train and no cached dataset found. Use --aiml/--hf/--pdf/--epub/--web or --prepare-data + source to prepare data."    
+            return False, (
+                "No cached dataset found for training.\n\n"
+                "Prepare your dataset first:\n"
+                "  python main.py --prepare-data --aiml\n"
+                "  python main.py --prepare-data --aiml --hf --pdf --epub\n"
+                "  python main.py --prepare-data --aiml --bpe-vocab-size 8000\n\n"
+                "Run 'python main.py --prepare-data --help' for all options."
+            )
 
     if args.num_cores < 0 or args.num_threads < 0:
         return False, "--num_cores and --num_threads must be >= 0"
@@ -111,9 +123,8 @@ def setup_cpu_configuration(args):
     try:
         torch.set_num_interop_threads(args.num_cores)
     except RuntimeError:
-        pass  # already set in this process
+        pass
     
-    # Enforce memory limit (75% of system RAM by default)
     args.max_ram_bytes = get_memory_limit_bytes(getattr(args, 'max_ram_fraction', SYSTEM_CONFIG['max_ram_fraction']))
     if args.max_ram_bytes is not None:
         current_used = psutil.virtual_memory().used
@@ -128,7 +139,6 @@ def setup_cpu_configuration(args):
     logger.info(f"{'='*80}\n")
 
 
-# Main
 if __name__ == '__main__':
     try:
         # Calculate default CPU configuration
@@ -142,7 +152,6 @@ if __name__ == '__main__':
             int(system_cpu_count * SYSTEM_CONFIG['default_cores_fraction'])
         )
 
-        
         # Parse command-line arguments
         parser = argparse.ArgumentParser(
             description='MyIAModelChat - AI Chat Model Training and Inference',
@@ -174,22 +183,22 @@ DATA SOURCES (required with --train or --prepare-data):
 
 TRAINING OPTIONS:
   --epochs NUM         Number of training epochs (default: 1)
-  --use-cache          Load cached dataset if available
-  --refresh-cache      Rebuild cache from scratch
   --use-cpuonly        Force CPU-only execution (disable GPU)
-  --onlytokenize       Build vocabulary only
 
 CPU CONFIGURATION:
   --num_cores NUM      CPU cores for processing (default: {default_num_cores}, 0=all)
   --num_threads NUM    Threads per worker (default: {default_num_threads}, 0=all)
 
 EXAMPLES:
+  # Prepare data (create/update cache)
   python main.py --prepare-data --aiml --hf --pdf --epub
+  python main.py --prepare-data --aiml --bpe-vocab-size 8000
   python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls.txt)
 
-  python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 10
-  python main.py --train --aiml --use-cpuonly --num_cores 4 --num_threads 4
-  python main.py --train --aiml --hf --web --use-cache
+  # Train model (uses cached dataset)
+  python main.py --train --epochs 10
+  python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --epochs 10
+  python main.py --train --use-cpuonly --num_cores 4 --num_threads 4
 
   python main.py --chat --model ciencias_naturales
   python main.py --chat --model ciencias_naturales+programacion
@@ -234,9 +243,8 @@ EXAMPLES:
         
         # Training options
         parser.add_argument("--epochs", type=int, default=1, help="Training epochs (default: 1)")
-        parser.add_argument("--onlytokenize", action='store_true', help="Build vocabulary only")
-        parser.add_argument("--use-cache", action='store_true', help="Load cached dataset")
-        parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache")
+        parser.add_argument("--use-cache", action='store_true', help="Load cached dataset (for --prepare-data)")
+        parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache (for --prepare-data)")
         parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
         parser.add_argument("--cuda-device", type=str, default=None,
@@ -293,12 +301,6 @@ EXAMPLES:
         
         args = parser.parse_args()
 
-        # Force cache use for training if available
-        cache_path = os.path.join('dataset_cache', 'prepared_dataset')
-        if args.train and os.path.exists(cache_path):
-            args.use_cache = True
-            logger.info("Cache found, forcing --use-cache for training")
-
         # Validate arguments
         is_valid, error_msg = validate_arguments(args)
         if not is_valid:
@@ -317,7 +319,6 @@ EXAMPLES:
             export_cli(args.export, formats)
             sys.exit(0)
 
-        
         # Garbage collection
         gc.collect()
         
@@ -330,43 +331,56 @@ EXAMPLES:
         logger.info(f"Specified --num_threads: {args.num_threads}")
         logger.info(f"{'='*80}\n")
         
-# Handle CPU-only mode or explicit CUDA device selection
+        # Handle CPU-only mode or explicit CUDA device selection
         if args.use_cpuonly:
             os.environ['CUDA_VISIBLE_DEVICES'] = ''
-            logger.info("✓ CPU-only mode enabled (GPU disabled)")
+            logger.info("CPU-only mode enabled (GPU disabled)")
         elif args.cuda_device is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_device)
-            logger.info(f"✓ CUDA device(s) forced: {args.cuda_device}")
+            logger.info(f"CUDA device(s) forced: {args.cuda_device}")
         
         # Setup CPU configuration
         setup_cpu_configuration(args)
         
         # Clear cache if requested
         if args.clear_cache:
-            from data_preparer import CACHE_DIR, DataPreparer
             preparer = DataPreparer(args)
             preparer._clear_cache()
-            logger.info("✅ Cache cleared successfully")
+            logger.info("Cache cleared successfully")
             sys.exit(0)
         
-        # Prepare data if needed
-        if args.prepare_data or (args.train and not args.use_cache):
+        # Prepare data only when explicitly requested
+        if args.prepare_data:
             logger.info("Preparing datasets...")
             dataset, stats = prepare_datasets_for_training(args)
             if dataset is not None:
-                logger.info("✅ Dataset preparation completed!")
+                logger.info("Dataset preparation completed!")
                 logger.info(f"Total samples: {stats.get('total_samples', 0):,}")
                 if stats.get('from_cache'):
                     logger.info("(Loaded from cache)")
             else:
-                logger.error("❌ Dataset preparation failed!")
+                logger.error("Dataset preparation failed!")
                 sys.exit(1)
         
         # Train
         if args.train:
             logger.info("Initializing training...")
-            main_train = MainTrain(args)
-            training_thread = threading.Thread(target=main_train.performMainTrain, name="TrainingThread", daemon=True)
+            config = TrainingConfig(
+                epochs=args.epochs,
+                checkpoint_name=args.checkpoint_name,
+                dataset_source=args.dataset,
+                use_cpuonly=args.use_cpuonly,
+                cuda_device=args.cuda_device,
+                num_cores=args.num_cores,
+                num_threads=args.num_threads,
+                max_ram_fraction=args.max_ram_fraction,
+                max_ram_bytes=getattr(args, 'max_ram_bytes', None),
+                thinking_loss_weight=args.thinking_loss_weight,
+                thinking_enabled=args.thinking_enabled,
+                thinking_max_tokens=args.thinking_max_tokens,
+            )
+            trainer = Trainer(config)
+            training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=True)
             training_thread.start()
             try:
                 while training_thread.is_alive():
@@ -375,7 +389,7 @@ EXAMPLES:
                         try:
                             if keyboard.is_pressed('esc'):
                                 logger.warning("\nTraining interrupted by user (ESC pressed)")
-                                main_train.request_stop()
+                                trainer.request_stop()
                                 training_thread.join(timeout=10)
                                 if training_thread.is_alive():
                                     logger.warning("Training thread did not stop within timeout")
@@ -384,7 +398,7 @@ EXAMPLES:
                             pass
             except KeyboardInterrupt:
                 logger.warning("\nTraining interrupted by user (Ctrl+C)")
-                main_train.request_stop()
+                trainer.request_stop()
                 training_thread.join(timeout=10)
                 if training_thread.is_alive():
                     logger.warning("Training thread did not stop within timeout")
@@ -394,19 +408,25 @@ EXAMPLES:
         if args.chat:
             # Handle model merging if + is in model name
             if args.model and '+' in args.model:
-                from model_merge import merge_from_names, parse_merge_spec
                 names, weights = parse_merge_spec(args.model)
                 logger.info(f"Merging models: {names}")
                 merged_path = merge_from_names(names, weights)
-                # Set the merged path for the chat to load
                 args.model = merged_path.replace('.pth', '')
 
             logger.info("Starting chat interface...")
-            main_chat = MainChat(args)
-            main_chat.performMainChat()
+            config = ChatConfig(
+                model_name=args.model,
+                use_cpuonly=args.use_cpuonly,
+                cuda_device=args.cuda_device,
+                show_thinking=args.show_thinking,
+                thinking_enabled=args.thinking_enabled,
+                thinking_max_tokens=args.thinking_max_tokens,
+            )
+            engine = ChatEngine(config)
+            engine.start_chat_loop()
         
         logger.info("\n" + "="*80)
-        logger.info("✅ Program completed successfully")
+        logger.info("Program completed successfully")
         logger.info("="*80)
     
     except KeyboardInterrupt:

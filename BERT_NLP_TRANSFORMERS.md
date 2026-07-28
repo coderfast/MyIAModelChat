@@ -25,7 +25,7 @@ intent_classifier = pipeline('text-classification', model='nlptown/bert-base-mul
 Los modelos se descargan una vez y se almacenan localmente:
 
 ```python
-from model_downloader import ensure_model_local
+from commons.registry.model_downloader import ensure_model_local
 
 sentiment_model_path = ensure_model_local(
     'nlptown/bert-base-multilingual-uncased-sentiment',
@@ -91,7 +91,7 @@ El clasificador de intención usa el modelo de sentimiento como proxy para enten
 | 4 stars | `4 stars` | El usuario está satisfecho |
 | 5 stars | `5 stars` | El usuario está muy contento |
 
-**Código de mapeo** (`dialogmanager.py:161-170`):
+**Código de mapeo** (`commons/dialogue/dialogmanager.py:161-170`):
 ```python
 intent_map = {
     'POSITIVE': 'El usuario expresa algo positivo',
@@ -188,7 +188,7 @@ if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size - 1
 
 ## Arquitectura del modelo principal
 
-### GPT-2 Transformer (chatmodel.py)
+### GPT-2 Transformer (commons/model/chatmodel.py)
 
 El modelo de generación es un GPT-2 personalizado:
 
@@ -225,7 +225,7 @@ Token IDs → Embedding → Transformer (4 capas) → LM Head → Logits
 |---------|-----------|-------------|
 | `transformers` | Pipelines NLP + GPT-2 | Sí |
 | `torch` | Inferencia del modelo | Sí |
-| `model_downloader.py` | Descarga y caché de modelos | Sí (interno) |
+| `commons/registry/model_downloader.py` | Descarga y caché de modelos | Sí (interno) |
 
 ## Rendimiento
 
@@ -244,7 +244,7 @@ Token IDs → Embedding → Transformer (4 capas) → LM Head → Logits
 # Los modelos se descargan automáticamente la primera vez
 # Si falla, verificar conexión a internet y reintentar
 # O descargar manualmente:
-python -c "from model_downloader import ensure_model_local; ensure_model_local('nlptown/bert-base-multilingual-uncased-sentiment', 'models/sentiment')"
+python -c "from commons.registry.model_downloader import ensure_model_local; ensure_model_local('nlptown/bert-base-multilingual-uncased-sentiment', 'models/sentiment')"
 ```
 
 ### Sentimiento no detectado

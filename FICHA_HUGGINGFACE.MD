@@ -27,7 +27,7 @@
   - Layer norm final: 512
 
 ## Tokenizador
-- Tokenizador BPE multilingüe: `SentencePieceTokenizerWrapper` (módulo `bpe_tokenizer.py`)
+- Tokenizador BPE multilingüe: `SentencePieceTokenizerWrapper` (módulo `commons/tokenizer/bpe_tokenizer.py`)
 - Único tokenizador del proyecto — no hay fallback a word-level
 - Soporta Español e Inglés de forma nativa, extensible a más idiomas
 - Modelo BPE entrenado en `dataset_cache/sentencepiece.model`
@@ -41,13 +41,13 @@
 - Endpoint de inferencia HTTP y chat de consola
 
 ## Entrenamiento
-- Arquitectura definida en `chatmodel.py`
-- Pipeline de entrenamiento en `main_train.py`
-- Datos preparados con `main.py --prepare-data`
+- Arquitectura definida en `commons/model/chatmodel.py`
+- Pipeline de entrenamiento en `training/trainer.py`
+- Datos preparados con `python main.py --prepare-data`
 - Soporta cache de datasets para entrenamiento rápido
 
 ## Inferencia
-- Servidor FastAPI en `main_chat.py`
+- Servidor FastAPI en `envAIModels/app.py`
 - Endpoints disponibles:
   - `POST /v1/chat/completions` — Chat completion (compatible OpenAI)
   - `POST /api/chat/completions` — Chat completion alternativo
@@ -70,16 +70,24 @@
 
 ## Archivos clave
 - `main.py` — punto de entrada principal (CLI)
-- `main_chat.py` — servidor FastAPI y lógica de inferencia
-- `main_train.py` — pipeline de entrenamiento
-- `chatmodel.py` — definición del modelo GPT2LMHeadModel
-- `dialogmanager.py` — gestión de diálogo y generación de respuestas
-- `bpe_tokenizer.py` — tokenizador BPE (SentencePiece, único tokenizador)
-- `data_preparer.py` — preparación de datos y entrenamiento BPE
-- `generate_thinking_data.py` — generador de datos con `<think>`
+- `commons/model/chatmodel.py` — definición del modelo GPT2LMHeadModel
+- `commons/dialogue/dialogmanager.py` — gestión de diálogo y generación de respuestas
+- `commons/tokenizer/bpe_tokenizer.py` — tokenizador BPE (SentencePiece, único tokenizador)
+- `commons/dataset/chatdataset.py` — Dataset de PyTorch para training
+- `commons/registry/model_registry.py` — registro y listado de modelos
+- `commons/registry/model_merge.py` — fusión de modelos por promedio de pesos
+- `commons/registry/model_export.py` — exportación a GGUF/ONNX
+- `commons/registry/model_downloader.py` — descarga de modelos HuggingFace
+- `dataset_preparer/data_preparer.py` — preparación de datos multi-fuente
+- `dataset_preparer/aiml/loader.py` — carga de archivos AIML
+- `dataset_preparer/web/scraper.py` — scraping web para datos
+- `dataset_preparer/generate_thinking_data.py` — generador de datos con `<think>`
+- `training/trainer.py` — pipeline de entrenamiento
+- `inference/chat_engine.py` — lógica de inferencia
+- `envAIModels/app.py` — servidor FastAPI
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
 - `dataset_cache/sentencepiece.model` — modelo BPE entrenado
-- `chat_model.pth` — checkpoint del modelo
+- `models/` — checkpoints de modelos entrenados
 
 ## Licencia
 - Indicar la licencia de uso del proyecto si aplica.
@@ -91,3 +99,7 @@
 - El modelo soporta chain-of-thought reasoning (`<think>`) para mostrar el proceso de razonamiento.
 - El servidor es compatible con clientes Ollama y OpenAI API (formato de mensajes idéntico).
 - Opciones de streaming y pensamiento incluido (`include_thinking`) disponibles en todos los endpoints.
+
+---
+
+*Updated: 2026-07-28 - Reflects new modular project structure*
