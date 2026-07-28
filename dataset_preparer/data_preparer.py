@@ -1474,43 +1474,71 @@ class DataPreparer:
         except Exception:
             pass
     
+    def _add_source_column(self, dataset: Dataset, source_name: str) -> Dataset:
+        """
+        Add a 'source' column to a dataset with the given source name.
+        
+        Args:
+            dataset: Input dataset
+            source_name: Name of the source (e.g., 'aiml', 'hf', 'pdf', etc.)
+            
+        Returns:
+            Dataset with 'source' column added
+        """
+        if dataset is None or len(dataset) == 0:
+            return dataset
+        
+        # Check if source column already exists
+        if 'source' in dataset.column_names:
+            return dataset
+        
+        # Add source column
+        return dataset.add_column('source', [source_name] * len(dataset))
+    
     def _combine_datasets(self) -> Dataset:
         """
-        Combine AIML, HF, PDF, and EPUB datasets.
+        Combine AIML, HF, PDF, EPUB, Web, and CSV datasets.
+        Adds a 'source' column to track the origin of each sample.
         
         Returns:
-            Combined dataset
+            Combined dataset with 'source' column
         """
         datasets_to_combine = []
         total_samples = 0
         
         if self.aiml_data is not None and len(self.aiml_data) > 0:
-            datasets_to_combine.append(self.aiml_data)
+            aiml_with_source = self._add_source_column(self.aiml_data, 'AIML')
+            datasets_to_combine.append(aiml_with_source)
             total_samples += len(self.aiml_data)
             logger.info(f"  Adding AIML data: {len(self.aiml_data)} samples")
         
         if self.hf_data is not None and len(self.hf_data) > 0:
-            datasets_to_combine.append(self.hf_data)
+            hf_with_source = self._add_source_column(self.hf_data, 'HuggingFace')
+            datasets_to_combine.append(hf_with_source)
             total_samples += len(self.hf_data)
             logger.info(f"  Adding HuggingFace data: {len(self.hf_data)} samples")
         
         if self.pdf_data is not None and len(self.pdf_data) > 0:
-            datasets_to_combine.append(self.pdf_data)
+            pdf_with_source = self._add_source_column(self.pdf_data, 'PDF')
+            datasets_to_combine.append(pdf_with_source)
             total_samples += len(self.pdf_data)
             logger.info(f"  Adding PDF data: {len(self.pdf_data)} samples")
         
         if self.epub_data is not None and len(self.epub_data) > 0:
-            datasets_to_combine.append(self.epub_data)
+            epub_with_source = self._add_source_column(self.epub_data, 'EPUB')
+            datasets_to_combine.append(epub_with_source)
             total_samples += len(self.epub_data)
             logger.info(f"  Adding EPUB data: {len(self.epub_data)} samples")
 
         if self.web_data is not None and len(self.web_data) > 0:
-            datasets_to_combine.append(self.web_data)
+            web_with_source = self._add_source_column(self.web_data, 'Web')
+            datasets_to_combine.append(web_with_source)
             total_samples += len(self.web_data)
             logger.info(f"  Adding Web data: {len(self.web_data)} samples")
 
         if self.csv_data is not None and len(self.csv_data) > 0:
-            datasets_to_combine.append(self.csv_data)
+            csv_with_source = self._add_source_column(self.csv_data, 'CSV')
+            datasets_to_combine.append(csv_with_source)
             total_samples += len(self.csv_data)
             logger.info(f"  Adding CSV data: {len(self.csv_data)} samples")
 
