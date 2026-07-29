@@ -36,9 +36,9 @@ def test_bpe_thinking_symbols_registered():
 
     # Verify they decode to the correct strings
     decoded = wrapper.sp.id_to_piece(thinking_id)
-    assert 'thought' in decoded.lower() or '<think>' in decoded, f"Unexpected token: {decoded}"
+    assert 'thought' in decoded.lower() or '<thinking>' in decoded, f"Unexpected token: {decoded}"
     decoded_end = wrapper.sp.id_to_piece(thinking_end_id)
-    assert 'thought' in decoded_end.lower() or '</think>' in decoded_end, f"Unexpected token: {decoded_end}"
+    assert 'thought' in decoded_end.lower() or '</thinking>' in decoded_end, f"Unexpected token: {decoded_end}"
     print("PASS: BPE thinking symbols registered and working")
 
 
@@ -53,7 +53,7 @@ def test_bpe_encode_preserves_thinking_tags():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    text_with_thinking = "<think>El usuario pregunta sobre Python. Python es un lenguaje.</think>La respuesta es 42."
+    text_with_thinking = "<thinking>El usuario pregunta sobre Python. Python es un lenguaje.</thinking>La respuesta es 42."
     encoded = wrapper.encode(text_with_thinking, add_bos=False, add_eos=False)
 
     assert len(encoded) > 0, "Encoded should not be empty"
@@ -82,7 +82,7 @@ def test_bpe_has_thinking_method():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    text_with = "<think>Razoning aquí</think>La respuesta"
+    text_with = "<thinking>Razoning aquí</thinking>La respuesta"
     text_without = "Hola mundo"
 
     assert wrapper.has_thinking(text_with) is True
@@ -313,15 +313,15 @@ def test_aiml_generator_depth():
 
 def test_thinking_detection_in_dataset():
     """Verify thinking data detection works."""
-    sample_with_thinking = "<think>El usuario pregunta.</think>La respuesta es 42."
+    sample_with_thinking = "<thinking>El usuario pregunta.</thinking>La respuesta es 42."
     sample_without_thinking = "Hola! ¿Cómo estás?"
 
-    has_open = '<think>' in sample_with_thinking
-    has_close = '</think>' in sample_with_thinking
+    has_open = '<thinking>' in sample_with_thinking
+    has_close = '</thinking>' in sample_with_thinking
     assert has_open and has_close, "Should detect thinking tags in sample"
 
-    has_open_plain = '<think>' in sample_without_thinking
-    has_close_plain = '</think>' in sample_without_thinking
+    has_open_plain = '<thinking>' in sample_without_thinking
+    has_close_plain = '</thinking>' in sample_without_thinking
     assert not has_open_plain and not has_close_plain, "Should not detect thinking tags in plain text"
     print("PASS: Thinking detection in dataset works")
 
@@ -358,14 +358,14 @@ def test_thinking_metrics_accumulation():
 def test_thinking_sample_format():
     """Verify thinking sample has correct format for training."""
     sample = {
-        'input_ids': '<think>El usuario pregunta sobre Python.</think> Python es un lenguaje.',
-        'thinking_text': '<think>El usuario pregunta sobre Python.</think>',
+        'input_ids': '<thinking>El usuario pregunta sobre Python.</thinking> Python es un lenguaje.',
+        'thinking_text': '<thinking>El usuario pregunta sobre Python.</thinking>',
         'answer': 'Python es un lenguaje.',
         'token_ids': [5, 10, 20, 30, 6, 40, 50]
     }
 
-    assert '<think>' in sample['input_ids'], "input_ids should contain <think>"
-    assert '</think>' in sample['input_ids'], "input_ids should contain </think>"
+    assert '<thinking>' in sample['input_ids'], "input_ids should contain <thinking>"
+    assert '</thinking>' in sample['input_ids'], "input_ids should contain </thinking>"
     assert sample['answer'] in sample['input_ids'], "answer should be in input_ids"
     print("PASS: Thinking sample format correct")
 
@@ -421,8 +421,8 @@ def test_format_thinking_sample_structure():
     result = ThinkingGenerator._format_thinking_sample(None, sample, "El usuario me despuda amablemente.")
 
     assert 'thinking' in result, "Result should have 'thinking' key"
-    assert '<think>' in result.get('input_ids', ''), "input_ids should contain <think>"
-    assert '</think>' in result.get('input_ids', ''), "input_ids should contain </think>"
+    assert '<thinking>' in result.get('thinking_text', ''), "thinking_text should contain <thinking>"
+    assert '</thinking>' in result.get('thinking_text', ''), "thinking_text should contain </thinking>"
     assert 'Hola' in result.get('input_ids', ''), "Answer should be in input_ids"
     print("PASS: _format_thinking_sample produces correct structure")
 

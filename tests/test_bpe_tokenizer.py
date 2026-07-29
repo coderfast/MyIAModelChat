@@ -104,12 +104,12 @@ class TestSentencePieceTokenizerWrapper:
     # ── Thinking token tests ──────────────────────────────────────────
 
     def test_has_thinking(self, sp_tokenizer):
-        assert sp_tokenizer.has_thinking("<think>pensamiento</think>respuesta") is True
+        assert sp_tokenizer.has_thinking("<thinking>pensamiento</thinking>respuesta") is True
         assert sp_tokenizer.has_thinking("respuesta sin thinking") is False
-        assert sp_tokenizer.has_thinking("<think>solo apertura") is False
+        assert sp_tokenizer.has_thinking("<thinking>solo apertura") is False
 
     def test_split_thinking(self, sp_tokenizer):
-        thinking, response = sp_tokenizer.split_thinking("<think>razón</think>respuesta final")
+        thinking, response = sp_tokenizer.split_thinking("<thinking>razón</thinking>respuesta final")
         assert thinking == "razón"
         assert response == "respuesta final"
 
@@ -119,14 +119,14 @@ class TestSentencePieceTokenizerWrapper:
         assert response == "respuesta normal"
 
     def test_split_thinking_multiline(self, sp_tokenizer):
-        text = "<think>paso 1\npaso 2</think>la respuesta"
+        text = "<thinking>paso 1\npaso 2</thinking>la respuesta"
         thinking, response = sp_tokenizer.split_thinking(text)
         assert "paso 1" in thinking
         assert "paso 2" in thinking
         assert response == "la respuesta"
 
     def test_extract_response(self, sp_tokenizer):
-        result = sp_tokenizer.extract_response("<think>pensamiento</think>respuesta limpia")
+        result = sp_tokenizer.extract_response("<thinking>pensamiento</thinking>respuesta limpia")
         assert result == "respuesta limpia"
         assert "pensamiento" not in result
 
@@ -135,12 +135,12 @@ class TestSentencePieceTokenizerWrapper:
         assert result == "respuesta directa"
 
     def test_encode_decode_with_thinking(self, sp_tokenizer):
-        text = "<think>pensamiento breve</think>hola mundo"
+        text = "<thinking>pensamiento breve</thinking>hola mundo"
         ids = sp_tokenizer.encode(text)
         assert isinstance(ids, list)
         decoded = sp_tokenizer.decode(ids, skip_special_tokens=False)
-        assert "<think>" in decoded
-        assert "</think>" in decoded
+        assert "<thinking>" in decoded
+        assert "</thinking>" in decoded
         assert "hola mundo" in decoded
 
     def test_get_thinking_index(self, sp_tokenizer):
@@ -149,11 +149,11 @@ class TestSentencePieceTokenizerWrapper:
         # Should be >= 0 if the token exists in vocab
         if thinking_id >= 0:
             token = sp_tokenizer.idx2word.get(thinking_id, '')
-            assert 'think' in token.lower() or '<think>' in token
+            assert 'think' in token.lower() or '<thinking>' in token
 
     def test_get_thinking_end_index(self, sp_tokenizer):
         thinking_end_id = sp_tokenizer.get_thinking_end_index()
         assert isinstance(thinking_end_id, int)
         if thinking_end_id >= 0:
             token = sp_tokenizer.idx2word.get(thinking_end_id, '')
-            assert 'think' in token.lower() or '</think>' in token
+            assert 'think' in token.lower() or '</thinking>' in token

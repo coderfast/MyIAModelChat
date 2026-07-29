@@ -52,7 +52,7 @@ Este roadmap define la implementación completa de chain-of-thought ("thinking")
 
 | Componente | Estado | Problema |
 |-----------|--------|----------|
-| Tokens `<think>`/`</think>` | Registrados correctamente en SentencePiece | Ninguno |
+| Tokens `<thinking>`/`</thinking>` | Registrados correctamente en SentencePiece | Ninguno |
 | Loss masking | Funcional | Peso 0.5 **reduce** aprendizaje de thinking cuando debería mantenerlo |
 | Datos thinking | Templates genéricos, no razonamiento | **CRÍTICO** - el modelo no aprende a razonar |
 | Pipeline thinking | Desconectado de data_preparer | **CRÍTICO** - generate_thinking_data.py nunca se ejecuta |
@@ -86,7 +86,7 @@ Raw Sources (AIML, CSV, PDF, EPUB, Web, HF)
     │
     ▼
 [3] Combined Dataset with Thinking
-    │  Formato: <think>reasoning</think>response
+    │  Formato: <thinking>reasoning</thinking>response
     │  BPE tokenizer entrena con thinking tokens en contexto
     │
     ▼
@@ -97,7 +97,7 @@ Raw Sources (AIML, CSV, PDF, EPUB, Web, HF)
     ▼
 [5] Inference con Thinking Real
     │  Prompt: "Pregunta: {q}\nPiensa paso a paso.\n\n"
-    │  Genera: <think>reasoning</think>answer
+    │  Genera: <thinking>reasoning</thinking>answer
     │  Streaming: reasoning + content separados
 ```
 
@@ -149,13 +149,13 @@ git revert <commit>
 - **Ubicación**: `generate_response()` línea ~205
 - **Cambio actual**: `prompt_text = f"Pregunta: {user_text}\nRespuesta:"`
 - **Cambio nuevo**: `prompt_text = f"Pregunta: {user_text}\nPiensa paso a paso antes de responder.\n\n"`
-- **Razón**: Sin esta instrucción, el modelo nunca genera `<think>` aunque esté entrenado para ello.
+- **Razón**: Sin esta instrucción, el modelo nunca genera `<thinking>` aunque esté entrenado para ello.
 - **Líneas**: ~205
 - **Estado**: `DONE` ✅
 
 ### Verificación Fase 0
 - [ ] Entrenar 1 epoch con thinking loss weight 1.0, verificar que thinking_loss ≈ response_loss
-- [ ] Chat con `--show-thinking`, verificar que el modelo intenta generar `<think>`
+- [ ] Chat con `--show-thinking`, verificar que el modelo intenta generar `<thinking>`
 
 ---
 
@@ -579,7 +579,7 @@ Resume y razona sobre la información clave:"""
               generator = generators[source_name]
               dataset = dataset.map(generator.generate)
       
-      # Formatear: <think>thinking</think>response
+      # Formatear: <thinking>thinking</thinking>response
       self.combined_data = self._format_thinking_data(self.combined_data)
   ```
 - **Estado**: `DONE` ✅

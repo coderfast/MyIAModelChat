@@ -49,7 +49,7 @@ def test_csv_generator():
     result = gen.generate(sample)
     assert 'thinking' in result
     assert result['thinking'] is not None
-    assert 'Python' in result['thinking'] or 'pregunta' in result['thinking'].lower()
+    assert 'Python' in result['thinking'] or 'python' in result['thinking'].lower() or 'question' in result['thinking'].lower()
     print("PASS: test_csv_generator")
 
 
@@ -153,8 +153,8 @@ def test_format_thinking_sample():
     sample = {'input': 'hello', 'output': 'Hello!'}
     result = gen.generate(sample)
     assert 'thinking_text' in result
-    assert '<think>' in result['thinking_text']
-    assert '</think>' in result['thinking_text']
+    assert '<thinking>' in result['thinking_text']
+    assert '</thinking>' in result['thinking_text']
     print("PASS: test_format_thinking_sample")
 
 

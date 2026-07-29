@@ -66,7 +66,7 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
 - **Cambio**: Añadir los 6 nuevos tokens:
   ```python
   # Thinking tokens existentes
-  thinking_tokens = ['<think>', '</think>']
+  thinking_tokens = ['<thinking>', '</thinking>']
 
   # NUEVOS: Agentic tokens
   agentic_tokens = [
@@ -344,7 +344,7 @@ pytest tests/test_thinking_fixes.py -v
       """Ejecuta comando Bash (Linux/Mac)."""
 
   def has_tool_call(text: str) -> bool:
-      """Detecta si el texto contiene <think>."""
+      """Detecta si el texto contiene <thinking>."""
 
   def parse_tool_call(text: str) -> tuple[str, dict]:
       """Extrae (tool_name, arguments) de un tool_call."""
@@ -428,7 +428,7 @@ pytest tests/test_thinking_fixes.py -v
   Respuesta conocida: {answer}
 
   Si necesita herramientas, genera:
-  <think>
+  <thinking>
   {reasoning about what tool is needed and why}
   <tool_call>
   {"name": "tool_name", "arguments": {"param": "value"}}
@@ -439,7 +439,7 @@ pytest tests/test_thinking_fixes.py -v
   </observation>
 
   Si NO necesita herramientas, genera:
-  <think>
+  <thinking>
   {reasoning}
   </tool_call>
   {answer}
@@ -470,7 +470,7 @@ pytest tests/test_thinking_fixes.py -v
 - **Formato de salida por sample**:
   ```
   <|user|>¿Cuánto es 15 * 37?<|end|>
-  <think>El usuario pregunta una multiplicación. Necesito usar la calculadora.</think>
+  <thinking>El usuario pregunta una multiplicación. Necesito usar la calculadora.</thinking>
   <tool_call>
   {"name": "calculator", "arguments": {"expression": "15 * 37"}}
   </tool_call>
@@ -523,7 +523,7 @@ pytest tests/test_thinking_fixes.py -v
   # - Tokens dentro de <observation> (el modelo aprende a interpretar resultados)
 
   # Tokens que reciben peso reducido (thinking_loss_weight):
-  # - Tokens dentro de <think> (razonamiento interno)
+  # - Tokens dentro de <thinking> (razonamiento interno)
 
   # Tokens que NO contribuyen al loss:
   # - Tokens de usuario (<|user|>...<|end|>)
@@ -670,7 +670,7 @@ pytest tests/test_thinking_fixes.py -v
   # Preparación de datos con tool use
   python main.py --prepare-data --aiml --csv \
       --generate-thinking --generate-agent-data \
-      --agent-ratio 0.3 --thinking-model qwen2.5:1.5b
+      --agent-ratio 0.3 --thinking-model Qwen2.5-1.5B-Instruct-Q4_0:latest
 
   # Entrenamiento con agente
   python main.py --train --use-cache --epochs 50 \
@@ -928,7 +928,7 @@ class MoELayer(nn.Module):
   | Expert | Dominio | Datos de entrenamiento |
   |--------|---------|----------------------|
   | Expert 0 | Conversación general / chat | Datos AIML + HF sin tool_call |
-  | Expert 1 | Razonamiento / thinking | Datos con `<think>` sin tool_call |
+  | Expert 1 | Razonamiento / thinking | Datos con `<thinking>` sin tool_call |
   | Expert 2 | Tool use / acciones | Datos con `<tool_call>` |
   | Expert 3 | Observaciones / síntesis | Datos con `<observation>` |
 - **Inicialización**: Los experts se inicializan aleatoriamente, pero el training data los fuerza a especializarse

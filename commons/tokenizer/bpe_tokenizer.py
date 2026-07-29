@@ -39,8 +39,8 @@ class SentencePieceTokenizerWrapper:
         unk_id = _resolve_id('<unk>', '<UNK>')
         bos_id = _resolve_id('<s>', '<BOS>', '<bos>')
         eos_id = _resolve_id('</s>', '<eos>', '<EOS>')
-        thinking_id = _resolve_id('<think>')
-        thinking_end_id = _resolve_id('</think>')
+        thinking_id = _resolve_id('<thinking>')
+        thinking_end_id = _resolve_id('</thinking>')
 
         if pad_id < 0:
             pad_id = 0
@@ -151,18 +151,18 @@ class SentencePieceTokenizerWrapper:
     # ── Thinking helpers ──────────────────────────────────────────────
 
     def get_thinking_index(self) -> int:
-        """Return the token ID for <think>."""
+        """Return the token ID for <thinking>."""
         self._ensure_special_token_ids()
         return self._thinking_id
 
     def get_thinking_end_index(self) -> int:
-        """Return the token ID for </think>."""
+        """Return the token ID for </thinking>."""
         self._ensure_special_token_ids()
         return self._thinking_end_id
 
     def has_thinking(self, text: str) -> bool:
-        """Check if text contains <think> tags."""
-        return '<think>' in text and '</think>' in text
+        """Check if text contains <thinking> tags."""
+        return '<thinking>' in text and '</thinking>' in text
 
     def split_thinking(self, text: str):
         """Split text into (thinking, response) parts.
@@ -174,14 +174,14 @@ class SentencePieceTokenizerWrapper:
         if not self.has_thinking(text):
             return ('', text)
         try:
-            thinking = text.split('<think>')[1].split('</think>')[0]
-            response = text.split('</think>')[1].strip()
+            thinking = text.split('<thinking>')[1].split('</thinking>')[0]
+            response = text.split('</thinking>')[1].strip()
             return (thinking, response)
         except (IndexError, ValueError):
             return ('', text)
 
     def extract_response(self, text: str) -> str:
-        """Extract only the response part, removing <think> blocks."""
+        """Extract only the response part, removing <thinking> blocks."""
         _, response = self.split_thinking(text)
         return response
 

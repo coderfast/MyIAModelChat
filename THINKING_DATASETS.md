@@ -9,13 +9,13 @@ This document defines the format and examples for chain-of-thought thinking data
 Each training sample follows this structure:
 
 ```
-</think>Final clean response here
+</thinking>Final clean response here
 ```
 
 **Rules:**
-- `<think>` and `</think>` are special tokens, NOT text
+- `<thinking>` and `</thinking>` are special tokens, NOT text
 - Thinking content goes between the tags
-- Response goes after `</think>`
+- Response goes after `</thinking>`
 - Model learns to generate thinking first, then response
 - At inference, thinking can be shown or hidden
 
@@ -113,7 +113,7 @@ what do you think about technology,Technology has transformed how we live, work,
 ### Multi-step Reasoning
 
 ```
-<think>
+<thinking>
 El usuario pregunta sobre machine learning.
 
 Paso 1: Definir qué es ML
@@ -131,14 +131,14 @@ Paso 3: Dar ejemplos prácticos
 - Diagnóstico médico
 
 Paso 4: Resumir en una respuesta clara
-</think>
+</thinking>
 El aprendizaje automático es una rama de la inteligencia artificial que permite a los sistemas aprender de los datos y mejorar su rendimiento sin ser programados explícitamente. Se utiliza en reconocimiento de voz, sistemas de recomendación y diagnóstico médico.
 ```
 
 ### Mathematical Reasoning
 
 ```
-<think>
+<thinking>
 El usuario pregunta cuánto es 17 * 23.
 
 Paso 1: Descomponer el problema
@@ -151,14 +151,14 @@ Paso 2: Sumar los resultados
 
 Paso 3: Verificar
 - 17 * 23 = 391 ✓
-</think>
+</thinking>
 391
 ```
 
 ### Code Explanation
 
 ```
-<think>
+<thinking>
 El usuario pregunta qué hace esta función Python: def factorial(n): return 1 if n <= 1 else n * factorial(n-1)
 
 Paso 1: Identificar el patrón
@@ -177,7 +177,7 @@ Paso 2: Ejecutar mentalmente con n=5
 Paso 3: Explicar el propósito
 - Calcula el factorial de un número
 - factorial(n) = n * (n-1) * (n-2) * ... * 1
-</think>
+</thinking>
 Esta función calcula el factorial de un número de forma recursiva. El factorial de n (escrito como n!) es el producto de todos los números enteros desde 1 hasta n. Por ejemplo, factorial(5) = 5 * 4 * 3 * 2 * 1 = 120.
 ```
 
@@ -190,17 +190,17 @@ The final CSV file should have these columns:
 | Column | Type | Description |
 |--------|------|-------------|
 | `input` | string | User question/prompt |
-| `output` | string | Expected final response (after `</think>`) |
+| `output` | string | Expected final response (after `</thinking>`) |
 | `thinking` | string | Reasoning content (between tags) |
-| `thinking_text` | string | Full text with thinking tags: `<think>{thinking}</think>{output}` |
+| `thinking_text` | string | Full text with thinking tags: `<thinking>{thinking}</thinking>{output}` |
 | `category` | string | Category: identity, greeting, question, farewell, default |
 
 ### Example CSV
 
 ```csv
 input,output,thinking,thinking_text,category
-quien eres,yo soy Eduardo Piñera Aznárez,El usuario pregunta sobre mi identidad. Soy Eduardo Piñera Aznárez.,"<think>El usuario pregunta sobre mi identidad. Soy Eduardo Piñera Aznárez.</think>yo soy Eduardo Piñera Aznárez",identity
-qué es la IA,la IA es una rama de la informática,La pregunta es sobre inteligencia artificial. Es un campo de la informática que crea sistemas inteligentes.,"<think>La pregunta es sobre inteligencia artificial. Es un campo de la informática que crea sistemas inteligentes.</think>la IA es una rama de la informática",question
+quien eres,yo soy Eduardo Piñera Aznárez,El usuario pregunta sobre mi identidad. Soy Eduardo Piñera Aznárez.,"<thinking>El usuario pregunta sobre mi identidad. Soy Eduardo Piñera Aznárez.</thinking>yo soy Eduardo Piñera Aznárez",identity
+qué es la IA,la IA es una rama de la informática,La pregunta es sobre inteligencia artificial. Es un campo de la informática que crea sistemas inteligentes.,"<thinking>La pregunta es sobre inteligencia artificial. Es un campo de la informática que crea sistemas inteligentes.</thinking>la IA es una rama de la informática",question
 ```
 
 ---
@@ -243,8 +243,8 @@ qué es la IA,la IA es una rama de la informática,La pregunta es sobre intelige
 - Is too short (less than one sentence)
 
 ### Validation Checklist
-- [ ] Thinking starts after `<think>` token
-- [ ] Response starts after `</think>` token
+- [ ] Thinking starts after `<thinking>` token
+- [ ] Response starts after `</thinking>` token
 - [ ] Thinking logically leads to the response
 - [ ] No thinking/response contradictions
 - [ ] Appropriate length ratio (1:1 to 3:1 thinking:response)

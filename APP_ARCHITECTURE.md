@@ -2,7 +2,7 @@
 
 ## System Overview
 
-MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transformer** architecture using PyTorch. It supports bilingual operation (Spanish/English), chain-of-thought reasoning via `<think>` tags, intent classification and sentiment analysis via BERT, and multi-source data ingestion (AIML, PDF, EPUB, HuggingFace, Web scraping, CSV). It provides both an interactive CLI and an Ollama-compatible REST API server (FastAPI), plus a secondary GGUF/llama.cpp inference server.
+MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transformer** architecture using PyTorch. It supports bilingual operation (Spanish/English), chain-of-thought reasoning via `<thinking>` tags, intent classification and sentiment analysis via BERT, and multi-source data ingestion (AIML, PDF, EPUB, HuggingFace, Web scraping, CSV). It provides both an interactive CLI and an Ollama-compatible REST API server (FastAPI), plus a secondary GGUF/llama.cpp inference server.
 
 ---
 
@@ -165,8 +165,8 @@ Wraps a SentencePiece BPE model with special token support.
 | `<unk>` | 1 | Unknown |
 | `<s>` | 2 | Start of sequence |
 | `</s>` | 3 | End of sequence |
-| `<think>` | varies | Chain-of-thought start |
-| `</think>` | varies | Chain-of-thought end |
+| `<thinking>` | varies | Chain-of-thought start |
+| `</thinking>` | varies | Chain-of-thought end |
 
 **Key Methods:**
 - `encode(text)` / `decode(indices)` - Basic tokenization

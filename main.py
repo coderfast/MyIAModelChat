@@ -12,6 +12,7 @@ import sys
 import threading
 import logging
 import multiprocessing as mp
+from config import OLLAMA_MODEL
 
 try:
     import psutil
@@ -251,7 +252,7 @@ EXAMPLES:
                             help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
-        parser.add_argument("--show-thinking", action='store_true', help="Show <think> reasoning in chat")
+        parser.add_argument("--show-thinking", action='store_true', help="Show <thinking> reasoning in chat")
 
         # Thinking configuration
         parser.add_argument("--thinking-loss-weight", type=float, default=0.5,
@@ -267,8 +268,8 @@ EXAMPLES:
         parser.add_argument("--thinking-mode", type=str, default='nlp',
                             choices=['nlp', 'template', 'hf', 'ollama'],
                             help="Mode for thinking generation (default: nlp - ThinkingEngine)")
-        parser.add_argument("--thinking-model", type=str, default='qwen2.5:1.5b',
-                            help="Teacher model for thinking generation (default: qwen2.5:1.5b)")
+        parser.add_argument("--thinking-model", type=str, default=OLLAMA_MODEL,
+                            help=f"Teacher model for thinking generation (default: {OLLAMA_MODEL})")
         parser.add_argument("--thinking-depth", type=str, default='adaptive',
                             choices=['basic', 'adaptive', 'detailed'],
                             help="Thinking depth level (default: adaptive)")

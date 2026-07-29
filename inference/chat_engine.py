@@ -50,12 +50,12 @@ class ChatConfig:
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
-    """Parse <think> tags from response text."""
-    if '<think>' not in text or '</think>' not in text:
+    """Parse <thinking> tags from response text."""
+    if '<thinking>' not in text or '</thinking>' not in text:
         return {'thinking': None, 'response': text}
     try:
-        thinking = text.split('<think>')[1].split('</think>')[0]
-        response = text.split('</think>')[1].strip()
+        thinking = text.split('<thinking>')[1].split('</thinking>')[0]
+        response = text.split('</thinking>')[1].strip()
         return {'thinking': thinking, 'response': response}
     except (IndexError, ValueError):
         return {'thinking': None, 'response': text}
@@ -464,9 +464,9 @@ def parse_thinking_response(raw_output: str):
     Returns (thinking, response) tuple.
     If no thinking tags found, returns (None, raw_output).
     """
-    if '<think>' in raw_output and '</think>' in raw_output:
-        thinking = raw_output.split('<think>')[1].split('</think>')[0]
-        response = raw_output.split('</think>')[1].strip()
+    if '<thinking>' in raw_output and '</thinking>' in raw_output:
+        thinking = raw_output.split('<thinking>')[1].split('</thinking>')[0]
+        response = raw_output.split('</thinking>')[1].strip()
         return thinking, response
     return None, raw_output
 

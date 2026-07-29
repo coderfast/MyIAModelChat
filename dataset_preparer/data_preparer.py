@@ -20,6 +20,7 @@ from dataset_preparer.aiml.loader import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
 import sys
 import multiprocessing as mp
+from config import OLLAMA_MODEL
 
 try:
     import psutil
@@ -1259,16 +1260,16 @@ class DataPreparer:
                                 # Get chapter content
                                 content = item.get_content().decode('utf-8', errors='ignore')
 
-                                # Preserve <think> tags before removing HTML
-                                content = re.sub(r'<think>', '§THINKING_START§', content)
-                                content = re.sub(r'</think>', '§THINKING_END§', content)
+                                # Preserve <thinking> tags before removing HTML
+                                content = re.sub(r'<thinking>', '§THINKING_START§', content)
+                                content = re.sub(r'</thinking>', '§THINKING_END§', content)
 
                                 # Remove HTML tags (simple regex approach)
                                 content = re.sub(r'<[^>]+>', '', content)
 
-                                # Restore <think> tags
-                                content = re.sub(r'§THINKING_START§', '<think>', content)
-                                content = re.sub(r'§THINKING_END§', '</think>', content)
+                                # Restore <thinking> tags
+                                content = re.sub(r'§THINKING_START§', '<thinking>', content)
+                                content = re.sub(r'§THINKING_END§', '</thinking>', content)
 
                                 # Clean up whitespace
                                 content = re.sub(r'\s+', ' ', content)
@@ -1338,8 +1339,8 @@ class DataPreparer:
         try:
             sample = self.combined_data[0]
             input_text = sample.get('input_ids', '')
-            if isinstance(input_text, str) and '<think>' in input_text:
-                logger.info("  ✓ Dataset contains <think> tokens in input_ids - will use for BPE training")
+            if isinstance(input_text, str) and '<thinking>' in input_text:
+                logger.info("  ✓ Dataset contains <thinking> tokens in input_ids - will use for BPE training")
             else:
                 logger.info("  ℹ No thinking tokens detected in input_ids - using for BPE training")
         except Exception:
@@ -1406,8 +1407,8 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        # Add <think> and </think> as special tokens that won't be split by BPE
-        user_symbols = '--user_defined_symbols=<think>,</think>'
+        # Add <thinking> and </thinking> as special tokens that won't be split by BPE
+        user_symbols = '--user_defined_symbols=<thinking>,</thinking>'
         spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=0.9995 {user_symbols}"
         logger.info(f"  Training SentencePiece BPE model (vocab_size={vocab_size})... this may take a while")
         spm.SentencePieceTrainer.Train(spm_cmd)
@@ -1464,12 +1465,12 @@ class DataPreparer:
             for i in range(sample_size):
                 sample = self.combined_data[i]
                 text = sample.get('input_ids', '') if isinstance(sample.get('input_ids'), str) else str(sample.get('input_ids', ''))
-                if '<think>' in text and '</think>' in text:
+                if '<thinking>' in text and '</thinking>' in text:
                     has_thinking = True
                     break
         self.cache_metadata['has_thinking_tokens'] = has_thinking
         if has_thinking:
-            logger.info("  ✓ Detected thinking tokens (<think>/</think>) in dataset")
+            logger.info("  ✓ Detected thinking tokens (<thinking>/</thinking>) in dataset")
 
         # Cleanup temporary corpus
         try:
@@ -1703,7 +1704,7 @@ class DataPreparer:
         if use_ollama:
             try:
                 from dataset_preparer.thinking_generators import OllamaTeacher
-                thinking_model = getattr(self.args, 'thinking_model', 'qwen2.5:1.5b')
+                thinking_model = getattr(self.args, 'thinking_model', OLLAMA_MODEL)
                 teacher = OllamaTeacher(model=thinking_model)
                 if not teacher.is_model_available():
                     logger.info(f"  ℹ Ollama not available, using ThinkingEngine only")
@@ -1755,23 +1756,29 @@ class DataPreparer:
                         validation = validate_thinking(result['thinking'], result.get('output', ''))
                         if validation.valid:
                             source_thinking += 1
-                            enriched.append(result)
+                            # Original sample: ensure input_ids exists
+                            original = dict(sample)
+                            if 'input_ids' not in original:
+                                inp = original.get('input', '')
+                                out = original.get('output', '')
+                                original['input_ids'] = f"{inp} {out}".strip() if inp and out else out or inp
+                            enriched.append(original)    # Original sample (without thinking)
+                            enriched.append(result)      # Thinking sample (with thinking)
                         else:
-                            result['input_ids'] = result.get('output', '')
-                            result['thinking'] = ''
-                            result.pop('thinking_text', None)
-                            enriched.append(result)
+                            enriched.append(sample)      # Original only (validation failed)
                     else:
-                        enriched.append(result)
+                        enriched.append(sample)          # Original only (no thinking generated)
                     total_samples += 1
 
                 total_thinking += source_thinking
                 from datasets import Dataset
-                thinking_datasets.append(Dataset.from_list(enriched))
-                logger.info(f"    {source_name}: {source_thinking}/{len(samples)} samples with valid thinking")
+                ds = Dataset.from_list(enriched)
+                ds = self._add_source_column(ds, source_name)
+                thinking_datasets.append(ds)
+                logger.info(f"    {source_name}: {source_thinking}/{len(samples)} samples with valid thinking ({len(ds)} total)")
             except Exception as e:
                 logger.warning(f"    ⚠ Thinking generation failed for {source_name}: {e}")
-                thinking_datasets.append(dataset)
+                thinking_datasets.append(self._add_source_column(dataset, source_name))
 
         if thinking_datasets:
             from datasets import concatenate_datasets

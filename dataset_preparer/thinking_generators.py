@@ -9,6 +9,7 @@ import logging
 import urllib.request
 import urllib.error
 from typing import Optional, Dict, Any
+from config import OLLAMA_MODEL, OLLAMA_URL
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 class OllamaTeacher:
     """Teacher model via Ollama API for generating thinking."""
 
-    def __init__(self, model: str = 'qwen2.5:1.5b', url: str = 'http://localhost:11434'):
+    def __init__(self, model: str = OLLAMA_MODEL, url: str = OLLAMA_URL):
         self.model = model
         self.url = url.rstrip('/')
         self.cache: Dict[tuple, str] = {}
@@ -108,16 +109,18 @@ class ThinkingGenerator:
         raise NotImplementedError
 
     def _format_thinking_sample(self, sample: Dict[str, Any], thinking: str) -> Dict[str, Any]:
-        """Format a sample with thinking block, updating input_ids for training."""
+        """Format a sample with thinking block for training."""
         result = dict(sample)
         result['thinking'] = thinking
 
         answer = sample.get('output', sample.get('input_ids', ''))
         if thinking and answer:
-            thinking_text = f"<think>{thinking}</think>{answer}"
+            thinking_text = f"<thinking>{thinking}</thinking>{answer}"
             result['thinking_text'] = thinking_text
-            result['input_ids'] = thinking_text
+            result['input_ids'] = thinking_text  # Training needs thinking + response
+            result['original_text'] = answer  # Preserve original for reference
         elif answer:
             result['input_ids'] = answer
+            result['original_text'] = answer
 
         return result

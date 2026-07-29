@@ -940,10 +940,10 @@ class CacheViewer(QMainWindow):
         for item in self.vocab_data:
             # Apply filter
             if filter_type == "Special Tokens":
-                if item['token'] not in ['<unk>', '<s>', '</s>', '<think>', '</think>']:
+                if item['token'] not in ['<unk>', '<s>', '</s>', '<thinking>', '</thinking>']:
                     continue
             elif filter_type == "Regular Tokens":
-                if item['token'] in ['<unk>', '<s>', '</s>', '<think>', '</think>']:
+                if item['token'] in ['<unk>', '<s>', '</s>', '<thinking>', '</thinking>']:
                     continue
             
             # Apply search

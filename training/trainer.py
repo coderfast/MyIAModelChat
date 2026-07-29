@@ -251,7 +251,7 @@ class Trainer:
             sys.exit(1)
 
     def _detect_thinking_data(self):
-        """Detect if the dataset contains <think> thinking data."""
+        """Detect if the dataset contains <thinking> thinking data."""
         if self.loaded_dataset is None:
             return
 
@@ -261,7 +261,7 @@ class Trainer:
             logger.info("Thinking data detected (from cache metadata)")
             return
 
-        # Heuristic: sample first 100 items and check for <think> tags
+        # Heuristic: sample first 100 items and check for <thinking> tags
         sample_size = min(100, len(self.loaded_dataset))
         thinking_count = 0
         # Get thinking token IDs for detecting pre-tokenized thinking data
@@ -270,7 +270,7 @@ class Trainer:
         for i in range(sample_size):
             item = self.loaded_dataset[i]
             value = item.get('input_ids', item.get('token_ids', ''))
-            if isinstance(value, str) and '<think>' in value:
+            if isinstance(value, str) and '<thinking>' in value:
                 thinking_count += 1
             elif isinstance(value, list) and thinking_id >= 0 and thinking_end_id >= 0:
                 if thinking_id in value and thinking_end_id in value:
@@ -279,7 +279,7 @@ class Trainer:
         if thinking_count > 0:
             self.has_thinking_data = True
             self.thinking_sample_count = thinking_count
-            logger.info(f"Thinking data detected ({thinking_count}/{sample_size} samples contain <think>)")
+            logger.info(f"Thinking data detected ({thinking_count}/{sample_size} samples contain <thinking>)")
         else:
             logger.info("No thinking data detected in dataset")
 
@@ -477,7 +477,7 @@ class Trainer:
     def _compute_loss(self, model, inputs, targets, criterion):
         """Unified loss computation with thinking-aware loss weighting.
 
-        Thinking tokens (between <think> and </think>) receive a lower loss weight
+        Thinking tokens (between <thinking> and </thinking>) receive a lower loss weight
         (thinking_loss_weight) so the model focuses more on learning the response.
         """
         outputs = model(inputs)
@@ -760,7 +760,7 @@ class Trainer:
 
             # Log thinking data status
             if self.has_thinking_data:
-                logger.info(f" Thinking data: ENABLED (model will learn <think>...</think> structure)")
+                logger.info(f" Thinking data: ENABLED (model will learn <thinking>...</thinking> structure)")
             else:
                 logger.info(f"â„¹ Thinking data: NOT detected (standard training mode)")
 

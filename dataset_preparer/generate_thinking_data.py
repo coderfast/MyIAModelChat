@@ -1,8 +1,8 @@
 """
-Generate training data with <think> tags for chain-of-thought reasoning.
+Generate training data with <thinking> tags for chain-of-thought reasoning.
 
 Reads existing QA pairs and generates synthetic reasoning inside
-<think>...</think> tags before the final answer.
+<thinking>...</thinking> tags before the final answer.
 
 Usage:
     python generate_thinking_data.py --source csv --input datasets_source/csv/special_facts.csv --output datasets/thinking/thinking_data.csv
@@ -291,7 +291,7 @@ def generate_thinking_dataset(pairs: List[Dict[str, str]], lang: str = 'es', gen
         else:
             thinking = generate_thinking(text, answer, category, lang)
 
-        thinking_text = f"<think>{thinking}</think>{answer}"
+        thinking_text = f"<thinking>{thinking}</thinking>{answer}"
         thinking_pairs.append({
             'input': text,
             'output': answer,
@@ -317,7 +317,7 @@ def save_thinking_data(pairs: List[Dict[str, str]], output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate training data with <think> tags',
+        description='Generate training data with <thinking> tags',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -409,7 +409,7 @@ Examples:
             args.mode = 'template'
 
     # Generate thinking data
-    logger.info("\nGenerating <think> data...")
+    logger.info("\nGenerating <thinking> data...")
     thinking_data = generate_thinking_dataset(
         unique_pairs,
         lang=args.lang,

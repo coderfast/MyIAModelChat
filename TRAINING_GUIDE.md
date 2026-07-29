@@ -209,7 +209,7 @@ text = tokenizer.decode(token_ids)
 - Vocabulary size affects model parameters
 - Larger vocab = more flexibility, more memory
 - Common sizes: 2k, 8k, 16k, 32k tokens
-- Special tokens: <pad>, <unk>, <s>, </s>, <think>, </think>
+- Special tokens: <pad>, <unk>, <s>, </s>, <thinking>, </thinking>
 
 ### Issues & Solutions
 

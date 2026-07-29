@@ -1,21 +1,21 @@
-# Chain-of-Thought Reasoning (<think>)
+# Chain-of-Thought Reasoning (`<thinking>`)
 
 ## Qué es
 
-El modelo soporta **razonamiento encadenado** (chain-of-thought) usando la etiqueta `<think>`. Cuando el modelo genera una respuesta, puede incluir su proceso de pensamiento interno antes de la respuesta final.
+El modelo soporta **razonamiento encadenado** (chain-of-thought) usando la etiqueta `<thinking>`. Cuando el modelo genera una respuesta, puede incluir su proceso de pensamiento interno antes de la respuesta final.
 
 ### Formato
 
 ```
-<think>
+<thinking>
 El usuario pregunta sobre X. Voy a analizar la información disponible...
 Voy a dar una respuesta clara y directa.
-</think>
+</thinking>
 La respuesta es Y.
 ```
 
-- **Dentro de `<think>`**: razonamiento interno, pasos intermedios, autocorrección
-- **Fuera de `<think>`**: la respuesta limpia que ve el usuario
+- **Dentro de `<thinking>`**: razonamiento interno, pasos intermedios, autocorrección
+- **Fuera de `<thinking>`**: la respuesta limpia que ve el usuario
 
 ### Formato de datos de entrenamiento
 
@@ -23,7 +23,7 @@ Cada par de entrenamiento tiene esta estructura:
 
 ```
 <|user|>pregunta del usuario<|end|>
-<think>razonamiento interno del modelo...</think>respuesta final limpia<|end|>
+<thinking>razonamiento interno del modelo...</thinking>respuesta final limpia<|end|>
 ```
 
 ---
@@ -31,16 +31,13 @@ Cada par de entrenamiento tiene esta estructura:
 ## Flujo completo
 
 ```
-1. Generar datos con thinking
-   python dataset_preparer/generate_thinking_data.py --source all
+1. Preparar datos con thinking (Ollama teacher o NLP)
+   python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
 
-2. Preparar datos (incluye thinking en el dataset)
-   python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
-
-3. Entrenar el modelo
+2. Entrenar el modelo
    python main.py --train --use-cache --epochs 30
 
-4. Inferencia
+3. Inferencia
    python main.py --chat --show-thinking
 ```
 
@@ -48,13 +45,30 @@ Cada par de entrenamiento tiene esta estructura:
 
 ## Generar datos con thinking
 
-El script `dataset_preparer/generate_thinking_data.py` lee el dataset actual (AIML, HuggingFace, etc.) y genera ejemplos enriquecidos con `<think>`.
+### Opción A: Ollama Teacher (recomendada)
 
-### Estrategia
+Usa un LLM externo para generar `<thinking>` de alta calidad:
 
-- **Opción A (recomendada):** Usar un LLM externo (DeepSeek-R1, GPT-4, Claude) para generar `<think>` a partir de pares pregunta-respuesta existentes
-- **Opción B:** Escribir razonamiento manualmente para datos críticos
-- **Opción C:** Mezcla de ambas
+```bash
+# Configurar modelo en config.py (OLLAMA_MODEL)
+# Asegurarse de que Ollama esté corriendo en localhost:11434
+
+python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
+```
+
+### Opción B: NLP-based (sin dependencias externas)
+
+Genera thinking usando análisis NLP con ThinkingEngine:
+
+```bash
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
+```
+
+### Opción C: Script independiente
+
+```bash
+python dataset_preparer/generate_thinking_data.py --source all
+```
 
 ### Desde CSV y AIML
 
@@ -66,7 +80,7 @@ Esto genera `datasets/thinking/thinking_data.csv` con el formato:
 
 ```csv
 input,output,thinking,thinking_text,category
-"¿Quién es tu creador?","Mi creador es Eduardo Piñera Aznárez.","Pregunta de identidad. Respondo de forma clara y directa.","<think>Pregunta de identidad. Respondo de forma clara y directa.</think>Mi creador es Eduardo Piñera Aznárez.",identity
+"¿Quién es tu creador?","Mi creador es Eduardo Piñera Aznárez.","Pregunta de identidad. Respondo de forma clara y directa.","<thinking>Pregunta de identidad. Respondo de forma clara y directa.</thinking>Mi creador es Eduardo Piñera Aznárez.",identity
 ```
 
 ### Desde un CSV personalizado
@@ -85,27 +99,28 @@ python dataset_preparer/generate_thinking_data.py --source aiml --input aiml_dev
 
 ## Preparar datos
 
-La preparación incluye automáticamente los datos de thinking si existen en `datasets/thinking/thinking_data.csv`.
+La preparación incluye automáticamente los datos de thinking si se usa `--thinking-mode`.
 
 ```bash
-python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
+python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
 ```
 
 ### Qué hace:
-- Crea datos thinking desde CSV y AIML
-- Entrena modelo BPE con tokens `<think>` y `</think>`
+- Genera datos thinking para cada fuente (AIML, PDF, HF, etc.)
+- Crea DOS samples por cada entrada original (uno sin thinking, uno con thinking)
+- Entrena modelo BPE con tokens `<thinking>` y `</thinking>`
 - Tokeniza todos los datos (incluyendo thinking)
 - Guarda en `dataset_cache/`
 
 ### Tokens especiales en el BPE
 
-`<think>` y `</think>` se añaden como `user_defined_symbols` en el entrenamiento SentencePiece, asegurando que no se fragmenten (tokens indivisibles).
+`<thinking>` y `</thinking>` se añaden como `user_defined_symbols` en el entrenamiento SentencePiece, asegurando que no se fragmenten (tokens indivisibles).
 
 ### Archivos generados:
 ```
 dataset_cache/
 ├── prepared_dataset/          # Dataset con token_ids
-├── sentencepiece.model        # Modelo BPE (incluye tokens <think>/</think>)
+├── sentencepiece.model        # Modelo BPE (incluye tokens <thinking>/</thinking>)
 ├── cache_metadata.pkl         # Incluye has_thinking_tokens: true
 └── dataset_stats.pkl          # Estadísticas
 ```
@@ -119,8 +134,8 @@ python main.py --train --use-cache --epochs 30
 ```
 
 ### Qué hace:
-- Detecta si el dataset contiene `<think>` (via `cache_metadata.pkl` o heurística)
-- Entrena el modelo para generar `<think>...</think>...`
+- Detecta si el dataset contiene `<thinking>` (via `cache_metadata.pkl` o heurística)
+- Entrena el modelo para generar `<thinking>...</thinking>...`
 - Registra métricas de thinking durante entrenamiento
 
 ### Generación de secuencias de entrenamiento
@@ -129,7 +144,7 @@ Cada secuencia de entrenamiento se construye así:
 
 ```python
 input_ids:  [..., token_antes_de_thinking]
-target_ids: [..., <think>, razonamiento, </think>, respuesta]
+target_ids: [..., <thinking>, razonamiento, </thinking>, respuesta]
 ```
 
 - El modelo recibe contexto previo y debe predecir la secuencia completa
@@ -138,20 +153,20 @@ target_ids: [..., <think>, razonamiento, </think>, respuesta]
 
 ### Función de pérdida
 
-Se usa la estrategia simple: tratar `<think>...</think>...` como texto continuo, con loss sobre todos los tokens. No hay ponderación adicional por el momento.
+Se usa la estrategia simple: tratar `<thinking>...</thinking>...` como texto continuo, con loss sobre todos los tokens. No hay ponderación adicional por el momento.
 
 ### Métricas de entrenamiento
 
 Se registran las siguientes métricas:
 
-- `%` de ejemplos donde el modelo genera `<think>` correctamente
-- `%` de ejemplos donde `</think>` cierra correctamente
+- `%` de ejemplos donde el modelo genera `<thinking>` correctamente
+- `%` de ejemplos donde `</thinking>` cierra correctamente
 - Coherencia del razonamiento generado (evaluación manual o con LLM)
 
 ### Output esperado:
 ```
 ✓ Thinking data detected (from cache metadata)
-✓ Thinking data: ENABLED (model will learn <think>...</think> structure)
+✓ Thinking data: ENABLED (model will learn <thinking>...</thinking> structure)
 Training batch 50/inf in progress...
   Thinking Metrics Summary:
     thinking_token_accuracy: 0.0234
@@ -190,9 +205,9 @@ python main.py --chat
 from inference.chat_engine import ChatEngine
 
 def parse_thinking_response(raw_output):
-    if '<think>' in raw_output and '</think>' in raw_output:
-        thinking = raw_output.split('<think>')[1].split('</think>')[0]
-        response = raw_output.split('</think>')[1].strip()
+    if '<thinking>' in raw_output and '</thinking>' in raw_output:
+        thinking = raw_output.split('<thinking>')[1].split('</thinking>')[0]
+        response = raw_output.split('</thinking>')[1].strip()
         return thinking, response
     return None, raw_output
 ```
@@ -274,17 +289,20 @@ curl -X POST http://localhost:11434/api/generate \
 ### Archivos nuevos
 | Archivo | Descripción |
 |---------|-------------|
-| `dataset_preparer/generate_thinking_data.py` | Genera datos con `<think>` |
+| `config.py` | Configuración centralizada (OLLAMA_MODEL, OLLAMA_URL) |
+| `dataset_preparer/generate_thinking_data.py` | Genera datos con `<thinking>` |
+| `dataset_preparer/thinking_engine.py` | Motor NLP para generación de thinking |
 | `datasets/thinking/thinking_data.csv` | Datos generados |
 
 ### Archivos modificados
 | Archivo | Descripción |
 |---------|-------------|
 | `commons/tokenizer/bpe_tokenizer.py` | Helpers: `has_thinking()`, `split_thinking()`, `extract_response()` |
-| `dataset_preparer/data_preparer.py` | Carga datos thinking, tokens `<think>`/`</think>` en BPE |
+| `dataset_preparer/data_preparer.py` | Carga datos thinking, tokens `<thinking>`/`</thinking>` en BPE |
+| `dataset_preparer/thinking_generators.py` | Base ThinkingGenerator + OllamaTeacher |
 | `training/trainer.py` | Detecta thinking, métricas de entrenamiento |
 | `inference/chat_engine.py` | Parsing de thinking en inferencia |
-| `main.py` | Flag `--show-thinking` |
+| `main.py` | Flag `--thinking-mode`, `--thinking-model`, `--show-thinking` |
 | `envAIModels/schemas.py` | Campo `include_thinking` en requests |
 | `envAIModels/utils.py` | `parse_thinking_response()` |
 | `envAIModels/routers_v1.py` | Endpoints v1 con thinking |
@@ -294,7 +312,7 @@ curl -X POST http://localhost:11434/api/generate \
 
 ## Solución de problemas
 
-### El modelo no genera `<think>`
+### El modelo no genera `<thinking>`
 
 - Verificar que el dataset contiene datos thinking: `head datasets/thinking/thinking_data.csv`
 - Verificar que el BPE fue entrenado con los tokens: `cache_metadata.pkl` debe tener `has_thinking_tokens: true`
@@ -303,22 +321,21 @@ curl -X POST http://localhost:11434/api/generate \
 ### El thinking no aparece en la API
 
 - Verificar que `include_thinking: true` está en el request
-- Verificar que la respuesta del modelo contiene `<think>` (puede que aún no lo genere)
+- Verificar que la respuesta del modelo contiene `<thinking>` (puede que aún no lo genere)
 
-### Tokens `<think>` aparecen como `⁇`
+### Tokens `<thinking>` aparecen como `⁇`
 
 - El modelo BPE fue entrenado sin los tokens
-- Ejecutar: `python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache`
+- Ejecutar: `python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache`
 - Reentrenar el modelo
 
 ### Verificación end-to-end completa
 
 ```bash
-# 1. Preparar datos con thinking
-python dataset_preparer/generate_thinking_data.py --source aiml --output datasets/thinking/
+# 1. Preparar datos con thinking (NLP, sin Ollama)
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
 
 # 2. Entrenar con datos de thinking
-python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
 python main.py --train --use-cache --epochs 30
 
 # 3. Inferencia sin thinking
@@ -338,4 +355,4 @@ curl -X POST http://localhost:11434/v1/chat/completions \
 
 ---
 
-*Updated: 2026-07-28 - Reflects new modular project structure*
+*Updated: 2026-07-28 - Reflects new modular project structure, `<thinking>` tags, and Ollama teacher support*

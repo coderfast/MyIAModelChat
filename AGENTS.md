@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, chain-of-thought reasoning, and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
+MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, chain-of-thought reasoning (`<thinking>`), and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
 
 ---
 
@@ -11,6 +11,7 @@ MyIAModelChat is an advanced conversational AI system built with PyTorch, featur
 `
 MyIAModelChat/
 ├── main.py                              # Primary entry point (CLI) - ONLY file that processes args
+├── config.py                            # Centralized config (OLLAMA_MODEL, OLLAMA_URL)
 ├── commons/                             # Shared code (reusable across projects)
 │   ├── __init__.py
 │   ├── model/                           # Model architecture
@@ -127,7 +128,7 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
 ## Development Guidelines
 
 ### Code Style
-- Python 3.12 compatible
+- Python 3.12+ compatible (tested with 3.14)
 - Type hints recommended for new functions
 - Docstrings for public functions (brief, one-line)
 - No emojis in code unless explicitly requested
@@ -265,6 +266,8 @@ open → in_progress → done
 - PyTorch 2.0+
 - transformers (Hugging Face)
 - sentencepiece (BPE tokenizer)
+- datasets (Hugging Face datasets)
+- dill / multiprocess (serialization)
 
 ### Optional
 - spacy (professional sentence tokenization)
@@ -272,6 +275,7 @@ open → in_progress → done
 - datasketch (MinHash deduplication)
 - PyPDF2 (PDF extraction)
 - ebooklib (EPUB support)
+- ollama (external teacher for thinking generation)
 
 ---
 

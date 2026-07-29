@@ -231,7 +231,7 @@ class DialogueManager:
                         if in_thinking_phase:
                             thinking_tokens.append(next_token)
                             thinking_token_count += 1
-                            # Stop thinking phase on </think> or max thinking tokens
+                            # Stop thinking phase on </thinking> or max thinking tokens
                             if next_token == self.thinking_end_id or thinking_token_count >= self.thinking_max_tokens:
                                 in_thinking_phase = False
                                 # If we've used most of our generation budget on thinking,
@@ -285,7 +285,7 @@ class DialogueManager:
 
         try:
             if thinking_tokens and self.thinking_enabled:
-                # Decode thinking (skip the opening <think> token if present)
+                # Decode thinking (skip the opening <thinking> token if present)
                 think_start = 0
                 if thinking_tokens and thinking_tokens[0] == self.thinking_id:
                     think_start = 1

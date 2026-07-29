@@ -30,10 +30,20 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         self.engine = engine or ThinkingEngine(depth=depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
-        pattern = sample.get('input', '').lower().strip()
-        template = sample.get('output', '').strip()
+        # AIML data may have 'input'/'output' or combined 'input_ids'
+        input_text = sample.get('input', '')
+        output_text = sample.get('output', '')
+        combined = sample.get('input_ids', '')
 
-        if not pattern or not template:
+        if input_text and output_text:
+            pattern = input_text.lower().strip()
+            template = output_text.strip()
+            text_for_thinking = f"{pattern} {template}"
+        elif combined:
+            text_for_thinking = combined.strip()
+            pattern = text_for_thinking.lower()
+            template = text_for_thinking
+        else:
             return self._format_thinking_sample(sample, '')
 
         # Detect category for context
@@ -45,13 +55,13 @@ class AIMLThinkingGenerator(ThinkingGenerator):
 
         # Try ThinkingEngine first (always available)
         if self.engine:
-            thinking = self._engine_thinking(pattern, template, detected_category)
+            thinking = self._engine_thinking(text_for_thinking, detected_category)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
         # Try Ollama teacher if available
         if self.teacher and self.teacher.is_available():
-            thinking = self._teacher_thinking(pattern, template)
+            thinking = self._teacher_thinking(text_for_thinking)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
@@ -59,13 +69,11 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         thinking = self._category_thinking(pattern, template, detected_category)
         return self._format_thinking_sample(sample, thinking)
 
-    def _engine_thinking(self, pattern: str, template: str, category: Optional[str]) -> Optional[str]:
+    def _engine_thinking(self, text: str, category: Optional[str]) -> Optional[str]:
         """Generate thinking using ThinkingEngine NLP analysis."""
         try:
-            text = f"{pattern} {template}"
             context = {
-                'question': pattern,
-                'answer': template,
+                'question': text,
                 'category': category,
                 'type': 'chatbot_pair'
             }
@@ -73,13 +81,12 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         except Exception:
             return None
 
-    def _teacher_thinking(self, pattern: str, template: str) -> Optional[str]:
+    def _teacher_thinking(self, text: str) -> Optional[str]:
         """Generate thinking using Ollama teacher model."""
         max_tokens = self.depth_config['max_tokens']
         prompt = (
-            f"Analiza esta pregunta de chatbot y genera un razonamiento paso a paso.\n"
-            f"Pregunta del usuario: {pattern}\n"
-            f"Respuesta del bot: {template[:200]}\n\n"
+            f"Analiza esta interaccion de chatbot y genera un razonamiento paso a paso.\n"
+            f"Texto: {text[:400]}\n\n"
             f"Razonamiento ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones, en español):"
         )
         return self.teacher.generate(prompt, max_tokens=max_tokens)

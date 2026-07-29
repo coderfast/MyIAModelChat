@@ -15,7 +15,7 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **Sentiment Analysis**: BERT-based star rating detection (1-5 stars)
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
-- **Chain-of-Thought Reasoning**: Optional `<think>` reasoning in training and inference
+- **Chain-of-Thought Reasoning**: Optional `<thinking>` reasoning in training and inference
 - **Model Library**: Train, combine, and export multiple independent models
 
 ### Data Sources & Processing
@@ -496,11 +496,11 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 ```
 User: What is 2+2?
 
-<think>
+<thinking>
 The user is asking a simple arithmetic question.
 I need to add the numbers 2 and 2.
 2 + 2 = 4
-</think>
+</thinking>
 
 4
 ```
