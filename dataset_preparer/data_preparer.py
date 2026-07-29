@@ -522,14 +522,17 @@ class DataPreparer:
         Returns:
             int: Number of processes to use (min 1, max 4)
         """
-        try:
-            cpus = mp.cpu_count()
-            if cpus <= 2:
-                return 1
-            return min(4, max(1, cpus // 2))
-        except Exception:
-            return 1
-    
+        if sys.version_info >= (3, 14):
+            return 0  # dill incompatible
+        else:
+            try:
+                cpus = mp.cpu_count()
+                if cpus <= 2:
+                    return 1
+                return min(4, max(1, cpus // 2))
+            except Exception:
+                return 0
+
     def _cache_exists(self) -> bool:
         """Check if cached dataset exists."""
         return (os.path.exists(CACHE_DATASET_FILE) and 
@@ -1696,7 +1699,7 @@ class DataPreparer:
 
         # Optionally try Ollama teacher for enhanced thinking
         teacher = None
-        use_ollama = getattr(self.args, 'thinking_ollama', False)
+        use_ollama = getattr(self.args, 'thinking_ollama', False) or getattr(self.args, 'thinking_mode', 'nlp') == 'ollama'
         if use_ollama:
             try:
                 from dataset_preparer.thinking_generators import OllamaTeacher

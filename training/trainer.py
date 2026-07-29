@@ -318,13 +318,16 @@ class Trainer:
 
     def _get_num_proc(self):
         """Choose a safe number of processes for dataset map operations."""
-        try:
-            cpus = mp.cpu_count()
-            if cpus <= 2:
-                return 1
-            return min(4, max(1, cpus // 2))
-        except Exception:
-            return 1
+        if sys.version_info >= (3, 14):
+            return 0  # dill incompatible
+        else:
+            try:
+                cpus = mp.cpu_count()
+                if cpus <= 2:
+                    return 1
+                return min(4, max(1, cpus // 2))
+            except Exception:
+                return 0
 
     def _sample_generator(self):
         """Yield text or tokenized sequences from the loaded dataset in streaming mode."""
