@@ -171,7 +171,7 @@ class LazyTableModel(QAbstractTableModel):
         self._data: List[Optional[Dict]] = []
         self._total_count = 0
         self._loaded_count = 0
-        self._headers = ["#", "Text (truncated)", "Token Count", "Source"]
+        self._headers = ["#", "Text", "Token Count", "Source"]
     
     def rowCount(self, parent=QModelIndex()) -> int:
         return self._total_count
@@ -193,7 +193,7 @@ class LazyTableModel(QAbstractTableModel):
                     return str(item['index'])
                 elif col == 1:
                     text = item['text']
-                    return text[:200] + "..." if len(text) > 200 else text
+                    return text[:300] + "..." if len(text) > 300 else text
                 elif col == 2:
                     return str(item['token_count'])
                 elif col == 3:
