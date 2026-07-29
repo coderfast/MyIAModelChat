@@ -264,14 +264,16 @@ EXAMPLES:
                             help="Max tokens for thinking phase (default: 64)")
         parser.add_argument("--generate-thinking", action='store_true',
                             help="Generate real thinking data during preparation")
-        parser.add_argument("--thinking-mode", type=str, default='template',
-                            choices=['template', 'hf', 'ollama'],
-                            help="Mode for thinking generation (default: template)")
+        parser.add_argument("--thinking-mode", type=str, default='nlp',
+                            choices=['nlp', 'template', 'hf', 'ollama'],
+                            help="Mode for thinking generation (default: nlp - ThinkingEngine)")
         parser.add_argument("--thinking-model", type=str, default='qwen2.5:1.5b',
                             help="Teacher model for thinking generation (default: qwen2.5:1.5b)")
         parser.add_argument("--thinking-depth", type=str, default='adaptive',
                             choices=['basic', 'adaptive', 'detailed'],
                             help="Thinking depth level (default: adaptive)")
+        parser.add_argument("--thinking-ollama", action='store_true',
+                            help="Use Ollama teacher for enhanced thinking (optional)")
         parser.add_argument("--validate-sources", action='store_true',
                             help="Validate and clean each data source before training")
 

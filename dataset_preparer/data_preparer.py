@@ -1672,12 +1672,12 @@ class DataPreparer:
         logger.info(f"  Total: {original_count} -> {len(self.combined_data)} samples")
 
     def _generate_thinking_for_sources(self):
-        """Generate real thinking data for each source using source-specific generators."""
+        """Generate real thinking data for each source using ThinkingEngine."""
         if self.combined_data is None or len(self.combined_data) == 0:
             return
 
         try:
-            from dataset_preparer.thinking_generators import OllamaTeacher
+            from dataset_preparer.thinking_engine import ThinkingEngine
             from dataset_preparer.aiml.thinking import AIMLThinkingGenerator
             from dataset_preparer.csv.thinking import CSVThinkingGenerator
             from dataset_preparer.pdf.thinking import PDFThinkingGenerator
@@ -1689,23 +1689,34 @@ class DataPreparer:
             logger.warning(f"  ⚠ Thinking generator modules not found: {e}")
             return
 
-        thinking_model = getattr(self.args, 'thinking_model', 'qwen2.5:1.5b')
+        # Initialize ThinkingEngine (always available, no external dependency)
         thinking_depth = getattr(self.args, 'thinking_depth', 'adaptive')
-        teacher = OllamaTeacher(model=thinking_model)
+        engine = ThinkingEngine(depth=thinking_depth)
+        logger.info(f"  ✓ ThinkingEngine initialized (depth={thinking_depth})")
 
-        if not teacher.is_model_available():
-            logger.warning(f"  ⚠ Model '{thinking_model}' not available in Ollama")
-            logger.warning(f"  ⚠ Install Ollama and pull model: ollama pull {thinking_model}")
-            logger.warning(f"  ⚠ Falling back to rule-based thinking only")
-            teacher = None
+        # Optionally try Ollama teacher for enhanced thinking
+        teacher = None
+        use_ollama = getattr(self.args, 'thinking_ollama', False)
+        if use_ollama:
+            try:
+                from dataset_preparer.thinking_generators import OllamaTeacher
+                thinking_model = getattr(self.args, 'thinking_model', 'qwen2.5:1.5b')
+                teacher = OllamaTeacher(model=thinking_model)
+                if not teacher.is_model_available():
+                    logger.info(f"  ℹ Ollama not available, using ThinkingEngine only")
+                    teacher = None
+                else:
+                    logger.info(f"  ✓ Ollama teacher available for enhanced thinking")
+            except Exception:
+                pass
 
         generators = {
-            'aiml': AIMLThinkingGenerator(teacher, depth=thinking_depth),
-            'csv': CSVThinkingGenerator(teacher, depth=thinking_depth),
-            'pdf': PDFThinkingGenerator(teacher, depth=thinking_depth),
-            'epub': EPUBThinkingGenerator(teacher, depth=thinking_depth),
-            'web': WebThinkingGenerator(teacher, depth=thinking_depth),
-            'hf': HFThinkingGenerator(teacher, depth=thinking_depth),
+            'aiml': AIMLThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'csv': CSVThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'pdf': PDFThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'epub': EPUBThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'web': WebThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'hf': HFThinkingGenerator(engine, teacher, depth=thinking_depth),
         }
 
         source_datasets = {

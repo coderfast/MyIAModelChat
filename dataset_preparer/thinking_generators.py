@@ -1,6 +1,7 @@
 """
 Base thinking generator and Ollama teacher model integration.
 Each source has its own generator that produces real chain-of-thought reasoning.
+Now includes ThinkingEngine for NLP-based analysis without external LLM dependency.
 """
 import re
 import json
@@ -83,7 +84,10 @@ class OllamaTeacher:
 
 
 class ThinkingGenerator:
-    """Base class for source-specific thinking generators."""
+    """
+    Base class for source-specific thinking generators.
+    Now supports ThinkingEngine for NLP-based analysis.
+    """
 
     DEPTH_CONFIG = {
         'basic': {'max_tokens': 80, 'min_sentences': 1, 'max_sentences': 2},

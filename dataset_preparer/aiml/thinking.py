@@ -1,14 +1,15 @@
 """
-AIML thinking generator: hybrid rule-based + teacher model.
-Simple patterns use rules, complex patterns use Ollama teacher.
+AIML thinking generator: NLP-based analysis for chatbot pattern-template pairs.
+Uses ThinkingEngine for real reasoning instead of rule-based meta-commentary.
 """
 import re
 from typing import Dict, Any, Optional
 from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
+from dataset_preparer.thinking_engine import ThinkingEngine
 
 
 class AIMLThinkingGenerator(ThinkingGenerator):
-    """Generate thinking for AIML pattern-template pairs."""
+    """Generate thinking for AIML pattern-template pairs using NLP analysis."""
 
     SIMPLE_CATEGORIES = {
         'greeting': ['hello', 'hi', 'hey', 'hola', 'buenos dias', 'buenas', 'saludos'],
@@ -22,8 +23,11 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         'help': ['help', 'ayuda', 'necesito', 'puedes ayudar'],
     }
 
-    def __init__(self, teacher: Optional[OllamaTeacher] = None, depth: str = 'adaptive'):
+    def __init__(self, engine: Optional[ThinkingEngine] = None,
+                 teacher: Optional[OllamaTeacher] = None,
+                 depth: str = 'adaptive'):
         super().__init__(teacher, depth)
+        self.engine = engine or ThinkingEngine(depth=depth)
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         pattern = sample.get('input', '').lower().strip()
@@ -32,70 +36,45 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         if not pattern or not template:
             return self._format_thinking_sample(sample, '')
 
+        # Detect category for context
+        detected_category = None
         for category, keywords in self.SIMPLE_CATEGORIES.items():
             if any(kw in pattern for kw in keywords):
-                thinking = self._rule_based_thinking(category, pattern, template)
+                detected_category = category
+                break
+
+        # Try ThinkingEngine first (always available)
+        if self.engine:
+            thinking = self._engine_thinking(pattern, template, detected_category)
+            if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
+        # Try Ollama teacher if available
         if self.teacher and self.teacher.is_available():
             thinking = self._teacher_thinking(pattern, template)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 
-        thinking = self._fallback_thinking(pattern, template)
+        # Fallback: category-based thinking
+        thinking = self._category_thinking(pattern, template, detected_category)
         return self._format_thinking_sample(sample, thinking)
 
-    def _rule_based_thinking(self, category: str, pattern: str, template: str) -> str:
-        rules = {
-            'greeting': (
-                f"El usuario se dirige a mí con un saludo '{pattern}'. "
-                f"Esto indica que quiere iniciar una conversación. "
-                f"Debo responder de forma amigable y ofrecer mi ayuda."
-            ),
-            'farewell': (
-                f"El usuario se despide con '{pattern}'. "
-                f"Esto indica que la conversación está terminando. "
-                f"Debo despedirme de forma amable y dejar la puerta abierta."
-            ),
-            'identity': (
-                f"El usuario pregunta sobre mi identidad o nombre con '{pattern}'. "
-                f"Quiere saber quién soy. "
-                f"Debo presentarme de forma clara y amigable."
-            ),
-            'thanks': (
-                f"El usuario expresa agradecimiento con '{pattern}'. "
-                f"Alguien agradece algo que hice. "
-                f"Debo aceptar las gracias de forma amable."
-            ),
-            'yes': (
-                f"El usuario da una respuesta afirmativa con '{pattern}'. "
-                f"Esto indica conformidad o acuerdo. "
-                f"Debo confirmar la información positivamente."
-            ),
-            'no': (
-                f"El usuario da una respuesta negativa con '{pattern}'. "
-                f"Esto indica desacuerdo o rechazo. "
-                f"Debo aceptar la respuesta sin insistir."
-            ),
-            'weather': (
-                f"El usuario pregunta sobre el clima con '{pattern}'. "
-                f"Quiere información meteorológica. "
-                f"Debo proporcionar datos generales del clima."
-            ),
-            'time': (
-                f"El usuario pregunta la hora con '{pattern}'. "
-                f"Necesita saber la hora actual. "
-                f"Debo indicar que no tengo acceso al reloj en tiempo real."
-            ),
-            'help': (
-                f"El usuario necesita ayuda con '{pattern}'. "
-                f"Está solicitando asistencia. "
-                f"Debo ofrecer ayuda de forma proactiva y clara."
-            ),
-        }
-        return rules.get(category, f"Procesando solicitud del usuario sobre {category}.")
+    def _engine_thinking(self, pattern: str, template: str, category: Optional[str]) -> Optional[str]:
+        """Generate thinking using ThinkingEngine NLP analysis."""
+        try:
+            text = f"{pattern} {template}"
+            context = {
+                'question': pattern,
+                'answer': template,
+                'category': category,
+                'type': 'chatbot_pair'
+            }
+            return self.engine.generate_thinking(text, context)
+        except Exception:
+            return None
 
     def _teacher_thinking(self, pattern: str, template: str) -> Optional[str]:
+        """Generate thinking using Ollama teacher model."""
         max_tokens = self.depth_config['max_tokens']
         prompt = (
             f"Analiza esta pregunta de chatbot y genera un razonamiento paso a paso.\n"
@@ -105,23 +84,69 @@ class AIMLThinkingGenerator(ThinkingGenerator):
         )
         return self.teacher.generate(prompt, max_tokens=max_tokens)
 
-    def _fallback_thinking(self, pattern: str, template: str) -> str:
-        words = pattern.split()
-        if len(words) <= 2:
+    def _category_thinking(self, pattern: str, template: str, category: Optional[str]) -> str:
+        """Generate thinking based on detected category."""
+        if category == 'greeting':
             return (
-                f"El usuario hace una consulta breve: '{pattern}'. "
-                f"Esto indica que busca información específica. "
-                f"Debo responder de forma directa y clara."
+                f"El usuario inicia la conversación con un saludo. "
+                f"La intención detectada es establecer contacto. "
+                f"La respuesta apropiada debe ser amigable y ofrecer ayuda."
             )
-        elif '?' in pattern:
+        elif category == 'farewell':
             return (
-                f"El usuario hace una pregunta: '{pattern}'. "
-                f"Esto indica que necesita información. "
-                f"Debo proporcionar una respuesta informativa basada en el contexto."
+                f"El usuario se despide, indicando el fin de la conversación. "
+                f"La respuesta debe despedirse de forma amable y dejar la puerta abierta."
+            )
+        elif category == 'identity':
+            return (
+                f"El usuario pregunta sobre la identidad del asistente. "
+                f"La respuesta debe presentar al bot de forma clara y amigable."
+            )
+        elif category == 'thanks':
+            return (
+                f"El usuario expresa agradecimiento. "
+                f"La respuesta debe aceptar las gracias de forma amable."
+            )
+        elif category == 'yes':
+            return (
+                f"El usuario confirma o acepta algo. "
+                f"La respuesta debe continuar positivamente."
+            )
+        elif category == 'no':
+            return (
+                f"El usuario niega o rechaza algo. "
+                f"La respuesta debe aceptar sin insistir."
+            )
+        elif category == 'weather':
+            return (
+                f"El usuario solicita información meteorológica. "
+                f"La respuesta debe proporcionar datos del clima."
+            )
+        elif category == 'time':
+            return (
+                f"El usuario pregunta la hora. "
+                f"La respuesta debe indicar la hora actual o la incapacidad de proporcionarla."
+            )
+        elif category == 'help':
+            return (
+                f"El usuario necesita asistencia. "
+                f"La respuesta debe ofrecer ayuda de forma proactiva y clara."
             )
         else:
-            return (
-                f"El usuario envía un mensaje: '{pattern}'. "
-                f"Esto indica una solicitud o comentario. "
-                f"Debo procesar la solicitud y responder de forma apropiada."
-            )
+            # Generic thinking for unknown patterns
+            words = pattern.split()
+            if len(words) <= 2:
+                return (
+                    f"El usuario hace una consulta breve. "
+                    f"La respuesta debe ser directa y clara."
+                )
+            elif '?' in pattern:
+                return (
+                    f"El usuario formula una pregunta. "
+                    f"La respuesta debe proporcionar información relevante."
+                )
+            else:
+                return (
+                    f"El usuario envía un mensaje. "
+                    f"La respuesta debe procesar la solicitud de forma apropiada."
+                )
