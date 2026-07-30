@@ -849,6 +849,7 @@ class DataPreparer:
     def _load_aiml_data(self) -> Dataset:
         """
         Load AIML files from datasets_source/aiml directory.
+        Uses the parser to process AIML files directly (ignores cached .datasets files).
 
         Returns:
             Hugging Face Dataset with AIML data
@@ -860,77 +861,20 @@ class DataPreparer:
         
         logger.info(f"  Loading AIML files from: {data_dir}")
         
-        # Load AIML files
+        # Use the parser to process AIML files directly
         try:
             aiml_loader = AIMLLoader(data_dir)
-            logger.info(f"  ✓ AIML loader initialized")
+            dataset = aiml_loader.load_aiml_files()
+            
+            if dataset is not None and len(dataset) > 0:
+                logger.info(f"  ✓ Loaded {len(dataset)} AIML samples from parser")
+                return dataset
+            else:
+                logger.warning(f"  ⚠ No samples extracted from AIML files")
+                return Dataset.from_list([])
+                
         except Exception as e:
-            logger.warning(f"  ⚠ Error initializing AIML loader: {e}")
-            return Dataset.from_list([])
-        
-        # Load .datasets files
-        aiml_datasets = []
-        datasets_count = 0
-        
-        for filename in os.listdir(data_dir):
-            if filename.endswith('.datasets'):
-                file_path = os.path.join(data_dir, filename)
-                try:
-                    tokenized_data = self._safe_load_dataset_pickle(file_path)
-
-                    # AIML dataset pickles are usually HuggingFace Datasets with input/output fields.
-                    if isinstance(tokenized_data, Dataset):
-                        ds = tokenized_data
-
-                        if 'input' in ds.column_names and 'output' in ds.column_names:
-                            ds = ds.map(
-                                lambda x: {
-                                    'input_ids': (x['input'] + ' ' + x['output']).strip()
-                                    if x.get('output') else x['input']
-                                },
-                                batched=False
-                            )
-                        elif 'input_ids' in ds.column_names:
-                            # Already normalized
-                            ds = ds
-                        else:
-                            # Fallback, try to concatenate any available text fields
-                            text_fields = [c for c in ds.column_names if c in ('input', 'text', 'sentence')]
-                            if text_fields:
-                                ds = ds.map(
-                                    lambda x: {'input_ids': ' '.join(str(x[c]) for c in text_fields if x.get(c))},
-                                    batched=False
-                                )
-                            else:
-                                raise ValueError("AIML dataset missing both 'input'/'output' and 'input_ids' fields")
-
-                        if 'input_ids' in ds.column_names:
-                            ds = ds.select_columns(['input_ids'])
-
-                        aiml_datasets.append(ds)
-                        datasets_count += len(ds)
-                        logger.info(f"  ✓ Loaded: {filename} ({len(ds)} samples)")
-
-                    elif isinstance(tokenized_data, list):
-                        # Fallback: tokenized_data is list of sequences
-                        data = [{'input_ids': ' '.join(map(str, token_ids))} for token_ids in tokenized_data]
-                        aiml_datasets.append(Dataset.from_list(data))
-                        datasets_count += len(data)
-                        logger.info(f"  ✓ Loaded: {filename} ({len(data)} samples)")
-
-                    else:
-                        raise ValueError("Unexpected AIML .datasets content type: %s" % type(tokenized_data))
-
-                except Exception as e:
-                    logger.warning(f"  ⚠ Error loading {filename}: {e}")
-        
-        if aiml_datasets:
-            combined = concatenate_datasets(aiml_datasets)
-            logger.info(f"  Total AIML files processed: {datasets_count}")
-            logger.info(f"  Total AIML samples: {len(combined)}")
-            return combined
-        else:
-            logger.warning(f"  ⚠ No .datasets files found in {data_dir}/")
+            logger.warning(f"  ⚠ Error loading AIML files: {e}")
             return Dataset.from_list([])
     
     def _load_hf_data(self) -> Dataset:
