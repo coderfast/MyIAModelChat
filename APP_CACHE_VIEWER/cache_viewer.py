@@ -101,7 +101,7 @@ class ContinuousLoaderWorker(QThread):
     error_occurred = pyqtSignal(str)
     loading_finished = pyqtSignal()
     
-    def __init__(self, indices: List[int], dataset, block_size: int):
+    def __init__(self, indices: List[int], dataset, block_size: int, token_lengths: List[int] = None):
         super().__init__()
         self.indices = indices
         self.dataset = dataset
@@ -109,6 +109,7 @@ class ContinuousLoaderWorker(QThread):
         self._is_cancelled = False
         self._current_offset = 0
         self._lock = False
+        self._token_lengths = token_lengths or []
     
     def cancel(self):
         self._is_cancelled = True
@@ -136,13 +137,15 @@ class ContinuousLoaderWorker(QThread):
                     idx = self.indices[i]
                     row = self.dataset[idx]
                     text = row.get('input_ids', row.get('bpe_text', ''))
-                    token_ids = row.get('token_ids', [])
                     source = row.get('source', 'Unknown')
+                    
+                    # Use pre-computed token length
+                    token_count = self._token_lengths[idx] if idx < len(self._token_lengths) else 0
                     
                     items.append({
                         'index': idx,
                         'text': text,
-                        'token_count': len(token_ids),
+                        'token_count': token_count,
                         'source': source
                     })
                 
@@ -617,7 +620,7 @@ class CacheViewer(QMainWindow):
             # Don't cancel if it's already loading from same offset
             return
         
-        self.worker = ContinuousLoaderWorker(indices, self.dataset, BLOCK_SIZE)
+        self.worker = ContinuousLoaderWorker(indices, self.dataset, BLOCK_SIZE, getattr(self, '_token_lengths', None))
         self.worker.block_ready.connect(self._on_block_ready)
         self.worker.error_occurred.connect(self._on_block_error)
         self.worker.loading_finished.connect(self._on_loading_finished)
@@ -851,6 +854,14 @@ class CacheViewer(QMainWindow):
         try:
             self.dataset = Dataset.load_from_disk(self.cache_dataset_file)
             total = len(self.dataset)
+            
+            # Pre-compute token counts (avoid loading token_ids per row)
+            has_tokens = 'token_ids' in self.dataset.column_names
+            if has_tokens:
+                all_token_ids = self.dataset['token_ids']
+                self._token_lengths = [len(t) for t in all_token_ids]
+            else:
+                self._token_lengths = [0] * total
             
             # Build source indices
             self.source_indices.clear()
