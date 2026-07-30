@@ -859,12 +859,13 @@ class CacheViewer(QMainWindow):
             has_source_column = 'source' in self.dataset.column_names
             
             if has_source_column:
-                sources_set = set()
-                for idx in range(total):
-                    source = self.dataset[idx].get('source', 'Unknown')
-                    sources_set.add(source)
-                    if source not in self.source_indices:
-                        self.source_indices[source] = []
+                # Fast column access instead of row-by-row
+                all_sources = self.dataset['source']
+                
+                sources_set = set(all_sources)
+                self.source_indices = {s: [] for s in sources_set}
+                
+                for idx, source in enumerate(all_sources):
                     self.source_indices[source].append(idx)
                 
                 # Populate source combo
