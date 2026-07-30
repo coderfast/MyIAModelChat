@@ -42,8 +42,9 @@ MyIAModelChat/
 │   ├── generate_thinking_data.py        # Thinking data generation
 │   ├── aiml/
 │   │   ├── __init__.py
-│   │   ├── loader.py                    # AIML file processing
-│   │   └── thinking.py                  # AIML thinking
+│   │   ├── parser.py                      # AIML Parser (resolve elements, wildcards, quality)
+│   │   ├── loader.py                      # AIML file processing
+│   │   └── thinking.py                    # AIML thinking
 │   ├── pdf/
 │   │   ├── __init__.py
 │   │   └── thinking.py                  # PDF thinking
@@ -105,7 +106,8 @@ MyIAModelChat/
 | commons/registry/model_merge.py | Model merging by weight averaging |
 | commons/registry/model_export.py | Export to GGUF, ONNX |
 | dataset_preparer/data_preparer.py | Multi-source data loading |
-| dataset_preparer/aiml/loader.py | AIML file parsing |
+| dataset_preparer/aiml/parser.py | AIML Parser (resolve elements, wildcards, quality) |
+| dataset_preparer/aiml/loader.py | AIML file processing |
 | 	raining/trainer.py | Training pipeline with checkpointing |
 | inference/chat_engine.py | Chat interface and inference |
 
@@ -293,6 +295,9 @@ open → in_progress → done
 - Dataclass-based configuration (TrainingConfig, ChatConfig)
 - Removed CLI dependency from training/inference modules
 - Improved code organization for better maintainability
+- AIML 2.0 Smart Parser: resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
+- Contamination Filtering Pipeline: 6 phases (noise, quality, dedup, balance, leakage, language)
+- Source Validators: improved detection of URLs, emails, phone numbers, code, boilerplate
 
 ---
 

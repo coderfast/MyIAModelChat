@@ -19,13 +19,14 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **Model Library**: Train, combine, and export multiple independent models
 
 ### Data Sources & Processing
-- **AIML Pattern Matching**: Traditional rule-based responses from AIML files
+- **AIML 2.0 Smart Parser**: Resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
 - **PDF Text Extraction**: Automatic content extraction from PDF documents
 - **EPUB E-Book Support**: Full e-book parsing and integration
 - **Hugging Face Datasets**: Integration with pre-trained datasets
 - **Web Scraping**: Documentation crawling with trafilatura + BeautifulSoup
 - **CSV Datasets**: Curated QA pairs from CSV files
 - **Dataset Caching**: 12x faster training with intelligent caching system
+- **Contamination Filtering**: 6-phase pipeline (noise, quality, dedup, balance, leakage, language)
 
 ### Advanced Text Processing
 - **Professional Sentence Tokenization**: spaCy-based sentence splitting (replaces naive `split('.')`)
@@ -100,8 +101,16 @@ MyIAModelChat/
 │   ├── generate_thinking_data.py        # Thinking data generation
 │   ├── aiml/
 │   │   ├── __init__.py
-│   │   ├── loader.py                    # AIML file processing
-│   │   └── thinking.py                  # AIML thinking
+│   │   ├── parser.py                      # AIML Parser (resolve elements, wildcards, quality)
+│   │   ├── loader.py                      # AIML file processing
+│   │   └── thinking.py                    # AIML thinking
+│   ├── contamination/                     # Contamination filtering pipeline
+│   │   ├── __init__.py
+│   │   ├── filters.py                     # Noise + Quality filters
+│   │   ├── dedup.py                       # Cross-source deduplication
+│   │   ├── balance.py                     # Source balance control
+│   │   ├── leakage.py                     # Train/test leakage detection
+│   │   └── audit.py                       # Audit reporting
 │   ├── pdf/
 │   │   ├── __init__.py
 │   │   └── thinking.py                  # PDF thinking

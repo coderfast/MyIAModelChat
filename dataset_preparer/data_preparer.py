@@ -47,6 +47,17 @@ except ImportError:
     load_urls_from_file = None
     WEB_SCRAPER_DIR = os.path.join('datasets_source', 'web')
 
+# Contamination filtering module
+try:
+    from dataset_preparer.contamination.filters import NoiseFilter, QualityFilter, apply_noise_filter, apply_quality_filter
+    from dataset_preparer.contamination.dedup import CrossSourceDeduplicator, deduplicate_texts as cross_deduplicate
+    from dataset_preparer.contamination.balance import SourceBalancer, balance_sources
+    from dataset_preparer.contamination.leakage import LeakageDetector, detect_leakage
+    from dataset_preparer.contamination.audit import AuditReporter, SourceReport
+    CONTAMINATION_AVAILABLE = True
+except ImportError:
+    CONTAMINATION_AVAILABLE = False
+
 # NLP libraries for text processing
 try:
     import spacy
@@ -462,11 +473,7 @@ def filter_by_language(texts: List[str], allowed_languages: List[str]) -> List[s
 
     return filtered
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Setup logging (configured by main.py)
 logger = logging.getLogger(__name__)
 
 # Cache configuration
@@ -550,7 +557,7 @@ class DataPreparer:
             if not self._cache_exists():
                 return None
             
-            logger.info("\n💾 Loading cached dataset...")
+            logger.info("💾 Loading cached dataset...")
             
             # Load dataset
             self.combined_data = Dataset.load_from_disk(CACHE_DATASET_FILE)
@@ -561,7 +568,7 @@ class DataPreparer:
                 self.statistics = pickle.load(f)
             logger.info(f"  ✓ Loaded cached statistics")
             
-            logger.info("\n✅ DATASET LOADED FROM CACHE")
+            logger.info("✅ DATASET LOADED FROM CACHE")
             return self.combined_data, self.statistics
             
         except Exception as e:
@@ -575,7 +582,7 @@ class DataPreparer:
             if self.combined_data is None:
                 return
             
-            logger.info("\n💾 Saving dataset to cache...")
+            logger.info("💾 Saving dataset to cache...")
             
             # Save dataset
             self.combined_data.save_to_disk(CACHE_DATASET_FILE)
@@ -613,9 +620,7 @@ class DataPreparer:
         Returns:
             Dictionary with preparation status and statistics
         """
-        logger.info("=" * 80)
-        logger.info("DATASET PREPARATION STARTING")
-        logger.info("=" * 80)
+        logger.info("=" * 80 + " DATASET PREPARATION STARTING " + "=" * 80)
 
         if self.max_ram_bytes is not None and psutil is not None:
             used = psutil.virtual_memory().used
@@ -628,7 +633,7 @@ class DataPreparer:
         try:
             # Check for refresh cache flag
             if hasattr(self.args, 'refresh_cache') and self.args.refresh_cache:
-                logger.info("\n🔄 Refreshing cache (clearing old cache)...")
+                logger.info("🔄 Refreshing cache (clearing old cache)...")
                 self._clear_cache()
             
             # Check for use cache flag
@@ -637,8 +642,8 @@ class DataPreparer:
                 if result:
                     self.combined_data, self.statistics = result
                     self._display_summary()
-                    logger.info("\n" + "=" * 80)
-                    logger.info("✅ DATASET READY (from cache)")
+                    logger.info("=" * 80)
+                    logger.info("[OK] DATASET READY (from cache)")
                     logger.info("=" * 80)
                     return {
                         'status': 'success',
@@ -648,7 +653,7 @@ class DataPreparer:
                     }
             
             # Prepare fresh dataset
-            logger.info("\n[1/7] Loading AIML data..." if (self.args.aiml or self.args.hf) else "\n[1/7] No data sources selected...")
+            logger.info("[1/7] Loading AIML data..." if (self.args.aiml or self.args.hf) else "[1/7] No data sources selected...")
             
             # Load AIML data
             if self.args.aiml:
@@ -656,44 +661,76 @@ class DataPreparer:
             
             # Load Hugging Face data
             if self.args.hf:
-                logger.info("\n[2/7] Loading Hugging Face datasets...")
+                logger.info("[2/7] Loading Hugging Face datasets...")
                 self.hf_data = self._load_hf_data()
             
             # Load PDF data
             if hasattr(self.args, 'pdf') and self.args.pdf:
-                logger.info("\n[3/7] Loading PDF files...")
+                logger.info("[3/7] Loading PDF files...")
                 self.pdf_data = self._load_pdf_data()
             
             # Load EPUB data
             if hasattr(self.args, 'epub') and self.args.epub:
-                logger.info("\n[4/7] Loading EPUB files...")
+                logger.info("[4/7] Loading EPUB files...")
                 self.epub_data = self._load_epub_data()
 
             # Load Web documentation data
             if hasattr(self.args, 'web') and self.args.web:
-                logger.info("\n[4.5/7] Scraping web documentation...")
+                logger.info("[4.5/7] Scraping web documentation...")
                 self.web_data = self._load_web_data()
 
             # Load CSV data (curated supplementary dataset)
             if hasattr(self.args, 'csv') and self.args.csv:
-                logger.info("\n[5/7] Loading CSV data...")
+                logger.info("[5/7] Loading CSV data...")
                 self.csv_data = self._load_csv()
 
             # Combine datasets
-            logger.info("\n[6/7] Combining datasets...")
+            logger.info("[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
+
+            # Initialize audit reporter if enabled
+            audit = None
+            if CONTAMINATION_AVAILABLE and getattr(self.args, 'audit_report', False):
+                audit_dir = getattr(self.args, 'audit_dir', None)
+                audit = AuditReporter(report_dir=audit_dir, enabled=True)
+                audit.start_timer()
+                logger.info("  Audit reporting enabled")
 
             # Validate and clean sources (ANTES de thinking)
             validate_sources = getattr(self.args, 'validate_sources', False)
             if validate_sources:
-                logger.info("\n[6.4/7] Validating and cleaning sources...")
+                logger.info("[6.4/7] Validating and cleaning sources...")
                 self._validate_and_clean_sources()
 
-            # Generate thinking data for each source (DESPUÉS de validación)
+            # Apply noise filter (NEW)
+            filter_noise = getattr(self.args, 'filter_noise', False)
+            if filter_noise:
+                logger.info("[6.42/7] Applying noise filter...")
+                self._apply_noise_filter(audit=audit)
+
+            # Apply extended quality filter (NEW)
+            filter_quality = getattr(self.args, 'filter_contamination', False)
+            if filter_quality:
+                logger.info("[6.43/7] Applying quality filter...")
+                self._apply_quality_filter_contamination(audit=audit)
+
+            # Apply cross-source deduplication (NEW)
+            filter_dedup = getattr(self.args, 'filter_dedup', False)
+            if filter_dedup:
+                logger.info("[6.44/7] Applying cross-source deduplication...")
+                self._apply_cross_source_dedup(audit=audit)
+
+            # Apply balance control (NEW)
+            filter_balance = getattr(self.args, 'filter_balance', False)
+            if filter_balance:
+                logger.info("[6.45/7] Applying balance control...")
+                self._apply_balance_control(audit=audit)
+
+            # Generate thinking data for each source (DESPUES de validacion)
             generate_thinking = getattr(self.args, 'generate_thinking', False)
             if generate_thinking:
-                logger.info("\n[6.5/7] Generating real thinking data...")
+                logger.info("[6.5/7] Generating real thinking data...")
                 self._generate_thinking_for_sources()
                 # Recombine after thinking generation
 
@@ -701,24 +738,43 @@ class DataPreparer:
             # Apply deduplication if enabled
             enable_dedup = getattr(self.args, 'enable_dedup', False)
             if enable_dedup:
-                logger.info("\n[6.6/7] Applying deduplication...")
+                logger.info("[6.6/7] Applying deduplication...")
                 self._apply_deduplication()
 
             # Apply quality filtering if enabled
             enable_quality = getattr(self.args, 'enable_quality_filter', False)
             if enable_quality:
-                logger.info("\n[6.7/7] Applying quality filtering...")
+                logger.info("[6.7/7] Applying quality filtering...")
                 self._apply_quality_filter()
 
             # Apply language filtering if enabled
             enable_lang_filter = getattr(self.args, 'enable_lang_filter', False)
             if enable_lang_filter:
-                logger.info("\n[6.7/7] Applying language filtering...")
+                logger.info("[6.7/7] Applying language filtering...")
                 self._apply_language_filter()
 
+            # Apply leakage detection (NEW)
+            filter_leakage = getattr(self.args, 'filter_leakage', False)
+            if filter_leakage:
+                logger.info("[6.72/7] Applying leakage detection...")
+                self._apply_leakage_detection(audit=audit)
+
             # Collect statistics
-            logger.info("\nGathering statistics...")
+            logger.info("Gathering statistics...")
             self.statistics = self._collect_statistics()
+
+            # Save audit report if enabled
+            if audit is not None:
+                total_original = sum(
+                    audit.report.per_source.get(s, SourceReport()).original_count
+                    for s in audit.report.per_source
+                )
+                audit.set_final(
+                    count=len(self.combined_data) if self.combined_data else 0,
+                    discarded=total_original - (len(self.combined_data) if self.combined_data else 0)
+                )
+                audit.save()
+                audit.print_summary()
 
             # Always train BPE tokenizer and tokenize data before caching
             bpe_vocab_size = getattr(self.args, 'bpe_vocab_size', 8000)
@@ -733,8 +789,8 @@ class DataPreparer:
             # Display summary
             self._display_summary()
             
-            logger.info("\n" + "=" * 80)
-            logger.info("✅ DATASET PREPARATION COMPLETED SUCCESSFULLY")
+            logger.info("=" * 80)
+            logger.info("[OK] DATASET PREPARATION COMPLETED SUCCESSFULLY")
             logger.info("=" * 80)
             
             return {
@@ -745,7 +801,7 @@ class DataPreparer:
             }
             
         except Exception as e:
-            logger.error(f"\n❌ Dataset preparation failed: {e}")
+            logger.error(f"Dataset preparation failed: {e}")
             logger.error("=" * 80)
             return {
                 'status': 'failed',
@@ -870,7 +926,7 @@ class DataPreparer:
         
         if aiml_datasets:
             combined = concatenate_datasets(aiml_datasets)
-            logger.info(f"\n  Total AIML files processed: {datasets_count}")
+            logger.info(f"  Total AIML files processed: {datasets_count}")
             logger.info(f"  Total AIML samples: {len(combined)}")
             return combined
         else:
@@ -926,7 +982,7 @@ class DataPreparer:
         
         if hf_datasets:
             combined = concatenate_datasets(hf_datasets)
-            logger.info(f"\nTotal HuggingFace datasets loaded: {len(hf_datasets)}")
+            logger.info(f"Total HuggingFace datasets loaded: {len(hf_datasets)}")
             logger.info(f"Total HuggingFace samples: {len(combined)}")
             return combined
         else:
@@ -1010,7 +1066,7 @@ class DataPreparer:
 
             if csv_items:
                 ds = Dataset.from_list(csv_items)
-                logger.info(f"\nTotal CSV files processed: {csv_count}")
+                logger.info(f"Total CSV files processed: {csv_count}")
                 logger.info(f"Total CSV samples: {len(csv_items)}")
                 return ds
             else:
@@ -1055,7 +1111,7 @@ class DataPreparer:
 
         all_texts = []
         for seed_url in urls_to_scrape:
-            logger.info(f"\n  Scraping: {seed_url}")
+            logger.info(f"  Scraping: {seed_url}")
             try:
                 texts = scrape_web_docs(
                     url=seed_url,
@@ -1096,7 +1152,7 @@ class DataPreparer:
                         web_items.append({'input_ids': sentence})
 
         dataset = Dataset.from_list(web_items)
-        logger.info(f"\n  Total web pages scraped: {len(all_texts)}")
+        logger.info(f"  Total web pages scraped: {len(all_texts)}")
         logger.info(f"  Total web samples: {len(dataset)}")
 
         # Save scraped text to output directory for inspection
@@ -1202,7 +1258,7 @@ class DataPreparer:
 
         if pdf_texts:
             dataset = Dataset.from_list(pdf_texts)
-            logger.info(f"\nTotal PDF files processed: {pdf_count}")
+            logger.info(f"Total PDF files processed: {pdf_count}")
             logger.info(f"Total PDF samples: {len(dataset)}")
             return dataset
         else:
@@ -1316,7 +1372,7 @@ class DataPreparer:
 
         if epub_texts:
             dataset = Dataset.from_list(epub_texts)
-            logger.info(f"\nTotal EPUB files processed: {epub_count}")
+            logger.info(f"Total EPUB files processed: {epub_count}")
             logger.info(f"Total EPUB samples: {len(dataset)}")
             return dataset
         else:
@@ -1333,7 +1389,7 @@ class DataPreparer:
             return
 
         # Ensure we have a textual field to train BPE on (avoid numeric token ids)
-        logger.info("\n[7/7] Preparing BPE tokenizer (SentencePiece)...")
+        logger.info("[7/7] Preparing BPE tokenizer (SentencePiece)...")
         
         # Check if dataset contains thinking tokens
         try:
@@ -1555,7 +1611,7 @@ class DataPreparer:
         else:
             combined = concatenate_datasets(datasets_to_combine)
         
-        logger.info(f"\n  ✓ Combined dataset total: {total_samples} samples")
+            logger.info(f"  Combined dataset total: {total_samples} samples")
         return combined
     
     def _standardize_combined_dataset(self):
@@ -1670,7 +1726,7 @@ class DataPreparer:
         from datasets import concatenate_datasets
         self.combined_data = concatenate_datasets(cleaned_datasets)
 
-        logger.info("\n--- Source Validation Reports ---")
+        logger.info("--- Source Validation Reports ---")
         for source_name, report in reports.items():
             logger.info(f"  {report.summary()}")
         logger.info(f"  Total: {original_count} -> {len(self.combined_data)} samples")
@@ -1784,7 +1840,7 @@ class DataPreparer:
             from datasets import concatenate_datasets
             self.combined_data = concatenate_datasets(thinking_datasets)
 
-        logger.info(f"\n  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
+            logger.info(f"  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
 
     def _apply_deduplication(self):
         """Apply deduplication to the combined dataset using MinHash LSH."""
@@ -1887,6 +1943,228 @@ class DataPreparer:
         except Exception as e:
             logger.warning(f"  ⚠ Language filtering failed: {e}. Continuing with original dataset.")
 
+    # ============================================================
+    # Contamination filtering pipeline methods
+    # ============================================================
+
+    def _apply_noise_filter(self, audit=None):
+        """Apply noise filter to remove URLs, emails, code, boilerplate, etc."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        if not CONTAMINATION_AVAILABLE:
+            logger.warning("  Contamination module not available, skipping noise filter")
+            return
+
+        original_count = len(self.combined_data)
+        categories = getattr(self.args, 'noise_categories', None)
+        if categories and isinstance(categories, str):
+            categories = [c.strip() for c in categories.split(',')]
+
+        texts = [item.get('input_ids', '') for item in self.combined_data]
+        sources = [item.get('source', 'unknown') for item in self.combined_data]
+
+        nf = NoiseFilter(categories=categories)
+        result = nf.filter_batch(texts)
+
+        if result.discarded:
+            kept_data = []
+            for i, text in enumerate(result.kept):
+                if i < len(sources):
+                    kept_data.append({'input_ids': text, 'source': sources[i]})
+                else:
+                    kept_data.append({'input_ids': text})
+            self.combined_data = Dataset.from_list(kept_data)
+        else:
+            kept_data = [{'input_ids': t, 'source': s} for t, s in zip(result.kept, sources)]
+            self.combined_data = Dataset.from_list(kept_data)
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Noise filter: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        for reason, count in result.stats.items():
+            logger.info(f"    {reason}: {count}")
+
+        if audit:
+            audit.set_filter('noise')
+            per_source_discarded = {}
+            for d in result.discarded:
+                reason = d.get('reason', 'unknown')
+                per_source_discarded[reason] = per_source_discarded.get(reason, 0) + 1
+            for source_name in set(sources):
+                source_discards = {r: c for r, c in per_source_discarded.items()}
+                audit.update_source(source_name, after_noise=original_count - removed, discarded=source_discards)
+
+    def _apply_quality_filter_contamination(self, audit=None):
+        """Apply extended quality filter using contamination module."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        if not CONTAMINATION_AVAILABLE:
+            logger.warning("  Contamination module not available, skipping quality filter")
+            return
+
+        original_count = len(self.combined_data)
+        texts = [item.get('input_ids', '') for item in self.combined_data]
+
+        qf = QualityFilter()
+        result = qf.filter_batch(texts)
+
+        kept_data = [{'input_ids': t} for t in result.kept]
+        self.combined_data = Dataset.from_list(kept_data)
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Quality filter: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        for reason, count in result.stats.items():
+            logger.info(f"    {reason}: {count}")
+
+        if audit:
+            audit.set_filter('quality')
+            for source_name in self._get_source_names():
+                audit.update_source(source_name, after_quality=len(self.combined_data))
+
+    def _apply_cross_source_dedup(self, audit=None):
+        """Apply cross-source deduplication."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        if not CONTAMINATION_AVAILABLE:
+            logger.warning("  Contamination module not available, skipping cross-source dedup")
+            return
+
+        original_count = len(self.combined_data)
+        dedup_mode = getattr(self.args, 'dedup_mode', 'all')
+        dedup_threshold = getattr(self.args, 'dedup_threshold', 0.8)
+
+        texts = [item.get('input_ids', '') for item in self.combined_data]
+        sources = [item.get('source', 'unknown') for item in self.combined_data]
+
+        dedup = CrossSourceDeduplicator(mode=dedup_mode, near_threshold=dedup_threshold)
+        result = dedup.deduplicate(texts, sources)
+
+        kept_data = []
+        for item in result.unique_with_source:
+            entry = {'input_ids': item['text']}
+            if 'source' in item:
+                entry['source'] = item['source']
+            kept_data.append(entry)
+
+        self.combined_data = Dataset.from_list(kept_data)
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Cross-source dedup: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        logger.info(f"    Exact: {result.exact_duplicates} | Near: {result.near_duplicates} | Cross-source: {result.cross_source_duplicates}")
+
+        if audit:
+            audit.set_filter('dedup')
+            audit.set_cross_source_duplicates(result.cross_source_duplicates)
+            for source_name in self._get_source_names():
+                audit.update_source(source_name, after_dedup=len(self.combined_data))
+
+    def _apply_balance_control(self, audit=None):
+        """Apply source balance control."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        if not CONTAMINATION_AVAILABLE:
+            logger.warning("  Contamination module not available, skipping balance control")
+            return
+
+        original_count = len(self.combined_data)
+        max_ratio = getattr(self.args, 'max_source_ratio', 0.3)
+
+        indices = list(range(len(self.combined_data)))
+        sources = [item.get('source', 'unknown') for item in self.combined_data]
+
+        balancer = SourceBalancer(max_ratio=max_ratio)
+        result = balancer.balance(indices, sources)
+
+        kept_data = []
+        for idx in result.kept_indices:
+            item = self.combined_data[idx]
+            kept_data.append({'input_ids': item.get('input_ids', ''), 'source': item.get('source', 'unknown')})
+
+        self.combined_data = Dataset.from_list(kept_data)
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Balance control: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        for source, ratio in sorted(result.ratios.items()):
+            logger.info(f"    {source}: {result.source_counts[source]} ({ratio:.1%})")
+
+        if audit:
+            audit.set_filter('balance')
+            audit.set_balance(result.ratios)
+            for source_name, count in result.source_counts.items():
+                audit.update_source(source_name, after_balance=count)
+
+    def _apply_leakage_detection(self, audit=None):
+        """Apply data leakage detection."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        if not CONTAMINATION_AVAILABLE:
+            logger.warning("  Contamination module not available, skipping leakage detection")
+            return
+
+        original_count = len(self.combined_data)
+        threshold = getattr(self.args, 'leakage_threshold', 0.5)
+
+        texts = [item.get('input_ids', '') for item in self.combined_data]
+
+        detector = LeakageDetector(overlap_threshold=threshold)
+        result = detector.detect(texts)
+
+        if result.flagged_indices:
+            flag_set = set(result.flagged_indices)
+            kept_data = [item for i, item in enumerate(self.combined_data) if i not in flag_set]
+            self.combined_data = Dataset.from_list(kept_data)
+        else:
+            kept_data = [item for item in self.combined_data]
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Leakage detection: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        logger.info(f"    Overlap pairs: {len(result.overlap_pairs)} | Repeated fragments: {len(result.repeated_fragments)}")
+
+        if audit:
+            audit.set_filter('leakage')
+            for source_name in self._get_source_names():
+                audit.update_source(source_name, after_leakage=len(self.combined_data))
+
+    def _apply_language_filter_contamination(self, audit=None):
+        """Apply language filter using contamination module."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        original_count = len(self.combined_data)
+        allowed_languages = getattr(self.args, 'allowed_languages', ['es', 'en'])
+
+        texts = [item.get('input_ids', '') for item in self.combined_data]
+        sources = [item.get('source', 'unknown') for item in self.combined_data]
+
+        filtered_texts = filter_by_language(texts, allowed_languages=allowed_languages)
+
+        kept_data = [{'input_ids': t, 'source': s} for t, s in zip(filtered_texts, sources) if t]
+        self.combined_data = Dataset.from_list(kept_data)
+
+        removed = original_count - len(self.combined_data)
+        logger.info(f"  Language filter: {original_count} -> {len(self.combined_data)} ({removed} removed)")
+        logger.info(f"    Allowed: {allowed_languages}")
+
+        if audit:
+            audit.set_filter('language')
+            for source_name in self._get_source_names():
+                audit.update_source(source_name, after_language=len(self.combined_data))
+
+    def _get_source_names(self) -> set:
+        """Get unique source names from combined dataset."""
+        if self.combined_data is None:
+            return set()
+        sources = set()
+        for item in self.combined_data:
+            s = item.get('source', 'unknown')
+            if s:
+                sources.add(s)
+        return sources
+
     def _collect_statistics(self) -> Dict:
         """
         Collect statistics about prepared datasets.
@@ -1962,23 +2240,25 @@ class DataPreparer:
     
     def _display_summary(self):
         """Display preparation summary and statistics."""
-        logger.info("\n" + "=" * 80)
+        logger.info("=" * 80)
         logger.info("DATASET PREPARATION SUMMARY")
         logger.info("=" * 80)
         
         stats = self.statistics
         
-        logger.info(f"\n📊 Data Sources:")
+        logger.info("")
+        logger.info("Data Sources:")
         for source, count in stats.get('source_breakdown', {}).items():
             logger.info(f"   {source:20} {count:>10,} samples")
         
-        logger.info(f"\n📈 Combined Statistics:")
+        logger.info("")
+        logger.info("Combined Statistics:")
         logger.info(f"   Total Samples:       {stats.get('total_samples', 0):>10,}")
         logger.info(f"   Average Text Length: {stats.get('avg_text_length', 0):>10.1f} words")
         logger.info(f"   Min Text Length:     {stats.get('min_text_length', 0):>10} words")
         logger.info(f"   Max Text Length:     {stats.get('max_text_length', 0):>10} words")
         
-        logger.info("\n" + "=" * 80)
+        logger.info("=" * 80)
 
 
 class DataValidator:
@@ -2049,7 +2329,7 @@ def prepare_datasets_for_training(args) -> Tuple[Dataset, Dict]:
         if not validation['valid']:
             logger.error("Dataset validation failed:")
             for error in validation['errors']:
-                logger.error(f"  ❌ {error}")
+                    logger.error(f"  {error}")
             return None, {}
         
         for warning in validation['warnings']:

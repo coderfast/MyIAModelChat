@@ -3,36 +3,16 @@
 ## AIML Files in This Project
 
 ### AIML Directory Structure
-The `datasets_source/aiml/` directory contains ~60 AIML files for dialogue patterns and the `dataset_preparer/aiml/loader.py` module loads these files.
+The `datasets_source/aiml/` directory contains AIML files for dialogue patterns and the `dataset_preparer/aiml/parser.py` module processes these files.
 
 ### Major AIML Files
 
 **Core Dialogue**
-- `salutations.aiml`: Greeting patterns
-- `default.aiml`: Default responses
-- `that.aiml`: Context-aware responses based on what bot said
-- `continuation.aiml`: Conversation continuation patterns
-
-**Knowledge Categories**
-- `alice.aiml`: ALICE bot responses
-- `knowledge.aiml`: General knowledge responses
-- `science.aiml`: Science-related patterns
-- `history.aiml`: Historical information
-- `geography.aiml`: Geographic information
-- `movies.aiml`: Movie-related patterns
-- `music.aiml`: Music-related patterns
-- `sports.aiml`: Sports-related patterns
-- `food.aiml`: Food-related patterns
-
-**NLP Processing**
-- `reduction0.safe.aiml` - `reduction4.safe.aiml`: Pattern reduction and normalization
-- `reductions-update.aiml`: Updated reductions
-
-**Personality**
-- `bot_profile.aiml`: Bot personality definition
-- `client_profile.aiml`: Client profile handling
-- `personality.aiml`: Personality traits
-- `emotion.aiml`: Emotional responses
+- `bot.aiml`: Bot profile and identity (434KB)
+- `atomic.aiml`: Atomic dialogue patterns (407KB)
+- `ai.aiml`: AI-related patterns (42KB)
+- `alice.aiml`: ALICE bot responses (33KB)
+- `astrology.aiml`: Astrology patterns (2.4KB)
 
 ### AIML Pattern Format
 
@@ -44,7 +24,7 @@ Basic AIML pattern:
 </category>
 ```
 
-With wildcards:
+With wildcards (resolved by parser):
 ```xml
 <category>
     <pattern>MY NAME IS *</pattern>
@@ -52,21 +32,44 @@ With wildcards:
 </category>
 ```
 
-With context:
+With `<srai>` reduction:
+```xml
+<category>
+    <pattern>HI</pattern>
+    <srai>HELLO</srai>
+</category>
+```
+
+With `<random>` responses:
 ```xml
 <category>
     <pattern>HELLO</pattern>
-    <that>*</that>
-    <template>Hello back!</template>
+    <template>
+        <random>
+            <li>Hi there!</li>
+            <li>Hello!</li>
+            <li>Hey!</li>
+        </random>
+    </template>
 </category>
 ```
+
+## Parser Features
+
+The AIML Parser (`dataset_preparer/aiml/parser.py`) resolves:
+- `<srai>` chains (max depth 5)
+- `<random><li>` → generates N samples (one per `<li>`)
+- Wildcards `*`, `_`, `**`, `^` → expanded with contextual examples
+- `<thinking>` → eliminated (no collision with training tags)
+- `<set>`, `<get>`, `<bot>` → resolved with defaults
+- HTML tags → stripped
 
 ## Integrating AIML with the Model
 
 ### Current Integration (main.py)
-- AIML files are loaded via `dataset_preparer/aiml/loader.py`
-- Patterns converted to training data
-- Combined with Hugging Face datasets
+- AIML files are parsed via `dataset_preparer/aiml/parser.py`
+- Patterns resolved and expanded into training samples
+- Combined with other data sources
 - Used to train the neural model
 
 ### Usage in DialogueManager
@@ -85,13 +88,6 @@ With context:
 5. **Update reduction files**: Keep pattern reduction rules up-to-date
 6. **Use context (that/topic)**: Make conversations more coherent
 
-## Development AIML Files
-
-The `aiml_dev/` directory contains AIML files with associated `.datasets` files:
-- Used for development and testing
-- Allows dataset tracking with patterns
-- Enables iteration on patterns before moving to production
-
 ---
 
-*Updated: 2026-07-28 - Reflects new modular project structure*
+*Updated: 2026-07-30 - Reflects AIML 2.0 parser implementation*

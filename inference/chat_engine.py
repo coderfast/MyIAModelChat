@@ -34,7 +34,7 @@ MODELS_DIR = 'models'
 CHECKPOINTS_DIR = 'checkpoints'
 MAX_RAM_GB = None
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s: %(message)s")
+# Setup logging (configured by main.py)
 logger = logging.getLogger(__name__)
 
 
@@ -217,8 +217,9 @@ class ChatEngine:
         )
         intent_model_path = sentiment_model_path
 
-        intent_classifier = pipeline('text-classification', model=intent_model_path)
-        sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path)
+        pipe_device = 0 if device.type == 'cuda' else -1
+        intent_classifier = pipeline('text-classification', model=intent_model_path, device=pipe_device)
+        sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path, device=pipe_device)
 
         self.dialogue_manager = DialogueManager(
             model=self.model,

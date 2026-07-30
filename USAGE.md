@@ -225,6 +225,69 @@ Text Processing Arguments (advanced data preparation):
         - Unknown language texts are always kept
         - Requires --enable-lang-filter to work
 
+Contamination Filtering Arguments:
+================================================================================
+
+--filter-noise
+    Description: Apply noise filter (URLs, emails, code, boilerplate)
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --filter-noise
+    Notes:
+        - Detects and removes noisy texts (navigation, social media, etc.)
+        - Uses 12+ heuristics for noise detection
+
+--filter-contamination
+    Description: Apply quality-based contamination filter
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --filter-contamination
+    Notes:
+        - Classifies texts as good/fixable/discardable
+        - Removes low-quality contaminated samples
+
+--filter-dedup
+    Description: Apply cross-source deduplication
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --filter-dedup
+    Notes:
+        - Removes duplicate texts across all data sources
+        - Uses exact and near-duplicate detection
+
+--dedup-mode <mode>
+    Description: Deduplication mode
+    Type: String (exact, near, all)
+    Default: all
+    Example: python main.py --prepare-data --aiml --filter-dedup --dedup-mode near
+
+--filter-balance
+    Description: Apply source balance control
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --filter-balance
+    Notes:
+        - Prevents one source from dominating the dataset
+        - Limits each source to max-source-ratio of total
+
+--filter-leakage
+    Description: Apply train/test leakage detection
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --filter-leakage
+    Notes:
+        - Detects overlapping texts between train/test splits
+        - Uses similarity threshold to find near-duplicates
+
+--audit-report
+    Description: Generate contamination audit report
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --aiml --audit-report
+    Notes:
+        - Saves detailed audit report to file
+        - Shows contamination statistics per source
+
 --refresh-cache
     Description: Clear old cache and rebuild from fresh data
     Type: Boolean flag (no value needed)

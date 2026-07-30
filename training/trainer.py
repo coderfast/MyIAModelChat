@@ -37,8 +37,7 @@ class TrainingStopRequested(Exception):
     """Raised when a stop request is issued from the main thread."""
 
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging (configured by main.py)
 logger = logging.getLogger(__name__)
 
 try:
@@ -247,7 +246,7 @@ class Trainer:
             # detect thinking tokens in pre-tokenized data.
 
         except Exception as e:
-            logger.error(f"âŒ Error loading cached dataset: {e}")
+            logger.error(f"Error loading cached dataset: {e}")
             sys.exit(1)
 
     def _detect_thinking_data(self):
@@ -388,11 +387,11 @@ class Trainer:
             device_capability = torch.cuda.get_device_capability(0)
             total_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
             
-            logger.info(f"\n{'='*80}")
+            logger.info("=" * 80)
             logger.info(f"GPU DETECTED: {device_name}")
             logger.info(f"  Compute Capability: {device_capability[0]}.{device_capability[1]}")
             logger.info(f"  Total Memory: {total_memory:.2f} GB")
-            logger.info(f"{'='*80}\n")
+            logger.info("=" * 80)
             
             # Check for Tesla K80
             if "K80" in device_name or "Tesla" in device_name:
@@ -410,9 +409,9 @@ class Trainer:
             
             device = torch.device("cuda:0")
         else:
-            logger.info(f"\n{'='*80}")
+            logger.info("=" * 80)
             logger.info("NO GPU DETECTED - Using CPU training")
-            logger.info(f"{'='*80}\n")
+            logger.info("=" * 80)
             self.use_gpu = False
             self.use_mixed_precision = False
             self.use_gradient_checkpointing = False
@@ -688,7 +687,7 @@ class Trainer:
 
         # Log thinking metrics summary
         if thinking_metrics_accum:
-            logger.info("\n  Thinking Metrics Summary:")
+            logger.info("Thinking Metrics Summary:")
             for key, values in thinking_metrics_accum.items():
                 avg_val = sum(values) / len(values) if values else 0
                 logger.info(f"    {key}: {avg_val:.4f}")
@@ -876,7 +875,7 @@ class Trainer:
                 warm_up_steps = int(TRAINING_CONFIG.get('warm_up_steps', 100))
                 warmup_limit = max(1, int(len(loaded_dataset) * warm_up_ratio))
 
-                logger.info(f"\nStarting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
+                logger.info(f"Starting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
 
                 def warmup_pair_generator():
                     idx = 0
@@ -900,8 +899,8 @@ class Trainer:
                 logger.info(" Warm-up phase completed")
 
             # Main training loop
-            logger.info(f"\nStarting main training phase ({self.epochs} epochs)...")
-            logger.info(f"{'='*80}")
+            logger.info(f"Starting main training phase ({self.epochs} epochs)...")
+            logger.info("=" * 80)
             
             num_epochs = self.epochs
             for epoch in range(num_epochs):
@@ -953,13 +952,13 @@ class Trainer:
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():
-                logger.info("\nStop requested; skipping final model save")
+                logger.info("Stop requested; skipping final model save")
                 return
 
             # Fine-tune on CSV data if available
             csv_dataloader = self._get_csv_dataloader(batch_size=TRAINING_CONFIG['batch_size'])
             if csv_dataloader is not None:
-                logger.info("\nStarting CSV data fine-tuning...")
+                logger.info("Starting CSV data fine-tuning...")
                 try:
                     _ = self.train(model, csv_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
                     logger.info(" CSV data fine-tuning completed")
@@ -967,8 +966,8 @@ class Trainer:
                     logger.warning(f"CSV data fine-tuning failed: {e}")
 
             # Save final model + tokenizer state for consistent inference
-            logger.info(f"\n{'='*80}")
-            logger.info("Training completed! Saving final model and tokenizer...")
+            logger.info("=" * 80)
+            logger.info("[OK] Training completed! Saving final model and tokenizer...")
 
             # Save final checkpoint with metadata
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")

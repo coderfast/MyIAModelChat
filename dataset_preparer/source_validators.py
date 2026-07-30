@@ -65,6 +65,26 @@ class GenericValidator(SourceValidator):
     MIN_LENGTH = 5
     MAX_LENGTH = 2000
 
+    URL_PATTERN = re.compile(
+        r'https?://[^\s<>\"\'\)]+|'
+        r'www\.[^\s<>\"\'\)]+'
+    )
+    EMAIL_PATTERN = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
+    PHONE_PATTERN = re.compile(r'(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}')
+    SYSTEM_PATH_PATTERN = re.compile(r'([A-Z]:\\|/home/|/usr/|/var/|/etc/|~/)')
+    CODE_PATTERN = re.compile(
+        r'("""|\'\'\'|```|def\s+\w+\s*\(|class\s+\w+|import\s+\w+|'
+        r'function\s*\(|var\s+\w+\s*=|document\.|window\.)',
+        re.IGNORECASE
+    )
+    BOILERPLATE_PATTERN = re.compile(
+        r'(cookie|privacy|terms of use|all rights reserved|copyright|'
+        r'subscribe|newsletter|sign up|log in|sign in|'
+        r'advertisement|sponsored|click here|read more)',
+        re.IGNORECASE
+    )
+    NUMBERS_ONLY_PATTERN = re.compile(r'^[\d\s\.\,\-\+\(\)]+$')
+
     def __init__(self, source_name: str):
         self.source_name = source_name
         self.report_data = QualityReport(source=source_name)
@@ -92,6 +112,9 @@ class GenericValidator(SourceValidator):
         if self._has_html_tags(text):
             self._fix_counts['html_tags'] = self._fix_counts.get('html_tags', 0) + 1
             return 'fixable'
+
+        if self._has_noise_content(text):
+            return 'discardable'
 
         self.report_data.good += 1
         return 'good'
@@ -149,6 +172,43 @@ class GenericValidator(SourceValidator):
 
     def _has_html_tags(self, text: str) -> bool:
         return bool(re.search(r'<[a-zA-Z][^>]*>', text))
+
+    def _has_noise_content(self, text: str) -> bool:
+        """Detect noise: URLs, emails, phone numbers, paths, code, boilerplate, numbers-only."""
+        url_matches = self.URL_PATTERN.findall(text)
+        if len(url_matches) > 2 or (len(url_matches) >= 1 and len(text) < 50):
+            self._discard_counts['contains_urls'] = self._discard_counts.get('contains_urls', 0) + 1
+            return True
+
+        if self.EMAIL_PATTERN.search(text):
+            self._discard_counts['contains_emails'] = self._discard_counts.get('contains_emails', 0) + 1
+            return True
+
+        phone_matches = self.PHONE_PATTERN.findall(text)
+        if len(phone_matches) > 1:
+            self._discard_counts['contains_phones'] = self._discard_counts.get('contains_phones', 0) + 1
+            return True
+
+        path_matches = self.SYSTEM_PATH_PATTERN.findall(text)
+        if len(path_matches) > 1 or (len(path_matches) >= 1 and len(text) < 80):
+            self._discard_counts['contains_paths'] = self._discard_counts.get('contains_paths', 0) + 1
+            return True
+
+        code_matches = self.CODE_PATTERN.findall(text)
+        if len(code_matches) > 2:
+            self._discard_counts['contains_code'] = self._discard_counts.get('contains_code', 0) + 1
+            return True
+
+        boilerplate_count = len(self.BOILERPLATE_PATTERN.findall(text))
+        if boilerplate_count >= 2:
+            self._discard_counts['boilerplate'] = self._discard_counts.get('boilerplate', 0) + 1
+            return True
+
+        if self.NUMBERS_ONLY_PATTERN.match(text.strip()):
+            self._discard_counts['numbers_only'] = self._discard_counts.get('numbers_only', 0) + 1
+            return True
+
+        return False
 
     def _clean_text(self, text: str) -> str:
         text = html.unescape(text)
@@ -228,6 +288,13 @@ class PDFValidator(SourceValidator):
     HYPHEN_LINE_BREAK = re.compile(r'(\w)-\s*\n\s*(\w)')
     FORM_FEED = re.compile(r'\x0c')
     REPEATED_HEADER = re.compile(r'^(.{1,30})\n\1\n', re.MULTILINE)
+    BOOKMARK_PATTERN = re.compile(
+        r'(table of contents|contents|chapter \d|section \d|'
+        r'appendix|bibliography|index|glossary|acknowledgments)',
+        re.IGNORECASE
+    )
+    PAGE_REF_PATTERN = re.compile(r'(page|pag|p\.)\s*\d+', re.IGNORECASE)
+    URL_IN_PDF = re.compile(r'https?://[^\s<>\"\'\)]+|www\.[^\s<>\"\'\)]+')
 
     def __init__(self):
         self.source_name = 'pdf'
@@ -266,6 +333,19 @@ class PDFValidator(SourceValidator):
 
         if needs_fix:
             return 'fixable'
+
+        if self.BOOKMARK_PATTERN.search(text) and len(text.strip()) < 200:
+            self._discard_counts['bookmark_or_toc'] = self._discard_counts.get('bookmark_or_toc', 0) + 1
+            return 'discardable'
+
+        if self.PAGE_REF_PATTERN.search(text) and len(text.strip()) < 50:
+            self._discard_counts['page_reference'] = self._discard_counts.get('page_reference', 0) + 1
+            return 'discardable'
+
+        url_count = len(self.URL_IN_PDF.findall(text))
+        if url_count > 2 or (url_count >= 1 and len(text) < 60):
+            self._discard_counts['contains_urls'] = self._discard_counts.get('contains_urls', 0) + 1
+            return 'discardable'
 
         self.report_data.good += 1
         return 'good'
@@ -417,6 +497,18 @@ class WebValidator(SourceValidator):
         r'facebook|twitter|instagram|linkedin|youtube)',
         re.IGNORECASE
     )
+    NAVIGATION_PATTERNS = re.compile(
+        r'(skip to (main|content|navigation)|back to (top|home)|'
+        r'previous|next|page \d+ of \d+|showing \d+ of \d+|'
+        r'loading\.\.\.|please wait|page not found)',
+        re.IGNORECASE
+    )
+    SOCIAL_MEDIA_BOILERPLATE = re.compile(
+        r'(follow us on|share this|tweet|pin it|'
+        r'share on facebook|share on twitter|'
+        r'like us|subscribe to our|join our)',
+        re.IGNORECASE
+    )
     HTML_TAG = re.compile(r'<[^>]+>')
     JS_CONTENT = re.compile(r'(function\s*\(|var\s+\w+\s*=|document\.|window\.|addEventListener)')
 
@@ -442,6 +534,15 @@ class WebValidator(SourceValidator):
         boilerplate_ratio = len(self.BOILERPLATE_KEYWORDS.findall(text)) / max(len(text.split()), 1)
         if boilerplate_ratio > 0.1:
             self._discard_counts['too_much_boilerplate'] = self._discard_counts.get('too_much_boilerplate', 0) + 1
+            return 'discardable'
+
+        if self.NAVIGATION_PATTERNS.search(text) and len(text) < 200:
+            self._discard_counts['navigation_content'] = self._discard_counts.get('navigation_content', 0) + 1
+            return 'discardable'
+
+        social_count = len(self.SOCIAL_MEDIA_BOILERPLATE.findall(text))
+        if social_count >= 2:
+            self._discard_counts['social_media_boilerplate'] = self._discard_counts.get('social_media_boilerplate', 0) + 1
             return 'discardable'
 
         if len(text.strip()) < 30:
@@ -503,6 +604,8 @@ class WebValidator(SourceValidator):
 class CSVValidator(GenericValidator):
     """Validator for CSV source files."""
 
+    NUMBERS_ONLY = re.compile(r'^[\d\s\.\,\-\+\(\)]+$')
+
     def __init__(self):
         super().__init__('csv')
 
@@ -513,6 +616,13 @@ class CSVValidator(GenericValidator):
             output_text = sample.get('output', '')
             if not input_text or not output_text:
                 self._discard_counts['missing_fields'] = self._discard_counts.get('missing_fields', 0) + 1
+                return 'discardable'
+            if self.NUMBERS_ONLY.match(input_text.strip()) and self.NUMBERS_ONLY.match(output_text.strip()):
+                self._discard_counts['numbers_only'] = self._discard_counts.get('numbers_only', 0) + 1
+                return 'discardable'
+            combined = f"{input_text} {output_text}"
+            if len(combined.strip()) < 10:
+                self._discard_counts['too_short_combined'] = self._discard_counts.get('too_short_combined', 0) + 1
                 return 'discardable'
         return result
 

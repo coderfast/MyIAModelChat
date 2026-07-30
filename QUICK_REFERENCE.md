@@ -14,7 +14,13 @@
 | `commons/registry/model_export.py` | Export to GGUF, ONNX, ONNX quantized |
 | `commons/registry/model_downloader.py` | HuggingFace model downloader |
 | `dataset_preparer/data_preparer.py` | Multi-source data loading (AIML, PDF, EPUB, HF) |
+| `dataset_preparer/aiml/parser.py` | AIML 2.0 Parser (resolve elements, wildcards, quality) |
 | `dataset_preparer/aiml/loader.py` | Loads AIML files for training |
+| `dataset_preparer/contamination/filters.py` | Noise + Quality filters |
+| `dataset_preparer/contamination/dedup.py` | Cross-source deduplication |
+| `dataset_preparer/contamination/balance.py` | Source balance control |
+| `dataset_preparer/contamination/leakage.py` | Train/test leakage detection |
+| `dataset_preparer/contamination/audit.py` | Audit reporting |
 | `dataset_preparer/thinking_generators.py` | Chain-of-thought data generation |
 | `training/trainer.py` | Training pipeline (Trainer class + TrainingConfig) |
 | `inference/chat_engine.py` | Chat interface + inference (ChatEngine class) |

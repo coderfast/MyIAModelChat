@@ -35,11 +35,45 @@ try:
 except ImportError:
     KEYBOARD_AVAILABLE = False
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Setup logging with colors
+class ColorFormatter(logging.Formatter):
+    """Custom formatter with ANSI colors for console output."""
+    COLORS = {
+        'INFO': '',              # White/default
+        'WARNING': '\033[93m',   # Yellow
+        'ERROR': '\033[91m',     # Red
+        'CRITICAL': '\033[91m',  # Red
+        'DEBUG': '\033[90m',     # Gray
+    }
+    SUCCESS_COLOR = '\033[92m'   # Green for [OK] messages
+    SYMBOLS = {
+        'ERROR': '[ERROR] ',
+        'CRITICAL': '[CRITICAL] ',
+        'WARNING': '[WARN] ',
+        'INFO': '',
+        'DEBUG': '',
+    }
+    RESET = '\033[0m'
+
+    def format(self, record):
+        reset = self.RESET
+        symbol = self.SYMBOLS.get(record.levelname, '')
+
+        # Green for messages starting with [OK]
+        if record.levelname == 'INFO' and record.msg.startswith('[OK]'):
+            color = self.SUCCESS_COLOR
+        else:
+            color = self.COLORS.get(record.levelname, '')
+
+        record.msg = f"{color}{symbol}{record.msg}{reset}"
+        return super().format(record)
+
+handler = logging.StreamHandler()
+handler.setFormatter(ColorFormatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(handler)
 logger = logging.getLogger(__name__)
 
 # Configuration constants
@@ -114,9 +148,9 @@ def setup_cpu_configuration(args):
         args.num_threads = mp.cpu_count()
         logger.info(f"Auto-detected threads: {args.num_threads}")
     
-    logger.info(f"\n{'='*80}")
+    logger.info("=" * 80)
     logger.info("CPU CONFIGURATION")
-    logger.info(f"{'='*80}")
+    logger.info("=" * 80)
     
     os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
     torch.set_num_threads(args.num_threads)
@@ -137,7 +171,7 @@ def setup_cpu_configuration(args):
     logger.info(f"MKL_NUM_THREADS (NumPy): {args.num_cores}")
     logger.info(f"PyTorch threads: {torch.get_num_threads()}")
     logger.info(f"Available CPUs: {mp.cpu_count()}")
-    logger.info(f"{'='*80}\n")
+    logger.info("=" * 80)
 
 
 if __name__ == '__main__':
@@ -301,6 +335,31 @@ EXAMPLES:
                             help="Enable language filtering")
         parser.add_argument("--allowed-languages", type=str, nargs='+', default=['es', 'en'],
                             help="Allowed language codes for filtering (default: es en)")
+
+        # Contamination filtering options (NEW)
+        parser.add_argument("--filter-noise", action='store_true',
+                            help="Enable noise filter (URLs, emails, code, boilerplate)")
+        parser.add_argument("--noise-categories", type=str, default=None,
+                            help="Noise categories to filter (comma-separated: urls,emails,phones,paths,code,boilerplate,corruption)")
+        parser.add_argument("--filter-contamination", action='store_true',
+                            help="Enable extended quality filter (low alpha, repetition, diversity)")
+        parser.add_argument("--filter-dedup", action='store_true',
+                            help="Enable cross-source deduplication")
+        parser.add_argument("--dedup-mode", type=str, default='all',
+                            choices=['exact', 'near', 'cross', 'all'],
+                            help="Deduplication mode (default: all)")
+        parser.add_argument("--filter-balance", action='store_true',
+                            help="Enable source balance control")
+        parser.add_argument("--max-source-ratio", type=float, default=0.3,
+                            help="Max fraction per source (default: 0.3)")
+        parser.add_argument("--filter-leakage", action='store_true',
+                            help="Enable data leakage detection")
+        parser.add_argument("--leakage-threshold", type=float, default=0.5,
+                            help="Leakage overlap threshold (default: 0.5)")
+        parser.add_argument("--audit-report", action='store_true',
+                            help="Generate audit report for filtering pipeline")
+        parser.add_argument("--audit-dir", type=str, default=None,
+                            help="Directory for audit reports (default: dataset_preparer/contamination/reports/)")
         
         args = parser.parse_args()
 
@@ -326,13 +385,13 @@ EXAMPLES:
         gc.collect()
         
         # Display system information
-        logger.info(f"\n{'='*80}")
+        logger.info("=" * 80)
         logger.info("SYSTEM INFORMATION")
-        logger.info(f"{'='*80}")
+        logger.info("=" * 80)
         logger.info(f"Total available CPU cores: {system_cpu_count}")
         logger.info(f"Specified --num_cores: {args.num_cores}")
         logger.info(f"Specified --num_threads: {args.num_threads}")
-        logger.info(f"{'='*80}\n")
+        logger.info("=" * 80)
         
         # Handle CPU-only mode or explicit CUDA device selection
         if args.use_cpuonly:
@@ -357,7 +416,7 @@ EXAMPLES:
             logger.info("Preparing datasets...")
             dataset, stats = prepare_datasets_for_training(args)
             if dataset is not None:
-                logger.info("Dataset preparation completed!")
+                logger.info("[OK] Dataset preparation completed!")
                 logger.info(f"Total samples: {stats.get('total_samples', 0):,}")
                 if stats.get('from_cache'):
                     logger.info("(Loaded from cache)")
@@ -428,9 +487,9 @@ EXAMPLES:
             engine = ChatEngine(config)
             engine.start_chat_loop()
         
-        logger.info("\n" + "="*80)
-        logger.info("Program completed successfully")
-        logger.info("="*80)
+        logger.info("=" * 80)
+        logger.info("[OK] Program completed successfully")
+        logger.info("=" * 80)
     
     except KeyboardInterrupt:
         logger.warning("\nProgram interrupted by user")

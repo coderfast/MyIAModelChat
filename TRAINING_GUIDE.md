@@ -5,9 +5,10 @@
 ### Supported Dataset Types
 
 1. **AIML-based Datasets**
-   - Source: `datasets_source/aiml/` directory (~60 .aiml files)
-   - Processing: `dataset_preparer/aiml/loader.py` converts patterns to (input, output) pairs
-   - Format: XML patterns converted to dialogue examples
+   - Source: `datasets_source/aiml/` directory (~5 .aiml files, ~6000+ categories)
+   - Processing: `dataset_preparer/aiml/parser.py` resolves `<srai>`, `<random>`, wildcards, HTML tags
+   - Format: Normalized training samples with wildcard expansion and quality classification
+   - Flag: `--aiml` enables AIML processing
 
 2. **PDF Document Datasets**
    - Source: `datasets_source/pdf/` directory

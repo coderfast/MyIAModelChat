@@ -310,7 +310,7 @@ def scrape_web_docs(
         return []
 
     for seed_url in urls:
-        logger.info(f"\n--- Scraping: {seed_url} ---")
+        logger.info(f"--- Scraping: {seed_url} ---")
         scraper = WebDocScraper(
             seed_url=seed_url,
             max_pages=max_pages,

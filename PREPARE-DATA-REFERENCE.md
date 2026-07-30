@@ -52,28 +52,33 @@ When you run: python main.py --prepare-data --aiml --hf
 
 You'll see:
 
-  [1/3] Loading AIML data...
-    ✓ ai.aiml.datasets (45 samples)
-    ✓ alice.aiml.datasets (120 samples)
+  [1/7] Loading AIML data...
+    Parsed ai.aiml: 375 samples
+    Parsed alice.aiml: 8200 samples
     ... loaded 5 AIML files
 
-  [2/3] Loading Hugging Face datasets...
+  [2/7] Loading Hugging Face datasets...
     ✓ wikitext (1000 samples)
 
-  [3/3] Combining datasets...
-    Total: 1,500 samples
+  [6/7] Combining datasets...
+    Total: 10,310 samples
 
-  📊 Dataset Breakdown:
-     AIML:           500 samples
-     HuggingFace:  1,000 samples
+  [6.42/7] Applying noise filter...
+  [6.43/7] Applying quality filter...
+  [6.44/7] Applying cross-source deduplication...
 
-  📈 Statistics:
-     Total Samples:       1,500
-     Avg Text Length:     42.3 words
-     Min Text Length:     2 words
-     Max Text Length:     512 words
+  DATASET PREPARATION SUMMARY
+  ================================================================================
+  Data Sources:
+     AIML                     10,310 samples
 
-  ✅ DATASET PREPARATION COMPLETED
+  Combined Statistics:
+     Total Samples:           10,310
+     Average Text Length:        9.8 words
+     Min Text Length:              2 words
+     Max Text Length:            202 words
+
+  [OK] DATASET PREPARATION COMPLETED SUCCESSFULLY
 
 ================================================================================
                         WHAT IT VALIDATES

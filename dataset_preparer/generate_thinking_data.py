@@ -19,10 +19,7 @@ import argparse
 from pathlib import Path
 from typing import List, Dict, Tuple
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Setup logging (configured by main.py)
 logger = logging.getLogger(__name__)
 
 # Thinking templates by category
@@ -358,7 +355,7 @@ Examples:
     if args.source in ('csv', 'all'):
         csv_path = args.input if args.source == 'csv' and args.input else os.path.join('datasets_source', 'csv', 'special_facts.csv')
         if os.path.exists(csv_path):
-            logger.info(f"\nLoading CSV data from: {csv_path}")
+            logger.info(f"Loading CSV data from: {csv_path}")
             csv_pairs = load_csv_data(csv_path)
             all_pairs.extend(csv_pairs)
             logger.info(f"  Loaded {len(csv_pairs)} pairs")
@@ -368,7 +365,7 @@ Examples:
     if args.source in ('aiml', 'all'):
         aiml_dir = args.input if args.source == 'aiml' and args.input else os.path.join('datasets_source', 'aiml')
         if os.path.exists(aiml_dir):
-            logger.info(f"\nLoading AIML data from: {aiml_dir}")
+            logger.info(f"Loading AIML data from: {aiml_dir}")
             aiml_pairs = load_aiml_data(aiml_dir)
             all_pairs.extend(aiml_pairs)
             logger.info(f"  Loaded {len(aiml_pairs)} pairs")
@@ -393,13 +390,13 @@ Examples:
             seen.add(key)
             unique_pairs.append(pair)
 
-    logger.info(f"\nTotal unique pairs: {len(unique_pairs)}")
+    logger.info(f"Total unique pairs: {len(unique_pairs)}")
 
     # Initialize HF pipeline if needed
     hf_pipeline = None
     if args.mode == 'hf':
         model_name = args.model or 'Qwen/Qwen2.5-1.5B-Instruct'
-        logger.info(f"\nLoading HuggingFace model: {model_name}")
+            logger.info(f"Loading HuggingFace model: {model_name}")
         try:
             from transformers import pipeline as hf_pipeline_fn
             hf_pipeline = hf_pipeline_fn('text-generation', model=model_name, trust_remote_code=True)
@@ -409,7 +406,7 @@ Examples:
             args.mode = 'template'
 
     # Generate thinking data
-    logger.info("\nGenerating <thinking> data...")
+    logger.info("Generating <thinking> data...")
     thinking_data = generate_thinking_dataset(
         unique_pairs,
         lang=args.lang,
@@ -420,7 +417,7 @@ Examples:
 
     # Validate if requested
     if args.validate:
-        logger.info("\nValidating thinking consistency...")
+        logger.info("Validating thinking consistency...")
         valid_count = 0
         invalid_count = 0
         for item in thinking_data:
@@ -436,11 +433,11 @@ Examples:
     save_thinking_data(thinking_data, args.output)
 
     # Show examples
-    logger.info("\n" + "=" * 60)
+    logger.info("=" * 60)
     logger.info("EXAMPLES")
     logger.info("=" * 60)
     for i, example in enumerate(thinking_data[:5]):
-        logger.info(f"\n--- Example {i+1} [{example['category']}] ---")
+        logger.info(f"--- Example {i+1} [{example['category']}] ---")
         logger.info(f"Input:    {example['input']}")
         logger.info(f"Thinking: {example['thinking']}")
         logger.info(f"Output:   {example['output']}")
@@ -452,7 +449,7 @@ Examples:
         cat = p['category']
         categories[cat] = categories.get(cat, 0) + 1
 
-    logger.info("\n" + "=" * 60)
+    logger.info("=" * 60)
     logger.info("STATISTICS")
     logger.info("=" * 60)
     logger.info(f"Total examples: {len(thinking_data)}")
@@ -460,7 +457,7 @@ Examples:
     for cat, count in sorted(categories.items()):
         logger.info(f"  {cat:15} {count:>6}")
 
-    logger.info(f"\nOutput: {args.output}")
+    logger.info(f"Output: {args.output}")
     logger.info("Done!")
 
 

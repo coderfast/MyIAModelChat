@@ -53,24 +53,24 @@ model.gradient_checkpointing_enable()
 
 **Solution**:
 ```python
-# Debug aiml/loader.py
+# Debug aiml/parser.py
+from dataset_preparer.aiml.parser import parse_aiml_file
+
+# Check parsing of a single file
+samples, stats = parse_aiml_file('datasets_source/aiml/ai.aiml')
+print(f"Samples: {len(samples)}")
+print(f"Stats: {stats}")
+
+# Debug loader
 from dataset_preparer.aiml.loader import AIMLLoader
-
-loader = AIMLLoader()
-# Check if AIML files are found
-aiml_files = os.listdir('datasets_source/aiml/')
-print(f"Found {len(aiml_files)} AIML files")
-
-# Manually load one file
-from python-aiml import Kernel
-k = Kernel()
-k.learn("datasets_source/aiml/ai.aiml")
-print(f"Patterns loaded: {len(k._brain._nodes)}")
+loader = AIMLLoader('datasets_source/aiml/')
+dataset = loader.load_aiml_files()
+print(f"Dataset size: {len(dataset)}")
 ```
 
 **Prevention**:
 - Verify `datasets_source/aiml/` directory exists and contains .aiml files
-- Check file permissions
+- Check file encoding (some AIML files use ISO-8859-1)
 - Test with `--aiml` flag after confirming files present
 
 ---
