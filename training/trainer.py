@@ -107,6 +107,7 @@ class TrainingConfig:
     thinking_loss_weight: float = 0.5
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
+    statistics: bool = False
 
 class Trainer:
 
@@ -620,6 +621,10 @@ class Trainer:
         epoch_start_time = time.time()
         logger.info("Training loop started; the model is actively processing batches")
 
+        # Timing accumulators for micro-steps and optimizer updates
+        micro_step_times = []
+        optimizer_step_times = []
+
         # Thinking metrics accumulators
         thinking_metrics_accum = {}
 
@@ -643,6 +648,9 @@ class Trainer:
             inputs = inputs.to(device)
             targets = targets.to(device)
 
+            # --- Micro-step timing (forward + backward) ---
+            micro_step_start = time.time()
+
             # Forward pass
             if self.use_mixed_precision and scaler is not None:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
@@ -662,8 +670,22 @@ class Trainer:
             original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
             total_loss += original_loss.item()
 
-            # Optimizer step with gradient accumulation
+            micro_step_end = time.time()
+            micro_step_elapsed = micro_step_end - micro_step_start
+            micro_step_times.append(micro_step_elapsed)
+
+            # Log micro-step only if --statistics is enabled
+            if self.config.statistics:
+                logger.info(
+                    f"  [micro-step {batch_idx + 1}] "
+                    f"loss={original_loss.item():.4f} | "
+                    f"time={micro_step_elapsed*1000:.1f}ms"
+                )
+
+            # --- Optimizer step timing (every accumulation_steps) ---
             if (batch_idx + 1) % accumulation_steps == 0:
+                opt_step_start = time.time()
+
                 if self.use_mixed_precision and scaler is not None:
                     scaler.unscale_(optimizer)
 
@@ -678,6 +700,22 @@ class Trainer:
 
                 optimizer.zero_grad()
 
+                opt_step_end = time.time()
+                opt_step_elapsed = opt_step_end - opt_step_start
+                optimizer_step_times.append(opt_step_elapsed)
+
+                # Log optimizer step only if --statistics is enabled
+                if self.config.statistics:
+                    accum_group = (batch_idx + 1) // accumulation_steps
+                    micro_avg = sum(micro_step_times[-accumulation_steps:]) / accumulation_steps
+                    logger.info(
+                        f"  [optimizer step #{accum_group}] "
+                        f"opt_time={opt_step_elapsed*1000:.1f}ms | "
+                        f"micro_avg={micro_avg*1000:.1f}ms | "
+                        f"micro_total={sum(micro_step_times[-accumulation_steps:])*1000:.1f}ms | "
+                        f"ratio(opt/total)={opt_step_elapsed/(opt_step_elapsed + sum(micro_step_times[-accumulation_steps:]))*100:.1f}%"
+                    )
+
             # Memory cleanup on GPU
             if self.use_gpu and (batch_idx + 1) % TRAINING_CONFIG['memory_cleanup_interval'] == 0:
                 torch.cuda.empty_cache()
@@ -691,6 +729,46 @@ class Trainer:
             for key, values in thinking_metrics_accum.items():
                 avg_val = sum(values) / len(values) if values else 0
                 logger.info(f"    {key}: {avg_val:.4f}")
+
+        # --- Timing summary ---
+        total_elapsed = time.time() - epoch_start_time
+        if micro_step_times:
+            micro_avg = sum(micro_step_times) / len(micro_step_times)
+            micro_min = min(micro_step_times)
+            micro_max = max(micro_step_times)
+            micro_total_compute = sum(micro_step_times)
+            logger.info("=" * 80)
+            logger.info(f"TIMING SUMMARY ({phase_label})")
+            logger.info(f"  Micro-steps (forward+backward):")
+            logger.info(f"    Count:    {len(micro_step_times)}")
+            logger.info(f"    Avg:      {micro_avg*1000:.1f}ms")
+            logger.info(f"    Min:      {micro_min*1000:.1f}ms")
+            logger.info(f"    Max:      {micro_max*1000:.1f}ms")
+            logger.info(f"    Total:    {micro_total_compute*1000:.1f}ms")
+
+        if optimizer_step_times:
+            opt_avg = sum(optimizer_step_times) / len(optimizer_step_times)
+            opt_min = min(optimizer_step_times)
+            opt_max = max(optimizer_step_times)
+            opt_total = sum(optimizer_step_times)
+            logger.info(f"  Optimizer updates:")
+            logger.info(f"    Count:    {len(optimizer_step_times)}")
+            logger.info(f"    Avg:      {opt_avg*1000:.1f}ms")
+            logger.info(f"    Min:      {opt_min*1000:.1f}ms")
+            logger.info(f"    Max:      {opt_max*1000:.1f}ms")
+            logger.info(f"    Total:    {opt_total*1000:.1f}ms")
+
+            # Overhead analysis
+            if micro_step_times:
+                compute_total = sum(micro_step_times)
+                opt_total_val = sum(optimizer_step_times)
+                overhead = total_elapsed - compute_total - opt_total_val
+                logger.info(f"  Overhead (data loading, logging, etc): {overhead*1000:.1f}ms ({overhead/total_elapsed*100:.1f}%)")
+                logger.info(f"  Compute fraction:  {compute_total/total_elapsed*100:.1f}%")
+                logger.info(f"  Optimizer fraction: {opt_total_val/total_elapsed*100:.1f}%")
+
+        logger.info(f"  Total epoch time: {total_elapsed:.2f}s")
+        logger.info("=" * 80)
 
         logger.info(f"Training loop completed after {num_batches} batches")
         return avg_loss
@@ -761,7 +839,7 @@ class Trainer:
             if self.has_thinking_data:
                 logger.info(f" Thinking data: ENABLED (model will learn <thinking>...</thinking> structure)")
             else:
-                logger.info(f"â„¹ Thinking data: NOT detected (standard training mode)")
+                logger.info(f"Thinking data: NOT detected (standard training mode)")
 
             # Extract and normalize records from cached dataset in streaming mode
             logger.info("Extracting and validating dataset samples (streaming mode)...")

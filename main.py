@@ -106,7 +106,7 @@ def validate_arguments(args):
             )
 
     if args.num_cores < 0 or args.num_threads < 0:
-        return False, "--num_cores and --num_threads must be >= 0"
+        return False, "--num-cores and --num-threads must be >= 0"
 
     if args.max_ram_fraction < 0 or args.max_ram_fraction > 1:
         return False, "--max-ram-fraction must be between 0 and 1"
@@ -221,8 +221,11 @@ TRAINING OPTIONS:
   --use-cpuonly        Force CPU-only execution (disable GPU)
 
 CPU CONFIGURATION:
-  --num_cores NUM      CPU cores for processing (default: {default_num_cores}, 0=all)
-  --num_threads NUM    Threads per worker (default: {default_num_threads}, 0=all)
+  --num-cores NUM       CPU cores for processing (default: {default_num_cores}, 0=all)
+  --num-threads NUM     Threads per worker (default: {default_num_threads}, 0=all)
+
+STATISTICS:
+  --statistics          Show detailed per-step timing during training
 
 EXAMPLES:
   # Prepare data (create/update cache)
@@ -233,11 +236,11 @@ EXAMPLES:
   # Train model (uses cached dataset)
   python main.py --train --epochs 10
   python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --epochs 10
-  python main.py --train --use-cpuonly --num_cores 4 --num_threads 4
+  python main.py --train --use-cpuonly --num-cores 4 --num-threads 4
 
   python main.py --chat --model ciencias_naturales
   python main.py --chat --model ciencias_naturales+programacion
-  python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
+  python main.py --chat --use-cpuonly --num-cores 4 --num-threads 4
 
   python main.py --list-models
   python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
@@ -259,8 +262,8 @@ EXAMPLES:
         parser.add_argument("--dataset", type=str, default="dataset_cache", help="Path to dataset directory (default: dataset_cache)")
         
         # CPU configuration
-        parser.add_argument("--num_cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")
-        parser.add_argument("--num_threads", type=int, default=default_num_threads, help=f"Threads (default: {default_num_threads})")
+        parser.add_argument("--num-cores", type=int, default=default_num_cores, help=f"CPU cores (default: {default_num_cores})")
+        parser.add_argument("--num-threads", type=int, default=default_num_threads, help=f"Threads (default: {default_num_threads})")
         
         # Data sources
         parser.add_argument("--aiml", action='store_true', help="Include AIML data")
@@ -281,6 +284,7 @@ EXAMPLES:
         parser.add_argument("--use-cache", action='store_true', help="Load cached dataset (for --prepare-data)")
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache (for --prepare-data)")
         parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
+        parser.add_argument("--statistics", action='store_true', help="Show detailed per-step timing statistics during training")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
         parser.add_argument("--cuda-device", type=str, default=None,
                             help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
@@ -389,8 +393,8 @@ EXAMPLES:
         logger.info("SYSTEM INFORMATION")
         logger.info("=" * 80)
         logger.info(f"Total available CPU cores: {system_cpu_count}")
-        logger.info(f"Specified --num_cores: {args.num_cores}")
-        logger.info(f"Specified --num_threads: {args.num_threads}")
+        logger.info(f"Specified --num-cores: {args.num_cores}")
+        logger.info(f"Specified --num-threads: {args.num_threads}")
         logger.info("=" * 80)
         
         # Handle CPU-only mode or explicit CUDA device selection
@@ -440,6 +444,7 @@ EXAMPLES:
                 thinking_loss_weight=args.thinking_loss_weight,
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,
+                statistics=args.statistics,
             )
             trainer = Trainer(config)
             training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=True)
