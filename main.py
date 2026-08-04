@@ -229,7 +229,7 @@ MODEL LIBRARY:
   --dataset PATH       Path to dataset directory (default: dataset_cache)
   --formats F1,F2      Export formats: gguf, onnx, onnx_int8 (default: gguf,onnx)
 
-DATA SOURCES (required with --train or --prepare-data):
+DATA SOURCES (required with --prepare-data only):
   --aiml               Include AIML data from datasets_source/aiml directory
   --hf                 Include Hugging Face datasets
   --pdf                Include PDF data from datasets_source/pdf directory
@@ -262,9 +262,9 @@ EXAMPLES:
   python main.py --prepare-data --aiml --bpe-vocab-size 8000
   python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls.txt)
 
-  # Train model (uses cached dataset)
+  # Train model (always uses cached dataset from prepare-data)
   python main.py --train --epochs 10
-  python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --epochs 10
+  python main.py --train --checkpoint-name ciencias_naturales --epochs 10
   python main.py --train --cpu --num-cores 4 --num-threads 4
   python main.py --train --gpu 0 --epochs 10
   python main.py --train --gpu 0,1 --epochs 10       (DDP multi-GPU)
@@ -317,7 +317,6 @@ EXAMPLES:
         
         # Training options
         parser.add_argument("--epochs", type=int, default=1, help="Training epochs (default: 1)")
-        parser.add_argument("--use-cache", action='store_true', help="Load cached dataset (for --prepare-data)")
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache (for --prepare-data)")
         parser.add_argument("--statistics", action='store_true', help="Show detailed per-step timing statistics during training")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")

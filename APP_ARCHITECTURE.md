@@ -58,9 +58,10 @@ main.py
 **Key CLI Flags:**
 | Category | Flags |
 |----------|-------|
-| Operations | `--train`, `--chat`, `--prepare-data`, `--clear-cache`, `--list-models`, `--export` |
-| Data Sources | `--aiml`, `--hf`, `--pdf`, `--epub`, `--web`, `--csv` |
-| Training | `--epochs`, `--use-cache`, `--refresh-cache`, `--bpe-vocab-size`, `--cuda-device` |
+| Operations | `--train`, `--chat`, `--prepare-data`, `--clear-cache`, `--list-models`, `--model-info`, `--gpu-enum`, `--export` |
+| Data Sources (prepare-data only) | `--aiml`, `--hf`, `--pdf`, `--epub`, `--web`, `--csv` |
+| Training | `--epochs`, `--refresh-cache`, `--bpe-vocab-size` |
+| Device | `--cpu`, `--gpu`, `--vulkan`, `--cpu+gpu` |
 | Text Processing | `--enable-chunking`, `--enable-dedup`, `--enable-quality-filter`, `--enable-lang-filter` |
 | Model | `--model`, `--checkpoint-name`, `--dataset`, `--formats` |
 | CPU/RAM | `--num_cores`, `--num_threads`, `--max-ram-fraction` |
@@ -215,11 +216,11 @@ class TrainingConfig:
     web: bool = False
     csv: bool = False
     epochs: int = 1
-    use_cache: bool = False
     checkpoint_name: str = 'chat_model'
     dataset_source: str = 'dataset_cache'
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     num_cores: int = 0
     num_threads: int = 0
     max_ram_fraction: float = 0.75
@@ -342,8 +343,9 @@ Chat interface and inference engine.
 @dataclass
 class ChatConfig:
     model_name: Optional[str] = None
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     show_thinking: bool = False
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
@@ -359,7 +361,7 @@ class ChatConfig:
 ```python
 _chat_engine_instance: Optional[ChatEngine] = None
 
-def get_chat_engine_instance(use_cpuonly, cuda_device, model) -> ChatEngine:
+def get_chat_engine_instance(device_mode='auto', gpu_indices=None, model=None) -> ChatEngine:
     if _chat_engine_instance is None:
         _chat_engine_instance = ChatEngine(config)
     return _chat_engine_instance

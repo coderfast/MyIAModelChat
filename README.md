@@ -55,7 +55,7 @@ python main.py --prepare-data --aiml --pdf --epub
 
 ### 2. Train the Model
 ```bash
-python main.py --train --use-cache --epochs 30
+python main.py --train --epochs 30
 ```
 
 ### 3. Start Chatting
@@ -359,11 +359,11 @@ class TrainingConfig:
     web: bool = False
     csv: bool = False
     epochs: int = 1
-    use_cache: bool = False
     checkpoint_name: str = 'chat_model'
     dataset_source: str = 'dataset_cache'
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     num_cores: int = 0
     num_threads: int = 0
     max_ram_fraction: float = 0.75
@@ -391,8 +391,9 @@ class TrainingConfig:
 @dataclass
 class ChatConfig:
     model_name: Optional[str] = None
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     show_thinking: bool = False
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
@@ -411,9 +412,11 @@ class ChatConfig:
 | `--prepare-data` | Prepare and validate datasets only |
 | `--clear-cache` | Clear cached datasets and exit |
 | `--list-models` | List available trained models |
+| `--model-info NAME` | Show detailed layer info for a model |
+| `--gpu-enum` | Enumerate available GPUs and exit |
 | `--export NAME` | Export model to GGUF/ONNX |
 
-### Data Sources
+### Data Sources (for --prepare-data only)
 
 | Flag | Description |
 |------|-------------|
@@ -429,11 +432,18 @@ class ChatConfig:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--epochs NUM` | Number of training epochs | `1` |
-| `--use-cache` | Load cached dataset if available | (flag) |
 | `--refresh-cache` | Rebuild cache from scratch | (flag) |
-| `--use-cpuonly` | Force CPU-only execution | (flag) |
 | `--onlytokenize` | Build vocabulary only | (flag) |
 | `--bpe-vocab-size` | BPE vocabulary size | `8000` |
+
+### Device Selection
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--cpu` | Force CPU-only execution | (flag) |
+| `--gpu [N,N,...]` | Use GPU (no arg=auto, or indices) | auto |
+| `--vulkan` | Force Vulkan backend | (flag) |
+| `--cpu+gpu N,N,...` | CPU+GPU hybrid (split by VRAM) | - |
 
 ### System Resources
 
@@ -442,7 +452,6 @@ class ChatConfig:
 | `--num_cores` | CPU cores to use | 50% of available |
 | `--num_threads` | Training threads | 50% of available |
 | `--max-ram-fraction` | Max RAM usage (0.0-1.0) | `0.75` |
-| `--cuda-device` | CUDA device index(es) | None |
 
 ---
 

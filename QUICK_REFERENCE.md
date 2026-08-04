@@ -38,14 +38,11 @@ python main.py --prepare-data --aiml --pdf --epub
 python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
 # === TRAINING ===
-# Train with cached data (fast)
-python main.py --train --use-cache --epochs 30
+# Train with cached data (always uses cache from prepare-data)
+python main.py --train --epochs 30
 
-# Train with custom checkpoint name and dataset
-python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
-
-# Train without cache (slower)
-python main.py --train --epochs 10 --aiml --pdf --epub
+# Train with custom checkpoint name
+python main.py --train --checkpoint-name ciencias_naturales --epochs 30
 
 # Refresh cache after adding new data
 python main.py --prepare-data --aiml --epub --refresh-cache
@@ -77,7 +74,16 @@ python main.py --export ciencias_naturales+programacion --formats gguf
 python main.py --chat
 
 # Chat with CPU optimization
-python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
+python main.py --chat --cpu --num_cores 4 --num_threads 4
+
+# List models
+python main.py --list-models
+
+# Show model layer details
+python main.py --model-info chat_model
+
+# Enumerate GPUs
+python main.py --gpu-enum
 
 # Inspect cache metadata
 python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.pkl','rb')))"
@@ -263,11 +269,11 @@ python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.p
 | Issue | Fix |
 |-------|-----|
 | Import errors | Activate venv: `.\envMyIAModelChat\Scripts\Activate.ps1` |
-| CUDA out of memory | Use `--use-cpuonly` or reduce batch_size |
+| CUDA out of memory | Use `--cpu` or reduce batch_size |
 | Gibberish responses | Ensure `model.eval()` and check tokenizer match |
 | Tokenizer mismatch | Use same checkpoint for train & inference |
 | No data loaded | Run `--prepare-data` first, check source folders |
-| Slow training | Use `--use-cache`, increase `num_workers` |
+| Slow training | Increase `num_workers`, use GPU with `--gpu` |
 | PDF/EPUB not loading | Verify PyPDF2/ebooklib installed, files in correct folders |
 | Repetitive responses | Adjust `no_repeat_ngram_size`, `temperature` |
 | Short responses | Increase `min_length` parameter |

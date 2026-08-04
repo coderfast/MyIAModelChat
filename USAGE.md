@@ -10,22 +10,19 @@ with the MyIAModelChat model. Supports AIML, PDF, EPUB, and Hugging Face dataset
 ================================================================================
 
 TRAIN MODE (build/train the model):
-    python main.py --train --epochs 30 --aiml --pdf --epub --use-cache
+    python main.py --train --epochs 30
 
 CHAT MODE (run interactive chat):
-    python main.py --chat --use-cpuonly --num_cores 4 --num_threads 4
+    python main.py --chat --cpu --num_cores 4 --num_threads 4
 
-PREPARE DATASETS (validate data without training):
+PREPARE DATASETS (validate data and create cache):
     python main.py --prepare-data --aiml --pdf --epub
-
-USE CACHED DATASET (skip data loading, much faster):
-    python main.py --prepare-data --aiml --pdf --epub --use-cache
 
 REFRESH CACHE (rebuild cached dataset):
     python main.py --prepare-data --aiml --pdf --epub --refresh-cache
 
 TOKENIZE ONLY (prepare vocabulary without training):
-    python main.py --train --onlytokenize --aiml --pdf --epub
+    python main.py --train --onlytokenize
 
 ================================================================================
                         COMMAND LINE ARGUMENTS
@@ -35,17 +32,15 @@ Primary Mode Arguments (choose one):
 ================================================================================
 
 --train
-    Description: Run training mode
+    Description: Run training mode (uses cached dataset from --prepare-data)
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train --aiml --epochs 30
+    Example: python main.py --train --epochs 30
     Notes:
-        - Loads AIML, PDF, EPUB, and/or Hugging Face datasets
-        - Builds vocabulary from all text data using SentencePiece BPE
-        - Trains the neural model with LSTM architecture
-        - Saves: checkpoints/chat_model_best.pth and checkpoints/tokenizer.pkl
+        - Uses cached dataset (must run --prepare-data first)
+        - Trains the GPT-2 Transformer model
+        - Saves checkpoints to checkpoints/ directory
         - Can be interrupted with ESC key
-        - Supports bilingual EN/ES text processing
 
 --chat
     Description: Run inference/chat mode (interactive dialogue)
@@ -74,23 +69,6 @@ Primary Mode Arguments (choose one):
         - Useful before starting training to verify data quality
         - Helps identify data issues early
         - Supports schema alignment for dataset concatenation
-
---use-cache
-    Description: Load cached dataset instead of reloading from sources
-    Type: Boolean flag (no value needed)
-    Default: False
-    Example: python main.py --prepare-data --aiml --hf --use-cache
-    Requirements:
-        - Must have run --prepare-data first to create cache
-        - Cache persists in dataset_cache/ directory
-    Benefits:
-        - Skips all data loading (MUCH faster - seconds vs minutes)
-        - Useful for repeated runs with same data
-        - Ideal for model parameter tuning
-    Notes:
-        - Does NOT refresh data from original sources
-        - Use --refresh-cache to update cached data
-        - Works with --train and --prepare-data modes
 
 --bpe-vocab-size <N>
     Description: Vocabulary size for SentencePiece BPE tokenizer (triggers BPE training automatically)
@@ -300,7 +278,6 @@ Contamination Filtering Arguments:
     Notes:
         - Removes old dataset_cache/ directory
         - Reloads all data from sources
-        - Slower than --use-cache but ensures latest data
         - Automatically saves new cache
 
 --clear-cache
@@ -327,27 +304,29 @@ Cache Size: Typically 100MB - 1GB depending on data sources
 
 Typical Cache Workflow:
     1. python main.py --prepare-data --aiml --hf     (5-30 seconds, creates cache)
-    2. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
-    3. python main.py --prepare-data --aiml --hf --use-cache  (<2 seconds, uses cache)
-    4. python main.py --prepare-data --aiml --hf --refresh-cache  (5-30 seconds, updates)
+    2. python main.py --train --epochs 30             (uses cached data)
+    3. python main.py --prepare-data --aiml --hf --refresh-cache  (5-30 seconds, updates)
 
 Quick verification (BPE + cached training smoke test):
     # Prepare data with BPE and build tokenized cache
     python main.py --prepare-data --aiml --hf --bpe-vocab-size 2000 --refresh-cache
 
     # Run a very short training using the cached token_ids to verify integration
-    python main.py --train --use-cache --epochs 1
+    python main.py --train --epochs 1
 
 ================================================================================
 
 Data Source Arguments (use with --train or --prepare-data):
 ================================================================================
 
+Data Source Arguments (for --prepare-data only):
+================================================================================
+
 --aiml
-    Description: Include AIML files in training data
+    Description: Include AIML files in dataset
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train --aiml
+    Example: python main.py --prepare-data --aiml
     Notes:
         - Loads AIML files from aiml_dev/ directory
         - Contains ~60 dialogue pattern files
@@ -355,10 +334,10 @@ Data Source Arguments (use with --train or --prepare-data):
         - Recommended for dialogue variety
 
 --pdf
-    Description: Include PDF documents in training data
+    Description: Include PDF documents in dataset
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train --pdf
+    Example: python main.py --prepare-data --pdf
     Notes:
         - Loads PDF files from datasets_source/pdf/ directory
         - Uses PyPDF2 for automatic text extraction
@@ -366,10 +345,10 @@ Data Source Arguments (use with --train or --prepare-data):
         - Place PDF files in datasets_source/pdf/ folder
 
 --epub
-    Description: Include EPUB e-books in training data
+    Description: Include EPUB e-books in dataset
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train --epub
+    Example: python main.py --prepare-data --epub
     Notes:
         - Loads EPUB files from datasets_source/epub/ directory
         - Uses ebooklib for e-book parsing
@@ -381,30 +360,94 @@ Data Source Arguments (use with --train or --prepare-data):
     Description: Include Hugging Face datasets
     Type: Boolean flag (no value needed)
     Default: False
-    Example: python main.py --train --hf
+    Example: python main.py --prepare-data --hf
     Notes:
         - Loads public datasets from Hugging Face
         - Examples: wikitext, bookcorpus, common_voice, opus_100
         - Requires internet connection
         - Larger vocabulary and more examples
 
+--web
+    Description: Include web documentation data
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --web
+    Notes:
+        - Scrapes web pages for training data
+        - Reads URLs from --web-url flag or datasets_source/web/urls.txt
+        - Requires internet connection
+
+--csv
+    Description: Include CSV data files
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --prepare-data --csv
+    Notes:
+        - Loads CSV files from datasets_source/csv/ directory
+        - Expects text column for training data
+
     Combine multiple data sources:
-        python main.py --train --aiml --pdf --epub --hf
+        python main.py --prepare-data --aiml --pdf --epub --hf
 
 ================================================================================
 
 Performance & Hardware Arguments:
 ================================================================================
 
---use-cpuonly
+--cpu
     Description: Force CPU usage even if GPU is available
     Type: Boolean flag (no value needed)
     Default: False (auto-detect GPU)
-    Example: python main.py --train --use-cpuonly
+    Example: python main.py --train --cpu
     Notes:
         - Useful for testing or when GPU memory is insufficient
         - Prevents CUDA-related errors
         - Slower than GPU but more stable
+
+--gpu [N,N,...]
+    Description: Use GPU for training/inference
+    Type: Optional string (no value=auto GPU, or comma-separated indices)
+    Default: auto-detect best available GPU
+    Example: python main.py --train --gpu 0
+    Example: python main.py --train --gpu 0,1  (DDP multi-GPU)
+    Notes:
+        - Without value: uses default CUDA GPU
+        - With indices: uses specific GPUs (e.g. 0,1,2)
+        - Multiple GPUs automatically use DistributedDataParallel
+
+--vulkan
+    Description: Force Vulkan backend (if available)
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --train --vulkan
+    Notes:
+        - Requires PyTorch with Vulkan support
+        - Experimental: not all operations supported
+
+--cpu+gpu N,N,...
+    Description: CPU+GPU hybrid mode (split model layers by VRAM)
+    Type: String (GPU indices)
+    Example: python main.py --train --cpu+gpu 0
+    Notes:
+        - Loads as many layers as GPU VRAM allows
+        - Remaining layers stay on CPU
+        - Useful when model doesn't fully fit in GPU memory
+
+--gpu-enum
+    Description: Enumerate available GPUs and exit
+    Type: Boolean flag (no value needed)
+    Example: python main.py --gpu-enum
+    Notes:
+        - Shows GPU name, VRAM, compute capability
+        - Shows AI recommendation level for each GPU
+
+--model-info NAME
+    Description: Show detailed layer info for a specific model
+    Type: String (model name)
+    Example: python main.py --model-info chat_model
+    Notes:
+        - Shows all layer names, shapes, parameter counts
+        - Shows total model size and parameter count
 
 --num_cores <N>
     Description: Number of CPU cores for multiprocessing
@@ -467,20 +510,26 @@ TRAINING EXAMPLES:
 1. Basic training with default settings:
     python main.py --train
 
-2. Train with AIML data for 30 epochs:
-    python main.py --train --aiml --epochs 30
+2. Train for 30 epochs:
+    python main.py --train --epochs 30
 
-3. Train with multiple sources (recommended):
-    python main.py --train --aiml --pdf --epub --hf --epochs 50
+3. Train with optimized performance (assuming 16 CPU cores):
+    python main.py --train --epochs 30 --num_cores 12 --num_threads 6
 
-4. Train with optimized performance (assuming 16 CPU cores):
-    python main.py --train --aiml --pdf --epub --epochs 30 --num_cores 12 --num_threads 6
+4. Just build vocabulary without training:
+    python main.py --train --onlytokenize
 
-5. Just build vocabulary without training:
-    python main.py --train --onlytokenize --aiml --pdf --epub
+5. Extensive training with maximum cores and CPU-only:
+    python main.py --train --epochs 100 --num_cores 16 --num_threads 8 --cpu
 
-6. Extensive training with maximum cores and CPU-only:
-    python main.py --train --aiml --pdf --epub --hf --epochs 100 --num_cores 16 --num_threads 8 --use-cpuonly
+6. Train on specific GPU:
+    python main.py --train --gpu 0 --epochs 30
+
+7. Train on multiple GPUs (DDP):
+    python main.py --train --gpu 0,1 --epochs 30
+
+8. Train CPU+GPU hybrid:
+    python main.py --train --cpu+gpu 0 --epochs 30
 
 ================================================================================
 
@@ -517,8 +566,8 @@ Dataset caching enables fast repeated runs without reloading source data.
 4. Prepare multiple sources (recommended):
     python main.py --prepare-data --aiml --pdf --epub
 
-5. Load from cache on second run (MUCH faster):
-    python main.py --prepare-data --aiml --pdf --epub --use-cache
+5. Load from cache on second run (automatic):
+    python main.py --train --epochs 10
 
 6. Refresh cache after adding new documents:
     python main.py --prepare-data --aiml --pdf --epub --refresh-cache
@@ -530,16 +579,16 @@ Dataset caching enables fast repeated runs without reloading source data.
     python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
 
-9. Complete workflow with caching (prepare → cache → train → chat):
+9. Complete workflow (prepare -> train -> chat):
     python main.py --prepare-data --aiml --pdf --epub
-    python main.py --train --aiml --pdf --epub --epochs 30 --use-cache
+    python main.py --train --epochs 30
     python main.py --chat
 
-10. Workflow for repeated experiments (use cache to save time):
+10. Workflow for repeated experiments (cache is automatic):
     python main.py --prepare-data --aiml --pdf --epub          (first time: ~30 seconds)
-    python main.py --train --aiml --pdf --epub --epochs 10     (uses cache)
-    python main.py --train --aiml --pdf --epub --epochs 20     (uses cache)
-    python main.py --train --aiml --pdf --epub --epochs 30     (uses cache)
+    python main.py --train --epochs 10
+    python main.py --train --epochs 20
+    python main.py --train --epochs 30
 
 ================================================================================
 
@@ -585,24 +634,23 @@ BATCH PROCESSING EXAMPLES:
 
 Run multiple training sessions with data preparation:
     python main.py --prepare-data --aiml --hf
-    python main.py --train --aiml --epochs 5
-    python main.py --train --aiml --hf --epochs 10
+    python main.py --train --epochs 5
+    python main.py --train --epochs 10
 
 Train, then switch to chat:
-    python main.py --train --aiml --epochs 5
+    python main.py --train --epochs 5
     python main.py --chat
 
-Complete workflow (prepare → tokenize → train → chat):
+Complete workflow (prepare -> train -> chat):
     python main.py --prepare-data --aiml --hf
-    python main.py --train --onlytokenize --aiml --hf
-    python main.py --train --aiml --hf --epochs 20 --num_cores 8
+    python main.py --train --epochs 20 --num_cores 8
     python main.py --chat
 
 Workflow with cached data (fast iteration):
-    python main.py --prepare-data --aiml --hf          (first run, cached)
-    python main.py --train --aiml --epochs 5           (uses cache)
-    python main.py --train --aiml --epochs 10          (uses cache)
-    python main.py --train --aiml --epochs 15          (uses cache)
+    python main.py --prepare-data --aiml --hf          (first run, creates cache)
+    python main.py --train --epochs 5
+    python main.py --train --epochs 10
+    python main.py --train --epochs 15
 
 ================================================================================
                         EXPECTED FILE OUTPUTS
@@ -627,12 +675,13 @@ Dataset cache can be safely deleted with --clear-cache or manually.
 ================================================================================
 
 Error: "No such file or directory: checkpoints/tokenizer.pkl"
-    → Run training first: python main.py --train --aiml
-    → Or: python main.py --train --onlytokenize --aiml --pdf --epub
+    → Run data preparation first: python main.py --prepare-data --aiml
+    → Then train: python main.py --train
 
 Error: "CUDA out of memory"
-    → Use --use-cpuonly flag
-    → Reduce num_cores: python main.py --train --num_cores 2 --use-cpuonly
+    → Use --cpu flag
+    → Use --cpu+gpu 0 to split layers across CPU and GPU
+    → Reduce num_cores: python main.py --train --num_cores 2 --cpu
 
 Error: Directory "aiml_dev/" not found
     → Current directory must be project root
@@ -644,9 +693,9 @@ Error: PDF/EPUB loading fails
     → Verify file formats are valid
 
 Training too slow:
-    → Use --use-cache after first --prepare-data run
     → Increase num_cores: --num_cores 16
-    → Use GPU if available (remove --use-cpuonly)
+    → Use GPU if available (remove --cpu)
+    → Use --gpu 0 for GPU acceleration
     → Reduce epochs for testing: --epochs 5
 
 Training stuck or unresponsive:
@@ -671,7 +720,7 @@ Modifying Model Architecture:
 Changing Tokenizer Settings:
     Edit --bpe-vocab-size flag (default: 8000):
         python main.py --prepare-data --aiml --bpe-vocab-size 16000
-    Then retrain: python main.py --train --use-cache --epochs 30
+    Then retrain: python main.py --train --epochs 30
 
 Using Different Data Directories:
     Place files in:
@@ -749,14 +798,13 @@ Check GPU availability:
     python main.py --train --onlytokenize --aiml --hf
 
 4. Train Model (uses cached data from step 2):
-    python main.py --train --aiml --hf --epochs 20 --num_cores 8
+    python main.py --train --epochs 20 --num_cores 8
 
 5. Test Chat:
     python main.py --chat
 
-6. Iterate (use --use-cache for fast repeated runs):
-    python main.py --prepare-data --aiml --hf --use-cache
-    python main.py --train --aiml --hf --epochs 30 --num_cores 8
+6. Iterate (cache is automatic):
+    python main.py --train --epochs 30 --num_cores 8
     python main.py --chat
     
 7. If source data changes:
@@ -765,7 +813,7 @@ Check GPU availability:
 
 8. To clean up disk space:
     python main.py --clear-cache
-    - Retrain: python main.py --train --aiml --epochs 10
+    - Retrain: python main.py --train --epochs 10
     - Monitor loss convergence and stop early if plateau reached
 
 ================================================================================

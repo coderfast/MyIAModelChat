@@ -48,8 +48,8 @@ The system includes intelligent caching for 12x faster training iterations:
 # First time: Prepare and cache datasets
 python main.py --prepare-data --aiml --pdf --epub
 
-# Subsequent training: Use cached data
-python main.py --train --use-cache --epochs 30
+# Train model (always uses cached data)
+python main.py --train --epochs 30
 
 # Refresh cache after adding new data
 python main.py --prepare-data --pdf --epub --refresh-cache
@@ -99,24 +99,11 @@ from dataset_preparer.data_preparer import DataPreparer
 
 preparer = DataPreparer(args)
 
-# Load from cache if available
-if use_cache and os.path.exists('dataset_cache'):
+# Always use cached dataset (created by --prepare-data)
+if os.path.exists('dataset_cache'):
     final_dataset = preparer.load_cached_dataset()
 else:
-    # Load fresh data
-    aiml_dataset = preparer._load_aiml_data()
-    pdf_dataset = preparer._load_pdf_data()
-    epub_dataset = preparer._load_epub_data()
-    hf_dataset = load_dataset('wikitext')
-
-    # Combine all datasets (with schema alignment)
-    final_dataset = concatenate_datasets([aiml_dataset, pdf_dataset, epub_dataset, hf_dataset])
-
-    # Cache for future use
-    preparer.cache_dataset(final_dataset)
-
-# Create DataLoader with multiprocessing
-loader = DataLoader(final_dataset, batch_size=32, num_workers=4)
+    raise RuntimeError("No cached dataset found. Run: python main.py --prepare-data --aiml --hf")
 ```
 
 ## Training Configuration
@@ -126,30 +113,27 @@ loader = DataLoader(final_dataset, batch_size=32, num_workers=4)
 ```bash
 python main.py --train \
     --epochs 30 \
-    --dataset datasets_source/my_data/ \
     --checkpoint-name my_model \
-    --use-cache \
-    --aiml \
-    --pdf \
-    --epub \
-    --hf \
-    --use-cpuonly \
+    --cpu \
     --num_cores 4
 ```
 
 | Argument | Purpose | Default |
 |----------|---------|---------|
 | `--epochs` | Number of training epochs | 1 |
-| `--dataset` | Path to dataset directory | `dataset_cache` |
 | `--checkpoint-name` | Name for saved checkpoint | `chat_model` |
-| `--use-cache` | Use cached datasets for speed | False |
-| `--aiml` | Include AIML datasets | False |
-| `--pdf` | Include PDF document datasets | False |
-| `--epub` | Include EPUB e-book datasets | False |
-| `--hf` | Include Hugging Face datasets | False |
+| `--aiml` | Include AIML datasets (prepare-data only) | False |
+| `--pdf` | Include PDF document datasets (prepare-data only) | False |
+| `--epub` | Include EPUB e-book datasets (prepare-data only) | False |
+| `--hf` | Include Hugging Face datasets (prepare-data only) | False |
 | `--csv` | Include CSV datasets | False |
 | `--web` | Include web scraping datasets | False |
-| `--use-cpuonly` | Force CPU training | False |
+| `--cpu` | Force CPU training | False |
+| `--gpu [N,N,...]` | Use GPU (auto or specific indices) | auto |
+| `--vulkan` | Force Vulkan backend | False |
+| `--cpu+gpu N,N,...` | CPU+GPU hybrid (split by VRAM) | - |
+| `--gpu-enum` | Enumerate available GPUs and exit | - |
+| `--model-info NAME` | Show model layer details | - |
 | `--num_cores` | CPU cores for DataLoader workers | auto |
 | `--num_threads` | Additional threads per worker | auto |
 | `--onlytokenize` | Run tokenization only, skip training | False |
@@ -270,7 +254,8 @@ for epoch in range(epochs):
 
 **Out of Memory (OOM)**
 - Reduce batch size
-- Use `--use-cpuonly` for CPU training
+- Use `--cpu` for CPU training
+- Use `--cpu+gpu 0` to split layers across CPU and GPU
 - Reduce sequence length (max_len parameter)
 - Use gradient accumulation
 
