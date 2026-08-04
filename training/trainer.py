@@ -98,8 +98,9 @@ class TrainingConfig:
     epochs: int = 1
     checkpoint_name: str = 'chat_model'
     dataset_source: str = 'dataset_cache'
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     num_cores: int = 0
     num_threads: int = 0
     max_ram_fraction: float = 0.75
@@ -128,7 +129,6 @@ class Trainer:
         self.use_gpu = False
         self.use_mixed_precision = False
         self.use_gradient_checkpointing = False
-        self.use_cpuonly = False
         self.best_loss = float('inf')
 
         # Thinking detection
@@ -142,8 +142,9 @@ class Trainer:
 
         # Training parameters
         self.epochs = self.config.epochs
-        self.use_cpuonly = getattr(self.config, 'use_cpuonly', False)
-        self.cuda_device = getattr(self.config, 'cuda_device', None)
+        self.device_mode = getattr(self.config, 'device_mode', 'auto')
+        self.gpu_indices = getattr(self.config, 'gpu_indices', None) or []
+        self.use_vulkan = getattr(self.config, 'use_vulkan', False)
 
         # Dynamic checkpoint naming
         self.checkpoint_name = getattr(self.config, 'checkpoint_name', 'chat_model')
@@ -366,113 +367,207 @@ class Trainer:
                         yield text_tokens, None
 
     def _setup_device_and_config(self):
-        """Setup device configuration with CPU-GPU combined strategy and mixed precision support."""
-        
-        # Force CPU if requested
-        if self.use_cpuonly:
-            cuda_available = False
-        else:
-            # If user specified --cuda-device, torch should read CUDA_VISIBLE_DEVICES set by main.py
-            cuda_available = torch.cuda.is_available()
+        """Setup device configuration with support for CPU, GPU, Vulkan, DDP, and CPU+GPU."""
+        from commons.utils.device_utils import check_vulkan_available, resolve_device
 
-        # If explicit device is set and available, force it on torch
-        if self.cuda_device is not None and not self.use_cpuonly:
-            try:
-                selected = int(str(self.cuda_device).split(',')[0])
-                torch.cuda.set_device(selected)
-            except Exception:
-                pass
+        device_mode = self.device_mode
+        gpu_indices = self.gpu_indices or []
+        use_vulkan = self.use_vulkan
 
-        if cuda_available:
-            device_name = torch.cuda.get_device_name(0)
-            device_capability = torch.cuda.get_device_capability(0)
-            total_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-            
+        # --- CPU puro ---
+        if device_mode == 'cpu':
             logger.info("=" * 80)
-            logger.info(f"GPU DETECTED: {device_name}")
-            logger.info(f"  Compute Capability: {device_capability[0]}.{device_capability[1]}")
-            logger.info(f"  Total Memory: {total_memory:.2f} GB")
-            logger.info("=" * 80)
-            
-            # Check for Tesla K80
-            if "K80" in device_name or "Tesla" in device_name:
-                logger.info(" Tesla K80 GPU detected - using optimized configuration")
-                self.use_gpu = True
-                self.use_mixed_precision = True
-                self.use_gradient_checkpointing = True
-                # Tesla K80 has 24GB per GPU, enable memory efficient training
-                torch.cuda.set_per_process_memory_fraction(0.9)
-            else:
-                logger.info(" CUDA GPU detected - using optimized configuration")
-                self.use_gpu = True
-                self.use_mixed_precision = True
-                self.use_gradient_checkpointing = False
-            
-            device = torch.device("cuda:0")
-        else:
-            logger.info("=" * 80)
-            logger.info("NO GPU DETECTED - Using CPU training")
+            logger.info("CPU-ONLY MODE ENABLED")
             logger.info("=" * 80)
             self.use_gpu = False
             self.use_mixed_precision = False
             self.use_gradient_checkpointing = False
-            device = torch.device("cpu")
-        
-        # Enable cudnn benchmarking for faster training
-        if cuda_available:
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.enabled = True
-            logger.info(" CuDNN optimization enabled")
-        
+            return torch.device('cpu')
+
+        # --- Vulkan ---
+        if use_vulkan:
+            if not check_vulkan_available():
+                raise RuntimeError("Vulkan requested but not available on this system")
+            logger.info("=" * 80)
+            logger.info("VULKAN MODE ENABLED")
+            logger.info("=" * 80)
+            self.use_gpu = False
+            self.use_mixed_precision = False
+            self.use_gradient_checkpointing = False
+            return torch.device('vulkan')
+
+        # --- GPU (una o multiples) ---
+        if not torch.cuda.is_available():
+            logger.warning("CUDA not available, falling back to CPU")
+            self.use_gpu = False
+            self.use_mixed_precision = False
+            self.use_gradient_checkpointing = False
+            return torch.device('cpu')
+
+        # Configure CUDA_VISIBLE_DEVICES if explicit indices
+        if gpu_indices:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(str(i) for i in gpu_indices)
+            torch.cuda.set_device(gpu_indices[0])
+
+        # Log detected GPUs
+        num_gpus = torch.cuda.device_count()
+        logger.info("=" * 80)
+        logger.info(f"GPU DETECTED: {num_gpus} device(s)")
+        for i in range(num_gpus):
+            name = torch.cuda.get_device_name(i)
+            props = torch.cuda.get_device_properties(i)
+            mem = props.total_memory / (1024 ** 3)
+            cc = f"{props.major}.{props.minor}"
+            logger.info(f"  GPU {i}: {name} | VRAM: {mem:.2f} GB | Compute: {cc}")
+        logger.info("=" * 80)
+
+        # DDP info
+        if len(gpu_indices) > 1:
+            logger.info(f"Multi-GPU mode: {len(gpu_indices)} devices -> DistributedDataParallel")
+
+        # Configure for specific GPU types
+        device_idx = gpu_indices[0] if gpu_indices else 0
+        device_name = torch.cuda.get_device_name(device_idx)
+
+        if "K80" in device_name or "Tesla" in device_name:
+            logger.info("Tesla K80 GPU detected - using optimized configuration")
+            self.use_gradient_checkpointing = True
+            torch.cuda.set_per_process_memory_fraction(0.9)
+        else:
+            self.use_gradient_checkpointing = False
+
+        self.use_gpu = True
+        self.use_mixed_precision = True
+
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        logger.info("CuDNN optimization enabled")
+
         logger.info(f"Mixed Precision Training: {'ENABLED' if self.use_mixed_precision else 'DISABLED'}")
         logger.info(f"Gradient Checkpointing: {'ENABLED' if self.use_gradient_checkpointing else 'DISABLED'}")
+
+        device = torch.device(f'cuda:{device_idx}')
         logger.info(f"Training Device: {device}")
-        
         return device
 
     def _setup_model_with_device_strategy(self, model, device):
-        """Setup model with CPU-GPU combined device strategy for efficient memory usage."""
-        
-        if not self.use_gpu:
-            # CPU only - move entire model to CPU
+        """Setup model with CPU, GPU, DDP, or CPU+GPU device strategy."""
+        import gc
+        from commons.utils.device_utils import calculate_layers_for_vram
+
+        device_mode = self.device_mode
+        gpu_indices = self.gpu_indices or []
+
+        # --- CPU puro ---
+        if device_mode == 'cpu':
             model = model.to(device)
             logger.info("Model deployed on CPU")
             return model
-        
-        # GPU available - use intelligent device placement
+
+        # --- CPU+GPU: distribucion por capas ---
+        if device_mode == 'cpu+gpu':
+            return self._setup_model_cpu_gpu_split(model, device)
+
+        # --- GPU estandar (1 o DDP) ---
         try:
-            # Move model to GPU
             model = model.to(device)
-            logger.info(f"Model deployed on GPU: {device}")
-            
+
+            # DDP si multiples GPUs
+            if len(gpu_indices) > 1:
+                import torch.distributed as dist
+                from torch.nn.parallel import DistributedDataParallel as DDP
+
+                if not dist.is_initialized():
+                    os.environ['MASTER_ADDR'] = 'localhost'
+                    os.environ['MASTER_PORT'] = '12355'
+                    dist.init_process_group(backend='nccl', rank=0, world_size=len(gpu_indices))
+
+                model = DDP(model, device_ids=gpu_indices)
+                logger.info(f"Model wrapped with DDP on devices: {gpu_indices}")
+
             # Enable gradient checkpointing if available
             if self.use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
                 model.gradient_checkpointing_enable()
-                logger.info(" Gradient checkpointing enabled for memory efficiency")
-            
-            # For very large models, we can implement layer-wise CPU-GPU distribution
-            # This is useful for models that don't fit in GPU memory
-            if hasattr(model, 'get_total_params'):
-                total_params = model.get_total_params()
-                gpu_memory_available = torch.cuda.get_device_properties(device).total_memory / 1e9
-                estimated_model_memory = (total_params * 4) / 1e9  # Rough estimate in GB
-                
-                if estimated_model_memory > gpu_memory_available * 0.8:
-                    logger.warning(f"Model size ({estimated_model_memory:.2f}GB) approaches GPU memory ({gpu_memory_available:.2f}GB)")
-                    logger.info("Implementing model parallellism across CPU and GPU...")
-                    # Keep model on GPU but use CPU offloading where possible
-                    if hasattr(model, 'cpu_offload'):
-                        model.cpu_offload()
-            
+                logger.info("Gradient checkpointing enabled for memory efficiency")
+
+            logger.info(f"Model deployed on GPU: {device}")
             return model
-            
+
         except RuntimeError as e:
-            logger.warning(f"Could not move model to GPU: {e}")
-            logger.info("Falling back to CPU training...")
+            logger.warning(f"Could not move model to GPU: {e}, falling back to CPU")
             model = model.to(torch.device("cpu"))
             self.use_gpu = False
             self.use_mixed_precision = False
             return model
+
+    def _setup_model_cpu_gpu_split(self, model, gpu_device):
+        """Distribute model layers across CPU and GPU based on VRAM budget."""
+        import gc
+        from commons.utils.device_utils import calculate_layers_for_vram
+
+        model = model.to('cpu')
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        # Get transformer layers
+        transformer_layers = None
+        if hasattr(model, 'model') and hasattr(model.model, 'transformer'):
+            transformer_layers = model.model.transformer.h
+        if transformer_layers is None or len(transformer_layers) == 0:
+            logger.warning("Cannot split model: no transformer layers found. Using GPU only.")
+            return model.to(gpu_device)
+
+        num_layers = len(transformer_layers)
+        gpu_props = torch.cuda.get_device_properties(gpu_device)
+        gpu_memory_gb = gpu_props.total_memory / (1024 ** 3)
+        vram_budget = gpu_memory_gb * 0.80  # 80% usable
+
+        # Estimate memory per layer (params * 4 bytes FP32)
+        total_layer_params = sum(p.numel() for p in transformer_layers.parameters())
+        params_per_layer = total_layer_params / num_layers
+        mem_per_layer_gb = (params_per_layer * 4) / (1024 ** 3)
+
+        # Embeddings + lm_head memory
+        overhead_params = 0
+        if hasattr(model.model.transformer, 'wte'):
+            overhead_params += sum(p.numel() for p in model.model.transformer.wte.parameters())
+        if hasattr(model.model.transformer, 'wpe'):
+            overhead_params += sum(p.numel() for p in model.model.transformer.wpe.parameters())
+        if hasattr(model, 'lm_head'):
+            overhead_params += sum(p.numel() for p in model.lm_head.parameters())
+        overhead_gb = (overhead_params * 4) / (1024 ** 3)
+
+        # Calculate layers that fit
+        available_for_layers = vram_budget - overhead_gb
+        layers_on_gpu = min(num_layers, max(1, int(available_for_layers / mem_per_layer_gb))) if available_for_layers > 0 else 0
+
+        logger.info("=" * 80)
+        logger.info("CPU+GPU MODEL SPLIT")
+        logger.info(f"  GPU: {gpu_props.name} ({gpu_memory_gb:.2f} GB)")
+        logger.info(f"  Total layers: {num_layers}")
+        logger.info(f"  VRAM budget: {vram_budget:.2f} GB")
+        logger.info(f"  Overhead (embeddings + head): {overhead_gb:.4f} GB")
+        logger.info(f"  Layers on GPU: {layers_on_gpu}")
+        logger.info(f"  Layers on CPU: {num_layers - layers_on_gpu}")
+        logger.info("=" * 80)
+
+        # Move embeddings + head to GPU
+        if hasattr(model.model.transformer, 'wte'):
+            model.model.transformer.wte = model.model.transformer.wte.to(gpu_device)
+        if hasattr(model.model.transformer, 'wpe'):
+            model.model.transformer.wpe = model.model.transformer.wpe.to(gpu_device)
+        if hasattr(model, 'lm_head'):
+            model.lm_head = model.lm_head.to(gpu_device)
+
+        # Move first N layers to GPU
+        for i in range(layers_on_gpu):
+            transformer_layers[i] = transformer_layers[i].to(gpu_device)
+
+        self._gpu_layers_count = layers_on_gpu
+        self._gpu_device = gpu_device
+
+        return model
 
     def _compute_loss(self, model, inputs, targets, criterion):
         """Unified loss computation with thinking-aware loss weighting.

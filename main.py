@@ -22,10 +22,11 @@ except ImportError:
 import torch
 
 # Import from new module structure
-from commons.registry.model_registry import list_models_cli
+from commons.registry.model_registry import list_models_cli, display_model_info
 from commons.registry.model_merge import merge_from_names, parse_merge_spec
 from commons.registry.model_export import export_cli
 from dataset_preparer.data_preparer import prepare_datasets_for_training, DataPreparer
+from commons.utils.device_utils import enumerate_gpus
 from training.trainer import Trainer, TrainingConfig
 from inference.chat_engine import ChatEngine, ChatConfig
 
@@ -87,8 +88,8 @@ SYSTEM_CONFIG = {
 
 def validate_arguments(args):
     """Validate command-line arguments for consistency."""
-    if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.export):
-        return False, "Please specify: --train, --chat, --prepare-data, --clear-cache, --list-models, or --export"
+    if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.model_info or args.export):
+        return False, "Please specify: --train, --chat, --prepare-data, --clear-cache, --list-models, --model-info, or --export"
 
     if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
         return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, or --web"
@@ -111,13 +112,35 @@ def validate_arguments(args):
     if args.max_ram_fraction < 0 or args.max_ram_fraction > 1:
         return False, "--max-ram-fraction must be between 0 and 1"
 
-    if args.cuda_device is not None:
+    # Device mutual exclusion
+    if args.cpu and args.gpu is not None:
+        return False, "--cpu and --gpu are mutually exclusive"
+
+    if args.vulkan and args.gpu is not None:
+        return False, "--vulkan and --gpu are mutually exclusive"
+
+    if args.vulkan and args.cpu:
+        return False, "--vulkan and --cpu are mutually exclusive"
+
+    if args.cpu_gpu is not None and (args.cpu or args.gpu is not None):
+        return False, "--cpu+gpu is mutually exclusive with --cpu and --gpu"
+
+    # Validate GPU indices
+    if args.gpu is not None and args.gpu != '':
         try:
-            device_ids = [int(x) for x in str(args.cuda_device).split(',')]
+            device_ids = [int(x) for x in args.gpu.split(',')]
             if any(d < 0 for d in device_ids):
                 raise ValueError
         except Exception:
-            return False, "--cuda-device must be kernel indices like '0' or '0,1'"
+            return False, "--gpu must be indices like '0' or '0,1'"
+
+    if args.cpu_gpu is not None:
+        try:
+            device_ids = [int(x) for x in args.cpu_gpu.split(',')]
+            if any(d < 0 for d in device_ids):
+                raise ValueError
+        except Exception:
+            return False, "--cpu+gpu must be indices like '0' or '0,1'"
 
     if args.epochs < 1 and args.train:
         return False, "--epochs must be >= 1"
@@ -218,7 +241,13 @@ DATA SOURCES (required with --train or --prepare-data):
 
 TRAINING OPTIONS:
   --epochs NUM         Number of training epochs (default: 1)
-  --use-cpuonly        Force CPU-only execution (disable GPU)
+
+DEVICE SELECTION:
+  --cpu                Force CPU-only execution (disable GPU)
+  --gpu [N,N,...]      Use GPU (no args=default GPU, or specific indices like 0,1)
+  --vulkan             Force Vulkan backend (if available)
+  --gpu-enum           Enumerate available GPUs and exit
+  --cpu+gpu N,N,...    CPU+GPU hybrid: split layers by VRAM (e.g. --cpu+gpu 0,1)
 
 CPU CONFIGURATION:
   --num-cores NUM       CPU cores for processing (default: {default_num_cores}, 0=all)
@@ -236,13 +265,18 @@ EXAMPLES:
   # Train model (uses cached dataset)
   python main.py --train --epochs 10
   python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --epochs 10
-  python main.py --train --use-cpuonly --num-cores 4 --num-threads 4
+  python main.py --train --cpu --num-cores 4 --num-threads 4
+  python main.py --train --gpu 0 --epochs 10
+  python main.py --train --gpu 0,1 --epochs 10       (DDP multi-GPU)
+  python main.py --train --cpu+gpu 0 --epochs 10     (CPU+GPU hybrid)
 
   python main.py --chat --model ciencias_naturales
   python main.py --chat --model ciencias_naturales+programacion
-  python main.py --chat --use-cpuonly --num-cores 4 --num-threads 4
+  python main.py --chat --cpu --num-cores 4 --num-threads 4
 
+  python main.py --gpu-enum
   python main.py --list-models
+  python main.py --model-info chat_model
   python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
             """
         )
@@ -253,6 +287,8 @@ EXAMPLES:
         parser.add_argument("--prepare-data", action='store_true', help="Prepare datasets only")
         parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets")
         parser.add_argument("--list-models", action='store_true', help="List available trained models")
+        parser.add_argument("--model-info", type=str, default=None, metavar='NAME',
+                            help="Show detailed layer info for a specific model")
         parser.add_argument("--export", type=str, default=None, help="Export model to GGUF/ONNX (name or name+name for merge)")
         parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats (default: gguf,onnx)")
 
@@ -283,11 +319,18 @@ EXAMPLES:
         parser.add_argument("--epochs", type=int, default=1, help="Training epochs (default: 1)")
         parser.add_argument("--use-cache", action='store_true', help="Load cached dataset (for --prepare-data)")
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache (for --prepare-data)")
-        parser.add_argument("--use-cpuonly", action='store_true', help="CPU-only execution")
         parser.add_argument("--statistics", action='store_true', help="Show detailed per-step timing statistics during training")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
-        parser.add_argument("--cuda-device", type=str, default=None,
-                            help="CUDA device index(es), e.g. '0' or '0,1'; ignored with --use-cpuonly")
+
+        # Device selection
+        parser.add_argument("--cpu", action='store_true', help="Force CPU-only execution (disable GPU)")
+        parser.add_argument("--gpu", type=str, nargs='?', const='', default=None,
+                            help="Use GPU: no arg=auto default GPU, or indices like '0' or '0,1'")
+        parser.add_argument("--vulkan", action='store_true', help="Force Vulkan backend (if available)")
+        parser.add_argument("--gpu-enum", action='store_true', help="Enumerate available GPUs and exit")
+        parser.add_argument("--cpu+gpu", type=str, default=None, dest='cpu_gpu',
+                            help="CPU+GPU hybrid mode: split layers by VRAM (e.g. '0' or '0,1')")
+
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
         parser.add_argument("--show-thinking", action='store_true', help="Show <thinking> reasoning in chat")
@@ -367,6 +410,54 @@ EXAMPLES:
         
         args = parser.parse_args()
 
+        # Handle --gpu-enum before validation
+        if args.gpu_enum:
+            gpus = enumerate_gpus()
+            if not gpus:
+                print("No GPUs detected.")
+            else:
+                print("=" * 60)
+                print("GPU ENUMERATION")
+                print("=" * 60)
+                for g in gpus:
+                    rec = "RECOMMENDED" if g['ai_recommended'] else "NOT RECOMMENDED"
+                    print(f"[{g['index']}] {g['name']}")
+                    print(f"    VRAM: {g['vram_total_gb']:.2f} GB ({g['vram_free_gb']:.2f} GB free)")
+                    print(f"    Compute Capability: {g['compute_capability'][0]}.{g['compute_capability'][1]}")
+                    print(f"    Status: {g['status']}")
+                    print(f"    AI Level: {g['ai_level']} — {g['max_model_config']}")
+                    if g['notes']:
+                        print(f"    Notes: {g['notes']}")
+                    print()
+                print("=" * 60)
+            sys.exit(0)
+
+        # Resolve device mode from CLI args
+        if args.cpu:
+            args.device_mode = 'cpu'
+            args.gpu_indices = None
+            args.use_vulkan = False
+        elif args.cpu_gpu is not None:
+            args.device_mode = 'cpu+gpu'
+            args.gpu_indices = [int(x) for x in args.cpu_gpu.split(',')]
+            args.use_vulkan = False
+        elif args.gpu is not None:
+            if args.gpu == '':
+                args.device_mode = 'gpu'
+                args.gpu_indices = None  # auto-detect
+            else:
+                args.device_mode = 'gpu'
+                args.gpu_indices = [int(x) for x in args.gpu.split(',')]
+            args.use_vulkan = False
+        elif args.vulkan:
+            args.device_mode = 'gpu'
+            args.gpu_indices = None
+            args.use_vulkan = True
+        else:
+            args.device_mode = 'auto'
+            args.gpu_indices = None
+            args.use_vulkan = False
+
         # Validate arguments
         is_valid, error_msg = validate_arguments(args)
         if not is_valid:
@@ -377,6 +468,11 @@ EXAMPLES:
         # Handle --list-models
         if args.list_models:
             list_models_cli()
+            sys.exit(0)
+
+        # Handle --model-info
+        if args.model_info:
+            display_model_info(args.model_info)
             sys.exit(0)
 
         # Handle --export
@@ -397,13 +493,13 @@ EXAMPLES:
         logger.info(f"Specified --num-threads: {args.num_threads}")
         logger.info("=" * 80)
         
-        # Handle CPU-only mode or explicit CUDA device selection
-        if args.use_cpuonly:
+        # Handle device mode environment setup
+        if args.device_mode == 'cpu':
             os.environ['CUDA_VISIBLE_DEVICES'] = ''
             logger.info("CPU-only mode enabled (GPU disabled)")
-        elif args.cuda_device is not None:
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_device)
-            logger.info(f"CUDA device(s) forced: {args.cuda_device}")
+        elif args.gpu_indices is not None:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(str(i) for i in args.gpu_indices)
+            logger.info(f"CUDA device(s) forced: {args.gpu_indices}")
         
         # Setup CPU configuration
         setup_cpu_configuration(args)
@@ -435,8 +531,9 @@ EXAMPLES:
                 epochs=args.epochs,
                 checkpoint_name=args.checkpoint_name,
                 dataset_source=args.dataset,
-                use_cpuonly=args.use_cpuonly,
-                cuda_device=args.cuda_device,
+                device_mode=args.device_mode,
+                gpu_indices=args.gpu_indices,
+                use_vulkan=args.use_vulkan,
                 num_cores=args.num_cores,
                 num_threads=args.num_threads,
                 max_ram_fraction=args.max_ram_fraction,
@@ -483,8 +580,9 @@ EXAMPLES:
             logger.info("Starting chat interface...")
             config = ChatConfig(
                 model_name=args.model,
-                use_cpuonly=args.use_cpuonly,
-                cuda_device=args.cuda_device,
+                device_mode=args.device_mode,
+                gpu_indices=args.gpu_indices,
+                use_vulkan=args.use_vulkan,
                 show_thinking=args.show_thinking,
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,

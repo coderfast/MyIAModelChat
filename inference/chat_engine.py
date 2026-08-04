@@ -42,8 +42,9 @@ logger = logging.getLogger(__name__)
 class ChatConfig:
     """Configuration for chat/inference (no CLI args)."""
     model_name: Optional[str] = None
-    use_cpuonly: bool = False
-    cuda_device: Optional[int] = None
+    device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
+    gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
+    use_vulkan: bool = False
     show_thinking: bool = False
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
@@ -94,8 +95,9 @@ class ChatEngine:
         warnings.filterwarnings("ignore", message=".*clean_up_tokenization_spaces.*", category=FutureWarning)
 
         self.config = config
-        self.use_cpuonly = config.use_cpuonly
-        self.cuda_device = config.cuda_device
+        self.device_mode = config.device_mode
+        self.gpu_indices = config.gpu_indices or []
+        self.use_vulkan = config.use_vulkan
         self.show_thinking = config.show_thinking
 
         # Dynamic model resolution
@@ -105,10 +107,6 @@ class ChatEngine:
         else:
             self.ckpt_path = CKPT_PATH
         logger.info(f"Loading model from: {self.ckpt_path}")
-
-        if self.cuda_device is not None and not self.use_cpuonly:
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_device)
-            logger.info("Using CUDA devices limited to: %s", self.cuda_device)
 
         device = self.get_device()
 
@@ -259,21 +257,38 @@ class ChatEngine:
         return CKPT_PATH
 
     def get_device(self):
-        """Get appropriate device."""
-        if self.use_cpuonly:
+        """Get appropriate device based on configuration."""
+        from commons.utils.device_utils import check_vulkan_available
+
+        device_mode = self.device_mode
+        use_vulkan = self.use_vulkan
+        gpu_indices = self.gpu_indices
+
+        if device_mode == 'cpu':
             logger.info("CPU-only mode enabled")
             return torch.device('cpu')
+
+        if use_vulkan:
+            if check_vulkan_available():
+                logger.info("Using Vulkan backend")
+                return torch.device('vulkan')
+            else:
+                raise RuntimeError("Vulkan requested but not available")
+
         if torch.cuda.is_available():
-            try:
-                name = torch.cuda.get_device_name(0)
-                logger.info("Using CUDA: %s", name)
-            except Exception:
-                logger.info("Using CUDA")
-            return torch.device('cuda')
-        if torch.backends.mps.is_available():
-            logger.info("Using MPS")
+            if gpu_indices:
+                device = torch.device(f'cuda:{gpu_indices[0]}')
+                logger.info(f"Using CUDA device {gpu_indices[0]}: {torch.cuda.get_device_name(gpu_indices[0])}")
+            else:
+                device = torch.device('cuda')
+                logger.info(f"Using CUDA: {torch.cuda.get_device_name(0)}")
+            return device
+
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            logger.info("Using MPS (Apple Silicon)")
             return torch.device('mps')
-        logger.info("Using CPU")
+
+        logger.info("No accelerator available, using CPU")
         return torch.device('cpu')
 
     def try_load_checkpoint(self, path, device, trusted):
@@ -476,12 +491,12 @@ def parse_thinking_response(raw_output: str):
 _init_lock = threading.Lock()
 _chat_engine_instance = None
 
-def get_chat_engine_instance(use_cpuonly: bool = False, cuda_device: Optional[int] = None, model: Optional[str] = None):
+def get_chat_engine_instance(device_mode: str = 'auto', gpu_indices: Optional[List[int]] = None, model: Optional[str] = None):
     """Get or create singleton ChatEngine instance."""
     global _chat_engine_instance
     if _chat_engine_instance is None:
         with _init_lock:
             if _chat_engine_instance is None:
-                config = ChatConfig(use_cpuonly=use_cpuonly, cuda_device=cuda_device, model_name=model)
+                config = ChatConfig(device_mode=device_mode, gpu_indices=gpu_indices, model_name=model)
                 _chat_engine_instance = ChatEngine(config)
     return _chat_engine_instance
