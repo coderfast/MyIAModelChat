@@ -525,6 +525,23 @@ EXAMPLES:
         
         # Train
         if args.train:
+            # Detect DDP from torchrun environment
+            if 'RANK' in os.environ:
+                # Executed with torchrun - read config from environment
+                args.rank = int(os.environ['RANK'])
+                args.local_rank = int(os.environ['LOCAL_RANK'])
+                args.world_size = int(os.environ['WORLD_SIZE'])
+                args.master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+                args.master_port = int(os.environ.get('MASTER_PORT', 29500))
+                logger.info(f"DDP detected: rank={args.rank}, local_rank={args.local_rank}, world_size={args.world_size}")
+            else:
+                # Single-process mode
+                args.rank = 0
+                args.local_rank = 0
+                args.world_size = len(args.gpu_indices) if args.gpu_indices and len(args.gpu_indices) > 1 else 1
+                args.master_addr = 'localhost'
+                args.master_port = 29500
+
             logger.info("Initializing training...")
             config = TrainingConfig(
                 epochs=args.epochs,
@@ -541,6 +558,11 @@ EXAMPLES:
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,
                 statistics=args.statistics,
+                rank=args.rank,
+                local_rank=args.local_rank,
+                world_size=args.world_size,
+                master_addr=args.master_addr,
+                master_port=args.master_port,
             )
             trainer = Trainer(config)
             training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=True)

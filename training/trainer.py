@@ -3,6 +3,7 @@ import pickle
 import sys
 import time
 import threading
+import contextlib
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -78,15 +79,26 @@ LATEST_MODEL_FILE = 'chat_model.pth'
 
 class TokenPairIterableDataset(IterableDataset):
     """Iterable dataset that yields input-output token pairs without materializing all in memory."""
-    def __init__(self, sequence_generator, length=None):
+    def __init__(self, sequence_generator, length=None, rank=0, world_size=1):
         self.sequence_generator = sequence_generator
         self._length = length
+        self._rank = rank
+        self._world_size = world_size
 
     def __iter__(self):
+        if self._world_size > 1:
+            return self._sharded_iter()
         return iter(self.sequence_generator())
+
+    def _sharded_iter(self):
+        for i, item in enumerate(self.sequence_generator()):
+            if i % self._world_size == self._rank:
+                yield item
 
     def __len__(self):
         if self._length is not None:
+            if self._world_size > 1:
+                return self._length // self._world_size
             return self._length
         raise TypeError("TokenPairIterableDataset length not set")
 
@@ -109,6 +121,12 @@ class TrainingConfig:
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
     statistics: bool = False
+    # DDP fields (single-machine multi-GPU or multi-node)
+    rank: int = 0                # global rank
+    local_rank: int = 0          # rank within this machine
+    world_size: int = 1          # total number of processes
+    master_addr: str = 'localhost'
+    master_port: int = 29500
 
 class Trainer:
 
@@ -145,6 +163,11 @@ class Trainer:
         self.device_mode = getattr(self.config, 'device_mode', 'auto')
         self.gpu_indices = getattr(self.config, 'gpu_indices', None) or []
         self.use_vulkan = getattr(self.config, 'use_vulkan', False)
+
+        # DDP parameters
+        self.rank = getattr(self.config, 'rank', 0)
+        self.local_rank = getattr(self.config, 'local_rank', 0)
+        self.world_size = getattr(self.config, 'world_size', 1)
 
         # Dynamic checkpoint naming
         self.checkpoint_name = getattr(self.config, 'checkpoint_name', 'chat_model')
@@ -376,9 +399,10 @@ class Trainer:
 
         # --- CPU puro ---
         if device_mode == 'cpu':
-            logger.info("=" * 80)
-            logger.info("CPU-ONLY MODE ENABLED")
-            logger.info("=" * 80)
+            if self.rank == 0:
+                logger.info("=" * 80)
+                logger.info("CPU-ONLY MODE ENABLED")
+                logger.info("=" * 80)
             self.use_gpu = False
             self.use_mixed_precision = False
             self.use_gradient_checkpointing = False
@@ -388,9 +412,10 @@ class Trainer:
         if use_vulkan:
             if not check_vulkan_available():
                 raise RuntimeError("Vulkan requested but not available on this system")
-            logger.info("=" * 80)
-            logger.info("VULKAN MODE ENABLED")
-            logger.info("=" * 80)
+            if self.rank == 0:
+                logger.info("=" * 80)
+                logger.info("VULKAN MODE ENABLED")
+                logger.info("=" * 80)
             self.use_gpu = False
             self.use_mixed_precision = False
             self.use_gradient_checkpointing = False
@@ -404,33 +429,33 @@ class Trainer:
             self.use_gradient_checkpointing = False
             return torch.device('cpu')
 
-        # Configure CUDA_VISIBLE_DEVICES if explicit indices
-        if gpu_indices:
-            os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(str(i) for i in gpu_indices)
-            torch.cuda.set_device(gpu_indices[0])
+        # Set device for this DDP process
+        torch.cuda.set_device(self.local_rank)
 
-        # Log detected GPUs
+        # Log detected GPUs (rank-0 only)
         num_gpus = torch.cuda.device_count()
-        logger.info("=" * 80)
-        logger.info(f"GPU DETECTED: {num_gpus} device(s)")
-        for i in range(num_gpus):
-            name = torch.cuda.get_device_name(i)
-            props = torch.cuda.get_device_properties(i)
-            mem = props.total_memory / (1024 ** 3)
-            cc = f"{props.major}.{props.minor}"
-            logger.info(f"  GPU {i}: {name} | VRAM: {mem:.2f} GB | Compute: {cc}")
-        logger.info("=" * 80)
+        if self.rank == 0:
+            logger.info("=" * 80)
+            logger.info(f"GPU DETECTED: {num_gpus} device(s)")
+            for i in range(num_gpus):
+                name = torch.cuda.get_device_name(i)
+                props = torch.cuda.get_device_properties(i)
+                mem = props.total_memory / (1024 ** 3)
+                cc = f"{props.major}.{props.minor}"
+                logger.info(f"  GPU {i}: {name} | VRAM: {mem:.2f} GB | Compute: {cc}")
+            logger.info("=" * 80)
 
         # DDP info
-        if len(gpu_indices) > 1:
-            logger.info(f"Multi-GPU mode: {len(gpu_indices)} devices -> DistributedDataParallel")
+        if self.world_size > 1 and self.rank == 0:
+            logger.info(f"DDP mode: {self.world_size} processes, local_rank={self.local_rank}")
 
         # Configure for specific GPU types
-        device_idx = gpu_indices[0] if gpu_indices else 0
+        device_idx = self.local_rank
         device_name = torch.cuda.get_device_name(device_idx)
 
         if "K80" in device_name or "Tesla" in device_name:
-            logger.info("Tesla K80 GPU detected - using optimized configuration")
+            if self.rank == 0:
+                logger.info("Tesla K80 GPU detected - using optimized configuration")
             self.use_gradient_checkpointing = True
             torch.cuda.set_per_process_memory_fraction(0.9)
         else:
@@ -441,13 +466,14 @@ class Trainer:
 
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.enabled = True
-        logger.info("CuDNN optimization enabled")
-
-        logger.info(f"Mixed Precision Training: {'ENABLED' if self.use_mixed_precision else 'DISABLED'}")
-        logger.info(f"Gradient Checkpointing: {'ENABLED' if self.use_gradient_checkpointing else 'DISABLED'}")
+        if self.rank == 0:
+            logger.info("CuDNN optimization enabled")
+            logger.info(f"Mixed Precision Training: {'ENABLED' if self.use_mixed_precision else 'DISABLED'}")
+            logger.info(f"Gradient Checkpointing: {'ENABLED' if self.use_gradient_checkpointing else 'DISABLED'}")
 
         device = torch.device(f'cuda:{device_idx}')
-        logger.info(f"Training Device: {device}")
+        if self.rank == 0:
+            logger.info(f"Training Device: {device}")
         return device
 
     def _setup_model_with_device_strategy(self, model, device):
@@ -456,12 +482,12 @@ class Trainer:
         from commons.utils.device_utils import calculate_layers_for_vram
 
         device_mode = self.device_mode
-        gpu_indices = self.gpu_indices or []
 
         # --- CPU puro ---
         if device_mode == 'cpu':
             model = model.to(device)
-            logger.info("Model deployed on CPU")
+            if self.rank == 0:
+                logger.info("Model deployed on CPU")
             return model
 
         # --- CPU+GPU: distribucion por capas ---
@@ -472,25 +498,32 @@ class Trainer:
         try:
             model = model.to(device)
 
-            # DDP si multiples GPUs
-            if len(gpu_indices) > 1:
+            # DDP si multiples procesos
+            if self.world_size > 1:
                 import torch.distributed as dist
                 from torch.nn.parallel import DistributedDataParallel as DDP
 
                 if not dist.is_initialized():
-                    os.environ['MASTER_ADDR'] = 'localhost'
-                    os.environ['MASTER_PORT'] = '12355'
-                    dist.init_process_group(backend='nccl', rank=0, world_size=len(gpu_indices))
+                    os.environ['MASTER_ADDR'] = getattr(self.config, 'master_addr', 'localhost')
+                    os.environ['MASTER_PORT'] = str(getattr(self.config, 'master_port', 29500))
+                    dist.init_process_group(
+                        backend='nccl',
+                        rank=self.rank,
+                        world_size=self.world_size
+                    )
 
-                model = DDP(model, device_ids=gpu_indices)
-                logger.info(f"Model wrapped with DDP on devices: {gpu_indices}")
+                model = DDP(model, device_ids=[self.local_rank])
+                if self.rank == 0:
+                    logger.info(f"Model wrapped with DDP on {self.world_size} processes, local_rank={self.local_rank}")
 
             # Enable gradient checkpointing if available
             if self.use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
                 model.gradient_checkpointing_enable()
-                logger.info("Gradient checkpointing enabled for memory efficiency")
+                if self.rank == 0:
+                    logger.info("Gradient checkpointing enabled for memory efficiency")
 
-            logger.info(f"Model deployed on GPU: {device}")
+            if self.rank == 0:
+                logger.info(f"Model deployed on GPU: {device}")
             return model
 
         except RuntimeError as e:
@@ -714,7 +747,8 @@ class Trainer:
         model.train()
         optimizer.zero_grad()
         epoch_start_time = time.time()
-        logger.info("Training loop started; the model is actively processing batches")
+        if self.rank == 0:
+            logger.info("Training loop started; the model is actively processing batches")
 
         # Timing accumulators for micro-steps and optimizer updates
         micro_step_times = []
@@ -725,10 +759,11 @@ class Trainer:
 
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             if self.stop_event.is_set():
-                logger.info("Stop requested; exiting current training epoch early")
+                if self.rank == 0:
+                    logger.info("Stop requested; exiting current training epoch early")
                 break
 
-            if batch_idx == 0 or (batch_idx + 1) % 10 == 0:
+            if (batch_idx == 0 or (batch_idx + 1) % 10 == 0) and self.rank == 0:
                 batch_str = f"{batch_idx + 1}/{num_batches}" if num_batches != float('inf') else f"{batch_idx + 1}"
                 elapsed = time.time() - epoch_start_time
                 if batch_idx > 0 and num_batches != float('inf'):
@@ -746,31 +781,41 @@ class Trainer:
             # --- Micro-step timing (forward + backward) ---
             micro_step_start = time.time()
 
-            # Forward pass
-            if self.use_mixed_precision and scaler is not None:
-                with torch.autocast(device_type=device.type, dtype=torch.float16):
-                    loss = self._compute_loss(model, inputs, targets, criterion)
+            # Determine if this is the last micro-step (should sync gradients)
+            is_last_micro_step = ((batch_idx + 1) % accumulation_steps == 0)
+
+            # Use no_sync() for DDP when not at accumulation boundary
+            if self.world_size > 1 and hasattr(model, 'no_sync') and not is_last_micro_step:
+                context = model.no_sync()
             else:
-                loss = self._compute_loss(model, inputs, targets, criterion)
+                context = contextlib.nullcontext()
 
-            # Compute thinking metrics periodically
-            if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
-                thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device)
-                for key, value in thinking_metrics.items():
-                    if key not in thinking_metrics_accum:
-                        thinking_metrics_accum[key] = []
-                    thinking_metrics_accum[key].append(value)
+            # Forward pass
+            with context:
+                if self.use_mixed_precision and scaler is not None:
+                    with torch.autocast(device_type=device.type, dtype=torch.float16):
+                        loss = self._compute_loss(model, inputs, targets, criterion)
+                else:
+                    loss = self._compute_loss(model, inputs, targets, criterion)
 
-            # Backward pass
-            original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
-            total_loss += original_loss.item()
+                # Compute thinking metrics periodically
+                if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
+                    thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device)
+                    for key, value in thinking_metrics.items():
+                        if key not in thinking_metrics_accum:
+                            thinking_metrics_accum[key] = []
+                        thinking_metrics_accum[key].append(value)
+
+                # Backward pass
+                original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
+                total_loss += original_loss.item()
 
             micro_step_end = time.time()
             micro_step_elapsed = micro_step_end - micro_step_start
             micro_step_times.append(micro_step_elapsed)
 
-            # Log micro-step only if --statistics is enabled
-            if self.config.statistics:
+            # Log micro-step only if --statistics is enabled (rank-0 only)
+            if self.config.statistics and self.rank == 0:
                 logger.info(
                     f"  [micro-step {batch_idx + 1}] "
                     f"loss={original_loss.item():.4f} | "
@@ -799,8 +844,8 @@ class Trainer:
                 opt_step_elapsed = opt_step_end - opt_step_start
                 optimizer_step_times.append(opt_step_elapsed)
 
-                # Log optimizer step only if --statistics is enabled
-                if self.config.statistics:
+                # Log optimizer step only if --statistics is enabled (rank-0 only)
+                if self.config.statistics and self.rank == 0:
                     accum_group = (batch_idx + 1) // accumulation_steps
                     micro_avg = sum(micro_step_times[-accumulation_steps:]) / accumulation_steps
                     logger.info(
@@ -818,54 +863,56 @@ class Trainer:
         num_batches = max(1, total_batches)
         avg_loss = total_loss / num_batches
 
-        # Log thinking metrics summary
-        if thinking_metrics_accum:
+        # Log thinking metrics summary (rank-0 only)
+        if thinking_metrics_accum and self.rank == 0:
             logger.info("Thinking Metrics Summary:")
             for key, values in thinking_metrics_accum.items():
                 avg_val = sum(values) / len(values) if values else 0
                 logger.info(f"    {key}: {avg_val:.4f}")
 
-        # --- Timing summary ---
+        # --- Timing summary (rank-0 only) ---
         total_elapsed = time.time() - epoch_start_time
-        if micro_step_times:
-            micro_avg = sum(micro_step_times) / len(micro_step_times)
-            micro_min = min(micro_step_times)
-            micro_max = max(micro_step_times)
-            micro_total_compute = sum(micro_step_times)
-            logger.info("=" * 80)
-            logger.info(f"TIMING SUMMARY ({phase_label})")
-            logger.info(f"  Micro-steps (forward+backward):")
-            logger.info(f"    Count:    {len(micro_step_times)}")
-            logger.info(f"    Avg:      {micro_avg*1000:.1f}ms")
-            logger.info(f"    Min:      {micro_min*1000:.1f}ms")
-            logger.info(f"    Max:      {micro_max*1000:.1f}ms")
-            logger.info(f"    Total:    {micro_total_compute*1000:.1f}ms")
-
-        if optimizer_step_times:
-            opt_avg = sum(optimizer_step_times) / len(optimizer_step_times)
-            opt_min = min(optimizer_step_times)
-            opt_max = max(optimizer_step_times)
-            opt_total = sum(optimizer_step_times)
-            logger.info(f"  Optimizer updates:")
-            logger.info(f"    Count:    {len(optimizer_step_times)}")
-            logger.info(f"    Avg:      {opt_avg*1000:.1f}ms")
-            logger.info(f"    Min:      {opt_min*1000:.1f}ms")
-            logger.info(f"    Max:      {opt_max*1000:.1f}ms")
-            logger.info(f"    Total:    {opt_total*1000:.1f}ms")
-
-            # Overhead analysis
+        if self.rank == 0:
             if micro_step_times:
-                compute_total = sum(micro_step_times)
-                opt_total_val = sum(optimizer_step_times)
-                overhead = total_elapsed - compute_total - opt_total_val
-                logger.info(f"  Overhead (data loading, logging, etc): {overhead*1000:.1f}ms ({overhead/total_elapsed*100:.1f}%)")
-                logger.info(f"  Compute fraction:  {compute_total/total_elapsed*100:.1f}%")
-                logger.info(f"  Optimizer fraction: {opt_total_val/total_elapsed*100:.1f}%")
+                micro_avg = sum(micro_step_times) / len(micro_step_times)
+                micro_min = min(micro_step_times)
+                micro_max = max(micro_step_times)
+                micro_total_compute = sum(micro_step_times)
+                logger.info("=" * 80)
+                logger.info(f"TIMING SUMMARY ({phase_label})")
+                logger.info(f"  Micro-steps (forward+backward):")
+                logger.info(f"    Count:    {len(micro_step_times)}")
+                logger.info(f"    Avg:      {micro_avg*1000:.1f}ms")
+                logger.info(f"    Min:      {micro_min*1000:.1f}ms")
+                logger.info(f"    Max:      {micro_max*1000:.1f}ms")
+                logger.info(f"    Total:    {micro_total_compute*1000:.1f}ms")
 
-        logger.info(f"  Total epoch time: {total_elapsed:.2f}s")
-        logger.info("=" * 80)
+            if optimizer_step_times:
+                opt_avg = sum(optimizer_step_times) / len(optimizer_step_times)
+                opt_min = min(optimizer_step_times)
+                opt_max = max(optimizer_step_times)
+                opt_total = sum(optimizer_step_times)
+                logger.info(f"  Optimizer updates:")
+                logger.info(f"    Count:    {len(optimizer_step_times)}")
+                logger.info(f"    Avg:      {opt_avg*1000:.1f}ms")
+                logger.info(f"    Min:      {opt_min*1000:.1f}ms")
+                logger.info(f"    Max:      {opt_max*1000:.1f}ms")
+                logger.info(f"    Total:    {opt_total*1000:.1f}ms")
 
-        logger.info(f"Training loop completed after {num_batches} batches")
+                # Overhead analysis
+                if micro_step_times:
+                    compute_total = sum(micro_step_times)
+                    opt_total_val = sum(optimizer_step_times)
+                    overhead = total_elapsed - compute_total - opt_total_val
+                    logger.info(f"  Overhead (data loading, logging, etc): {overhead*1000:.1f}ms ({overhead/total_elapsed*100:.1f}%)")
+                    logger.info(f"  Compute fraction:  {compute_total/total_elapsed*100:.1f}%")
+                    logger.info(f"  Optimizer fraction: {opt_total_val/total_elapsed*100:.1f}%")
+
+        if self.rank == 0:
+            logger.info(f"  Total epoch time: {total_elapsed:.2f}s")
+            logger.info("=" * 80)
+
+            logger.info(f"Training loop completed after {num_batches} batches")
         return avg_loss
 
 
@@ -912,7 +959,7 @@ class Trainer:
 
         csv_length = len(self.raw_dataset) if hasattr(self.raw_dataset, '__len__') else None
         return DataLoader(
-            TokenPairIterableDataset(csv_pair_generator, length=csv_length),
+            TokenPairIterableDataset(csv_pair_generator, length=csv_length, rank=self.rank, world_size=self.world_size),
             batch_size=batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
@@ -962,13 +1009,15 @@ class Trainer:
                 logger.error("No valid text/token sequences found in cached dataset")
                 sys.exit(1)
 
-            logger.info(f" Processed {sample_count} samples for tokenizer fitting")
-            logger.info(f" Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
+            if self.rank == 0:
+                logger.info(f" Processed {sample_count} samples for tokenizer fitting")
+                logger.info(f" Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
             # Save tokenizer vocabulary for chat loading inside checkpoints
             os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
             self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
-            logger.info(f" Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
+            if self.rank == 0:
+                logger.info(f" Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
 
             # Preserve raw dataset text for special facts fine-tuning before tokenization
             self.raw_dataset = loaded_dataset
@@ -988,10 +1037,16 @@ class Trainer:
                     yield input_ids, output_ids
 
             dataset_length = len(self.loaded_dataset) if hasattr(self.loaded_dataset, '__len__') else None
-            iterable_dataset = TokenPairIterableDataset(token_pair_generator, length=dataset_length)
+            iterable_dataset = TokenPairIterableDataset(
+                token_pair_generator,
+                length=dataset_length,
+                rank=self.rank,
+                world_size=self.world_size
+            )
 
             # Create DataLoader with custom collate function
-            logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
+            if self.rank == 0:
+                logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
             pin_memory = self.use_gpu  # Only use pin_memory if GPU is available
             # num_workers = self._limit_num_workers_by_memory(max(1, min(2, mp.cpu_count() // 2)))
 
@@ -1004,7 +1059,8 @@ class Trainer:
                 num_workers=0
             )
 
-            logger.info(" DataLoader created")
+            if self.rank == 0:
+                logger.info(" DataLoader created")
         
         except Exception as e:
             logger.error(f"Error in data preparation: {e}", exc_info=True)
@@ -1014,16 +1070,19 @@ class Trainer:
             # CPU configuration already set in main.py entry point
             var_num_cores = os.environ.get("MKL_NUM_THREADS", mp.cpu_count())
             var_num_threads = os.environ.get("OMP_NUM_THREADS", torch.get_num_threads())
-            logger.info(f"CPU configuration - Cores: {var_num_cores}, Threads: {var_num_threads}")
+            if self.rank == 0:
+                logger.info(f"CPU configuration - Cores: {var_num_cores}, Threads: {var_num_threads}")
 
             # Setup device with improved configuration for CPU-GPU combined training
             device = self._setup_device_and_config()
 
             # Initialize model with device strategy
-            logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
+            if self.rank == 0:
+                logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
             model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'], num_layers=4)
             model = self._setup_model_with_device_strategy(model, device)
-            logger.info(f" Model initialized and deployed")
+            if self.rank == 0:
+                logger.info(f" Model initialized and deployed")
 
             # Define loss and optimizer
             criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
@@ -1031,16 +1090,18 @@ class Trainer:
             
             # Add learning rate scheduler
             scheduler = lr_scheduler.StepLR(optimizer, step_size=max(1, self.epochs // 3), gamma=0.1)
-            logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
+            if self.rank == 0:
+                logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
 
             # Initialize gradient scaler for mixed precision training
             scaler = GradScaler() if self.use_mixed_precision else None
-            if scaler:
+            if scaler and self.rank == 0:
                 logger.info(" Gradient scaler initialized for mixed precision training")
 
             # Create checkpoint directory
             os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
-            logger.info(f" Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
+            if self.rank == 0:
+                logger.info(f" Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
 
             # Warm-up phase (optional light training)
             if TRAINING_CONFIG.get('warm_up', False):
@@ -1048,7 +1109,8 @@ class Trainer:
                 warm_up_steps = int(TRAINING_CONFIG.get('warm_up_steps', 100))
                 warmup_limit = max(1, int(len(loaded_dataset) * warm_up_ratio))
 
-                logger.info(f"Starting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
+                if self.rank == 0:
+                    logger.info(f"Starting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
 
                 def warmup_pair_generator():
                     idx = 0
@@ -1059,7 +1121,7 @@ class Trainer:
                         idx += 1
 
                 warmup_dataloader = DataLoader(
-                    TokenPairIterableDataset(warmup_pair_generator),
+                    TokenPairIterableDataset(warmup_pair_generator, rank=self.rank, world_size=self.world_size),
                     batch_size=TRAINING_CONFIG['batch_size'],
                     shuffle=False,
                     collate_fn=self.collate_fn,
@@ -1069,11 +1131,13 @@ class Trainer:
 
                 warmup_num_batches = max(1, warmup_limit // TRAINING_CONFIG['batch_size'])
                 _ = self.train(model, warmup_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'], num_batches_override=warmup_num_batches, is_warmup=True)
-                logger.info(" Warm-up phase completed")
+                if self.rank == 0:
+                    logger.info(" Warm-up phase completed")
 
             # Main training loop
-            logger.info(f"Starting main training phase ({self.epochs} epochs)...")
-            logger.info("=" * 80)
+            if self.rank == 0:
+                logger.info(f"Starting main training phase ({self.epochs} epochs)...")
+                logger.info("=" * 80)
             
             num_epochs = self.epochs
             for epoch in range(num_epochs):
@@ -1088,115 +1152,143 @@ class Trainer:
                 scheduler.step()
                 current_lr = optimizer.param_groups[0]['lr']
                 
-                # Memory and performance information
-                if self.use_gpu:
-                    gpu_memory = torch.cuda.memory_allocated(device) / 1e9
-                    gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
-                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e} | GPU mem used: {gpu_memory:.2f}GB / reserved: {gpu_memory_reserved:.2f}GB")
-                else:
-                    logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
+                # Memory and performance information (rank-0 only)
+                if self.rank == 0:
+                    if self.use_gpu:
+                        gpu_memory = torch.cuda.memory_allocated(device) / 1e9
+                        gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
+                        logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e} | GPU mem used: {gpu_memory:.2f}GB / reserved: {gpu_memory_reserved:.2f}GB")
+                    else:
+                        logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
 
-                # Save best model checkpoint after each epoch
+                # Save best model checkpoint after each epoch (rank-0 only)
                 if loss < self.best_loss:
                     self.best_loss = loss
-                    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                    epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
-                    epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-                    os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
-                    torch.save({
-                        'epoch': epoch + 1,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'scheduler_state_dict': scheduler.state_dict(),
-                        'loss': loss,
-                        'tokenizer': self.tokenizer,
-                        'model_name': self.checkpoint_name,
-                        'architecture': {
-                            'embed_size': TRAINING_CONFIG['embed_size'],
-                            'hidden_size': TRAINING_CONFIG['hidden_size'],
-                            'num_layers': TRAINING_CONFIG.get('num_layers', 4),
-                            'n_head': TRAINING_CONFIG.get('n_head', 4),
-                            'n_positions': TRAINING_CONFIG.get('n_positions', 512),
-                            'vocab_size': self.tokenizer.vocab_size,
-                        },
-                        'dataset_source': self.dataset_source,
-                    }, epoch_path)
-                    logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
+                    if self.rank == 0:
+                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                        epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
+                        epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
+                        os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+                        # Use model.module.state_dict() for DDP to remove 'module.' prefix
+                        state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
+                        torch.save({
+                            'epoch': epoch + 1,
+                            'model_state_dict': state_dict,
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'scheduler_state_dict': scheduler.state_dict(),
+                            'loss': loss,
+                            'tokenizer': self.tokenizer,
+                            'model_name': self.checkpoint_name,
+                            'architecture': {
+                                'embed_size': TRAINING_CONFIG['embed_size'],
+                                'hidden_size': TRAINING_CONFIG['hidden_size'],
+                                'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                                'n_head': TRAINING_CONFIG.get('n_head', 4),
+                                'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+                                'vocab_size': self.tokenizer.vocab_size,
+                            },
+                            'dataset_source': self.dataset_source,
+                        }, epoch_path)
+                        logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
+                    # Synchronize all processes after checkpoint save
+                    if self.world_size > 1:
+                        import torch.distributed as dist
+                        dist.barrier()
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():
-                logger.info("Stop requested; skipping final model save")
+                if self.rank == 0:
+                    logger.info("Stop requested; skipping final model save")
                 return
 
             # Fine-tune on CSV data if available
             csv_dataloader = self._get_csv_dataloader(batch_size=TRAINING_CONFIG['batch_size'])
             if csv_dataloader is not None:
-                logger.info("Starting CSV data fine-tuning...")
+                if self.rank == 0:
+                    logger.info("Starting CSV data fine-tuning...")
                 try:
                     _ = self.train(model, csv_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
-                    logger.info(" CSV data fine-tuning completed")
+                    if self.rank == 0:
+                        logger.info(" CSV data fine-tuning completed")
                 except Exception as e:
                     logger.warning(f"CSV data fine-tuning failed: {e}")
 
-            # Save final model + tokenizer state for consistent inference
-            logger.info("=" * 80)
-            logger.info("[OK] Training completed! Saving final model and tokenizer...")
+            # Save final model + tokenizer state for consistent inference (rank-0 only)
+            if self.rank == 0:
+                logger.info("=" * 80)
+                logger.info("[OK] Training completed! Saving final model and tokenizer...")
 
-            # Save final checkpoint with metadata
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            epoch_filename = f"{self.checkpoint_name}_final_{timestamp}.pth"
-            epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-            torch.save({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'loss': self.best_loss,
-                'tokenizer': self.tokenizer,
-                'model_name': self.checkpoint_name,
-                'architecture': {
-                    'embed_size': TRAINING_CONFIG['embed_size'],
-                    'hidden_size': TRAINING_CONFIG['hidden_size'],
-                    'num_layers': TRAINING_CONFIG.get('num_layers', 4),
-                    'n_head': TRAINING_CONFIG.get('n_head', 4),
-                    'n_positions': TRAINING_CONFIG.get('n_positions', 512),
-                    'vocab_size': self.tokenizer.vocab_size,
-                },
-                'dataset_source': self.dataset_source,
-            }, epoch_path)
-            logger.info(f"  Final epoch checkpoint saved to {epoch_path}")
+                # Save final checkpoint with metadata
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                epoch_filename = f"{self.checkpoint_name}_final_{timestamp}.pth"
+                epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
+                # Use model.module.state_dict() for DDP to remove 'module.' prefix
+                state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
+                torch.save({
+                    'epoch': epoch + 1,
+                    'model_state_dict': state_dict,
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'loss': self.best_loss,
+                    'tokenizer': self.tokenizer,
+                    'model_name': self.checkpoint_name,
+                    'architecture': {
+                        'embed_size': TRAINING_CONFIG['embed_size'],
+                        'hidden_size': TRAINING_CONFIG['hidden_size'],
+                        'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                        'n_head': TRAINING_CONFIG.get('n_head', 4),
+                        'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+                        'vocab_size': self.tokenizer.vocab_size,
+                    },
+                    'dataset_source': self.dataset_source,
+                }, epoch_path)
+                logger.info(f"  Final epoch checkpoint saved to {epoch_path}")
 
-            # Save final model
-            torch.save({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'loss': self.best_loss,
-                'tokenizer': self.tokenizer,
-                'model_name': self.checkpoint_name,
-                'architecture': {
-                    'embed_size': TRAINING_CONFIG['embed_size'],
-                    'hidden_size': TRAINING_CONFIG['hidden_size'],
-                    'num_layers': TRAINING_CONFIG.get('num_layers', 4),
-                    'n_head': TRAINING_CONFIG.get('n_head', 4),
-                    'n_positions': TRAINING_CONFIG.get('n_positions', 512),
-                    'vocab_size': self.tokenizer.vocab_size,
-                },
-                'dataset_source': self.dataset_source,
-            }, self.model_output_path)
-            logger.info(f" Model + tokenizer saved to {self.model_output_path}")
+                # Save final model
+                torch.save({
+                    'epoch': epoch + 1,
+                    'model_state_dict': state_dict,
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'loss': self.best_loss,
+                    'tokenizer': self.tokenizer,
+                    'model_name': self.checkpoint_name,
+                    'architecture': {
+                        'embed_size': TRAINING_CONFIG['embed_size'],
+                        'hidden_size': TRAINING_CONFIG['hidden_size'],
+                        'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                        'n_head': TRAINING_CONFIG.get('n_head', 4),
+                        'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+                        'vocab_size': self.tokenizer.vocab_size,
+                    },
+                    'dataset_source': self.dataset_source,
+                }, self.model_output_path)
+                logger.info(f" Model + tokenizer saved to {self.model_output_path}")
+
+            # Synchronize all processes after final checkpoint save
+            if self.world_size > 1:
+                import torch.distributed as dist
+                dist.barrier()
 
         except TrainingStopRequested:
             logger.warning("\nTraining interrupted by request")
-            return
         except KeyboardInterrupt:
             logger.warning("\nTraining interrupted by user")
             self.stop_event.set()
-            return
         except Exception as e:
             logger.error(f"Error during training: {e}", exc_info=True)
             raise
+        finally:
+            # Cleanup DDP process group
+            if self.world_size > 1:
+                try:
+                    import torch.distributed as dist
+                    if dist.is_initialized():
+                        dist.destroy_process_group()
+                        if self.rank == 0:
+                            logger.info("DDP process group destroyed")
+                except Exception as e:
+                    logger.warning(f"Error destroying DDP process group: {e}")
 
     def _tokenize_dataset_item(self, value):
         if value is None:
