@@ -25,6 +25,7 @@ El proyecto está refactorizado en módulos independientes para mejor mantenibil
 - `POST /api/chat` — Chat bidireccional
 - `POST /api/chat/completions` — Completaciones de chat (alias)
 - `GET /api/models` — Listar modelos disponibles
+- `GET /api/models/available` — Listar archivos .gguf en exported/
 - `GET /api/version` — Versión del servidor
 - `GET /api/tags` — Metadatos adicionales
 
@@ -32,11 +33,15 @@ El proyecto está refactorizado en módulos independientes para mejor mantenibil
 - `POST /v1/completions` — Completación de texto
 - `POST /v1/chat/completions` — Completación de chat (OpenAI format)
 - `GET /v1/models` — Listar modelos (OpenAI format)
+- `GET /v1/models/available` — Listar archivos .gguf en exported/
+- `POST /v1/models/reload` — Hot-reload del modelo (sin reiniciar servidor)
 - `GET /v1/health` — Health check
 - `GET /v1/version` — Información de versión
 
 ### Características
 - ✅ **Lazy Loading**: El modelo se carga solo en el primer uso
+- ✅ **Hot-Reload**: Recargar modelo sin reiniciar servidor (`/v1/models/reload`)
+- ✅ **Multi-modelo**: Listar y seleccionar entre múltiples modelos GGUF
 - ✅ **Streaming**: Soporte para respuestas en tiempo real (NDJSON)
 - ✅ **OpenAI Compatible**: Usar cualquier cliente de OpenAI/Ollama sin cambios
 - ✅ **Async/Sync**: Manejo híbrido de requests sync y async

@@ -16,7 +16,11 @@ from .utils import (
     build_chat_completion_response,
     parse_thinking_response,
 )
-from .model import MODEL_NAME, MODEL_PATH, OLLAMA_VERSION, _resolve_model_name, _get_model_file_size
+from .model import (
+    model, MODEL_NAME, MODEL_PATH, OLLAMA_VERSION,
+    _resolve_model_name, _get_model_file_size,
+    list_available_models, EXPORTED_DIR,
+)
 
 router = APIRouter(prefix="/v1")
 
@@ -41,6 +45,50 @@ def models():
             "source": "envAIModels",
         }
     ]
+
+
+@router.get("/models/available")
+def models_available():
+    """List all .gguf files available in the exported models directory."""
+    return list_available_models()
+
+
+@router.post("/models/reload")
+async def models_reload(request: Request):
+    """Reload the current model or switch to a different model.
+
+    Body (optional):
+        model_path: str  # Path to .gguf file to load
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    model_path = data.get("model_path") if data else None
+
+    try:
+        loaded_path = model.reload(model_path)
+        file_size = _get_model_file_size(loaded_path)
+        file_size_mb = round(file_size / (1024 * 1024), 1) if file_size else None
+        return {
+            "status": "ok",
+            "model": _resolve_model_name(loaded_path),
+            "model_file": loaded_path,
+            "file_size_mb": file_size_mb,
+        }
+    except FileNotFoundError as e:
+        return Response(
+            content=json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            status_code=404,
+        )
+    except Exception as e:
+        return Response(
+            content=json.dumps({"error": f"Failed to reload model: {str(e)}"}, ensure_ascii=False).encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            status_code=500,
+        )
 
 
 @router.get("/version")

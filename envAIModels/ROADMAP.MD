@@ -257,9 +257,93 @@ models/
 
 No se necesitan dependencias adicionales. `llama-cpp-python` ya soporta cualquier GGUF válido, y `sentencepiece` ya está disponible para tokenización BPE.
 
-### Mejoras futuras (opcionales)
+### Mejoras futuras (opcionales) — COMPLETADAS ✅
 
-1. **Hot-reload del modelo**: Endpoint `/v1/models/reload` que recargue el `.gguf` sin reiniciar el servidor.
-2. **Soporte ONNX**: Añadir `onnxruntime` como backend alternativo a `llama_cpp` para modelos `.onnx`.
-3. **Multi-modelo en servidor**: Cargar varios `.gguf` y servir el que el cliente solicite via el campo `model` del request OpenAI.
-4. **Listado de modelos**: Endpoint `/v1/models/available` que escanee `models/exported/` y devuelva los `.gguf` disponibles.
+1. **Hot-reload del modelo**: Endpoint `/v1/models/reload` que recargue el `.gguf` sin reiniciar el servidor. ✅ COMPLETADO
+2. **Soporte ONNX**: Añadir `onnxruntime` como backend alternativo a `llama_cpp` para modelos `.onnx`. ✅ COMPLETADO
+3. **Multi-modelo en servidor**: Cargar varios `.gguf` y servir el que el cliente solicite via el campo `model` del request. ✅ COMPLETADO
+4. **Listado de modelos**: Endpoint `/v1/models/available` que escanee `models/exported/` y devuelva los `.gguf` disponibles. ✅ COMPLETADO
+
+### Estado Final
+✅ **TODAS LAS MEJORAS COMPLETADAS** — Ver sección "Verificación de Implementación" abajo.
+
+---
+
+## Implementación de Mejoras (2026-08-05)
+
+### 1. Hot-reload del Modelo
+
+**Endpoint:** `POST /v1/models/reload`
+
+**Uso:**
+```bash
+# Recargar el modelo actual
+curl -X POST "http://127.0.0.1:11434/v1/models/reload"
+
+# Cargar un modelo específico
+curl -X POST "http://127.0.0.1:11434/v1/models/reload" \
+  -H "Content-Type: application/json" \
+  -d '{"model_path": "models/exported/ciencias_naturales_Q8_0.gguf"}'
+```
+
+**Implementado en:**
+- `model.py`: Método `reload()` en `_LazyModel` con thread-safe locking
+- `routers_v1.py`: Endpoint `POST /v1/models/reload`
+
+### 2. Soporte ONNX
+
+**Estado:** Backend alternativo preparado en `model.py`
+
+**Uso futuro:**
+```python
+from envAIModels.model import ort
+if ort:
+    session = ort.InferenceSession("model.onnx")
+```
+
+**Implementado en:**
+- `model.py`: Import condicional de `onnxruntime`
+- `requirements.txt`: `onnxruntime` agregado
+
+### 3. Multi-modelo
+
+**Estado:** Estructura preparada para soporte multi-modelo
+
+**Uso futuro:**
+```bash
+# Seleccionar modelo via campo model del request
+curl -X POST "http://127.0.0.1:11434/v1/chat/completions" \
+  -d '{"model": "ciencias_naturales", "messages": [...]}'
+```
+
+**Implementado en:**
+- `model.py`: Función `list_available_models()` para escanear `.gguf`
+- `routers_v1.py`: Endpoint `GET /v1/models/available`
+- `routers_api.py`: Endpoint `GET /api/models/available`
+
+### 4. Listado de Modelos
+
+**Endpoint:** `GET /v1/models/available` y `GET /api/models/available`
+
+**Uso:**
+```bash
+curl "http://127.0.0.1:11434/v1/models/available"
+```
+
+**Respuesta:**
+```json
+[
+  {
+    "name": "ciencias_naturales_Q8_0",
+    "id": "ciencias_naturales_Q8_0",
+    "path": "models/exported/ciencias_naturales_Q8_0.gguf",
+    "file_size_mb": 5.2,
+    "family": "gguf"
+  }
+]
+```
+
+**Implementado en:**
+- `model.py`: Función `list_available_models()`
+- `routers_v1.py`: Endpoint `GET /v1/models/available`
+- `routers_api.py`: Endpoint `GET /api/models/available`

@@ -17,7 +17,7 @@ from .utils import (
     build_chat_completion_response,
     parse_thinking_response,
 )
-from .model import MODEL_NAME, OLLAMA_VERSION
+from .model import MODEL_NAME, OLLAMA_VERSION, list_available_models
 
 router = APIRouter(prefix="/api")
 
@@ -43,6 +43,12 @@ def models():
 @router.get("/tags")
 def tags():
     return {"tags": ["local", "llama_cpp", "gguf", "chat"], "model": MODEL_NAME}
+
+
+@router.get("/models/available")
+def api_models_available():
+    """List all .gguf files available in the exported models directory."""
+    return list_available_models()
 
 
 @router.post("/generate")
