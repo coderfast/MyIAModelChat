@@ -35,7 +35,7 @@ Cada par de entrenamiento tiene esta estructura:
    python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
 
 2. Entrenar el modelo
-   python main.py --train --use-cache --epochs 30
+   python main.py --train --epochs 30
 
 3. Inferencia
    python main.py --chat --show-thinking
@@ -67,13 +67,13 @@ python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
 ### Opción C: Script independiente
 
 ```bash
-python dataset_preparer/generate_thinking_data.py --source all
+python -m dataset_preparer.generate_thinking_data --source all
 ```
 
 ### Desde CSV y AIML
 
 ```bash
-python dataset_preparer/generate_thinking_data.py --source all
+python -m dataset_preparer.generate_thinking_data --source all
 ```
 
 Esto genera `datasets/thinking/thinking_data.csv` con el formato:
@@ -86,13 +86,13 @@ input,output,thinking,thinking_text,category
 ### Desde un CSV personalizado
 
 ```bash
-python dataset_preparer/generate_thinking_data.py --source csv --input mi_dataset.csv --output datasets/thinking/mi_thinking.csv
+python -m dataset_preparer.generate_thinking_data --source csv --input mi_dataset.csv --output datasets/thinking/mi_thinking.csv
 ```
 
 ### Desde directorio AIML
 
 ```bash
-python dataset_preparer/generate_thinking_data.py --source aiml --input aiml_dev
+python -m dataset_preparer.generate_thinking_data --source aiml --input datasets_source/aiml
 ```
 
 ---
@@ -130,7 +130,7 @@ dataset_cache/
 ## Entrenar con thinking
 
 ```bash
-python main.py --train --use-cache --epochs 30
+python main.py --train --epochs 30
 ```
 
 ### Qué hace:
@@ -288,7 +288,7 @@ curl -X POST http://localhost:11434/api/generate \
 | Archivo | Descripción |
 |---------|-------------|
 | `config.py` | Configuración centralizada (OLLAMA_MODEL, OLLAMA_URL) |
-| `dataset_preparer/generate_thinking_data.py` | Genera datos con `<thinking>` |
+| `python -m dataset_preparer.generate_thinking_data` | Genera datos con `<thinking>` |
 | `dataset_preparer/thinking_engine.py` | Motor NLP para generación de thinking |
 | `datasets/thinking/thinking_data.csv` | Datos generados |
 
@@ -334,7 +334,7 @@ curl -X POST http://localhost:11434/api/generate \
 python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
 
 # 2. Entrenar con datos de thinking
-python main.py --train --use-cache --epochs 30
+python main.py --train --epochs 30
 
 # 3. Inferencia sin thinking
 python main.py --chat

@@ -229,6 +229,7 @@ MODEL LIBRARY:
   --checkpoint-name N  Name for saved checkpoint (default: chat_model)
   --dataset PATH       Path to dataset directory (default: dataset_cache)
   --formats F1,F2      Export formats: gguf, onnx, onnx_int8 (default: gguf,onnx)
+  --quantization TYPE  GGUF quantization: f32, f16, q4_0, q4_k_m, q5_k_m, q6_k, q8_0, etc. (default: q8_0)
 
 DATA SOURCES (required with --prepare-data only):
   --aiml               Include AIML data from datasets_source/aiml directory
@@ -279,6 +280,7 @@ EXAMPLES:
   python main.py --list-models
   python main.py --model-info chat_model
   python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
+  python main.py --export chat_model --formats gguf --quantization q4_k_m
             """
         )
         
@@ -292,6 +294,12 @@ EXAMPLES:
                             help="Show detailed layer info for a specific model")
         parser.add_argument("--export", type=str, default=None, help="Export model to GGUF/ONNX (name or name+name for merge)")
         parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats (default: gguf,onnx)")
+        parser.add_argument("--quantization", type=str, default="q8_0",
+                            choices=["f32", "f16", "q4_0", "q4_1", "q5_0", "q5_1", "q8_0",
+                                     "q2_k", "q3_k", "q4_k", "q5_k", "q6_k", "q8_k",
+                                     "iq4_nl", "iq4_xs", "iq2_xxs", "iq2_xs", "iq2_s",
+                                     "iq3_xxs", "iq3_s", "iq1_s", "iq1_m"],
+                            help="GGUF quantization type (default: q8_0)")
 
         # Model library arguments
         parser.add_argument("--model", type=str, default=None, help="Model name to load for chat (e.g. ciencias_naturales)")
@@ -478,7 +486,7 @@ EXAMPLES:
         # Handle --export
         if args.export:
             formats = [f.strip() for f in args.formats.split(',')]
-            export_cli(args.export, formats)
+            export_cli(args.export, formats, quantization=args.quantization)
             sys.exit(0)
 
         # Garbage collection

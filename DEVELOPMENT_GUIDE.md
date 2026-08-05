@@ -345,23 +345,22 @@ from training.trainer import TrainingConfig, Trainer
 
 config = TrainingConfig(
     epochs=10,
-    dataset_path='datasets_source/ciencias/',
+    dataset_source='datasets_source/ciencias/',
     checkpoint_name='ciencias_naturales',
-    use_cache=True,
     aiml=True,
     hf=True
 )
 
 # Create trainer and run
 trainer = Trainer(config)
-trainer.run()
+trainer.performMainTrain()
 
 # Using ChatConfig dataclass
 from inference.chat_engine import ChatConfig, ChatEngine
 
 chat_config = ChatConfig(
     show_thinking=True,
-    model_path='models/ciencias_naturales.pth'
+    model_name='ciencias_naturales'
 )
 
 engine = ChatEngine(chat_config)

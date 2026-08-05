@@ -257,13 +257,13 @@ qué es la IA,la IA es una rama de la informática,La pregunta es sobre intelige
 ### Step 1: Generate Thinking Data
 ```bash
 # From CSV sources with templates
-python generate_thinking_data.py --source csv --mode template
+python -m dataset_preparer.generate_thinking_data --source csv --mode template
 
 # From AIML sources with Ollama
-python generate_thinking_data.py --source aiml --mode ollama --model llama3.2
+python -m dataset_preparer.generate_thinking_data --source aiml --mode ollama --model llama3.2
 
 # From all sources with HuggingFace
-python generate_thinking_data.py --source all --mode hf --model Qwen/Qwen2.5-1.5B-Instruct
+python -m dataset_preparer.generate_thinking_data --source all --mode hf --model Qwen/Qwen2.5-1.5B-Instruct
 ```
 
 ### Step 2: Validate Output
@@ -272,7 +272,7 @@ python generate_thinking_data.py --source all --mode hf --model Qwen/Qwen2.5-1.5
 head -5 datasets/thinking/thinking_data.csv
 
 # Validate consistency
-python generate_thinking_data.py --source csv --validate
+python -m dataset_preparer.generate_thinking_data --source csv --validate
 ```
 
 ### Step 3: Add to Training Pipeline
@@ -282,17 +282,17 @@ cp datasets/thinking/thinking_data.csv datasets_source/csv/
 
 # Prepare and train
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000 --refresh-cache
-python main.py --train --use-cache --epochs 30
+python main.py --train --epochs 30
 ```
 
 ---
 
 ## 9. Template Source Code Reference
 
-The templates used by `generate_thinking_data.py` are defined in:
+The templates used by `python -m dataset_preparer.generate_thinking_data` are defined in:
 
 ```python
-# Spanish templates (generate_thinking_data.py:29-54)
+# Spanish templates (generate_thinking_data.py lines 29-54)
 THINKING_TEMPLATES = {
     'identity': [
         "El usuario pregunta sobre mi identidad.",
@@ -317,7 +317,7 @@ THINKING_TEMPLATES = {
 }
 ```
 
-To add new templates, edit `generate_thinking_data.py` and add to the `THINKING_TEMPLATES` dict.
+To add new templates, edit `dataset_preparer/generate_thinking_data.py` and add to the `THINKING_TEMPLATES` dict.
 
 ---
 

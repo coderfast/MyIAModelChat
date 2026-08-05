@@ -95,8 +95,8 @@ You'll see:
 ================================================================================
 
 AIML Data:
-  - Location: aiml_dev/ directory
-  - Format: .datasets pickle files
+  - Location: datasets_source/aiml/ directory
+  - Format: .aiml XML files
   - Contains: ~60 dialogue pattern files
 
 Hugging Face Datasets:
@@ -112,18 +112,18 @@ Local Data:
                         TROUBLESHOOTING
 ================================================================================
 
-Error: "Directory not found: aiml_dev"
+Error: "Directory not found: datasets_source/aiml/"
   → Check working directory is project root
-  → Verify aiml_dev/ folder exists
+  → Verify datasets_source/aiml/ folder exists
 
 Error: "Error loading wikitext"
   → Check internet connection
   → May need to re-run (network timeout)
   → Run AIML-only if offline: python main.py --prepare-data --aiml
 
-Error: "No .datasets files found in aiml_dev/"
-  → Run training first to generate .datasets files
-  → Or train with --onlytokenize first
+Error: "No .aiml files found in datasets_source/aiml/"
+  → Place .aiml XML files in datasets_source/aiml/
+  → Or run with --aiml flag to include AIML data
 
 Success but "very few samples"?
   → AIML data may not be preprocessed
@@ -147,7 +147,7 @@ If preparation fails:
   2. Verify AIML files exist and are readable
   3. Test connectivity if using --hf
   4. Try --aiml only first
-  5. Consult CORRECTIONS.md or DEVELOPMENT-GUIDE.md for more help
+  5. Consult DEVELOPMENT_GUIDE.md for more help
 
 ================================================================================
                         STATISTICS INTERPRETATION

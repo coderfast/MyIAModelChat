@@ -33,7 +33,12 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         new_state[new_key] = v
 
     if tokenizer is None:
-        raise RuntimeError("No tokenizer found in checkpoint. Cannot export to ONNX.")
+        tokenizer_path = ckpt.get('tokenizer_path')
+        if tokenizer_path and os.path.exists(tokenizer_path):
+            from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+            tokenizer = SentencePieceTokenizerWrapper(tokenizer_path)
+        else:
+            raise RuntimeError("No tokenizer found in checkpoint. Cannot export to ONNX.")
 
     arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
     model = ChatModel(tokenizer,
@@ -98,7 +103,7 @@ def export_to_onnx_quantized(pth_path: str, output_path: Optional[str] = None, q
     return output_path
 
 
-def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantization: str = 'Q8_0') -> str:
+def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantization: str = 'q8_0') -> str:
     """Export a .pth checkpoint to GGUF format.
 
     This generates a HuggingFace-compatible directory that can be converted
@@ -121,7 +126,12 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
         new_state[new_key] = v
 
     if tokenizer is None:
-        raise RuntimeError("No tokenizer found in checkpoint. Cannot export to GGUF.")
+        tokenizer_path = ckpt.get('tokenizer_path')
+        if tokenizer_path and os.path.exists(tokenizer_path):
+            from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+            tokenizer = SentencePieceTokenizerWrapper(tokenizer_path)
+        else:
+            raise RuntimeError("No tokenizer found in checkpoint. Cannot export to GGUF.")
 
     stem = Path(pth_path).stem
     os.makedirs(EXPORTED_DIR, exist_ok=True)
@@ -152,27 +162,44 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     # Save tokenizer files
     tokenizer.save_vocabulary(os.path.join(hf_dir, "tokenizer_vocab.json"))
 
-    # Generate conversion command for the user
-    convert_script = os.path.join(hf_dir, "convert_to_gguf.sh")
-    with open(convert_script, 'w') as f:
+    # Generate conversion scripts for the user (with absolute paths)
+    hf_dir_abs = os.path.abspath(hf_dir)
+    exported_dir = os.path.abspath(EXPORTED_DIR)
+    convert_py = os.path.join(exported_dir, 'convert.py')
+    gguf_out = os.path.abspath(os.path.join(exported_dir, f"{stem}_{quantization}.gguf"))
+    convert_cmd = f"python \"{convert_py}\" \"{hf_dir_abs}\" --outfile \"{gguf_out}\" --outtype {quantization.lower()}"
+    convert_cmd_unix = convert_cmd.replace('\\', '/')
+
+    # .sh for Linux/Mac
+    sh_path = os.path.join(hf_dir, "convert_to_gguf.sh")
+    with open(sh_path, 'w', newline='\n') as f:
         f.write(f"#!/bin/bash\n")
         f.write(f"# Convert {stem} to GGUF\n")
-        f.write(f"# Run this script from the llama.cpp directory\n")
-        f.write(f"python convert.py {hf_dir} --outfile {stem}_{quantization}.gguf --outtype {quantization.lower()}\n")
+        f.write(f"{convert_cmd_unix}\n")
+
+    # .bat for Windows
+    bat_path = os.path.join(hf_dir, "convert_to_gguf.bat")
+    with open(bat_path, 'w', newline='\r\n') as f:
+        f.write(f"@echo off\n")
+        f.write(f"REM Convert {stem} to GGUF\n")
+        f.write(f"{convert_cmd}\n")
 
     logger.info(f"HuggingFace format exported to: {hf_dir}")
-    logger.info(f"To convert to GGUF, run: bash {convert_script}")
-    logger.info(f"Or manually: python convert.py {hf_dir} --outfile {stem}_{quantization}.gguf --outtype {quantization.lower()}")
+    logger.info(f"To convert to GGUF:")
+    logger.info(f"  Windows:   {bat_path}")
+    logger.info(f"  Linux/Mac: bash {sh_path}")
+    logger.info(f"  Or manually: {convert_cmd}")
 
     return hf_dir
 
 
-def export_model(pth_path: str, formats: List[str]) -> dict:
+def export_model(pth_path: str, formats: List[str], quantization: str = 'q8_0') -> dict:
     """Export a model to multiple formats.
 
     Args:
         pth_path: Path to the .pth checkpoint.
         formats: List of format strings: 'gguf', 'onnx', 'onnx_int8'
+        quantization: GGUF quantization type (e.g. 'q8_0', 'q4_k_m', 'f16')
 
     Returns:
         Dict mapping format to output path.
@@ -186,7 +213,7 @@ def export_model(pth_path: str, formats: List[str]) -> dict:
             elif fmt == 'onnx_int8':
                 results['onnx_int8'] = export_to_onnx_quantized(pth_path, quant_type='int8')
             elif fmt == 'gguf':
-                results['gguf'] = export_to_gguf(pth_path)
+                results['gguf'] = export_to_gguf(pth_path, quantization=quantization)
             else:
                 logger.warning(f"Unknown format: {fmt}")
         except Exception as e:
@@ -196,7 +223,7 @@ def export_model(pth_path: str, formats: List[str]) -> dict:
     return results
 
 
-def export_cli(model_spec: str, formats: List[str]):
+def export_cli(model_spec: str, formats: List[str], quantization: str = 'q8_0'):
     """CLI entry point for model export."""
     # Parse model spec (may contain + for merge)
     if '+' in model_spec:
@@ -213,7 +240,7 @@ def export_cli(model_spec: str, formats: List[str]):
             sys.exit(1)
         pth_path = direct_path
 
-    results = export_model(pth_path, formats)
+    results = export_model(pth_path, formats, quantization=quantization)
 
     print(f"\nExport results for {Path(pth_path).stem}:")
     print("-" * 50)

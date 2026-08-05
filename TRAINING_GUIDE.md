@@ -136,7 +136,11 @@ python main.py --train \
 | `--model-info NAME` | Show model layer details | - |
 | `--num_cores` | CPU cores for DataLoader workers | auto |
 | `--num_threads` | Additional threads per worker | auto |
-| `--onlytokenize` | Run tokenization only, skip training | False |
+| `--dataset PATH` | Path to dataset directory | `dataset_cache` |
+| `--statistics` | Show detailed per-step timing stats | False |
+| `--web-url URL` | Seed URL to scrape | reads from urls.txt |
+| `--web-max-pages N` | Max pages to scrape | 50 |
+| `--web-max-depth N` | Max link-following depth | 3 |
 
 ### Hyperparameter Tuning
 
@@ -273,7 +277,7 @@ for epoch in range(epochs):
 - Add more diverse training data (PDFs/EPUBs)
 
 **Slow training**
-- Use `--use-cache` for 12x speedup
+- Use cached dataset (from `--prepare-data`) for 12x speedup
 - Increase `num_workers` in DataLoader
 - Use GPU instead of CPU
 - Profile code to find bottlenecks
@@ -419,7 +423,7 @@ print(prof.key_averages().table(sort_by="cpu_time_total"))
 ```
 
 ### Common Bottlenecks
-1. Data loading (use `--use-cache` for 12x speedup)
+1. Data loading (use pre-built cache from `--prepare-data` for 12x speedup)
 2. PDF/EPUB parsing (cache extracted text)
 3. GPU transfer (use pinned memory)
 4. Tokenization (use batched encoding with SentencePieceTokenizerWrapper)

@@ -41,7 +41,7 @@ Output Logits
 
 - **vocab_size**: Number of unique tokens in vocabulary (default: 8000 via BPE)
 - **embed_size**: Dimension of embedding vectors (256), maps to `n_embd` in GPT2Config
-- **num_layers**: Number of transformer layers (4)
+- **num_layers**: Number of transformer layers (default: 2, trained with 4)
 - **n_head**: Number of attention heads (4)
 - **n_positions**: Maximum sequence length (512)
 

@@ -48,8 +48,8 @@ Primary Mode Arguments (choose one):
     Default: False
     Example: python main.py --chat
     Notes:
-        - Loads pre-trained model from checkpoints/chat_model_best.pth
-        - Loads tokenizer from checkpoints/tokenizer.pkl
+        - Loads pre-trained model from checkpoints/chat_model.pth
+        - Loads tokenizer from checkpoints/tokenizer_vocab.json
         - Provides interactive chat interface with dynamic n-gram penalization
         - Uses intent classification and sentiment analysis
         - Requires trained model and tokenizer
@@ -328,7 +328,7 @@ Data Source Arguments (for --prepare-data only):
     Default: False
     Example: python main.py --prepare-data --aiml
     Notes:
-        - Loads AIML files from aiml_dev/ directory
+        - Loads AIML files from datasets_source/aiml/ directory
         - Contains ~60 dialogue pattern files
         - Uses XML-based patterns for training
         - Recommended for dialogue variety
@@ -657,8 +657,8 @@ Workflow with cached data (fast iteration):
 ================================================================================
 
 Training Mode Creates (in checkpoints/ directory):
-    - chat_model_best.pth         Best model weights (saved when validation improves)
-    - tokenizer.pkl               Bilingual tokenizer with vocabulary and mappings
+    - chat_model.pth              Model weights
+    - tokenizer_vocab.json        Bilingual tokenizer with vocabulary and mappings
     - config.json                 Training configuration and metadata
 
 Data Preparation Creates (in dataset_cache/ directory):
@@ -674,18 +674,18 @@ Dataset cache can be safely deleted with --clear-cache or manually.
                         TROUBLESHOOTING
 ================================================================================
 
-Error: "No such file or directory: checkpoints/tokenizer.pkl"
+Error: "No such file or directory: checkpoints/tokenizer_vocab.json"
     → Run data preparation first: python main.py --prepare-data --aiml
     → Then train: python main.py --train
 
 Error: "CUDA out of memory"
     → Use --cpu flag
     → Use --cpu+gpu 0 to split layers across CPU and GPU
-    → Reduce num_cores: python main.py --train --num_cores 2 --cpu
+    → Reduce num_cores: python main.py --train --num-cores 2 --cpu
 
-Error: Directory "aiml_dev/" not found
+Error: Directory "datasets_source/aiml/" not found
     → Current directory must be project root
-    → Files should be in: G:\PROJECTS\MyIAModelChat\aiml_dev\
+    → Files should be in: G:\PROJECTS\MyIAModelChat\datasets_source\aiml\
 
 Error: PDF/EPUB loading fails
     → Install dependencies: pip install PyPDF2 ebooklib
@@ -724,16 +724,16 @@ Changing Tokenizer Settings:
 
 Using Different Data Directories:
     Place files in:
-        aiml_dev/ for AIML files
+        datasets_source/aiml/ for AIML files
         datasets_source/pdf/ for PDF documents
         datasets_source/epub/ for EPUB e-books
     Then run: python main.py --prepare-data --aiml --pdf --epub
 
 Adjusting Generation Parameters:
     Edit in dialogmanager.py __init__:
-        top_k: sampling parameter (default 50)
-        top_p: nucleus sampling (default 0.9)
-        temperature: randomness (default 0.8)
+        top_k: sampling parameter (default 12)
+        top_p: nucleus sampling (default 0.8)
+        temperature: randomness (default 0.65)
         min_length: minimum response length (default 5)
         no_repeat_ngram_size: repetition prevention (default 3)
 

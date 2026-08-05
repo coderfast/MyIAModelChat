@@ -143,11 +143,11 @@ Esto le da al modelo GPT-2 contexto sobre el tono emocional del usuario para gen
 
 ```python
 DialogueManager(
-    top_k=50,              # Muestra de los 50 tokens más probables
-    top_p=0.9,             # Nucleus sampling: 90% de probabilidad acumulada
-    temperature=0.7,       # Temperatura base (ajustada por sentimiento)
+    top_k=12,              # Muestra de los 12 tokens más probables
+    top_p=0.8,             # Nucleus sampling: 80% de probabilidad acumulada
+    temperature=0.65,      # Temperatura base (ajustada por sentimiento)
     max_len=128,           # Longitud máxima de respuesta en tokens
-    min_length=3,          # Longitud mínima de respuesta
+    min_length=5,          # Longitud mínima de respuesta
     no_repeat_ngram_size=3 # Penalización de n-gramas repetidos
 )
 ```

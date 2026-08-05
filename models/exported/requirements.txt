@@ -1,0 +1,14 @@
+# Dependencies for GGUF conversion
+# Install: pip install -r requirements.txt
+
+# gguf: GGUF format writer
+gguf>=0.10.0
+
+# torch: model weight loading
+torch
+
+# numpy: quantization
+numpy
+
+
+onnxscript

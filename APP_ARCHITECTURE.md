@@ -28,7 +28,7 @@ MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transforme
          v                      v                    v
 +------------------+  +------------------+  +------------------+
 | commons/         |  |  Model Library   |  |  GGUF Server     |
-| (shared code)    |  |  (models/*.pth)  |  | (envAIModels/)   |
+| (shared code)    |  |  (checkpoints/*.pth)  |  | (envAIModels/)   |
 |                  |  |                  |  |                  |
 | model|tokenizer  |  | Merge | Export   |  | llama.cpp        |
 | dialogue|dataset |  | ONNX | GGUF      |  | Ollama-API       |

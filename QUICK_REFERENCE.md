@@ -74,7 +74,7 @@ python main.py --export ciencias_naturales+programacion --formats gguf
 python main.py --chat
 
 # Chat with CPU optimization
-python main.py --chat --cpu --num_cores 4 --num_threads 4
+python main.py --chat --cpu --num-cores 4 --num-threads 4
 
 # List models
 python main.py --list-models
@@ -121,7 +121,6 @@ accumulation_steps = 8     # Gradient accumulation (effective batch = 32)
 learning_rate = 0.001
 epochs = 1                 # Default (use --epochs to increase)
 num_workers = 0            # DataLoader workers
-use_cache = False          # Default (use --use-cache to enable)
 ```
 
 ## Model Architecture Flow
@@ -250,8 +249,8 @@ export_to_gguf("model.pth")
 ## Caching System
 
 ```bash
-# Enable caching for 12x faster training
-python main.py --train --use-cache --epochs 10
+# Use cached dataset (from --prepare-data) for 12x faster training
+python main.py --train --epochs 10
 
 # Refresh cache after adding new PDFs/EPUBs
 python main.py --prepare-data --pdf --epub --refresh-cache

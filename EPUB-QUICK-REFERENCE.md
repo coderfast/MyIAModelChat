@@ -41,7 +41,6 @@ project/
 │   ├── book2.epub
 │   └── ebook3.epub
 ├── main.py
-├── data_preparer.py
 └── requirements.txt
 ```
 
@@ -220,7 +219,6 @@ python main.py --prepare-data --aiml --epub
 | `--epochs N` | Number of training epochs |
 | `--refresh-cache` | Rebuild cache from scratch |
 | `--clear-cache` | Delete cached data |
-| `--use-cache` | Load from cache (fast) |
 
 ---
 

@@ -60,7 +60,7 @@
 - Streaming de respuestas soportado
 
 ## Requisitos principales
-- Python 3.11+ (probado en 3.14)
+- Python 3.12+ (probado en 3.14)
 - PyTorch
 - Transformers (Hugging Face)
 - FastAPI
@@ -87,7 +87,7 @@
 - `envAIModels/app.py` — servidor FastAPI
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
 - `dataset_cache/sentencepiece.model` — modelo BPE entrenado
-- `models/` — checkpoints de modelos entrenados
+- `checkpoints/` — checkpoints de modelos entrenados
 
 ## Licencia
 - Indicar la licencia de uso del proyecto si aplica.

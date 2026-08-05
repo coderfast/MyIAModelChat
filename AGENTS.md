@@ -26,12 +26,15 @@ MyIAModelChat/
 │   ├── dataset/                         # PyTorch datasets
 │   │   ├── __init__.py
 │   │   └── chatdataset.py               # ChatDataset
-│   └── registry/                        # Model management
+│   ├── registry/                        # Model management
+│   │   ├── __init__.py
+│   │   ├── model_registry.py            # Model discovery, listing
+│   │   ├── model_merge.py               # Model merging
+│   │   ├── model_export.py              # Export to GGUF/ONNX
+│   │   └── model_downloader.py          # HuggingFace downloader
+│   └── utils/                           # Shared utilities
 │       ├── __init__.py
-│       ├── model_registry.py            # Model discovery, listing
-│       ├── model_merge.py               # Model merging
-│       ├── model_export.py              # Export to GGUF/ONNX
-│       └── model_downloader.py          # HuggingFace downloader
+│       └── device_utils.py              # GPU detection, device resolution
 │
 ├── dataset_preparer/                    # Data preparation
 │   ├── __init__.py
@@ -39,7 +42,15 @@ MyIAModelChat/
 │   ├── source_validators.py             # Data quality validators
 │   ├── thinking_generators.py           # Thinking generation base
 │   ├── thinking_quality.py              # Quality validation
+│   ├── thinking_engine.py               # NLP-based chain-of-thought reasoning
 │   ├── generate_thinking_data.py        # Thinking data generation
+│   ├── contamination/                   # Data contamination filtering
+│   │   ├── __init__.py
+│   │   ├── filters.py                   # Noise/quality filters
+│   │   ├── dedup.py                     # Deduplication
+│   │   ├── balance.py                   # Class balancing
+│   │   ├── audit.py                     # Data audit
+│   │   └── leakage.py                   # Leakage detection
 │   ├── aiml/
 │   │   ├── __init__.py
 │   │   ├── parser.py                      # AIML Parser (resolve elements, wildcards, quality)
@@ -80,13 +91,17 @@ MyIAModelChat/
 │   ├── model.py
 │   └── model_metadata.py
 │
-├── manual_test.py                       # Manual testing
-├── tests/                               # Test suite
-├── checkpoints/                         # Model checkpoints
 ├── models/                              # Trained models
+│   ├── intent/                          # BERT intent classifier
+│   ├── sentiment/                       # BERT sentiment analyzer
 │   └── exported/                        # Exported models
 ├── dataset_cache/                       # Cached datasets
-└── datasets_source/                     # Data sources
+├── datasets_source/                     # Data sources
+├── tests/                               # Test suite (13 test files)
+├── requirements.txt                     # Python dependencies
+├── APP_CACHE_VIEWER/                    # PyQt5 dataset cache viewer
+├── DOCS/                                # Documentation
+└── ROADMAPS/                            # Project roadmaps
 `
 
 ---
@@ -98,6 +113,7 @@ MyIAModelChat/
 | Module | Purpose |
 |--------|---------|
 | main.py | CLI entry point - parses args, orchestrates operations |
+| config.py | Centralized config (OLLAMA_MODEL, OLLAMA_URL) |
 | commons/model/chatmodel.py | GPT-2 Transformer architecture |
 | commons/dialogue/dialogmanager.py | Intent/sentiment analysis, temperature adjustment |
 | commons/dataset/chatdataset.py | PyTorch Dataset for tokenized chat data |
@@ -105,10 +121,14 @@ MyIAModelChat/
 | commons/registry/model_registry.py | Model discovery and listing |
 | commons/registry/model_merge.py | Model merging by weight averaging |
 | commons/registry/model_export.py | Export to GGUF, ONNX |
+| commons/utils/device_utils.py | GPU detection, device resolution |
 | dataset_preparer/data_preparer.py | Multi-source data loading |
+| dataset_preparer/thinking_engine.py | NLP-based chain-of-thought reasoning |
+| dataset_preparer/thinking_quality.py | Thinking quality validation |
 | dataset_preparer/aiml/parser.py | AIML Parser (resolve elements, wildcards, quality) |
 | dataset_preparer/aiml/loader.py | AIML file processing |
-| 	raining/trainer.py | Training pipeline with checkpointing |
+| dataset_preparer/contamination/ | Data contamination filtering pipeline |
+| training/trainer.py | Training pipeline with checkpointing |
 | inference/chat_engine.py | Chat interface and inference |
 
 ### Data Flow
@@ -138,15 +158,15 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
 
 ### Testing
 
-`ash
+`
 # Run all tests
 pytest tests/
 
 # Run specific test file
 pytest tests/test_chatmodel.py
 
-# Manual testing
-python manual_test.py
+# Run thinking tests
+pytest tests/test_thinking.py tests/test_thinking_engine.py tests/test_thinking_quality_v2.py -v
 `
 
 ### Training Commands
@@ -156,7 +176,7 @@ python manual_test.py
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
 
 # Train model (default checkpoint name)
-python main.py --train --use-cache --epochs 30
+python main.py --train --epochs 30
 
 # Train with custom name and dataset
 python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
@@ -177,8 +197,8 @@ python main.py --export ciencias_naturales --formats gguf,onnx
 ### API Server
 
 `ash
-# Start FastAPI server
-python main_chat.py
+# Start FastAPI server (from envAIModels/)
+python -m envAIModels.app
 
 # API endpoints
 POST /v1/chat/completions  # Chat completion
@@ -199,9 +219,9 @@ GET  /v1/models            # List available models
 - Trainer encapsulates all training logic
 
 ### Module Organization
-- commons/: Reusable code (model, tokenizer, dialogue, registry)
-- dataset_preparer/: Data loading and preprocessing
-- 	raining/: Training pipeline
+- commons/: Reusable code (model, tokenizer, dialogue, registry, utils)
+- dataset_preparer/: Data loading, preprocessing, and contamination filtering
+- training/: Training pipeline
 - inference/: Inference and chat
 - envAIModels/: FastAPI server (separate concern)
 
@@ -264,19 +284,33 @@ open → in_progress → done
 ## Dependencies
 
 ### Core
-- Python 3.8+
-- PyTorch 2.0+
+- Python 3.12+ (tested with 3.14)
+- PyTorch 2.0+ (torch, torchvision, torchaudio, torchtext)
 - transformers (Hugging Face)
 - sentencepiece (BPE tokenizer)
 - datasets (Hugging Face datasets)
-- dill / multiprocess (serialization)
+- numpy
+- onnx (model export)
+- huggingface_hub (model download)
+
+### API Server
+- fastapi
+- uvicorn
+- pydantic
+
+### Data Processing
+- python-aiml (AIML parsing)
+- PyPDF2 (PDF extraction)
+- ebooklib (EPUB support)
+- trafilatura (web scraping)
+- beautifulsoup4 (HTML parsing)
+- requests (HTTP client)
 
 ### Optional
 - spacy (professional sentence tokenization)
 - langdetect (language detection)
 - datasketch (MinHash deduplication)
-- PyPDF2 (PDF extraction)
-- ebooklib (EPUB support)
+- keyboard (hotkey support)
 - ollama (external teacher for thinking generation)
 
 ---
@@ -301,4 +335,4 @@ open → in_progress → done
 
 ---
 
-*Last updated: 2026-07-28*
+*Last updated: 2026-08-05*

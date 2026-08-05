@@ -41,7 +41,6 @@ project/
 │   ├── document2.pdf
 │   └── document3.pdf
 ├── main.py
-├── data_preparer.py
 └── requirements.txt
 ```
 
@@ -211,7 +210,6 @@ python main.py --prepare-data --aiml --pdf
 | `--epochs N` | Number of training epochs |
 | `--refresh-cache` | Rebuild cache from scratch |
 | `--clear-cache` | Delete cached data |
-| `--use-cache` | Load from cache (fast) |
 
 ---
 

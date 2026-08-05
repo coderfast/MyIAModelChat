@@ -70,6 +70,7 @@ python main.py --chat
 ```
 MyIAModelChat/
 ├── main.py                              # Primary entry point (CLI) - ONLY file that processes args
+├── config.py                            # Centralized config (OLLAMA_MODEL, OLLAMA_URL)
 │
 ├── commons/                             # Shared code (reusable across projects)
 │   ├── __init__.py
@@ -91,6 +92,9 @@ MyIAModelChat/
 │       ├── model_merge.py               # Model merging
 │       ├── model_export.py              # Export to GGUF/ONNX
 │       └── model_downloader.py          # HuggingFace downloader
+│   └── utils/                           # Shared utilities
+│       ├── __init__.py
+│       └── device_utils.py              # GPU detection, device resolution
 │
 ├── dataset_preparer/                    # Data preparation
 │   ├── __init__.py
@@ -98,6 +102,7 @@ MyIAModelChat/
 │   ├── source_validators.py             # Data quality validators
 │   ├── thinking_generators.py           # Thinking generation base
 │   ├── thinking_quality.py              # Quality validation
+│   ├── thinking_engine.py               # NLP-based chain-of-thought reasoning
 │   ├── generate_thinking_data.py        # Thinking data generation
 │   ├── aiml/
 │   │   ├── __init__.py
@@ -146,13 +151,18 @@ MyIAModelChat/
 │   ├── model.py
 │   └── model_metadata.py
 │
-├── manual_test.py                       # Manual testing
-├── tests/                               # Test suite
+├── tests/                               # Test suite (13 test files)
 ├── checkpoints/                         # Model checkpoints
 ├── models/                              # Trained models
+│   ├── intent/                          # BERT intent classifier
+│   ├── sentiment/                       # BERT sentiment analyzer
 │   └── exported/                        # Exported models
 ├── dataset_cache/                       # Cached datasets
-└── datasets_source/                     # Data sources
+├── datasets_source/                     # Data sources
+├── requirements.txt                     # Python dependencies
+├── APP_CACHE_VIEWER/                    # PyQt5 dataset cache viewer
+├── DOCS/                                # Documentation
+└── ROADMAPS/                            # Project roadmaps
 ```
 
 ---
@@ -591,12 +601,14 @@ main.py
 ## Requirements
 
 ### Core
-- Python 3.8+
-- PyTorch 2.0+
+- Python 3.12+ (tested with 3.14)
+- PyTorch 2.0+ (torch, torchvision, torchaudio, torchtext)
 - Transformers (Hugging Face)
 - sentencepiece
 - datasets
 - numpy
+- onnx (model export)
+- huggingface_hub (model download)
 
 ### API Server
 - fastapi
@@ -604,11 +616,13 @@ main.py
 - pydantic
 
 ### Data Processing
+- python-aiml (AIML parsing)
 - PyPDF2
 - ebooklib
 - beautifulsoup4
 - trafilatura
 - requests
+- keyboard (hotkey support)
 
 ### Optional
 - spacy (professional sentence tokenization)

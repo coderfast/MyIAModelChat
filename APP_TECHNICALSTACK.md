@@ -12,7 +12,7 @@
 +---------------+ +-----------+ +---------------+
 |   Languages   | | Frameworks| |   Libraries   |
 +---------------+ +-----------+ +---------------+
-| Python 3.8+   | | PyTorch   | | transformers  |
+| Python 3.12+  | | PyTorch   | | transformers  |
 |               | | FastAPI   | | sentencepiece |
 |               | | Uvicorn   | | datasets      |
 +---------------+ +-----------+ +---------------+
@@ -24,7 +24,7 @@
 
 | Language | Version | Usage |
 |----------|---------|-------|
-| **Python** | 3.8+ (3.12 recommended) | All source code, CLI, API, training, data processing |
+| **Python** | 3.12+ (tested with 3.14) | All source code, CLI, API, training, data processing |
 | **Shell Script** | Bash/PowerShell | Export converter scripts (GGUF via llama.cpp) |
 
 ---
@@ -204,7 +204,6 @@
 | Tool | Purpose | Command |
 |------|---------|---------|
 | **pytest** | Unit and integration testing | `pytest tests/` |
-| **manual_test.py** | Manual API endpoint testing | `python manual_test.py` |
 | **Ollama** | GGUF model serving | `ollama create <name> -f Modelfile` |
 | **llama.cpp** | GGUF conversion | `python convert.py <hf_dir> --outfile <model>.gguf` |
 
@@ -274,7 +273,7 @@ ollama run mi-model
 
 | Component | Min Version | Recommended | Notes |
 |-----------|-------------|-------------|-------|
-| Python | 3.8 | 3.12 | Type hints, dict ordering |
+| Python | 3.12 | 3.14 | Type hints, dict ordering |
 | PyTorch | 2.0 | 2.1+ | AMP, torch.onnx improvements |
 | sentencepiece | 0.1.99 | 0.2+ | BPE training stability |
 | transformers | 4.30 | 4.35+ | GPT2Config, pipeline API |
