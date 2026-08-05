@@ -259,7 +259,7 @@ GPT-2 Transformer architecture for conversational AI.
 ```python
 from commons.model.chatmodel import ChatModel
 
-model = ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)
+model = ChatModel(tokenizer, embed_size=256, num_layers=4)
 ```
 
 ### commons/tokenizer/bpe_tokenizer.py

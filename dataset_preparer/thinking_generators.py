@@ -8,6 +8,7 @@ import json
 import logging
 import urllib.request
 import urllib.error
+from collections import OrderedDict
 from typing import Optional, Dict, Any
 from config import OLLAMA_MODEL, OLLAMA_URL
 
@@ -20,7 +21,8 @@ class OllamaTeacher:
     def __init__(self, model: str = OLLAMA_MODEL, url: str = OLLAMA_URL):
         self.model = model
         self.url = url.rstrip('/')
-        self.cache: Dict[tuple, str] = {}
+        self.cache: OrderedDict = OrderedDict()
+        self._cache_maxsize = 1000
         self._available: Optional[bool] = None
         self._model_valid: Optional[bool] = None
 
@@ -81,6 +83,9 @@ class OllamaTeacher:
                 data = json.loads(resp.read().decode('utf-8'))
                 result = data.get('response', '').strip()
                 self.cache[cache_key] = result
+                # LRU eviction
+                if len(self.cache) > self._cache_maxsize:
+                    self.cache.popitem(last=False)
                 return result
         except Exception as e:
             logger.debug(f"Ollama generation failed: {e}")

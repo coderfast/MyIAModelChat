@@ -65,23 +65,15 @@ try:
 except ImportError:
     SPACY_AVAILABLE = False
 
-try:
-    import unicodedata
-    UNICODE_AVAILABLE = True
-except ImportError:
-    UNICODE_AVAILABLE = False
+import unicodedata
+import re
 
-try:
-    import re
-    REGEX_AVAILABLE = True
-except ImportError:
-    REGEX_AVAILABLE = False
+# spaCy model singleton cache
+_spacy_nlp = None
 
 
 def normalize_unicode(text: str) -> str:
     """Normalize Unicode text to NFKC form for consistency."""
-    if not UNICODE_AVAILABLE:
-        return text
     return unicodedata.normalize('NFKC', text)
 
 
@@ -124,18 +116,18 @@ def split_sentences(text: str) -> List[str]:
     # Try spaCy first (most accurate)
     if SPACY_AVAILABLE:
         try:
-            # Try to load Spanish model, fallback to English
-            try:
-                nlp = spacy.load('es_core_news_sm')
-            except OSError:
+            global _spacy_nlp
+            if _spacy_nlp is None:
                 try:
-                    nlp = spacy.load('en_core_web_sm')
+                    _spacy_nlp = spacy.load('es_core_news_sm')
                 except OSError:
-                    # If no model available, use blank pipeline with sentencizer
-                    nlp = spacy.blank("en")
-                    nlp.add_pipe("sentencizer")
+                    try:
+                        _spacy_nlp = spacy.load('en_core_web_sm')
+                    except OSError:
+                        _spacy_nlp = spacy.blank("en")
+                        _spacy_nlp.add_pipe("sentencizer")
 
-            doc = nlp(text)
+            doc = _spacy_nlp(text)
             sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
             return sentences
         except Exception:
@@ -565,6 +557,7 @@ class DataPreparer:
             
             # Load statistics
             with open(CACHE_STATS_FILE, 'rb') as f:
+                logger.warning("Loading pickle cache (untrusted data risk): %s", CACHE_STATS_FILE)
                 self.statistics = pickle.load(f)
             logger.info(f"  ✓ Loaded cached statistics")
             
@@ -744,13 +737,13 @@ class DataPreparer:
             # Apply quality filtering if enabled
             enable_quality = getattr(self.args, 'enable_quality_filter', False)
             if enable_quality:
-                logger.info("[6.7/7] Applying quality filtering...")
+                logger.info("[6.7a/7] Applying quality filtering...")
                 self._apply_quality_filter()
 
             # Apply language filtering if enabled
             enable_lang_filter = getattr(self.args, 'enable_lang_filter', False)
             if enable_lang_filter:
-                logger.info("[6.7/7] Applying language filtering...")
+                logger.info("[6.7b/7] Applying language filtering...")
                 self._apply_language_filter()
 
             # Apply leakage detection (NEW)
@@ -997,8 +990,8 @@ class DataPreparer:
                             # Standardized format: question/answer pair
                             prompt_text = f"{input_text} {output_text}"
 
-                            # Oversample with moderate repetition (20x)
-                            for _ in range(20):
+                            # Oversample with moderate repetition (5x)
+                            for _ in range(5):
                                 csv_items.append({'input_ids': prompt_text})
                                 file_count += 1
 
@@ -1154,14 +1147,18 @@ class DataPreparer:
 
                     with open(file_path, 'rb') as f:
                         pdf_reader = PdfReader(f)
-                        text = ""
+                        text_parts = []
 
                         # Extract text from all pages
                         for page_num, page in enumerate(pdf_reader.pages):
                             try:
-                                text += page.extract_text() + " "
+                                page_text = page.extract_text()
+                                if page_text:
+                                    text_parts.append(page_text)
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting page {page_num} from {filename}: {e}")
+
+                        text = " ".join(text_parts)
 
                         # Split text by sentences/paragraphs into samples
                         if text.strip():
@@ -1251,7 +1248,7 @@ class DataPreparer:
 
                     # Open and parse EPUB
                     book = epub.read_epub(file_path)
-                    text = ""
+                    text_parts = []
 
                     # Extract text from all chapters
                     for item in book.get_items():
@@ -1273,9 +1270,12 @@ class DataPreparer:
 
                                 # Clean up whitespace
                                 content = re.sub(r'\s+', ' ', content)
-                                text += content + " "
+                                if content.strip():
+                                    text_parts.append(content)
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting chapter from {filename}: {e}")
+
+                    text = " ".join(text_parts)
 
                     # Split text into samples
                     if text.strip():
@@ -1409,9 +1409,23 @@ class DataPreparer:
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
         # Add <thinking> and </thinking> as special tokens that won't be split by BPE
         user_symbols = '--user_defined_symbols=<thinking>,</thinking>'
-        spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type=bpe --character_coverage=0.9995 {user_symbols}"
-        logger.info(f"  Training SentencePiece BPE model (vocab_size={vocab_size})... this may take a while")
-        spm.SentencePieceTrainer.Train(spm_cmd)
+        
+        # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
+        current_vocab = vocab_size
+        max_retries = 3
+        for attempt in range(max_retries):
+            spm_cmd = f"--input={tmp_corpus} --model_prefix={model_prefix} --vocab_size={current_vocab} --model_type=bpe --character_coverage=0.9995 {user_symbols}"
+            logger.info(f"  Training SentencePiece BPE model (vocab_size={current_vocab})... this may take a while")
+            try:
+                spm.SentencePieceTrainer.Train(spm_cmd)
+                break
+            except Exception as sp_err:
+                err_msg = str(sp_err)
+                if 'Vocabulary size too high' in err_msg or 'vocab' in err_msg.lower():
+                    current_vocab = max(256, current_vocab // 2)
+                    logger.warning(f"  vocab_size too large for this corpus. Retrying with vocab_size={current_vocab}...")
+                else:
+                    raise
 
         model_file = model_prefix + '.model'
         if not os.path.exists(model_file):
@@ -2163,20 +2177,26 @@ class DataPreparer:
         if self.combined_data and len(self.combined_data) > 0:
             stats['total_samples'] = len(self.combined_data)
             
-            # Calculate text length statistics
+            # Calculate text length statistics in single pass
             try:
-                lengths = []
+                total_length = 0
+                min_length = float('inf')
+                max_length = 0
+                count = 0
                 for item in self.combined_data:
                     if isinstance(item['input_ids'], str):
                         length = len(item['input_ids'].split())
                     else:
                         length = len(item['input_ids'])
-                    lengths.append(length)
+                    total_length += length
+                    min_length = min(min_length, length)
+                    max_length = max(max_length, length)
+                    count += 1
                 
-                if lengths:
-                    stats['avg_text_length'] = sum(lengths) / len(lengths)
-                    stats['min_text_length'] = min(lengths)
-                    stats['max_text_length'] = max(lengths)
+                if count > 0:
+                    stats['avg_text_length'] = total_length / count
+                    stats['min_text_length'] = min_length
+                    stats['max_text_length'] = max_length
             except Exception as e:
                 logger.warning(f"  Could not calculate length statistics: {e}")
         

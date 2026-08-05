@@ -10,9 +10,8 @@ from transformers import GPT2Config, GPT2LMHeadModel
 
 
 class ChatModel(nn.Module):
-    def __init__(self, tokenizer, embed_size, hidden_size, num_layers=2):
+    def __init__(self, tokenizer, embed_size, num_layers=2):
         super(ChatModel, self).__init__()
-        self.tokenizer = tokenizer
         config = GPT2Config(
             vocab_size=tokenizer.vocab_size,
             n_embd=embed_size,

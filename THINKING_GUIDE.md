@@ -202,14 +202,12 @@ python main.py --chat
 ### Lógica de parsing
 
 ```python
-from inference.chat_engine import ChatEngine
+from inference.chat_engine import parse_thinking_response
 
-def parse_thinking_response(raw_output):
-    if '<thinking>' in raw_output and '</thinking>' in raw_output:
-        thinking = raw_output.split('<thinking>')[1].split('</thinking>')[0]
-        response = raw_output.split('</thinking>')[1].strip()
-        return thinking, response
-    return None, raw_output
+result = parse_thinking_response(raw_output)
+# Returns: {'thinking': str or None, 'response': str}
+thinking = result['thinking']
+response = result['response']
 ```
 
 Por defecto el thinking NO se muestra (solo respuesta). Usar `--show-thinking` para verlo.

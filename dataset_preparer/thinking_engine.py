@@ -11,6 +11,9 @@ from collections import Counter
 
 logger = logging.getLogger(__name__)
 
+# Module-level compiled regex patterns
+_ADJ_PATTERN = re.compile(r'\b\w+\s+\w+(?:\s+\w+)?\b')
+
 try:
     import spacy
     SPACY_AVAILABLE = True
@@ -36,7 +39,8 @@ class ThinkingEngine:
         self.depth = depth
         self.depth_config = self.DEPTH_CONFIG.get(depth, self.DEPTH_CONFIG['adaptive'])
         self._nlp = None
-        self._analysis_cache: Dict[str, dict] = {}
+        self._analysis_cache: dict = {}
+        self._cache_maxsize = 500
         self._load_nlp_model()
 
     def _estimate_complexity(self, text: str, analysis: dict) -> str:
@@ -127,6 +131,10 @@ class ThinkingEngine:
 
         # Cache result
         self._analysis_cache[cache_key] = thinking
+        # LRU eviction
+        if len(self._analysis_cache) > self._cache_maxsize:
+            oldest_key = next(iter(self._analysis_cache))
+            del self._analysis_cache[oldest_key]
 
         return thinking
 
@@ -180,8 +188,7 @@ class ThinkingEngine:
 
         # Simple noun phrase detection: adjective + noun patterns
         noun_phrases = []
-        adj_pattern = re.compile(r'\b\w+\s+\w+(?:\s+\w+)?\b')
-        for match in adj_pattern.finditer(text):
+        for match in _ADJ_PATTERN.finditer(text):
             phrase = match.group()
             if len(phrase.split()) >= 2:
                 noun_phrases.append(phrase)

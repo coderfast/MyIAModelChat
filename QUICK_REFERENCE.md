@@ -96,8 +96,7 @@ python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.p
 ```python
 # commons/model/chatmodel.py - Key parameters (GPT-2 architecture)
 vocab_size = 8000           # Vocabulary size (BPE, default)
-embed_size = 256            # Embedding dimension
-hidden_size = 512           # Hidden state size
+embed_size = 256            # Embedding dimension (maps to n_embd)
 num_layers = 4              # Number of transformer layers
 n_head = 4                  # Attention heads
 n_positions = 512           # Max sequence length
@@ -150,7 +149,7 @@ SentencePieceTokenizerWrapper.decode() → Response text
 ```python
 from commons.model.chatmodel import ChatModel
 
-model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
+model = ChatModel(tokenizer, embed_size=256)
 output = model(input_ids)  # Forward pass
 model.to(device)  # Move to GPU/CPU
 ```

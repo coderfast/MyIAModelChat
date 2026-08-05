@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +143,18 @@ class DialogueManager:
 
         # Adjust temperature based on sentiment
         if sentiment_label:
-            stars = sentiment_label.replace(' stars', '').replace(' star', '').strip()
             try:
-                stars = int(stars)
-                if stars <= 2:
-                    adjusted_temperature = max(0.3, self.temperature - 0.2)
-                elif stars >= 4:
-                    adjusted_temperature = min(1.0, self.temperature + 0.1)
-            except ValueError:
+                match = re.search(r'(\d+)', sentiment_label)
+                if match:
+                    stars = int(match.group(1))
+                    if stars <= 2:
+                        adjusted_temperature = max(0.3, self.temperature - 0.2)
+                    elif stars >= 4:
+                        adjusted_temperature = min(1.0, self.temperature + 0.1)
+            except (ValueError, AttributeError):
                 pass
 
-        print(f"Intent: {intent_label}, Sentiment: {sentiment_label}, Adjusted temp: {adjusted_temperature:.2f}")
+        print(f"Intent: {intent_label} | Sentiment: {sentiment_label} | Temp: {adjusted_temperature:.2f}")
 
         # Build enriched prompt with human-readable context
         prompt_parts = [f"Pregunta: {user_text.strip()}"]
@@ -188,20 +190,25 @@ class DialogueManager:
         response_tokens = []
         thinking_token_count = 0
 
+        # Pre-allocate token buffer to avoid O(n^2) torch.cat growth
+        src_buf = torch.full((1, len(input_ids) + self.max_len), self.pad_token_id or 0, dtype=torch.long, device=self.device)
+        src_buf[0, :len(input_ids)] = src
+        src_len = len(input_ids)
+
         try:
             with torch.no_grad():
                 for step in range(self.max_len):
-                    out = self.model(src)
+                    out = self.model(src_buf[:, :src_len])
                     if isinstance(out, (tuple, list)):
                         out = out[0]
                     logits = out[:, -1, :]
 
                     # Apply dynamic penalization for repeated n-grams
+                    banned_tokens = set()
                     if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size - 1:
                         penalty = 5.0
                         ngram_size = self.no_repeat_ngram_size
                         prefix = tuple(generated[-(ngram_size - 1):])
-                        banned_tokens = set()
                         for i in range(len(generated) - ngram_size + 1):
                             if tuple(generated[i:i + ngram_size - 1]) == prefix:
                                 banned_tokens.add(generated[i + ngram_size - 1])
@@ -209,7 +216,7 @@ class DialogueManager:
                             if token_id < logits.size(-1):
                                 logits[0, token_id] -= penalty
 
-                    next_token = self.sample_next_token(logits.squeeze(0), temperature=adjusted_temperature)
+                    next_token = self.sample_next_token(logits.squeeze(0), temperature=adjusted_temperature, banned_tokens=banned_tokens)
 
                     if next_token is None:
                         break
@@ -244,8 +251,8 @@ class DialogueManager:
                         response_tokens.append(next_token)
 
                     # Append token to context for autoregressive generation
-                    next_token_tensor = torch.LongTensor([[next_token]]).to(self.device)
-                    src = torch.cat([src, next_token_tensor], dim=1)
+                    src_buf[0, src_len] = next_token
+                    src_len += 1
 
                     # If generation keeps outputting only special/tiny tokens, abort
                     if len(generated) >= 3:
@@ -265,7 +272,7 @@ class DialogueManager:
         if not generated:
             return {'thinking': None, 'response': self.default_response}
 
-        # Ensure no repeated n-grams in output
+        # Ensure no repeated n-grams in output — retry once if found
         if self.no_repeat_ngram_size and len(generated) >= self.no_repeat_ngram_size:
             def has_repeated_ngram(seq, n):
                 if len(seq) < n * 2:
@@ -277,7 +284,31 @@ class DialogueManager:
                 return False
 
             if has_repeated_ngram(generated, self.no_repeat_ngram_size):
-                return {'thinking': None, 'response': self.default_response}
+                # Strip last n-gram and retry generation for remaining tokens
+                generated = generated[:-self.no_repeat_ngram_size]
+                response_tokens = response_tokens[:-self.no_repeat_ngram_size] if len(response_tokens) >= self.no_repeat_ngram_size else response_tokens
+                # Continue generation from current state
+                src_buf_trimmed = src_buf[:, :src_len - self.no_repeat_ngram_size]
+                src_len_trimmed = src_len - self.no_repeat_ngram_size
+                if src_len_trimmed > 0:
+                    try:
+                        for step in range(self.max_len - len(generated)):
+                            out = self.model(src_buf_trimmed[:, :src_len_trimmed])
+                            if isinstance(out, (tuple, list)):
+                                out = out[0]
+                            logits = out[:, -1, :]
+                            next_token = self.sample_next_token(logits.squeeze(0), temperature=adjusted_temperature)
+                            if next_token is None:
+                                break
+                            if (self.eos_token_id is not None and next_token == self.eos_token_id
+                                    and len(generated) >= self.min_length):
+                                break
+                            generated.append(next_token)
+                            response_tokens.append(next_token)
+                            src_buf_trimmed[0, src_len_trimmed] = next_token
+                            src_len_trimmed += 1
+                    except Exception:
+                        pass  # If retry fails, keep what we have
 
         # Decode thinking and response separately
         thinking_text = None
@@ -313,13 +344,4 @@ class DialogueManager:
             return {'thinking': thinking_text, 'response': self.default_response}
 
         return {'thinking': thinking_text, 'response': response_text}
-
-    def _is_repeated_ngram(self, seq, n):
-        if n < 1 or len(seq) < n * 2:
-            return False
-        last = tuple(seq[-n:])
-        for i in range(len(seq) - n):
-            if tuple(seq[i:i+n]) == last:
-                return True
-        return False
 

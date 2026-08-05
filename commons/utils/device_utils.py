@@ -107,7 +107,6 @@ def enumerate_gpus() -> List[Dict[str, Any]]:
 
             # Try to get free memory
             try:
-                torch.cuda.set_device(i)
                 free_mem, total_mem = torch.cuda.mem_get_info(i)
                 vram_free = free_mem / (1024 ** 3)
             except Exception:
@@ -207,6 +206,7 @@ def calculate_layers_for_vram(
     model: torch.nn.Module,
     gpu_device: torch.device,
     vram_fraction: float = 0.80,
+    bytes_per_param: int = 4,
 ) -> int:
     """Calculate how many transformer layers fit in GPU VRAM.
 
@@ -214,10 +214,13 @@ def calculate_layers_for_vram(
         model: The full model (on CPU)
         gpu_device: Target GPU device
         vram_fraction: Fraction of VRAM to use (default 80%)
+        bytes_per_param: Bytes per parameter (4=FP32, 2=FP16, 1=INT8)
 
     Returns:
         Number of transformer layers that can be placed on GPU
     """
+    if not torch.cuda.is_available():
+        return 0
     gpu_props = torch.cuda.get_device_properties(gpu_device)
     vram_total = gpu_props.total_memory / (1024 ** 3)
     vram_budget = vram_total * vram_fraction
@@ -234,7 +237,7 @@ def calculate_layers_for_vram(
     # Estimate memory per layer
     total_layer_params = sum(p.numel() for p in transformer_layers.parameters())
     params_per_layer = total_layer_params / num_layers
-    mem_per_layer_gb = (params_per_layer * 4) / (1024 ** 3)  # FP32
+    mem_per_layer_gb = (params_per_layer * bytes_per_param) / (1024 ** 3)
 
     # Estimate overhead (embeddings + lm_head)
     overhead_params = 0

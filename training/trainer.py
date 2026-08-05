@@ -2,6 +2,7 @@
 import pickle
 import sys
 import time
+import math
 import threading
 import contextlib
 import torch
@@ -171,13 +172,12 @@ class Trainer:
 
         # Dynamic checkpoint naming
         self.checkpoint_name = getattr(self.config, 'checkpoint_name', 'chat_model')
-        self.dataset_source = getattr(self.config, 'dataset', 'dataset_cache')
+        self.dataset_source = getattr(self.config, 'dataset_source', 'dataset_cache')
         self.model_output_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}.pth')
         os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
 
         # Load cached dataset and metadata (if present)
         self.cache_metadata = {}
-        self.cache_has_token_ids = False
         print(f"Loading dataset from cache...")
         self._load_cached_dataset()
 
@@ -252,11 +252,9 @@ class Trainer:
 
             # Detect whether cached dataset already contains tokenized ids
             if 'token_ids' in getattr(self.loaded_dataset, 'column_names', []):
-                self.cache_has_token_ids = True
                 logger.info("Cached dataset contains 'token_ids' - will use pre-tokenized data for training")
             # fallback: if metadata includes a bpe model path, prefer tokenized flow
             elif isinstance(self.cache_metadata, dict) and self.cache_metadata.get('bpe_model_path'):
-                self.cache_has_token_ids = True
                 logger.info("Cache metadata indicates BPE model present; training will prefer tokenized cache if available")
 
             # Load statistics if available
@@ -478,7 +476,6 @@ class Trainer:
 
     def _setup_model_with_device_strategy(self, model, device):
         """Setup model with CPU, GPU, DDP, or CPU+GPU device strategy."""
-        import gc
         from commons.utils.device_utils import calculate_layers_for_vram
 
         device_mode = self.device_mode
@@ -512,15 +509,16 @@ class Trainer:
                         world_size=self.world_size
                     )
 
-                model = DDP(model, device_ids=[self.local_rank])
-                if self.rank == 0:
-                    logger.info(f"Model wrapped with DDP on {self.world_size} processes, local_rank={self.local_rank}")
-
-            # Enable gradient checkpointing if available
+            # Enable gradient checkpointing BEFORE DDP wrapping
             if self.use_gradient_checkpointing and hasattr(model, 'gradient_checkpointing_enable'):
                 model.gradient_checkpointing_enable()
                 if self.rank == 0:
                     logger.info("Gradient checkpointing enabled for memory efficiency")
+
+            if self.world_size > 1:
+                model = DDP(model, device_ids=[self.local_rank])
+                if self.rank == 0:
+                    logger.info(f"Model wrapped with DDP on {self.world_size} processes, local_rank={self.local_rank}")
 
             if self.rank == 0:
                 logger.info(f"Model deployed on GPU: {device}")
@@ -609,6 +607,7 @@ class Trainer:
         (thinking_loss_weight) so the model focuses more on learning the response.
         """
         outputs = model(inputs)
+        raw_outputs = outputs  # Keep full outputs for thinking metrics
 
         # Build weight mask on 2D tensors before flattening
         weights = torch.ones_like(targets, dtype=torch.float)
@@ -644,12 +643,12 @@ class Trainer:
         token_losses = criterion(outputs, targets)
         weight_sum = weights.sum()
         if weight_sum <= 0:
-            # Fallback: all tokens are padding â€” return zero loss
-            return torch.tensor(0.0, device=outputs.device, requires_grad=True)
+            # Fallback: all tokens are padding — return zero loss
+            return torch.tensor(0.0, device=outputs.device, requires_grad=True), raw_outputs
         loss = (token_losses * weights).sum() / weight_sum
-        return loss
+        return loss, raw_outputs
 
-    def _compute_thinking_metrics(self, model, inputs, targets, device):
+    def _compute_thinking_metrics(self, model, inputs, targets, device, logits=None):
         """Compute metrics for thinking token generation if thinking data is present."""
         if not self.has_thinking_data:
             return {}
@@ -661,7 +660,7 @@ class Trainer:
             return {}
 
         with torch.no_grad():
-            outputs = model(inputs)
+            outputs = logits if logits is not None else model(inputs)
             predictions = outputs.argmax(dim=-1)
 
             thinking_open_correct = 0
@@ -736,23 +735,32 @@ class Trainer:
 
         total_loss = 0
         total_batches = 0
+        num_batches = 0
         phase_label = "Light training (warm-up)" if is_warmup else "Training"
-        if num_batches_override is not None:
-            num_batches = num_batches_override
-        else:
+        # Try to get total batch count
+        known_total = num_batches_override
+        if known_total is None:
             try:
-                num_batches = len(dataloader)
+                known_total = len(dataloader)
             except (TypeError, AttributeError):
-                num_batches = float('inf')
+                known_total = None
         model.train()
         optimizer.zero_grad()
         epoch_start_time = time.time()
         if self.rank == 0:
             logger.info("Training loop started; the model is actively processing batches")
 
-        # Timing accumulators for micro-steps and optimizer updates
-        micro_step_times = []
-        optimizer_step_times = []
+        # Timing accumulators for micro-steps and optimizer updates (running stats)
+        micro_step_count = 0
+        micro_step_sum = 0.0
+        micro_step_min = float('inf')
+        micro_step_max = 0.0
+        micro_step_last = 0.0
+        optimizer_step_count = 0
+        optimizer_step_sum = 0.0
+        optimizer_step_min = float('inf')
+        optimizer_step_max = 0.0
+        optimizer_step_last = 0.0
 
         # Thinking metrics accumulators
         thinking_metrics_accum = {}
@@ -764,15 +772,28 @@ class Trainer:
                 break
 
             if (batch_idx == 0 or (batch_idx + 1) % 10 == 0) and self.rank == 0:
-                batch_str = f"{batch_idx + 1}/{num_batches}" if num_batches != float('inf') else f"{batch_idx + 1}"
                 elapsed = time.time() - epoch_start_time
-                if batch_idx > 0 and num_batches != float('inf'):
-                    eta_seconds = (elapsed / (batch_idx + 1)) * (num_batches - batch_idx - 1)
-                    eta_m, eta_s = divmod(int(eta_seconds), 60)
-                    eta_str = f"{eta_m}m {eta_s}s" if eta_m > 0 else f"{eta_s}s"
-                    logger.info(f"{phase_label} batch {batch_str} | ETA: {eta_str}")
+                current_batch = batch_idx + 1
+                # Show total if we know it; otherwise just show current
+                if known_total is not None and known_total > 1:
+                    total_str = f"/{known_total}"
+                    remaining = max(0, known_total - current_batch)
                 else:
-                    logger.info(f"{phase_label} batch {batch_str} in progress...")
+                    total_str = ""
+                    remaining = 0
+                if batch_idx > 0:
+                    rate = current_batch / elapsed
+                    if remaining > 0:
+                        eta_seconds = remaining / rate
+                        eta_m, eta_s = divmod(int(eta_seconds), 60)
+                        eta_str = f"{eta_m}m {eta_s}s" if eta_m > 0 else f"{eta_s}s"
+                    else:
+                        # Unknown remaining: just show elapsed
+                        e_m, e_s = divmod(int(elapsed), 60)
+                        eta_str = f"elapsed {e_m}m {e_s}s" if e_m > 0 else f"elapsed {e_s}s"
+                    logger.info(f"{phase_label} batch {current_batch}{total_str} | ETA: {eta_str}")
+                else:
+                    logger.info(f"{phase_label} batch {current_batch}{total_str} in progress...")
 
             total_batches += 1
             inputs = inputs.to(device)
@@ -784,35 +805,36 @@ class Trainer:
             # Determine if this is the last micro-step (should sync gradients)
             is_last_micro_step = ((batch_idx + 1) % accumulation_steps == 0)
 
-            # Use no_sync() for DDP when not at accumulation boundary
-            if self.world_size > 1 and hasattr(model, 'no_sync') and not is_last_micro_step:
-                context = model.no_sync()
-            else:
-                context = contextlib.nullcontext()
-
             # Forward pass
-            with context:
-                if self.use_mixed_precision and scaler is not None:
-                    with torch.autocast(device_type=device.type, dtype=torch.float16):
-                        loss = self._compute_loss(model, inputs, targets, criterion)
-                else:
-                    loss = self._compute_loss(model, inputs, targets, criterion)
+            if self.use_mixed_precision and scaler is not None:
+                with torch.autocast(device_type=device.type, dtype=torch.float16):
+                    loss, logits = self._compute_loss(model, inputs, targets, criterion)
+            else:
+                loss, logits = self._compute_loss(model, inputs, targets, criterion)
 
-                # Compute thinking metrics periodically
-                if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
-                    thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device)
-                    for key, value in thinking_metrics.items():
-                        if key not in thinking_metrics_accum:
-                            thinking_metrics_accum[key] = []
-                        thinking_metrics_accum[key].append(value)
+            # Compute thinking metrics periodically (reuse logits from _compute_loss)
+            if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
+                thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device, logits=logits)
+                for key, value in thinking_metrics.items():
+                    if key not in thinking_metrics_accum:
+                        thinking_metrics_accum[key] = []
+                    thinking_metrics_accum[key].append(value)
 
-                # Backward pass
+            # Backward pass — use no_sync() for DDP when not at accumulation boundary
+            if self.world_size > 1 and hasattr(model, 'no_sync') and not is_last_micro_step:
+                with model.no_sync():
+                    original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
+            else:
                 original_loss = self._backward_pass(loss, optimizer, scaler, accumulation_steps)
                 total_loss += original_loss.item()
 
             micro_step_end = time.time()
             micro_step_elapsed = micro_step_end - micro_step_start
-            micro_step_times.append(micro_step_elapsed)
+            micro_step_count += 1
+            micro_step_sum += micro_step_elapsed
+            micro_step_min = min(micro_step_min, micro_step_elapsed)
+            micro_step_max = max(micro_step_max, micro_step_elapsed)
+            micro_step_last = micro_step_elapsed
 
             # Log micro-step only if --statistics is enabled (rank-0 only)
             if self.config.statistics and self.rank == 0:
@@ -842,26 +864,28 @@ class Trainer:
 
                 opt_step_end = time.time()
                 opt_step_elapsed = opt_step_end - opt_step_start
-                optimizer_step_times.append(opt_step_elapsed)
+                optimizer_step_count += 1
+                optimizer_step_sum += opt_step_elapsed
+                optimizer_step_min = min(optimizer_step_min, opt_step_elapsed)
+                optimizer_step_max = max(optimizer_step_max, opt_step_elapsed)
+                optimizer_step_last = opt_step_elapsed
 
                 # Log optimizer step only if --statistics is enabled (rank-0 only)
                 if self.config.statistics and self.rank == 0:
                     accum_group = (batch_idx + 1) // accumulation_steps
-                    micro_avg = sum(micro_step_times[-accumulation_steps:]) / accumulation_steps
                     logger.info(
                         f"  [optimizer step #{accum_group}] "
                         f"opt_time={opt_step_elapsed*1000:.1f}ms | "
-                        f"micro_avg={micro_avg*1000:.1f}ms | "
-                        f"micro_total={sum(micro_step_times[-accumulation_steps:])*1000:.1f}ms | "
-                        f"ratio(opt/total)={opt_step_elapsed/(opt_step_elapsed + sum(micro_step_times[-accumulation_steps:]))*100:.1f}%"
+                        f"micro_avg={micro_step_last*1000:.1f}ms | "
+                        f"ratio(opt/total)={opt_step_elapsed/(opt_step_elapsed + micro_step_last)*100:.1f}%"
                     )
 
-            # Memory cleanup on GPU
-            if self.use_gpu and (batch_idx + 1) % TRAINING_CONFIG['memory_cleanup_interval'] == 0:
-                torch.cuda.empty_cache()
+            num_batches = max(1, total_batches)
+        avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
 
-        num_batches = max(1, total_batches)
-        avg_loss = total_loss / num_batches
+        # Memory cleanup at epoch boundary
+        if self.use_gpu:
+            torch.cuda.empty_cache()
 
         # Log thinking metrics summary (rank-0 only)
         if thinking_metrics_accum and self.rank == 0:
@@ -873,40 +897,32 @@ class Trainer:
         # --- Timing summary (rank-0 only) ---
         total_elapsed = time.time() - epoch_start_time
         if self.rank == 0:
-            if micro_step_times:
-                micro_avg = sum(micro_step_times) / len(micro_step_times)
-                micro_min = min(micro_step_times)
-                micro_max = max(micro_step_times)
-                micro_total_compute = sum(micro_step_times)
+            if micro_step_count > 0:
+                micro_avg = micro_step_sum / micro_step_count
                 logger.info("=" * 80)
                 logger.info(f"TIMING SUMMARY ({phase_label})")
                 logger.info(f"  Micro-steps (forward+backward):")
-                logger.info(f"    Count:    {len(micro_step_times)}")
+                logger.info(f"    Count:    {micro_step_count}")
                 logger.info(f"    Avg:      {micro_avg*1000:.1f}ms")
-                logger.info(f"    Min:      {micro_min*1000:.1f}ms")
-                logger.info(f"    Max:      {micro_max*1000:.1f}ms")
-                logger.info(f"    Total:    {micro_total_compute*1000:.1f}ms")
+                logger.info(f"    Min:      {micro_step_min*1000:.1f}ms")
+                logger.info(f"    Max:      {micro_step_max*1000:.1f}ms")
+                logger.info(f"    Total:    {micro_step_sum*1000:.1f}ms")
 
-            if optimizer_step_times:
-                opt_avg = sum(optimizer_step_times) / len(optimizer_step_times)
-                opt_min = min(optimizer_step_times)
-                opt_max = max(optimizer_step_times)
-                opt_total = sum(optimizer_step_times)
+            if optimizer_step_count > 0:
+                opt_avg = optimizer_step_sum / optimizer_step_count
                 logger.info(f"  Optimizer updates:")
-                logger.info(f"    Count:    {len(optimizer_step_times)}")
+                logger.info(f"    Count:    {optimizer_step_count}")
                 logger.info(f"    Avg:      {opt_avg*1000:.1f}ms")
-                logger.info(f"    Min:      {opt_min*1000:.1f}ms")
-                logger.info(f"    Max:      {opt_max*1000:.1f}ms")
-                logger.info(f"    Total:    {opt_total*1000:.1f}ms")
+                logger.info(f"    Min:      {optimizer_step_min*1000:.1f}ms")
+                logger.info(f"    Max:      {optimizer_step_max*1000:.1f}ms")
+                logger.info(f"    Total:    {optimizer_step_sum*1000:.1f}ms")
 
                 # Overhead analysis
-                if micro_step_times:
-                    compute_total = sum(micro_step_times)
-                    opt_total_val = sum(optimizer_step_times)
-                    overhead = total_elapsed - compute_total - opt_total_val
-                    logger.info(f"  Overhead (data loading, logging, etc): {overhead*1000:.1f}ms ({overhead/total_elapsed*100:.1f}%)")
-                    logger.info(f"  Compute fraction:  {compute_total/total_elapsed*100:.1f}%")
-                    logger.info(f"  Optimizer fraction: {opt_total_val/total_elapsed*100:.1f}%")
+                compute_total = micro_step_sum
+                overhead = total_elapsed - compute_total - optimizer_step_sum
+                logger.info(f"  Overhead (data loading, logging, etc): {overhead*1000:.1f}ms ({overhead/total_elapsed*100:.1f}%)")
+                logger.info(f"  Compute fraction:  {compute_total/total_elapsed*100:.1f}%")
+                logger.info(f"  Optimizer fraction: {optimizer_step_sum/total_elapsed*100:.1f}%")
 
         if self.rank == 0:
             logger.info(f"  Total epoch time: {total_elapsed:.2f}s")
@@ -972,10 +988,10 @@ class Trainer:
         
         try:
             # Use the cached dataset
-            loaded_dataset = self.loaded_dataset
+            _pre_tokenized_dataset = self.loaded_dataset
 
-            logger.info(f"Dataset size: {len(loaded_dataset)} samples")
-            logger.info(f"Dataset columns: {loaded_dataset.column_names}")
+            logger.info(f"Dataset size: {len(_pre_tokenized_dataset)} samples")
+            logger.info(f"Dataset columns: {_pre_tokenized_dataset.column_names}")
 
             # Log thinking data status
             if self.has_thinking_data:
@@ -1014,13 +1030,12 @@ class Trainer:
                 logger.info(f" Tokenizer vocabulary size: {self.tokenizer.vocab_size}")
 
             # Save tokenizer vocabulary for chat loading inside checkpoints
-            os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
-            self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
             if self.rank == 0:
+                self.tokenizer.save_vocabulary(TOKENIZER_VOCAB_FILE)
                 logger.info(f" Tokenizer vocabulary saved to {TOKENIZER_VOCAB_FILE}")
 
             # Preserve raw dataset text for special facts fine-tuning before tokenization
-            self.raw_dataset = loaded_dataset
+            self.raw_dataset = _pre_tokenized_dataset
 
             # Build or load pretokenized cache for faster training iterations
             self.loaded_dataset = self._get_tokenized_dataset()
@@ -1079,13 +1094,13 @@ class Trainer:
             # Initialize model with device strategy
             if self.rank == 0:
                 logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
-            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], hidden_size=TRAINING_CONFIG['hidden_size'], num_layers=4)
+            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:
                 logger.info(f" Model initialized and deployed")
 
             # Define loss and optimizer
-            criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index())
+            criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index(), reduction='none')
             optimizer = optim.Adam(model.parameters(), lr=TRAINING_CONFIG['learning_rate'])
             
             # Add learning rate scheduler
@@ -1098,8 +1113,7 @@ class Trainer:
             if scaler and self.rank == 0:
                 logger.info(" Gradient scaler initialized for mixed precision training")
 
-            # Create checkpoint directory
-            os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
+            # Checkpoint directory already created in __init__
             if self.rank == 0:
                 logger.info(f" Checkpoint directory: {MODEL_CHECKPOINT_DIR}")
 
@@ -1107,7 +1121,7 @@ class Trainer:
             if TRAINING_CONFIG.get('warm_up', False):
                 warm_up_ratio = float(TRAINING_CONFIG.get('warm_up_ratio', 0.1))
                 warm_up_steps = int(TRAINING_CONFIG.get('warm_up_steps', 100))
-                warmup_limit = max(1, int(len(loaded_dataset) * warm_up_ratio))
+                warmup_limit = max(1, int(len(_pre_tokenized_dataset) * warm_up_ratio))
 
                 if self.rank == 0:
                     logger.info(f"Starting warm-up phase (light training) with {warmup_limit} samples and up to {warm_up_steps} batches...")
@@ -1129,7 +1143,7 @@ class Trainer:
                     num_workers=0
                 )
 
-                warmup_num_batches = max(1, warmup_limit // TRAINING_CONFIG['batch_size'])
+                warmup_num_batches = max(1, math.ceil(warmup_limit / TRAINING_CONFIG['batch_size']))
                 _ = self.train(model, warmup_dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'], num_batches_override=warmup_num_batches, is_warmup=True)
                 if self.rank == 0:
                     logger.info(" Warm-up phase completed")
@@ -1168,7 +1182,6 @@ class Trainer:
                         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                         epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
                         epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-                        os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
                         # Use model.module.state_dict() for DDP to remove 'module.' prefix
                         state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
                         torch.save({
@@ -1177,7 +1190,7 @@ class Trainer:
                             'optimizer_state_dict': optimizer.state_dict(),
                             'scheduler_state_dict': scheduler.state_dict(),
                             'loss': loss,
-                            'tokenizer': self.tokenizer,
+                            'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
                             'model_name': self.checkpoint_name,
                             'architecture': {
                                 'embed_size': TRAINING_CONFIG['embed_size'],
@@ -1212,16 +1225,14 @@ class Trainer:
                         logger.info(" CSV data fine-tuning completed")
                 except Exception as e:
                     logger.warning(f"CSV data fine-tuning failed: {e}")
+                finally:
+                    self.raw_dataset = None  # Free memory after CSV fine-tuning
 
             # Save final model + tokenizer state for consistent inference (rank-0 only)
             if self.rank == 0:
                 logger.info("=" * 80)
                 logger.info("[OK] Training completed! Saving final model and tokenizer...")
 
-                # Save final checkpoint with metadata
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                epoch_filename = f"{self.checkpoint_name}_final_{timestamp}.pth"
-                epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
                 # Use model.module.state_dict() for DDP to remove 'module.' prefix
                 state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
                 torch.save({
@@ -1230,28 +1241,7 @@ class Trainer:
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),
                     'loss': self.best_loss,
-                    'tokenizer': self.tokenizer,
-                    'model_name': self.checkpoint_name,
-                    'architecture': {
-                        'embed_size': TRAINING_CONFIG['embed_size'],
-                        'hidden_size': TRAINING_CONFIG['hidden_size'],
-                        'num_layers': TRAINING_CONFIG.get('num_layers', 4),
-                        'n_head': TRAINING_CONFIG.get('n_head', 4),
-                        'n_positions': TRAINING_CONFIG.get('n_positions', 512),
-                        'vocab_size': self.tokenizer.vocab_size,
-                    },
-                    'dataset_source': self.dataset_source,
-                }, epoch_path)
-                logger.info(f"  Final epoch checkpoint saved to {epoch_path}")
-
-                # Save final model
-                torch.save({
-                    'epoch': epoch + 1,
-                    'model_state_dict': state_dict,
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': scheduler.state_dict(),
-                    'loss': self.best_loss,
-                    'tokenizer': self.tokenizer,
+                    'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
                     'model_name': self.checkpoint_name,
                     'architecture': {
                         'embed_size': TRAINING_CONFIG['embed_size'],

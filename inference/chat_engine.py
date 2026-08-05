@@ -26,7 +26,7 @@ try:
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 except ImportError:
     SentencePieceTokenizerWrapper = None
-from transformers import pipeline
+from transformers import AutoTokenizer, pipeline
 
 # Configuration constants
 CKPT_PATH = os.path.join('checkpoints', 'chat_model.pth')
@@ -147,9 +147,17 @@ class ChatEngine:
         try:
             ckpt = self.try_load_checkpoint(self.ckpt_path, device, False)
             if isinstance(ckpt, dict):
-                if 'tokenizer' in ckpt and ckpt['tokenizer'] is not None:
+                # Load tokenizer from path saved in checkpoint (avoids unpickling custom objects)
+                if 'tokenizer_path' in ckpt and ckpt['tokenizer_path']:
+                    sp_path = ckpt['tokenizer_path']
+                    if not os.path.isabs(sp_path):
+                        sp_path = os.path.join(os.getcwd(), sp_path)
+                    if SentencePieceTokenizerWrapper is not None and os.path.exists(sp_path):
+                        self.tokenizer = SentencePieceTokenizerWrapper(sp_path)
+                        logger.info(f"Loaded tokenizer from checkpoint path: {sp_path}, vocab_size: {self.tokenizer.vocab_size}")
+                elif 'tokenizer' in ckpt and ckpt['tokenizer'] is not None:
                     self.tokenizer = ckpt['tokenizer']
-                    logger.info(f"Loaded tokenizer from checkpoint, vocab_size: {self.tokenizer.vocab_size}")
+                    logger.info(f"Loaded tokenizer from checkpoint (legacy), vocab_size: {self.tokenizer.vocab_size}")
                 state_dict = ckpt.get('model_state_dict', ckpt.get('state_dict', None))
             else:
                 state_dict = ckpt
@@ -163,7 +171,6 @@ class ChatEngine:
             arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
             self.model = ChatModel(self.tokenizer,
                 embed_size=arch.get('embed_size', 256),
-                hidden_size=arch.get('hidden_size', 512),
                 num_layers=arch.get('num_layers', 4))
 
             if state_dict is None:
@@ -186,7 +193,7 @@ class ChatEngine:
                     f"Error loading model checkpoint: {e}. "
                     "Ensure the model was trained with BPE tokenizer."
                 )
-            self.model = ChatModel(self.tokenizer, embed_size=256, hidden_size=512)
+            self.model = ChatModel(self.tokenizer, embed_size=256)
             logger.info("Initializing model with random weights...")
             init_fn = getattr(self.tokenizer, "init_weights", None)
             if callable(init_fn):
@@ -216,8 +223,13 @@ class ChatEngine:
         intent_model_path = sentiment_model_path
 
         pipe_device = 0 if device.type == 'cuda' else -1
-        intent_classifier = pipeline('text-classification', model=intent_model_path, device=pipe_device)
-        sentiment_analyzer = pipeline('sentiment-analysis', model=sentiment_model_path, device=pipe_device)
+        shared_bert = pipeline(
+            'text-classification',
+            model=sentiment_model_path,
+            device=pipe_device,
+            )
+        intent_classifier = shared_bert
+        sentiment_analyzer = shared_bert
 
         self.dialogue_manager = DialogueManager(
             model=self.model,
@@ -295,11 +307,13 @@ class ChatEngine:
         """Load model checkpoint with safety measures."""
         try:
             if trusted:
+                logger.warning("Loading checkpoint with weights_only=False (trusted path): %s", path)
                 return torch.load(path, map_location=device, weights_only=False)
             else:
                 try:
                     return torch.load(path, map_location=device, weights_only=True)
                 except Exception:
+                    logger.warning("weights_only=True failed, falling back to weights_only=False: %s", path)
                     return torch.load(path, map_location=device, weights_only=False)
         except Exception as e:
             msg = str(e)
@@ -311,6 +325,7 @@ class ChatEngine:
                     mod = importlib.import_module(module_name)
                     cls = getattr(mod, class_name)
                     with torch.serialization.safe_globals([cls]):
+                        logger.warning("Loading checkpoint with weights_only=False (allowlisted class): %s", path)
                         return torch.load(path, map_location=device, weights_only=False)
                 except Exception:
                     logger.exception("Allowlisting failed for %s", full_name)
@@ -322,6 +337,7 @@ class ChatEngine:
                     allowed.append(SentencePieceTokenizerWrapper)
                 if allowed:
                     with torch.serialization.safe_globals(allowed):
+                        logger.warning("Loading checkpoint with weights_only=False (allowlisted tokenizer): %s", path)
                         return torch.load(path, map_location=device, weights_only=False)
             except Exception:
                 pass
@@ -402,6 +418,23 @@ class ChatEngine:
             return result.get('response', '')
         return result
 
+    def close(self):
+        """Release GPU memory and cleanup resources."""
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
+            self.model = None
+        if hasattr(self, 'dialogue_manager') and self.dialogue_manager is not None:
+            dm = self.dialogue_manager
+            if hasattr(dm, 'intent_classifier') and dm.intent_classifier is not None:
+                del dm.intent_classifier
+            if hasattr(dm, 'sentiment_analyzer') and dm.sentiment_analyzer is not None:
+                del dm.sentiment_analyzer
+            del self.dialogue_manager
+            self.dialogue_manager = None
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        logger.info("ChatEngine resources released")
+
 
 # Streaming helper functions for SSE format
 def stream_chat_with_thinking(thinking: str, response: str):
@@ -474,19 +507,6 @@ def stream_chat_text(text: str):
     yield 'data: [DONE]\n\n'
 
 
-def parse_thinking_response(raw_output: str):
-    """Parse thinking from model output.
-    
-    Returns (thinking, response) tuple.
-    If no thinking tags found, returns (None, raw_output).
-    """
-    if '<thinking>' in raw_output and '</thinking>' in raw_output:
-        thinking = raw_output.split('<thinking>')[1].split('</thinking>')[0]
-        response = raw_output.split('</thinking>')[1].strip()
-        return thinking, response
-    return None, raw_output
-
-
 # Singleton for FastAPI integration
 _init_lock = threading.Lock()
 _chat_engine_instance = None
@@ -500,3 +520,12 @@ def get_chat_engine_instance(device_mode: str = 'auto', gpu_indices: Optional[Li
                 config = ChatConfig(device_mode=device_mode, gpu_indices=gpu_indices, model_name=model)
                 _chat_engine_instance = ChatEngine(config)
     return _chat_engine_instance
+
+
+def reset_chat_engine():
+    """Release singleton ChatEngine resources."""
+    global _chat_engine_instance
+    with _init_lock:
+        if _chat_engine_instance is not None:
+            _chat_engine_instance.close()
+            _chat_engine_instance = None

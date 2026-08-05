@@ -266,7 +266,7 @@ class TrainingConfig:
     'loss': float,
     'tokenizer': dict,          # Vocabulary metadata
     'model_name': str,
-    'architecture': {           # embed_size, hidden_size, num_layers, n_head, n_positions, vocab_size
+    'architecture': {           # embed_size, num_layers, n_head, n_positions, vocab_size
         ...
     },
     'dataset_source': str,
@@ -288,7 +288,7 @@ Input Tokens (vocab_size)
        -> LayerNorm
        -> Multi-Head Self-Attention (n_head=4)
        -> Residual + LayerNorm
-       -> Feed-Forward (hidden_size=512)
+        -> Feed-Forward (4 * embed_size)
        -> Residual
   -> LayerNorm
   -> LM Head (vocab_size) -> Logits

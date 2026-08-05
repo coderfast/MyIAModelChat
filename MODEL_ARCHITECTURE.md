@@ -40,8 +40,7 @@ Output Logits
 ### Key Parameters (from commons/model/chatmodel.py)
 
 - **vocab_size**: Number of unique tokens in vocabulary (default: 8000 via BPE)
-- **embed_size**: Dimension of embedding vectors (256)
-- **hidden_size**: Hidden state dimension (512)
+- **embed_size**: Dimension of embedding vectors (256), maps to `n_embd` in GPT2Config
 - **num_layers**: Number of transformer layers (4)
 - **n_head**: Number of attention heads (4)
 - **n_positions**: Maximum sequence length (512)
@@ -183,7 +182,7 @@ from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 from commons.model.chatmodel import ChatModel
 
 tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
-model = ChatModel(tokenizer, embed_size=256, hidden_size=512)
+model = ChatModel(tokenizer, embed_size=256)
 model.load_state_dict(torch.load('chat_model.pth'))
 model.eval()  # Set to evaluation mode
 ```
@@ -193,7 +192,6 @@ model.eval()  # Set to evaluation mode
 - **Batch Size**: Larger batches = faster training but more memory
 - **Sequence Length**: Longer sequences = more context but slower processing
 - **Embedding Dimension**: Higher = more expressive but more parameters
-- **Hidden Size**: Larger = more capacity but slower inference
 - **Multiprocessing**: Use multiple workers in DataLoader for faster data loading
 
 ## Extending the Architecture
@@ -202,9 +200,9 @@ model.eval()  # Set to evaluation mode
 - Increase `num_layers` in GPT2Config
 - More layers = more capacity but slower training
 
-### Increasing Hidden Size
-- Increase `n_embd` and `hidden_size` in GPT2Config
-- Larger hidden size = more expressive model
+### Increasing Embedding Dimension
+- Increase `embed_size` parameter (maps to `n_embd` in GPT2Config)
+- Larger embedding dimension = more expressive model
 
 ### Adding Dropout
 - Reduces overfitting

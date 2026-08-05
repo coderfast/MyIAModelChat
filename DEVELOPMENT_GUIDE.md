@@ -298,7 +298,7 @@ class TestChatModel(unittest.TestCase):
         # ChatModel requires a tokenizer object as first argument
         from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
         tokenizer = SentencePieceTokenizerWrapper('dataset_cache/sentencepiece.model')
-        self.model = ChatModel(tokenizer, embed_size=256, hidden_size=512, num_layers=4)
+        self.model = ChatModel(tokenizer, embed_size=256, num_layers=4)
     
     def test_forward_shape(self):
         input_tensor = torch.LongTensor([[1, 2, 3, 4]])

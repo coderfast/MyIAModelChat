@@ -61,7 +61,7 @@ class ColorFormatter(logging.Formatter):
         symbol = self.SYMBOLS.get(record.levelname, '')
 
         # Green for messages starting with [OK]
-        if record.levelname == 'INFO' and record.msg.startswith('[OK]'):
+        if record.levelname == 'INFO' and str(record.msg).startswith('[OK]'):
             color = self.SUCCESS_COLOR
         else:
             color = self.COLORS.get(record.levelname, '')
@@ -74,7 +74,8 @@ handler.setFormatter(ColorFormatter('%(asctime)s - %(levelname)s - %(message)s')
 
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
-root_logger.addHandler(handler)
+if not root_logger.handlers:
+    root_logger.addHandler(handler)
 logger = logging.getLogger(__name__)
 
 # Configuration constants
@@ -565,11 +566,11 @@ EXAMPLES:
                 master_port=args.master_port,
             )
             trainer = Trainer(config)
-            training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=True)
+            training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=False)
             training_thread.start()
             try:
                 while training_thread.is_alive():
-                    training_thread.join(timeout=1)
+                    training_thread.join(timeout=30)
                     if KEYBOARD_AVAILABLE:
                         try:
                             if keyboard.is_pressed('esc'):

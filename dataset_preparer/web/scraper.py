@@ -258,7 +258,14 @@ class WebDocScraper:
                         queue.append((link, depth + 1))
 
         logger.info(f"Scrape complete: {pages_scraped} pages, {len(self.texts)} text blocks extracted")
+        self.close()
         return self.texts
+
+    def close(self):
+        """Close the requests session and release connection pool."""
+        if self._session is not None:
+            self._session.close()
+            self._session = None
 
 
 def load_urls_from_file(filepath: str) -> List[str]:

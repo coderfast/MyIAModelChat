@@ -396,7 +396,7 @@ Examples:
     hf_pipeline = None
     if args.mode == 'hf':
         model_name = args.model or 'Qwen/Qwen2.5-1.5B-Instruct'
-            logger.info(f"Loading HuggingFace model: {model_name}")
+        logger.info(f"Loading HuggingFace model: {model_name}")
         try:
             from transformers import pipeline as hf_pipeline_fn
             hf_pipeline = hf_pipeline_fn('text-generation', model=model_name, trust_remote_code=True)
