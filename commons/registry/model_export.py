@@ -72,8 +72,27 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     return output_path
 
 
-def export_to_onnx_quantized(pth_path: str, output_path: Optional[str] = None, quant_type: str = 'int8') -> str:
-    """Export a .pth checkpoint to quantized ONNX format."""
+def export_to_onnx_quantized(
+    pth_path: str,
+    output_path: Optional[str] = None,
+    quant_type: str = 'int8',
+    static: bool = False,
+    per_channel: bool = False,
+    block_size: int = 128,
+) -> str:
+    """Export a .pth checkpoint to quantized ONNX format.
+
+    Args:
+        pth_path: Path to .pth checkpoint
+        output_path: Output ONNX path (auto-generated if None)
+        quant_type: Quantization type (int8, uint8, int4, uint4, fp8_e4m3fn, fp8_e5m2, fp8_e4m3fnuz, fp8_e5m2fnuz)
+        static: Use static quantization (default: dynamic)
+        per_channel: Use per-channel quantization
+        block_size: Block size for INT4/UINT4
+
+    Returns:
+        Path to quantized ONNX model
+    """
     # First export to regular ONNX
     onnx_path = export_to_onnx(pth_path)
 
@@ -89,6 +108,8 @@ def export_to_onnx_quantized(pth_path: str, output_path: Optional[str] = None, q
     quant_type_map = {
         'int8': QuantType.QInt8,
         'uint8': QuantType.QUInt8,
+        'int4': QuantType.QInt4,
+        'uint4': QuantType.QUInt4,
     }
     qt = quant_type_map.get(quant_type, QuantType.QInt8)
 
@@ -193,13 +214,25 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     return hf_dir
 
 
-def export_model(pth_path: str, formats: List[str], quantization: str = 'q8_0') -> dict:
+def export_model(
+    pth_path: str,
+    formats: List[str],
+    quantization: str = 'q8_0',
+    onnx_quant_type: str = 'int8',
+    onnx_static: bool = False,
+    onnx_per_channel: bool = False,
+    onnx_block_size: int = 128,
+) -> dict:
     """Export a model to multiple formats.
 
     Args:
         pth_path: Path to the .pth checkpoint.
-        formats: List of format strings: 'gguf', 'onnx', 'onnx_int8'
+        formats: List of format strings: 'gguf', 'onnx', 'onnx_int8', 'onnx_int4', 'onnx_fp8'
         quantization: GGUF quantization type (e.g. 'q8_0', 'q4_k_m', 'f16')
+        onnx_quant_type: ONNX quantization type (int8, uint8, int4, uint4, fp8_*)
+        onnx_static: Use static quantization for ONNX
+        onnx_per_channel: Use per-channel quantization for ONNX
+        onnx_block_size: Block size for INT4/UINT4 ONNX quantization
 
     Returns:
         Dict mapping format to output path.
@@ -212,6 +245,10 @@ def export_model(pth_path: str, formats: List[str], quantization: str = 'q8_0') 
                 results['onnx'] = export_to_onnx(pth_path)
             elif fmt == 'onnx_int8':
                 results['onnx_int8'] = export_to_onnx_quantized(pth_path, quant_type='int8')
+            elif fmt == 'onnx_int4':
+                results['onnx_int4'] = export_to_onnx_quantized(pth_path, quant_type='int4')
+            elif fmt == 'onnx_fp8':
+                results['onnx_fp8'] = export_to_onnx_quantized(pth_path, quant_type='fp8_e4m3fn')
             elif fmt == 'gguf':
                 results['gguf'] = export_to_gguf(pth_path, quantization=quantization)
             else:
@@ -223,7 +260,15 @@ def export_model(pth_path: str, formats: List[str], quantization: str = 'q8_0') 
     return results
 
 
-def export_cli(model_spec: str, formats: List[str], quantization: str = 'q8_0'):
+def export_cli(
+    model_spec: str,
+    formats: List[str],
+    quantization: str = 'q8_0',
+    onnx_quant_type: str = 'int8',
+    onnx_static: bool = False,
+    onnx_per_channel: bool = False,
+    onnx_block_size: int = 128,
+):
     """CLI entry point for model export."""
     # Parse model spec (may contain + for merge)
     if '+' in model_spec:
@@ -240,7 +285,15 @@ def export_cli(model_spec: str, formats: List[str], quantization: str = 'q8_0'):
             sys.exit(1)
         pth_path = direct_path
 
-    results = export_model(pth_path, formats, quantization=quantization)
+    results = export_model(
+        pth_path,
+        formats,
+        quantization=quantization,
+        onnx_quant_type=onnx_quant_type,
+        onnx_static=onnx_static,
+        onnx_per_channel=onnx_per_channel,
+        onnx_block_size=onnx_block_size,
+    )
 
     print(f"\nExport results for {Path(pth_path).stem}:")
     print("-" * 50)

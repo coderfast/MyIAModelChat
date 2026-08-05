@@ -1,6 +1,9 @@
 # os -> included by default in python
 # json -> included by default in python
 onnx
+onnxruntime
+# onnxruntime-gpu  # Optional: for FP8 support on NVIDIA GPU
+gguf>=0.10.0
 torch
 torchvision
 torchaudio

@@ -281,6 +281,8 @@ EXAMPLES:
   python main.py --model-info chat_model
   python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
   python main.py --export chat_model --formats gguf --quantization q4_k_m
+  python main.py --export chat_model --formats onnx --onnx-quant-type int8 --onnx-static
+  python main.py --export chat_model --formats onnx --onnx-quant-type fp8_e4m3fn --onnx-static
             """
         )
         
@@ -293,13 +295,23 @@ EXAMPLES:
         parser.add_argument("--model-info", type=str, default=None, metavar='NAME',
                             help="Show detailed layer info for a specific model")
         parser.add_argument("--export", type=str, default=None, help="Export model to GGUF/ONNX (name or name+name for merge)")
-        parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats (default: gguf,onnx)")
+        parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats: gguf, onnx, onnx_int8, onnx_int4, onnx_fp8 (default: gguf,onnx)")
         parser.add_argument("--quantization", type=str, default="q8_0",
                             choices=["f32", "f16", "q4_0", "q4_1", "q5_0", "q5_1", "q8_0",
                                      "q2_k", "q3_k", "q4_k", "q5_k", "q6_k", "q8_k",
                                      "iq4_nl", "iq4_xs", "iq2_xxs", "iq2_xs", "iq2_s",
                                      "iq3_xxs", "iq3_s", "iq1_s", "iq1_m"],
                             help="GGUF quantization type (default: q8_0)")
+        parser.add_argument("--onnx-quant-type", type=str, default="int8",
+                            choices=["int8", "uint8", "int4", "uint4",
+                                     "fp8_e4m3fn", "fp8_e5m2", "fp8_e4m3fnuz", "fp8_e5m2fnuz"],
+                            help="ONNX quantization type (default: int8)")
+        parser.add_argument("--onnx-static", action='store_true',
+                            help="Use static quantization for ONNX (default: dynamic)")
+        parser.add_argument("--onnx-per-channel", action='store_true',
+                            help="Use per-channel quantization for ONNX")
+        parser.add_argument("--onnx-block-size", type=int, default=128,
+                            help="Block size for INT4/UINT4 ONNX quantization (default: 128)")
 
         # Model library arguments
         parser.add_argument("--model", type=str, default=None, help="Model name to load for chat (e.g. ciencias_naturales)")
@@ -486,7 +498,15 @@ EXAMPLES:
         # Handle --export
         if args.export:
             formats = [f.strip() for f in args.formats.split(',')]
-            export_cli(args.export, formats, quantization=args.quantization)
+            export_cli(
+                args.export,
+                formats,
+                quantization=args.quantization,
+                onnx_quant_type=args.onnx_quant_type,
+                onnx_static=args.onnx_static,
+                onnx_per_channel=args.onnx_per_channel,
+                onnx_block_size=args.onnx_block_size,
+            )
             sys.exit(0)
 
         # Garbage collection

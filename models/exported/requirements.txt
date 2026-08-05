@@ -1,4 +1,4 @@
-# Dependencies for GGUF conversion
+# Dependencies for GGUF and ONNX conversion
 # Install: pip install -r requirements.txt
 
 # gguf: GGUF format writer
@@ -10,5 +10,9 @@ torch
 # numpy: quantization
 numpy
 
+# onnxruntime: ONNX quantization (dynamic and static)
+onnxruntime
+# onnxruntime-gpu  # Optional: for FP8 support on NVIDIA GPU
 
+# onnxscript: ONNX model manipulation (optional)
 onnxscript

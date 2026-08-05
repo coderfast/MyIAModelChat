@@ -153,3 +153,10 @@ IQ-quants use importance matrices and grid-based quantization:
 - IQ-quant types (`iq4_nl` through `iq1_m`) use custom implementation in `quantize.py`
 - All quantization is pure Python/NumPy (no external dependencies required)
 - The model must be exported to HuggingFace format first before GGUF conversion
+
+---
+
+## See Also
+
+- [ONNX Quantization Roadmap](ROADMAP_ONNX_QUANTIZE.md) — INT8/INT4/FP8 quantization for ONNX export
+- [IQ Quantization DONE](DONE_ROADMAP_IQ_QUANTIZE.md) — Completed IQ quantization implementation
