@@ -1,4 +1,4 @@
-# La Biblia del AIML 2.0
+# La Biblia del AIML 2.1
 
 ## Guía Completa del Estándar Artificial Intelligence Markup Language
 
@@ -9,7 +9,7 @@
 
 ---
 
-**Versión del documento:** 2.0  
+**Versión del documento:** 2.1  
 **Última actualización:** 2026-08-06  
 **Extensión del estándar:** AIML 2.1 (Junio 20, 2018)  
 **Autor original del estándar:** Dr. Richard S. Wallace
@@ -4984,5 +4984,5 @@ echo "Backup completado: $(date)"
 
 **Fin del documento**
 
-*La Biblia del AIML 2.0 - Guía Completa del Estándar*
-*Versión 2.0 - Última actualización: 2026-08-06*
+*La Biblia del AIML 2.1 - Guía Completa del Estándar*
+*Versión 2.1 - Última actualización: 2026-08-06*
