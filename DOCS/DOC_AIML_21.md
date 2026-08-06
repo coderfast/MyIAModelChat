@@ -1,5 +1,7 @@
 # La Biblia del AIML 2.1
 
+![Portada de libro técnico titled 'La Biblia del AIML 2.1', estilo minimalista con código XML flotante, esquema de árbol de decisiones, y un robot amigable leyendo un libro, fondo azul oscuro con detalles dorados, estilo flat design moderno](images/00_portada.png)
+
 ## Guía Completa del Estándar Artificial Intelligence Markup Language
 
 ---
@@ -76,6 +78,8 @@
 ---
 
 ## Capítulo 1: Historia y Evolución de AIML
+
+![Línea de tiempo visual mostrando la evolución de AIML desde 1995 hasta 2026, con hitos importantes: ALICE 1995, Loebner Prize 2000, AIML 1.0 2001, AIML 2.0 2012, AIML 2.1 2018, estilo infografía moderna colores azul y blanco](images/01_historia_aiml.png)
 
 ### 1.1 Los Orígenes: ALICE y Richard Wallace (1995-2002)
 
@@ -173,6 +177,8 @@ Con la llegada de modelos como GPT y Claude, podría parecer que AIML quedó obs
 ---
 
 ## Capítulo 2: Arquitectura de un Procesador AIML
+
+![Diagrama de arquitectura de un procesador AIML mostrando: Parser XML, Motor de Matching, Template Resolution, Sesiones, Variables, Historial, con flechas de flujo de datos, estilo diagrama técnico limpio](images/02_arquitectura_procesador.png)
 
 ### 2.1 Flujo General de Procesamiento
 
@@ -299,6 +305,8 @@ Cada conversación con un usuario es una **sesión**. Las sesiones almacenan:
 ---
 
 ## Capítulo 3: Estructura Básica de AIML
+
+![Diagrama anotado de la estructura básica de un archivo AIML, mostrando los elementos: aiml, category, pattern, template, con etiquetas y conexiones claras, estilo diagrama educativo](images/03_estructura_aiml.png)
 
 ### 3.1 El Elemento Raíz `<aiml>`
 
@@ -473,6 +481,8 @@ aiml_project/
 
 ## Capítulo 4: Wildcards - Guía Completa
 
+![Ilustración visual de los 4 wildcards de AIML: *, _, **, ^, con ejemplos de coincidencia para cada uno, usando texto resaltado y flechas, estilo tabla visual comparativa](images/04_wildcards_ejemplos.png)
+
 ### 4.1 `*` (Star): Coincide Una o Más Palabras
 
 El wildcard `*` coincide con una o más palabras en la entrada del usuario:
@@ -642,6 +652,8 @@ graph LR
 ---
 
 ## Capítulo 5: Symbolic Reduction (SRAI)
+
+![Diagrama de flujo mostrando una cadena SRAI: 'BUENOS DIAS' → 'HOLA' → '¡Hola!', con flechas de redirección y nodo central, estilo flowchart moderno](images/05_srai_cadena.png)
 
 ### 5.1 Concepto de SRAI
 
@@ -863,6 +875,8 @@ SRAI puede formar cadenas:
 
 ## Capítulo 6: Condiciones
 
+![Árbol de decisión de un chatbot mostrando condicionales: if-else con ramas para mood (happy, sad, angry), con iconos de caritas y respuestas, estilo diagrama de árbol](images/06_condiciones_arbol.png)
+
 ### 6.1 Condición Básica
 
 Las condiciones permiten respuestas diferentes según variables:
@@ -1028,6 +1042,8 @@ AIML 2.0 introduce `var` como alias de `name`:
 
 ## Capítulo 7: Respuestas Aleatorias
 
+![Ilustración de selección aleatoria de respuestas: dado o ruleta con múltiples opciones de respuesta saliendo, estilo conceptual moderno](images/07_random_respuestas.png)
+
 ### 7.1 Básico `<random>` con `<li>`
 
 ```xml
@@ -1145,6 +1161,8 @@ AIML 2.0 introduce `var` como alias de `name`:
 ---
 
 ## Capítulo 8: Manejo de Contexto
+
+![Diagrama de secuencia de conversación mostrando: Usuario → Bot → that (respuesta anterior) → siguiente respuesta, con burbujas de diálogo, estilo secuencia UML](images/08_contexto_conversacion.png)
 
 ### 8.1 Concepto de `<that>`
 
@@ -1282,6 +1300,8 @@ Puedes especificar múltiples respuestas anteriores separadas por barras:
 ---
 
 ## Capítulo 9: Sistema de Temas
+
+![Diagrama de contenedores mostrando temas como cajas que agrupan categories relacionadas: TEMA=CLIMA con categories de clima dentro, estilo diagrama de contenedores](images/09_sistema_temas.png)
 
 ### 9.1 Concepto de Topic
 
@@ -1437,6 +1457,8 @@ Los temas (`<topic>`) agrupan categories relacionadas. Esto ayuda a organizar el
 ---
 
 ## Capítulo 10: Variables y Alcance
+
+![Diagrama de alcance de variables AIML mostrando 3 niveles: user-* (sesión), bot-* (global), topic-* (tema), con círculos concéntricos, estilo diagrama de scopes](images/10_variables_alcance.png)
 
 ### 10.1 Variables de Usuario
 
@@ -1607,6 +1629,8 @@ Cuando se busca una variable, el orden de búsqueda es:
 
 ## Capítulo 11: Elementos de Lista
 
+![Infografía de operaciones de lista: list, first, rest, size, repeat, loop, con iconos y ejemplos visuales para cada operación, estilo grid de iconos](images/11_operaciones_lista.png)
+
 ### 11.1 `<list>` - Crear Listas
 
 ```xml
@@ -1696,6 +1720,8 @@ Cuando se busca una variable, el orden de búsqueda es:
 ---
 
 ## Capítulo 12: Historial de Conversación
+
+![Línea de tiempo de historial de conversación mostrando: input[1], input[2], input[3] con marcas de tiempo y contenido, estilo timeline visual](images/12_historial_conversacion.png)
 
 ### 12.1 `<input>` - Historial de Input
 
@@ -1808,6 +1834,8 @@ Cuando se busca una variable, el orden de búsqueda es:
 ---
 
 ## Capítulo 13: Aprendizaje Dinámico
+
+![Diagrama de ciclo de aprendizaje dinámico: learn → usar → unlearn → learn, con iconos de cerebro y flechas circulares, estilo diagrama circular moderno](images/13_aprendizaje_ciclo.png)
 
 ### 13.1 `<learn>` - Aprender durante Conversación
 
@@ -1967,6 +1995,8 @@ flowchart TD
 
 ## Capítulo 14: Transformaciones de Texto
 
+![Pipeline de transformaciones de texto: entrada → person → person2 → gender → formal → salida, con flechas y ejemplo visual para cada paso, estilo pipeline diagram](images/14_transformaciones_texto.png)
+
 ### 14.1 `<person>` - Conversión Primera/Segunda Persona
 
 ```xml
@@ -2099,6 +2129,8 @@ flowchart TD
 
 ## Capítulo 15: Operaciones del Sistema
 
+![Diagrama de operaciones del sistema mostrando: thinking (cerebro), date (reloj), eval (terminal), system (servidor), con iconos modernos, estilo icon grid](images/15_operaciones_sistema.png)
+
 ### 15.1 `<thinking>` - Razonamiento Interno
 
 El elemento `<thinking>` permite al bot "pensar" sin mostrar ese razonamiento al usuario:
@@ -2225,6 +2257,8 @@ El elemento `<thinking>` permite al bot "pensar" sin mostrar ese razonamiento al
 ---
 
 ## Capítulo 16: Elementos de Formateo
+
+![Mockup de respuesta enriquecida de chatbot mostrando: texto con formato, enlaces, imágenes, tablas, dentro de un marco de ventana, estilo UI mockup](images/16_formato_respuesta.png)
 
 ### 16.1 HTML Básico en AIML
 
@@ -2378,6 +2412,8 @@ AIML permite usar HTML en las respuestas:
 ---
 
 ## Capítulo 17: Patrones de Conversación
+
+![Mapa mental de patrones de conversación: saludo, despedida, fallback, confirmación, multi-turno, con ramas y colores, estilo mind map](images/17_patrones_conversacion.png)
 
 ### 17.1 Patrón de Saludo
 
@@ -2574,6 +2610,8 @@ AIML permite usar HTML en las respuestas:
 
 ## Capítulo 18: Patrones de Personalidad
 
+![Diagrama de personalidad de chatbot mostrando: formal, casual, funny, empático, con escalas y情緒 indicators, estilo diagrama de personalidad](images/18_patrones_personalidad.png)
+
 ### 18.1 Definición de Personalidad
 
 ```xml
@@ -2739,6 +2777,8 @@ AIML permite usar HTML en las respuestas:
 
 ## Capítulo 19: Patrones de Memoria
 
+![Diagrama de memoria: corto plazo (RAM), largo plazo (disco), preferencias (base de datos), contexto (buffer), con iconos de almacenamiento, estilo diagrama de memoria](images/19_patrones_memoria.png)
+
 ### 19.1 Memoria a Corto Plazo
 
 ```xml
@@ -2859,6 +2899,8 @@ AIML permite usar HTML en las respuestas:
 
 ## Capítulo 20: Testing y Debugging
 
+![Pipeline de testing: unit tests → integration tests → performance tests → deploy, con iconos de checkmarks y bug, estilo CI/CD pipeline](images/20_testing_debugging.png)
+
 ### 20.1 Estrategias de Testing
 
 ```mermaid
@@ -2960,6 +3002,8 @@ flowchart TD
 
 ## Capítulo 21: Optimización de Rendimiento
 
+![Dashboard de optimización mostrando métricas: tiempo de respuesta, uso de memoria, cache hit ratio, con gráficas y KPIs, estilo dashboard moderno](images/21_optimizacion.png)
+
 ### 21.1 Índice de Patrones
 
 Organizar las categories para búsqueda eficiente:
@@ -3030,6 +3074,8 @@ La mayoría de procesadores AIML compilan las categories a código nativo para m
 ---
 
 ## Capítulo 22: Organización de Proyectos
+
+![Estructura de carpetas de proyecto AIML: main.aiml, modules/, topics/, tests/, data/, con iconos de carpeta y archivos, estilo tree diagram](images/22_organizacion_proyectos.png)
 
 ### 22.1 Estructura de Directorios
 
@@ -3155,6 +3201,8 @@ git merge feature/new-greetings
 
 ## Capítulo 23: Mejores Prácticas
 
+![Checklist visual de mejores prácticas: código limpio, seguridad, testing, documentación, con checkmarks y X, estilo infographic de checklist](images/23_mejores_practicas.png)
+
 ### 23.1 Código Limpio en AIML
 
 ```xml
@@ -3251,6 +3299,8 @@ git merge feature/new-greetings
 ---
 
 ## Capítulo 24: Bot de Atención al Cliente
+
+![Mockup de interfaz de chatbot de atención al cliente mostrando: menú de opciones, preguntas frecuentes, formulario de soporte, estilo UI moderno](images/24_bot_cliente.png)
 
 ### 24.1 Arquitectura del Bot
 
@@ -3412,6 +3462,8 @@ flowchart TD
 
 ## Capítulo 25: Bot Educativo
 
+![Interfaz de chatbot educativo mostrando: lección activa, quiz interactivo, progreso del estudiante, estilo UI de e-learning](images/25_bot_educativo.png)
+
 ### 25.1 Patrón de Tutoría
 
 ```xml
@@ -3533,6 +3585,8 @@ flowchart TD
 
 ## Capítulo 26: Bot de Salud
 
+![Interfaz de chatbot de salud con advertencias: formulario de síntomas, recomendaciones, botón de emergencia, estilo medical UI](images/26_bot_salud.png)
+
 ### 26.1 Patrón de Triaje
 
 ```xml
@@ -3650,6 +3704,8 @@ flowchart TD
 ---
 
 ## Capítulo 27: Bot Multilingüe
+
+![Diagrama de chatbot multilingüe mostrando: detección de idioma, traducción, respuestas en múltiples idiomas, con banderas y texto, estilo internacionalización](images/27_bot_multilingue.png)
 
 ### 27.1 Estructura Multi-Idioma
 
@@ -3877,6 +3933,8 @@ async def health():
 
 ## Capítulo 29: Integración con LLMs
 
+![Diagrama híbrido AIML + LLM: AIML como capa de control → fallback a LLM → respuesta, con iconos de cerebro y reglas, estilo architecture diagram](images/28_integracion_llm.png)
+
 ### 29.1 AIML como Capa de Control
 
 ```mermaid
@@ -3972,6 +4030,8 @@ class HybridBot:
 ---
 
 ## Capítulo 30: Despliegue en Producción
+
+![Diagrama de despliegue en producción: Docker → Load Balancer → Instances → Monitoring, con iconos de contenedor y gráficas, estilo DevOps diagram](images/29_despliegue_produccion.png)
 
 ### 30.1 Contenerización
 
