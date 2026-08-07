@@ -261,7 +261,8 @@ class MarkdownPDF(FPDF):
             self.set_y(8)
             self.set_font("CourierNew", "B", 8)
             self.set_text_color(*self.t["title_color"])
-            self.cell(0, 5, sanitize(self.doc_title or "Documento"), align="C")
+            short_title = (self.doc_title or "Documento").split(" — ")[0].strip()
+            self.cell(0, 5, sanitize(short_title), align="C")
             self.set_draw_color(0, 0, 0)
             self.set_line_width(0.3)
             self.line(10, 14, 200, 14)
@@ -277,13 +278,13 @@ class MarkdownPDF(FPDF):
         self.start_section(title, level - 1)
 
     def chapter_title(self, level, text):
-        sizes = {1: 18, 2: 14, 3: 12, 4: 10}
+        sizes = {1: 16, 2: 13, 3: 11, 4: 10}
         if self.get_y() > 257:
             self.add_page()
         self.set_font("CourierNew", "B", sizes.get(level, 10))
         self.set_text_color(*self.t["title_color"])
         self.ln(4)
-        self.multi_cell(0, 7, sanitize(text))
+        self.multi_cell(0, 6, sanitize(text))
         if level <= 2:
             self.set_draw_color(*self.t["border_color"])
             self.set_line_width(0.3)
@@ -363,11 +364,23 @@ class MarkdownPDF(FPDF):
         self.set_y(y_start + box_h + 3)
 
     def mermaid_block(self, img_path: str, code: str = ""):
+        from PIL import Image as PILImage
         y = self.get_y()
-        if y + 70 > 270:
+        max_w = 180
+        max_h = 80
+        if y + max_h > 270:
             self.add_page()
         try:
-            self.image(img_path, x=15, w=180)
+            with PILImage.open(img_path) as im:
+                iw, ih = im.size
+            ratio = iw / ih
+            w = max_w
+            h = w / ratio
+            if h > max_h:
+                h = max_h
+                w = h * ratio
+            x = 10 + (190 - w) / 2
+            self.image(img_path, x=x, w=w, h=h)
             self.ln(5)
         except Exception:
             self.set_fill_color(*self.t["mermaid_bg"])
@@ -405,31 +418,24 @@ class MarkdownPDF(FPDF):
         self.set_fill_color(*self.t["cover_bg"])
         self.rect(0, 0, 210, 297, "F")
 
-        self.set_draw_color(0, 0, 0)
+        self.set_draw_color(*self.t["title_color"])
         self.set_line_width(0.5)
         self.rect(5, 5, 200, 287, "D")
 
-        self.set_font("CourierNew", "", 10)
-        self.set_text_color(*self.t["body_color"])
-        self.set_xy(15, 20)
-        self.cell(0, 6, "Status: draft", align="L")
+        title = self.doc_title or "Documento"
+        parts = title.split(" — ", 1)
+        line1 = parts[0].strip()
+        line2 = parts[1].strip() if len(parts) > 1 else ""
 
         self.set_font("CourierNew", "B", 28)
         self.set_text_color(*self.t["title_color"])
-        self.set_xy(15, 80)
-        self.cell(180, 15, sanitize(self.doc_title or "Documento"), align="C")
+        self.set_xy(15, 85)
+        self.cell(180, 12, sanitize(line1), align="C")
 
-        self.set_font("CourierNew", "", 16)
-        self.set_text_color(*self.t["subtitle_color"])
-        self.set_xy(15, 105)
-        self.cell(180, 10, sanitize(self.doc_subtitle or "Sub-Title"), align="C")
-
-        self.set_font("CourierNew", "", 10)
-        self.set_text_color(*self.t["body_color"])
-        self.set_xy(30, 150)
-        self.multi_cell(150, 6, sanitize(
-            self.doc_description or "[Here a brief description of the document.]"
-        ), align="C")
+        if line2:
+            self.set_font("CourierNew", "B", 22)
+            self.set_xy(15, 102)
+            self.cell(180, 10, sanitize(line2), align="C")
 
 
 def md_to_pdf(md_path: str, pdf_path: str | None = None, template_name: str = "vintage_light_pink"):
@@ -471,7 +477,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None, template_name: str = "v
         if typ == "h1":
             found_title = True
             continue
-        if found_title and typ == "p":
+        if found_title and typ in ("p", "blockquote"):
             if not pdf.doc_subtitle:
                 pdf.doc_subtitle = val
             elif not pdf.doc_description:
@@ -491,6 +497,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None, template_name: str = "v
                 pdf.add_chapter(1, val)
                 if skip_first_h1:
                     skip_first_h1 = False
+                    pdf.add_page()
                 else:
                     pdf.add_page()
                     pdf.chapter_title(1, val)

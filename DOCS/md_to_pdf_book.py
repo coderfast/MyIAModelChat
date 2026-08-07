@@ -171,10 +171,12 @@ def parse_markdown(md_text, md_dir: Path = None):
 class MarkdownPDF(FPDF):
     FONT_DIR = Path(__file__).parent / "fonts"
 
-    def __init__(self, md_dir: Path = None):
+    def __init__(self, md_dir: Path = None, book_title: str = "", book_subtitle: str = ""):
         super().__init__()
         self.set_auto_page_break(auto=True, margin=20)
         self.md_dir = md_dir
+        self.book_title = book_title
+        self.book_subtitle = book_subtitle
         self.add_font("CourierNew", "", str(self.FONT_DIR / "CourierNew.ttf"))
         self.add_font("CourierNew", "B", str(self.FONT_DIR / "CourierNew-Bold.ttf"))
         self.add_font("CourierNew", "I", str(self.FONT_DIR / "CourierNew-Italic.ttf"))
@@ -185,7 +187,7 @@ class MarkdownPDF(FPDF):
             self.set_y(8)
             self.set_font("CourierNew", "I", 7)
             self.set_text_color(150, 150, 150)
-            self.cell(0, 5, sanitize("La Biblia del AIML 2.1"), align="C")
+            self.cell(0, 5, sanitize(self.book_title or "Documento"), align="C")
             self.set_draw_color(220, 220, 220)
             self.line(10, 14, 200, 14)
             self.set_y(18)
@@ -200,13 +202,13 @@ class MarkdownPDF(FPDF):
         self.start_section(title, level - 1)
 
     def chapter_title(self, level, text):
-        sizes = {1: 18, 2: 14, 3: 12, 4: 10}
+        sizes = {1: 16, 2: 13, 3: 11, 4: 10}
         if self.get_y() > 257:
             self.add_page()
         self.set_font("CourierNew", "B", sizes.get(level, 10))
         self.set_text_color(44, 62, 80)
         self.ln(4)
-        self.multi_cell(0, 7, sanitize(text))
+        self.multi_cell(0, 6, sanitize(text))
         if level <= 2:
             self.set_draw_color(189, 195, 199)
             self.line(10, self.get_y() + 1, 200, self.get_y() + 1)
@@ -287,11 +289,23 @@ class MarkdownPDF(FPDF):
         self.set_y(y_start + box_h + 3)
 
     def mermaid_block(self, img_path: str, code: str = ""):
+        from PIL import Image as PILImage
         y = self.get_y()
-        if y + 70 > 270:
+        max_w = 180
+        max_h = 80
+        if y + max_h > 270:
             self.add_page()
         try:
-            self.image(img_path, x=15, w=180)
+            with PILImage.open(img_path) as im:
+                iw, ih = im.size
+            ratio = iw / ih
+            w = max_w
+            h = w / ratio
+            if h > max_h:
+                h = max_h
+                w = h * ratio
+            x = 10 + (190 - w) / 2
+            self.image(img_path, x=x, w=w, h=h)
             self.ln(5)
         except Exception:
             self.set_fill_color(235, 245, 255)
@@ -326,6 +340,46 @@ class MarkdownPDF(FPDF):
         self.ln(3)
 
 
+def _draw_title_on_cover(pdf, book_title: str, book_subtitle: str):
+    """Draw title split into two lines on cover page."""
+    parts = (book_title or "Documento").split(" — ", 1)
+    line1 = parts[0].strip()
+    line2 = parts[1].strip() if len(parts) > 1 else ""
+
+    pdf.set_text_color(255, 255, 255)
+    pdf.ln(70)
+
+    pdf.set_font("CourierNew", "B", 28)
+    pdf.cell(0, 12, sanitize(line1), align="C")
+    pdf.ln(14)
+
+    if line2:
+        pdf.set_font("CourierNew", "B", 22)
+        pdf.cell(0, 10, sanitize(line2), align="C")
+        pdf.ln(14)
+
+    if book_subtitle:
+        pdf.set_font("CourierNew", "", 14)
+        pdf.set_text_color(200, 220, 240)
+        pdf.multi_cell(0, 7, sanitize(book_subtitle), align="C")
+
+
+def extract_title_subtitle(md_text: str) -> tuple[str, str]:
+    """Extract the first h1 title and first blockquote subtitle from markdown."""
+    title = ""
+    subtitle = ""
+    lines = md_text.split("\n")
+    for line in lines:
+        stripped = line.strip()
+        if not title and stripped.startswith("# ") and not stripped.startswith("##"):
+            title = parse_inline(stripped[2:])
+        elif title and not subtitle and stripped.startswith("> "):
+            subtitle = parse_inline(stripped[2:])
+        elif title and subtitle:
+            break
+    return title, subtitle
+
+
 def md_to_pdf(md_path: str, pdf_path: str | None = None):
     md_file = Path(md_path)
     if not md_file.exists():
@@ -338,6 +392,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
     md_dir = md_file.parent
     md_text = md_file.read_text(encoding="utf-8")
     elements = parse_markdown(md_text, md_dir)
+    book_title, book_subtitle = extract_title_subtitle(md_text)
 
     mermaid_count = sum(1 for t, _ in elements if t == "mermaid")
     image_count = sum(1 for t, _ in elements if t == "image")
@@ -346,7 +401,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
     if image_count > 0:
         print(f"Processing {image_count} images...")
 
-    pdf = MarkdownPDF(md_dir=md_dir)
+    pdf = MarkdownPDF(md_dir=md_dir, book_title=book_title, book_subtitle=book_subtitle)
 
     # Primera página: imagen de portada completa
     pdf.add_page()
@@ -365,52 +420,37 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
         except Exception:
             pdf.set_fill_color(44, 62, 80)
             pdf.rect(0, 0, 210, 297, "F")
-            pdf.set_font("CourierNew", "B", 36)
-            pdf.set_text_color(255, 255, 255)
-            pdf.ln(80)
-            pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
-            pdf.ln(25)
-            pdf.set_font("CourierNew", "", 16)
-            pdf.set_text_color(200, 220, 240)
-            pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
+            _draw_title_on_cover(pdf, book_title, book_subtitle)
     else:
         pdf.set_fill_color(44, 62, 80)
         pdf.rect(0, 0, 210, 297, "F")
-        pdf.set_font("CourierNew", "B", 36)
-        pdf.set_text_color(255, 255, 255)
-        pdf.ln(80)
-        pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
-        pdf.ln(25)
-        pdf.set_font("CourierNew", "", 16)
-        pdf.set_text_color(200, 220, 240)
-        pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
+        _draw_title_on_cover(pdf, book_title, book_subtitle)
 
     # Segunda página: información del documento
     pdf.add_page()
 
-    pdf.set_font("CourierNew", "B", 24)
+    parts = (book_title or "Documento").split(" — ", 1)
+    line1 = parts[0].strip()
+    line2 = parts[1].strip() if len(parts) > 1 else ""
+
+    pdf.set_font("CourierNew", "B", 20)
     pdf.set_text_color(44, 62, 80)
     pdf.ln(20)
-    pdf.cell(0, 12, sanitize("La Biblia del AIML 2.1"), align="C")
-    pdf.ln(10)
-    pdf.set_font("CourierNew", "", 12)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 8, sanitize("Guia Completa del Estandar AIML"), align="C")
-    pdf.ln(20)
-
-    pdf.set_font("CourierNew", "", 10)
-    pdf.set_text_color(80, 80, 80)
-    pdf.multi_cell(0, 6, sanitize(
-        "Este documento cubre todos los elementos de AIML 2.0/2.1, "
-        "patrones de diseno, casos de uso y mejores practicas. "
-        "Usa el panel de marcadores (Bookmarks) para navegar rapidamente "
-        "entre capitulos y secciones."
-    ))
-    pdf.ln(10)
+    pdf.cell(0, 10, sanitize(line1), align="C")
+    pdf.ln(12)
+    if line2:
+        pdf.set_font("CourierNew", "B", 16)
+        pdf.cell(0, 8, sanitize(line2), align="C")
+        pdf.ln(10)
+    if book_subtitle:
+        pdf.set_font("CourierNew", "", 11)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 6, sanitize(book_subtitle), align="C")
+    pdf.ln(15)
 
     pdf.set_font("CourierNew", "I", 9)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, sanitize("Ultima actualizacion: 2026-08-06 | Estandar: AIML 2.1"), align="C")
+    pdf.cell(0, 6, sanitize("Generado automaticamente desde Markdown"), align="C")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
