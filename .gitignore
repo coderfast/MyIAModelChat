@@ -10,7 +10,6 @@ build/
 
 # Virtual environments
 envMyIAModelChat/
-envAIModels/
 .venv/
 venv/
 
@@ -22,6 +21,7 @@ models/**/*.gguf
 models/**/*.safetensors
 models/**/__pycache__/
 envAIModels/models/*.gguf
+envAIModels/__pycache__/
 
 # BERT models (intent/sentiment)
 /models/intent/
