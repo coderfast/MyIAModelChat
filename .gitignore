@@ -2,11 +2,25 @@
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+envMyIAModelChat/
+envAIModels/
+.venv/
+venv/
 
 # Models (pesados, no subir)
-models/
+models/**/*.pth
+models/**/*.bin
+models/**/*.onnx
+models/**/*.gguf
+models/**/__pycache__/
 envAIModels/models/*.gguf
-*.pth
 
 # Dataset cache
 /dataset_cache/
@@ -17,13 +31,38 @@ envAIModels/models/*.gguf
 # Checkpoints
 /checkpoints/
 
-# Environment
+# Exported ONNX (generated files)
+models/exported/*.onnx
+models/exported/*.onnx.data
+
+# Environment & secrets
 .env
+.env.*
+!.env.example
+
+# IDE / Tools
 /.mimocode/
-
-# IDE
 /.opencode/plans
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
 
-# PDFs y EPUBs
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PDFs y EPUBs (documentación pesada)
 /pdfs/*.pdf
 /epub/*.epub
+/DOCS/*.pdf
+/DOCS/*.html
+/DOCS/images.txt
+/DOCS/images/*.png
+/DOCS/images/*.jpg
+
+# Logs
+*.log
+logs/
