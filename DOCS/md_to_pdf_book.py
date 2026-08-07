@@ -200,6 +200,8 @@ class MarkdownPDF(FPDF):
 
     def chapter_title(self, level, text):
         sizes = {1: 18, 2: 14, 3: 12, 4: 10}
+        if self.get_y() > 257:
+            self.add_page()
         self.set_font("Helvetica", "B", sizes.get(level, 10))
         self.set_text_color(44, 62, 80)
         self.ln(4)
@@ -330,7 +332,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
         sys.exit(1)
 
     if pdf_path is None:
-        pdf_path = md_file.with_suffix(".pdf")
+        pdf_path = str(md_file.with_suffix("")) + "_book.pdf"
 
     md_dir = md_file.parent
     md_text = md_file.read_text(encoding="utf-8")
@@ -344,6 +346,45 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
         print(f"Processing {image_count} images...")
 
     pdf = MarkdownPDF(md_dir=md_dir)
+
+    # Primera página: imagen de portada completa
+    pdf.add_page()
+
+    portada_path = None
+    possible_names = ["00_portada.jpg", "00_portada.png", "00_portada.jpeg"]
+    for name in possible_names:
+        test_path = md_dir / "images" / name
+        if test_path.exists():
+            portada_path = str(test_path)
+            break
+
+    if portada_path:
+        try:
+            pdf.image(portada_path, x=0, y=0, w=210, h=297)
+        except Exception:
+            pdf.set_fill_color(44, 62, 80)
+            pdf.rect(0, 0, 210, 297, "F")
+            pdf.set_font("Helvetica", "B", 36)
+            pdf.set_text_color(255, 255, 255)
+            pdf.ln(80)
+            pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
+            pdf.ln(25)
+            pdf.set_font("Helvetica", "", 16)
+            pdf.set_text_color(200, 220, 240)
+            pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
+    else:
+        pdf.set_fill_color(44, 62, 80)
+        pdf.rect(0, 0, 210, 297, "F")
+        pdf.set_font("Helvetica", "B", 36)
+        pdf.set_text_color(255, 255, 255)
+        pdf.ln(80)
+        pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
+        pdf.ln(25)
+        pdf.set_font("Helvetica", "", 16)
+        pdf.set_text_color(200, 220, 240)
+        pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
+
+    # Segunda página: información del documento
     pdf.add_page()
 
     pdf.set_font("Helvetica", "B", 24)
@@ -373,6 +414,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
         mermaid_cache = {}
+        skip_first_image = True
 
         for typ, val in elements:
             if typ == "h1":
@@ -412,7 +454,10 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
                     pdf.ln(9)
             elif typ == "image":
                 alt_text, img_path, exists = val
-                pdf.image_block(alt_text, img_path, exists)
+                if skip_first_image and "00_portada" in img_path:
+                    skip_first_image = False
+                else:
+                    pdf.image_block(alt_text, img_path, exists)
             elif typ == "table":
                 for j, row in enumerate(val):
                     pdf.table_row(row, is_header=(j == 0))
