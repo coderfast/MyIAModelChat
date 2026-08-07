@@ -73,3 +73,5 @@ desktop.ini
 # Logs
 *.log
 logs/
+/models/exported/chat_model_hf/tokenizer_vocab.json
+/models/exported/chat_model_hf/config.json
