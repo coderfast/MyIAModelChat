@@ -87,15 +87,10 @@ def sanitize(text):
     replacements = {
         '\u2014': '-', '\u2013': '-', '\u2018': "'", '\u2019': "'",
         '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u2022': '*',
-        '\u00e1': 'a', '\u00e9': 'e', '\u00ed': 'i', '\u00f3': 'o',
-        '\u00fa': 'u', '\u00f1': 'n', '\u00fc': 'u', '\u00c1': 'A',
-        '\u00c9': 'E', '\u00cd': 'I', '\u00d3': 'O', '\u00da': 'U',
-        '\u00d1': 'N', '\u00dc': 'U', '\u00bf': '?', '\u00a1': '!',
-        '\u00bb': '>>', '\u00ab': '<<', '\u00b0': 'o',
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
-    return text.encode('latin-1', 'replace').decode('latin-1')
+    return text
 
 
 def parse_inline(text):
@@ -246,6 +241,8 @@ def parse_markdown(md_text, md_dir: Path = None):
 
 
 class MarkdownPDF(FPDF):
+    FONT_DIR = Path(__file__).parent / "fonts"
+
     def __init__(self, md_dir: Path = None, template: dict = None):
         super().__init__()
         self.set_auto_page_break(auto=True, margin=20)
@@ -254,11 +251,15 @@ class MarkdownPDF(FPDF):
         self.doc_title = ""
         self.doc_subtitle = ""
         self.doc_description = ""
+        self.add_font("CourierNew", "", str(self.FONT_DIR / "CourierNew.ttf"))
+        self.add_font("CourierNew", "B", str(self.FONT_DIR / "CourierNew-Bold.ttf"))
+        self.add_font("CourierNew", "I", str(self.FONT_DIR / "CourierNew-Italic.ttf"))
+        self.add_font("CourierNew", "BI", str(self.FONT_DIR / "CourierNew-BoldItalic.ttf"))
 
     def header(self):
         if self.page_no() > 1:
             self.set_y(8)
-            self.set_font("Courier", "B", 8)
+            self.set_font("CourierNew", "B", 8)
             self.set_text_color(*self.t["title_color"])
             self.cell(0, 5, sanitize(self.doc_title or "Documento"), align="C")
             self.set_draw_color(0, 0, 0)
@@ -268,7 +269,7 @@ class MarkdownPDF(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        self.set_font("Courier", "", 8)
+        self.set_font("CourierNew", "", 8)
         self.set_text_color(*self.t["footer_color"])
         self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
@@ -279,7 +280,7 @@ class MarkdownPDF(FPDF):
         sizes = {1: 18, 2: 14, 3: 12, 4: 10}
         if self.get_y() > 257:
             self.add_page()
-        self.set_font("Courier", "B", sizes.get(level, 10))
+        self.set_font("CourierNew", "B", sizes.get(level, 10))
         self.set_text_color(*self.t["title_color"])
         self.ln(4)
         self.multi_cell(0, 7, sanitize(text))
@@ -290,14 +291,14 @@ class MarkdownPDF(FPDF):
         self.ln(3)
 
     def body_text(self, text):
-        self.set_font("Courier", "", 9)
+        self.set_font("CourierNew", "", 9)
         self.set_text_color(*self.t["body_color"])
         self.multi_cell(0, 5, sanitize(text))
         self.ln(2)
 
     def code_block(self, code):
         self.set_fill_color(*self.t["code_bg"])
-        self.set_font("Courier", "", 7)
+        self.set_font("CourierNew", "", 7)
         self.set_text_color(*self.t["code_text"])
         y = self.get_y()
         lines = code.split("\n")
@@ -344,12 +345,12 @@ class MarkdownPDF(FPDF):
         box_h = 40
         self.rect(10, y_start, 190, box_h, "DF")
 
-        self.set_font("Courier", "B", 8)
+        self.set_font("CourierNew", "B", 8)
         self.set_text_color(*self.t["image_placeholder_text"])
         self.set_xy(12, y_start + 2)
         self.cell(186, 5, "[Imagen placeholder]")
 
-        self.set_font("Courier", "", 6)
+        self.set_font("CourierNew", "", 6)
         self.set_text_color(80, 80, 80)
         self.set_xy(12, y_start + 8)
 
@@ -373,14 +374,14 @@ class MarkdownPDF(FPDF):
             self.set_draw_color(*self.t["mermaid_border"])
             y_start = self.get_y()
             self.rect(10, y_start, 190, 8, "DF")
-            self.set_font("Courier", "B", 7)
+            self.set_font("CourierNew", "B", 7)
             self.set_text_color(*self.t["mermaid_text"])
             self.set_x(12)
             self.cell(0, 8, "[Diagrama Mermaid - ver version Markdown para diagrama interactivo]")
             self.ln(9)
 
     def table_row(self, cells, is_header=False):
-        self.set_font("Courier", "B" if is_header else "", 7)
+        self.set_font("CourierNew", "B" if is_header else "", 7)
         if is_header:
             self.set_fill_color(*self.t["table_header_bg"])
             self.set_text_color(*self.t["table_header_text"])
@@ -394,7 +395,7 @@ class MarkdownPDF(FPDF):
         self.ln()
 
     def blockquote(self, text):
-        self.set_font("Courier", "I", 9)
+        self.set_font("CourierNew", "I", 9)
         self.set_text_color(*self.t["blockquote_color"])
         self.set_x(18)
         self.multi_cell(178, 5, sanitize(text))
@@ -408,22 +409,22 @@ class MarkdownPDF(FPDF):
         self.set_line_width(0.5)
         self.rect(5, 5, 200, 287, "D")
 
-        self.set_font("Courier", "", 10)
+        self.set_font("CourierNew", "", 10)
         self.set_text_color(*self.t["body_color"])
         self.set_xy(15, 20)
         self.cell(0, 6, "Status: draft", align="L")
 
-        self.set_font("Courier", "B", 28)
+        self.set_font("CourierNew", "B", 28)
         self.set_text_color(*self.t["title_color"])
         self.set_xy(15, 80)
         self.cell(180, 15, sanitize(self.doc_title or "Documento"), align="C")
 
-        self.set_font("Courier", "", 16)
+        self.set_font("CourierNew", "", 16)
         self.set_text_color(*self.t["subtitle_color"])
         self.set_xy(15, 105)
         self.cell(180, 10, sanitize(self.doc_subtitle or "Sub-Title"), align="C")
 
-        self.set_font("Courier", "", 10)
+        self.set_font("CourierNew", "", 10)
         self.set_text_color(*self.t["body_color"])
         self.set_xy(30, 150)
         self.multi_cell(150, 6, sanitize(
@@ -519,7 +520,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None, template_name: str = "v
                         pdf.add_page()
                         y_start = pdf.get_y()
                     pdf.rect(10, y_start, 190, 8, "DF")
-                    pdf.set_font("Courier", "B", 7)
+                    pdf.set_font("CourierNew", "B", 7)
                     pdf.set_text_color(*template["mermaid_text"])
                     pdf.set_x(12)
                     pdf.cell(0, 8, "[Diagrama Mermaid - ver version Markdown para diagrama interactivo]")

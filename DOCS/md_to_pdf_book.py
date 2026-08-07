@@ -10,15 +10,10 @@ def sanitize(text):
     replacements = {
         '\u2014': '-', '\u2013': '-', '\u2018': "'", '\u2019': "'",
         '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u2022': '*',
-        '\u00e1': 'a', '\u00e9': 'e', '\u00ed': 'i', '\u00f3': 'o',
-        '\u00fa': 'u', '\u00f1': 'n', '\u00fc': 'u', '\u00c1': 'A',
-        '\u00c9': 'E', '\u00cd': 'I', '\u00d3': 'O', '\u00da': 'U',
-        '\u00d1': 'N', '\u00dc': 'U', '\u00bf': '?', '\u00a1': '!',
-        '\u00bb': '>>', '\u00ab': '<<', '\u00b0': 'o',
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
-    return text.encode('latin-1', 'replace').decode('latin-1')
+    return text
 
 
 def parse_inline(text):
@@ -174,15 +169,21 @@ def parse_markdown(md_text, md_dir: Path = None):
 
 
 class MarkdownPDF(FPDF):
+    FONT_DIR = Path(__file__).parent / "fonts"
+
     def __init__(self, md_dir: Path = None):
         super().__init__()
         self.set_auto_page_break(auto=True, margin=20)
         self.md_dir = md_dir
+        self.add_font("CourierNew", "", str(self.FONT_DIR / "CourierNew.ttf"))
+        self.add_font("CourierNew", "B", str(self.FONT_DIR / "CourierNew-Bold.ttf"))
+        self.add_font("CourierNew", "I", str(self.FONT_DIR / "CourierNew-Italic.ttf"))
+        self.add_font("CourierNew", "BI", str(self.FONT_DIR / "CourierNew-BoldItalic.ttf"))
 
     def header(self):
         if self.page_no() > 1:
             self.set_y(8)
-            self.set_font("Helvetica", "I", 7)
+            self.set_font("CourierNew", "I", 7)
             self.set_text_color(150, 150, 150)
             self.cell(0, 5, sanitize("La Biblia del AIML 2.1"), align="C")
             self.set_draw_color(220, 220, 220)
@@ -191,7 +192,7 @@ class MarkdownPDF(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        self.set_font("Helvetica", "I", 8)
+        self.set_font("CourierNew", "I", 8)
         self.set_text_color(128)
         self.cell(0, 10, f"Pagina {self.page_no()}", align="C")
 
@@ -202,7 +203,7 @@ class MarkdownPDF(FPDF):
         sizes = {1: 18, 2: 14, 3: 12, 4: 10}
         if self.get_y() > 257:
             self.add_page()
-        self.set_font("Helvetica", "B", sizes.get(level, 10))
+        self.set_font("CourierNew", "B", sizes.get(level, 10))
         self.set_text_color(44, 62, 80)
         self.ln(4)
         self.multi_cell(0, 7, sanitize(text))
@@ -212,14 +213,14 @@ class MarkdownPDF(FPDF):
         self.ln(3)
 
     def body_text(self, text):
-        self.set_font("Helvetica", "", 10)
+        self.set_font("CourierNew", "", 10)
         self.set_text_color(51, 51, 51)
         self.multi_cell(0, 5, sanitize(text))
         self.ln(2)
 
     def code_block(self, code):
         self.set_fill_color(244, 244, 244)
-        self.set_font("Courier", "", 7)
+        self.set_font("CourierNew", "", 7)
         self.set_text_color(51, 51, 51)
         y = self.get_y()
         lines = code.split("\n")
@@ -267,12 +268,12 @@ class MarkdownPDF(FPDF):
         box_h = 40
         self.rect(10, y_start, 190, box_h, "DF")
 
-        self.set_font("Helvetica", "B", 8)
+        self.set_font("CourierNew", "B", 8)
         self.set_text_color(70, 130, 180)
         self.set_xy(12, y_start + 2)
         self.cell(186, 5, "[Imagen placeholder]")
 
-        self.set_font("Helvetica", "", 6)
+        self.set_font("CourierNew", "", 6)
         self.set_text_color(80, 80, 80)
         self.set_xy(12, y_start + 8)
 
@@ -297,14 +298,14 @@ class MarkdownPDF(FPDF):
             self.set_draw_color(180, 200, 230)
             y_start = self.get_y()
             self.rect(10, y_start, 190, 8, "DF")
-            self.set_font("Helvetica", "B", 7)
+            self.set_font("CourierNew", "B", 7)
             self.set_text_color(60, 80, 120)
             self.set_x(12)
             self.cell(0, 8, "[Diagrama Mermaid - ver version Markdown para diagrama interactivo]")
             self.ln(9)
 
     def table_row(self, cells, is_header=False):
-        self.set_font("Helvetica", "B" if is_header else "", 7)
+        self.set_font("CourierNew", "B" if is_header else "", 7)
         if is_header:
             self.set_fill_color(44, 62, 80)
             self.set_text_color(255)
@@ -318,7 +319,7 @@ class MarkdownPDF(FPDF):
         self.ln()
 
     def blockquote(self, text):
-        self.set_font("Helvetica", "I", 10)
+        self.set_font("CourierNew", "I", 10)
         self.set_text_color(100, 100, 100)
         self.set_x(18)
         self.multi_cell(178, 5, sanitize(text))
@@ -364,40 +365,40 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
         except Exception:
             pdf.set_fill_color(44, 62, 80)
             pdf.rect(0, 0, 210, 297, "F")
-            pdf.set_font("Helvetica", "B", 36)
+            pdf.set_font("CourierNew", "B", 36)
             pdf.set_text_color(255, 255, 255)
             pdf.ln(80)
             pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
             pdf.ln(25)
-            pdf.set_font("Helvetica", "", 16)
+            pdf.set_font("CourierNew", "", 16)
             pdf.set_text_color(200, 220, 240)
             pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
     else:
         pdf.set_fill_color(44, 62, 80)
         pdf.rect(0, 0, 210, 297, "F")
-        pdf.set_font("Helvetica", "B", 36)
+        pdf.set_font("CourierNew", "B", 36)
         pdf.set_text_color(255, 255, 255)
         pdf.ln(80)
         pdf.cell(0, 15, sanitize("La Biblia del AIML 2.1"), align="C")
         pdf.ln(25)
-        pdf.set_font("Helvetica", "", 16)
+        pdf.set_font("CourierNew", "", 16)
         pdf.set_text_color(200, 220, 240)
         pdf.cell(0, 10, sanitize("Guia Completa del Estandar AIML"), align="C")
 
     # Segunda página: información del documento
     pdf.add_page()
 
-    pdf.set_font("Helvetica", "B", 24)
+    pdf.set_font("CourierNew", "B", 24)
     pdf.set_text_color(44, 62, 80)
     pdf.ln(20)
     pdf.cell(0, 12, sanitize("La Biblia del AIML 2.1"), align="C")
     pdf.ln(10)
-    pdf.set_font("Helvetica", "", 12)
+    pdf.set_font("CourierNew", "", 12)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 8, sanitize("Guia Completa del Estandar AIML"), align="C")
     pdf.ln(20)
 
-    pdf.set_font("Helvetica", "", 10)
+    pdf.set_font("CourierNew", "", 10)
     pdf.set_text_color(80, 80, 80)
     pdf.multi_cell(0, 6, sanitize(
         "Este documento cubre todos los elementos de AIML 2.0/2.1, "
@@ -407,7 +408,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
     ))
     pdf.ln(10)
 
-    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_font("CourierNew", "I", 9)
     pdf.set_text_color(120, 120, 120)
     pdf.cell(0, 6, sanitize("Ultima actualizacion: 2026-08-06 | Estandar: AIML 2.1"), align="C")
 
@@ -447,7 +448,7 @@ def md_to_pdf(md_path: str, pdf_path: str | None = None):
                         pdf.add_page()
                         y_start = pdf.get_y()
                     pdf.rect(10, y_start, 190, 8, "DF")
-                    pdf.set_font("Helvetica", "B", 7)
+                    pdf.set_font("CourierNew", "B", 7)
                     pdf.set_text_color(60, 80, 120)
                     pdf.set_x(12)
                     pdf.cell(0, 8, "[Diagrama Mermaid - ver version Markdown para diagrama interactivo]")
