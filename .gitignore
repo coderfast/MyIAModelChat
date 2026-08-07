@@ -19,8 +19,14 @@ models/**/*.pth
 models/**/*.bin
 models/**/*.onnx
 models/**/*.gguf
+models/**/*.safetensors
 models/**/__pycache__/
 envAIModels/models/*.gguf
+
+# BERT models (intent/sentiment)
+/models/intent/
+/models/sentiment/
+/models/tokenizer_vocab.json
 
 # Dataset cache
 /dataset_cache/
@@ -62,6 +68,7 @@ desktop.ini
 /DOCS/images.txt
 /DOCS/images/*.png
 /DOCS/images/*.jpg
+/DOCS/fonts/*.ttf
 
 # Logs
 *.log
