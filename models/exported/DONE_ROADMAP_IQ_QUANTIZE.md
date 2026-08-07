@@ -10,7 +10,7 @@
 
 ## Resumen de Implementación
 
-Todos los tipos IQ fueron implementados en `models/exported/quantize.py` con las siguientes características:
+Todos los tipos IQ fueron implementados en `models/exported/gguf_quantizer.py` con las siguientes características:
 
 | Tipo | Estado | Tamaño | Test Export |
 |------|--------|--------|-------------|
@@ -25,8 +25,8 @@ Todos los tipos IQ fueron implementados en `models/exported/quantize.py` con las
 | IQ1_M | ✅ | 56 bytes/block | ✅ OK |
 
 **Archivos modificados:**
-- `models/exported/quantize.py` — Clases de cuantización IQ
-- `models/exported/convert.py` — Mapeo de tipos IQ
+- `models/exported/gguf_quantizer.py` — Clases de cuantización IQ
+- `models/exported/convert_gguf.py` — Mapeo de tipos IQ
 - `main.py` — Choices para `--quantization`
 - `models/exported/GGUF_QUANTIZATION_README.md` — Documentación actualizada
 
@@ -143,7 +143,7 @@ Todos los tipos IQ fueron implementados en `models/exported/quantize.py` con las
 
 ## Estructura del Código
 
-### Archivo: `models/exported/quantize.py` (extender)
+### Archivo: `models/exported/gguf_quantizer.py` (extender)
 
 ```python
 # Agregar después de las clases K-quant
@@ -176,7 +176,7 @@ class IQ4_XS_Quantizer:
 # ... etc para cada tipo
 ```
 
-### Archivo: `models/exported/convert.py` (extender)
+### Archivo: `models/exported/convert_gguf.py` (extender)
 
 ```python
 # Agregar IQ types al KQUANT_TYPES
@@ -239,7 +239,7 @@ print(f'Mean error: {error:.6f}')
 "
 
 # 3. Test export completo
-python models/exported/convert.py models/exported/chat_model_hf \
+python models/exported/convert_gguf.py models/exported/chat_model_hf \
     --outfile models/exported/test_iq4_nl.gguf --outtype iq4_nl
 ```
 

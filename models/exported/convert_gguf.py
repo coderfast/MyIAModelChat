@@ -19,7 +19,7 @@ from gguf import GGUFWriter, GGMLQuantizationType, quantize
 
 # Import our custom K-quant implementations
 try:
-    from quantize import quantize_k_quant, QUANTIZERS
+    from gguf_quantizer import quantize_k_quant, QUANTIZERS
     HAS_KQUANT = True
 except ImportError:
     HAS_KQUANT = False

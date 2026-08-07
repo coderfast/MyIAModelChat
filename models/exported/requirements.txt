@@ -1,18 +1,32 @@
 # Dependencies for GGUF and ONNX conversion
 # Install: pip install -r requirements.txt
 
+# --- GGUF ---
 # gguf: GGUF format writer
 gguf>=0.10.0
 
-# torch: model weight loading
+# --- Common ---
+# torch: model loading and ONNX export
 torch
 
-# numpy: quantization
+# numpy: quantization math
 numpy
 
+# --- ONNX ---
 # onnxruntime: ONNX quantization (dynamic and static)
-onnxruntime
-# onnxruntime-gpu  # Optional: for FP8 support on NVIDIA GPU
+# Required for all ONNX quantization types
+onnxruntime>=1.17
 
-# onnxscript: ONNX model manipulation (optional)
-onnxscript
+# onnx: ONNX graph manipulation, INT4/FP8 type definitions
+onnx>=1.16
+
+# onnxruntime-gpu: FP8 support on NVIDIA GPU (H100, Blackwell)
+# Uncomment for GPU acceleration:
+# onnxruntime-gpu>=1.16
+
+# --- Optional ---
+# optimum: HuggingFace Optimum for ONNX export/optimization
+# optimum[onnxruntime]
+
+# transformers: required for convert_onnx.py (HuggingFace model loading)
+transformers

@@ -9,7 +9,7 @@ All available quantization types for GGUF export.
 python main.py --export chat_model --formats gguf --quantization q5_0
 
 # Direct conversion
-python models/exported/convert.py <hf_dir> --outfile output.gguf --outtype q5_0
+python models/exported/convert_gguf.py <hf_dir> --outfile output.gguf --outtype q5_0
 ```
 
 ## Supported Quantization Types
@@ -149,8 +149,8 @@ IQ-quants use importance matrices and grid-based quantization:
 ### Implementation Notes
 
 - Standard types (`q4_0`, `q4_1`, `q5_0`, `q5_1`, `q8_0`) use the `gguf` package's built-in quantize function
-- K-quant types (`q2_k` through `q6_k`) use custom implementation in `quantize.py`
-- IQ-quant types (`iq4_nl` through `iq1_m`) use custom implementation in `quantize.py`
+- K-quant types (`q2_k` through `q6_k`) use custom implementation in `gguf_quantizer.py`
+- IQ-quant types (`iq4_nl` through `iq1_m`) use custom implementation in `gguf_quantizer.py`
 - All quantization is pure Python/NumPy (no external dependencies required)
 - The model must be exported to HuggingFace format first before GGUF conversion
 
@@ -158,5 +158,5 @@ IQ-quants use importance matrices and grid-based quantization:
 
 ## See Also
 
-- [ONNX Quantization Roadmap](ROADMAP_ONNX_QUANTIZE.md) — INT8/INT4/FP8 quantization for ONNX export
+- [ONNX Quantization Reference](ONNX_QUANTIZATION_README.md) — INT8/INT4/FP8 quantization for ONNX export
 - [IQ Quantization DONE](DONE_ROADMAP_IQ_QUANTIZE.md) — Completed IQ quantization implementation

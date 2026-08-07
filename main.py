@@ -295,7 +295,10 @@ EXAMPLES:
         parser.add_argument("--model-info", type=str, default=None, metavar='NAME',
                             help="Show detailed layer info for a specific model")
         parser.add_argument("--export", type=str, default=None, help="Export model to GGUF/ONNX (name or name+name for merge)")
-        parser.add_argument("--formats", type=str, default="gguf,onnx", help="Export formats: gguf, onnx, onnx_int8, onnx_int4, onnx_fp8 (default: gguf,onnx)")
+        parser.add_argument("--formats", type=str, default="gguf,onnx",
+                            help="Export formats: gguf, onnx, onnx_int8, onnx_uint8, onnx_int4, onnx_uint4, "
+                                 "onnx_static_int8, onnx_static_int4, onnx_fp8, onnx_fp8_mixed, "
+                                 "onnx_per_channel, onnx_mixed (default: gguf,onnx)")
         parser.add_argument("--quantization", type=str, default="q8_0",
                             choices=["f32", "f16", "q4_0", "q4_1", "q5_0", "q5_1", "q8_0",
                                      "q2_k", "q3_k", "q4_k", "q5_k", "q6_k", "q8_k",
@@ -304,7 +307,12 @@ EXAMPLES:
                             help="GGUF quantization type (default: q8_0)")
         parser.add_argument("--onnx-quant-type", type=str, default="int8",
                             choices=["int8", "uint8", "int4", "uint4",
-                                     "fp8_e4m3fn", "fp8_e5m2", "fp8_e4m3fnuz", "fp8_e5m2fnuz"],
+                                     "static_int8_qdq", "static_int8_qoperator",
+                                     "static_int4_qoperator", "static_int4_qdq",
+                                     "fp8_e4m3fn", "fp8_e5m2", "fp8_mixed",
+                                     "fp8_e4m3fnuz", "fp8_e5m2fnuz",
+                                     "per_channel_int8", "per_channel_int4",
+                                     "mixed_int8_int4", "mixed_fp8_int8", "tensor_overrides"],
                             help="ONNX quantization type (default: int8)")
         parser.add_argument("--onnx-static", action='store_true',
                             help="Use static quantization for ONNX (default: dynamic)")

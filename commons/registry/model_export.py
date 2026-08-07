@@ -82,10 +82,18 @@ def export_to_onnx_quantized(
 ) -> str:
     """Export a .pth checkpoint to quantized ONNX format.
 
+    Supports all 6 phases:
+    - Dynamic: int8, uint8, int4, uint4
+    - Static INT8: static_int8_qdq, static_int8_qoperator
+    - Static INT4: static_int4_qoperator, static_int4_qdq
+    - FP8: fp8_e4m3fn, fp8_e5m2, fp8_mixed, fp8_e4m3fnuz, fp8_e5m2fnuz
+    - Per-Channel: per_channel_int8, per_channel_int4
+    - Mixed: mixed_int8_int4, mixed_fp8_int8, tensor_overrides
+
     Args:
         pth_path: Path to .pth checkpoint
         output_path: Output ONNX path (auto-generated if None)
-        quant_type: Quantization type (int8, uint8, int4, uint4, fp8_e4m3fn, fp8_e5m2, fp8_e4m3fnuz, fp8_e5m2fnuz)
+        quant_type: Quantization type string
         static: Use static quantization (default: dynamic)
         per_channel: Use per-channel quantization
         block_size: Block size for INT4/UINT4
@@ -97,27 +105,27 @@ def export_to_onnx_quantized(
     onnx_path = export_to_onnx(pth_path)
 
     try:
-        from onnxruntime.quantization import quantize_dynamic, QuantType
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from models.exported.onnx_quantizer import quantize_onnx
     except ImportError:
-        raise RuntimeError("onnxruntime is required for ONNX quantization. Install: pip install onnxruntime")
+        # Fallback: try relative import
+        try:
+            from onnx_quantizer import quantize_onnx
+        except ImportError:
+            raise RuntimeError("onnx_quantizer module not found. Ensure models/exported/ is accessible.")
 
     if output_path is None:
         stem = Path(pth_path).stem
         output_path = os.path.join(EXPORTED_DIR, f"{stem}_{quant_type}.onnx")
 
-    quant_type_map = {
-        'int8': QuantType.QInt8,
-        'uint8': QuantType.QUInt8,
-        'int4': QuantType.QInt4,
-        'uint4': QuantType.QUInt4,
-    }
-    qt = quant_type_map.get(quant_type, QuantType.QInt8)
+    # Resolve quant_type: if user passes simple "int8" with static=True, use static_int8_qdq
+    resolved_type = quant_type
+    if static and quant_type in ('int8', 'uint8'):
+        resolved_type = f"static_{quant_type}_qdq"
+    elif static and quant_type in ('int4', 'uint4'):
+        resolved_type = f"static_{quant_type}_qdq"
 
-    quantize_dynamic(
-        model_input=onnx_path,
-        model_output=output_path,
-        weight_type=qt,
-    )
+    quantize_onnx(onnx_path, output_path, quant_type=resolved_type)
 
     size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
     logger.info(f"ONNX quantized ({quant_type}): {output_path} ({size_mb} MB)")
@@ -128,7 +136,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     """Export a .pth checkpoint to GGUF format.
 
     This generates a HuggingFace-compatible directory that can be converted
-    to GGUF using llama.cpp's convert.py script.
+    to GGUF using llama.cpp's convert_gguf.py script.
     """
     try:
         from commons.model.chatmodel import ChatModel
@@ -186,7 +194,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     # Generate conversion scripts for the user (with absolute paths)
     hf_dir_abs = os.path.abspath(hf_dir)
     exported_dir = os.path.abspath(EXPORTED_DIR)
-    convert_py = os.path.join(exported_dir, 'convert.py')
+    convert_py = os.path.join(exported_dir, 'convert_gguf.py')
     gguf_out = os.path.abspath(os.path.join(exported_dir, f"{stem}_{quantization}.gguf"))
     convert_cmd = f"python \"{convert_py}\" \"{hf_dir_abs}\" --outfile \"{gguf_out}\" --outtype {quantization.lower()}"
     convert_cmd_unix = convert_cmd.replace('\\', '/')
@@ -227,7 +235,19 @@ def export_model(
 
     Args:
         pth_path: Path to the .pth checkpoint.
-        formats: List of format strings: 'gguf', 'onnx', 'onnx_int8', 'onnx_int4', 'onnx_fp8'
+        formats: List of format strings:
+            - 'gguf': GGUF format
+            - 'onnx': FP32 ONNX
+            - 'onnx_int8': Dynamic INT8
+            - 'onnx_uint8': Dynamic UINT8
+            - 'onnx_int4': Dynamic INT4
+            - 'onnx_uint4': Dynamic UINT4
+            - 'onnx_static_int8': Static INT8 QDQ
+            - 'onnx_static_int4': Static INT4
+            - 'onnx_fp8': FP8 E4M3FN
+            - 'onnx_fp8_mixed': FP8 mixed
+            - 'onnx_per_channel': Per-channel INT8
+            - 'onnx_mixed': Mixed INT8+INT4
         quantization: GGUF quantization type (e.g. 'q8_0', 'q4_k_m', 'f16')
         onnx_quant_type: ONNX quantization type (int8, uint8, int4, uint4, fp8_*)
         onnx_static: Use static quantization for ONNX
@@ -244,11 +264,37 @@ def export_model(
             if fmt == 'onnx':
                 results['onnx'] = export_to_onnx(pth_path)
             elif fmt == 'onnx_int8':
-                results['onnx_int8'] = export_to_onnx_quantized(pth_path, quant_type='int8')
+                results['onnx_int8'] = export_to_onnx_quantized(
+                    pth_path, quant_type='int8')
+            elif fmt == 'onnx_uint8':
+                results['onnx_uint8'] = export_to_onnx_quantized(
+                    pth_path, quant_type='uint8')
             elif fmt == 'onnx_int4':
-                results['onnx_int4'] = export_to_onnx_quantized(pth_path, quant_type='int4')
+                results['onnx_int4'] = export_to_onnx_quantized(
+                    pth_path, quant_type='int4')
+            elif fmt == 'onnx_uint4':
+                results['onnx_uint4'] = export_to_onnx_quantized(
+                    pth_path, quant_type='uint4')
+            elif fmt == 'onnx_static_int8':
+                results['onnx_static_int8'] = export_to_onnx_quantized(
+                    pth_path, quant_type='int8', static=True,
+                    per_channel=onnx_per_channel)
+            elif fmt == 'onnx_static_int4':
+                results['onnx_static_int4'] = export_to_onnx_quantized(
+                    pth_path, quant_type='int4', static=True,
+                    block_size=onnx_block_size)
             elif fmt == 'onnx_fp8':
-                results['onnx_fp8'] = export_to_onnx_quantized(pth_path, quant_type='fp8_e4m3fn')
+                results['onnx_fp8'] = export_to_onnx_quantized(
+                    pth_path, quant_type='fp8_e4m3fn', static=True)
+            elif fmt == 'onnx_fp8_mixed':
+                results['onnx_fp8_mixed'] = export_to_onnx_quantized(
+                    pth_path, quant_type='fp8_mixed', static=True)
+            elif fmt == 'onnx_per_channel':
+                results['onnx_per_channel'] = export_to_onnx_quantized(
+                    pth_path, quant_type='per_channel_int8', static=True)
+            elif fmt == 'onnx_mixed':
+                results['onnx_mixed'] = export_to_onnx_quantized(
+                    pth_path, quant_type='mixed_int8_int4', static=True)
             elif fmt == 'gguf':
                 results['gguf'] = export_to_gguf(pth_path, quantization=quantization)
             else:
