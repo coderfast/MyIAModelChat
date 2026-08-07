@@ -158,7 +158,7 @@ El **Loebner Prize** es una competencia anual donde chatbots compiten en convers
 
 Con la llegada de modelos como GPT y Claude, podría parecer que AIML quedó obsoleto. Sin embargo, AIML sigue siendo relevante por:
 
-1. **Control predictivo**: AIML garantiza respuestas específicas, unlike LLMs
+1. **Control predictivo**: AIML garantiza respuestas específicas, a diferencia de LLMs
 2. **Sin necesidad de GPU**: Funciona en hardware básico
 3. **Privacidad**: No requiere envío de datos a servicios externos
 4. **Personalización**: Fácil de personalizar para dominios específicos
@@ -611,7 +611,7 @@ Entrada: "QUE LENGUAJE ES PYTHON"
 |-------|----------|----------|
 | `QUE * ES *` | Ambigüedad en matching | Usar `index` explícito |
 | `* ES` | `*` al final no captura correctamente | Usar `**` al final |
-| `_ *` | Combinación rara | Evitar这种 combinación |
+| `_ *` | Combinación rara | Evitar esta combinación |
 | `** *` | Conflicto de prioridad | Usar un solo tipo |
 
 ### 4.8 Tabla de Prioridad Completa
@@ -947,7 +947,7 @@ AIML 2.0 introduce `var` como alias de `name`:
 
 ```xml
 <category>
-  <pattern>MOSTRAR PERFIL</category>
+  <pattern>MOSTRAR PERFIL</pattern>
   <template>
     <condition name="logged-in">
       <li value="true">
@@ -2610,7 +2610,7 @@ AIML permite usar HTML en las respuestas:
 
 ## Capítulo 18: Patrones de Personalidad
 
-![Diagrama de personalidad de chatbot mostrando: formal, casual, funny, empático, con escalas y情緒 indicators, estilo diagrama de personalidad](images/18_patrones_personalidad.png)
+![Diagrama de personalidad de chatbot mostrando: formal, casual, funny, empático, con escalas y indicadores de estado de ánimo, estilo diagrama de personalidad](images/18_patrones_personalidad.png)
 
 ### 18.1 Definición de Personalidad
 
@@ -3634,7 +3634,7 @@ flowchart TD
 <category>
   <pattern>TENGO TOS</pattern>
   <template>
-    La tos puede ser por许多 causas.
+    La tos puede ser por muchas causas.
     Si dura más de una semana, consulta a un médico.
   </template>
 </category>
