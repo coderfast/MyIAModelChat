@@ -1,0 +1,1 @@
+Aqui se genera cache de entrenamiento
