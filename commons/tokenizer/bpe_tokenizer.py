@@ -44,6 +44,12 @@ class SentencePieceTokenizerWrapper:
         context_id = _resolve_id('<|context|>')
         answer_id = _resolve_id('<|answer|>')
         thinking_mode_id = _resolve_id('<|thinking|>')
+        tool_call_id = _resolve_id('<tool_call>')
+        tool_call_end_id = _resolve_id('</tool_call>')
+        action_id = -1
+        action_end_id = -1
+        observation_id = _resolve_id('<observation>')
+        observation_end_id = _resolve_id('</observation>')
 
         if pad_id < 0:
             pad_id = 0
@@ -63,6 +69,12 @@ class SentencePieceTokenizerWrapper:
         self._context_id = context_id
         self._answer_id = answer_id
         self._thinking_mode_id = thinking_mode_id
+        self._tool_call_id = tool_call_id
+        self._tool_call_end_id = tool_call_end_id
+        self._action_id = action_id
+        self._action_end_id = action_end_id
+        self._observation_id = observation_id
+        self._observation_end_id = observation_end_id
 
     def _build_vocab_dicts(self):
         self._idx2word = {}
@@ -224,10 +236,68 @@ class SentencePieceTokenizerWrapper:
             return ('context', text[len('<|context|>'):].strip())
         return ('context', text)
 
-    def encode_with_thinking(self, text: str):
-        """Encode text, returning (thinking_ids, response_ids, all_ids).
+    # ── Agentic token helpers ──────────────────────────────────────
 
-        Useful for training where you want to separate thinking from response.
+    def get_tool_call_index(self) -> int:
+        """Return the token ID for <tool_call>."""
+        self._ensure_special_token_ids()
+        return self._tool_call_id
+
+    def get_tool_call_end_index(self) -> int:
+        """Return the token ID for </tool_call>."""
+        self._ensure_special_token_ids()
+        return self._tool_call_end_id
+
+    def get_action_index(self) -> int:
+        """Return the token ID for <action> (reserved, not currently used)."""
+        self._ensure_special_token_ids()
+        return self._action_id
+
+    def get_action_end_index(self) -> int:
+        """Return the token ID for </action> (reserved, not currently used)."""
+        self._ensure_special_token_ids()
+        return self._action_end_id
+
+    def get_observation_index(self) -> int:
+        """Return the token ID for <observation>."""
+        self._ensure_special_token_ids()
+        return self._observation_id
+
+    def get_observation_end_index(self) -> int:
+        """Return the token ID for </observation>."""
+        self._ensure_special_token_ids()
+        return self._observation_end_id
+
+    def has_tool_call(self, text: str) -> bool:
+        """Check if text contains <tool_call> tags."""
+        return '<tool_call>' in text and '</tool_call>' in text
+
+    def split_tool_call(self, text: str):
+        """Split text into (before_tool_call, tool_call_json, after_tool_call).
+
+        Returns:
+            Tuple[str, str, str]: (prefix, tool_call_json, suffix)
+            If no tool_call found, returns (text, '', '').
+        """
+        if not self.has_tool_call(text):
+            return (text, '', '')
+        try:
+            before = text.split('<tool_call>')[0]
+            tool_call_json = text.split('<tool_call>')[1].split('</tool_call>')[0]
+            after = text.split('</tool_call>')[1]
+            return (before, tool_call_json, after)
+        except (IndexError, ValueError):
+            return (text, '', '')
+
+    def extract_tool_response(self, text: str) -> str:
+        """Extract only the tool response (after </tool_call>)."""
+        _, _, after = self.split_tool_call(text)
+        return after.strip()
+
+    def encode_with_thinking(self, text: str):
+        """DEPRECATED: Encode text, returning (thinking_ids, response_ids, all_ids).
+
+        This method is unused in the codebase. Consider removing in future cleanup.
         """
         thinking, response = self.split_thinking(text)
         all_ids = self.encode(text)

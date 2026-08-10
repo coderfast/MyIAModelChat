@@ -308,47 +308,69 @@ def test_aiml_generator_depth():
 
 
 # ============================================================
-# Training Metrics Tests
+# Training Metrics Tests (testing real project code)
 # ============================================================
 
 def test_thinking_detection_in_dataset():
-    """Verify thinking data detection works."""
-    sample_with_thinking = "<thinking>El usuario pregunta.</thinking>La respuesta es 42."
-    sample_without_thinking = "Hola! ¿Cómo estás?"
+    """Verify has_thinking method detects thinking tags correctly."""
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
-    has_open = '<thinking>' in sample_with_thinking
-    has_close = '</thinking>' in sample_with_thinking
-    assert has_open and has_close, "Should detect thinking tags in sample"
+    model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
+    if not os.path.exists(model_path):
+        print("SKIP: sentencepiece.model not found")
+        return
 
-    has_open_plain = '<thinking>' in sample_without_thinking
-    has_close_plain = '</thinking>' in sample_without_thinking
-    assert not has_open_plain and not has_close_plain, "Should not detect thinking tags in plain text"
-    print("PASS: Thinking detection in dataset works")
+    wrapper = SentencePieceTokenizerWrapper(model_path)
+
+    sample_with = "<thinking>El usuario pregunta.</thinking>La respuesta es 42."
+    sample_without = "Hola! ¿Cómo estás?"
+
+    assert wrapper.has_thinking(sample_with) is True, "Should detect thinking tags"
+    assert wrapper.has_thinking(sample_without) is False, "Should not detect thinking tags in plain text"
+
+    thinking, response = wrapper.split_thinking(sample_with)
+    assert 'El usuario pregunta' in thinking
+    assert 'La respuesta es 42' in response
+    print("PASS: Thinking detection works correctly")
 
 
 def test_thinking_loss_weight_in_config():
-    """Verify thinking_loss_weight is 0.5 in TRAINING_CONFIG."""
-    from training.trainer import TRAINING_CONFIG
+    """Verify TrainingConfig defaults to thinking_loss_weight=1.0."""
+    from training.trainer import TrainingConfig
 
-    assert 'thinking_loss_weight' in TRAINING_CONFIG, "thinking_loss_weight not in config"
-    assert TRAINING_CONFIG['thinking_loss_weight'] == 0.5, \
-        f"Expected 0.5, got {TRAINING_CONFIG['thinking_loss_weight']}"
-    print("PASS: thinking_loss_weight is 0.5 in config")
+    config = TrainingConfig()
+    assert config.thinking_loss_weight == 1.0, \
+        f"Expected 1.0, got {config.thinking_loss_weight}"
+    print("PASS: thinking_loss_weight is 1.0 in config")
 
 
 def test_thinking_metrics_accumulation():
-    """Verify thinking metrics accumulate correctly."""
-    metrics_accum = {
-        'thinking_accuracy': [0.8, 0.85, 0.9],
-        'thinking_token_ratio': [0.3, 0.35, 0.4],
-    }
+    """Verify thinking metrics are computed from real tokenizer output."""
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
-    for key, values in metrics_accum.items():
-        avg = sum(values) / len(values)
-        assert avg > 0, f"Average for {key} should be > 0"
-        assert avg <= 1.0, f"Average for {key} should be <= 1.0"
+    model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
+    if not os.path.exists(model_path):
+        print("SKIP: sentencepiece.model not found")
+        return
 
-    print("PASS: Thinking metrics accumulation correct")
+    wrapper = SentencePieceTokenizerWrapper(model_path)
+
+    # Encode a text with thinking tags
+    text = "<thinking>Análizo la pregunta.</thinking>La respuesta es 42."
+    token_ids = wrapper.encode(text)
+
+    thinking_id = wrapper.get_thinking_index()
+    thinking_end_id = wrapper.get_thinking_end_index()
+
+    # Count thinking positions
+    thinking_positions = sum(1 for t in token_ids if t == thinking_id or t == thinking_end_id)
+    assert thinking_positions == 2, f"Expected 2 thinking positions, got {thinking_positions}"
+
+    # Verify ordering
+    first_thinking = token_ids.index(thinking_id)
+    first_end = token_ids.index(thinking_end_id)
+    assert first_thinking < first_end, "Opening tag should come before closing tag"
+    print("PASS: Thinking metrics computed correctly")
 
 
 # ============================================================
@@ -356,65 +378,7 @@ def test_thinking_metrics_accumulation():
 # ============================================================
 
 def test_thinking_sample_format():
-    """Verify thinking sample has correct format for training."""
-    sample = {
-        'input_ids': '<thinking>El usuario pregunta sobre Python.</thinking> Python es un lenguaje.',
-        'thinking_text': '<thinking>El usuario pregunta sobre Python.</thinking>',
-        'answer': 'Python es un lenguaje.',
-        'token_ids': [5, 10, 20, 30, 6, 40, 50]
-    }
-
-    assert '<thinking>' in sample['input_ids'], "input_ids should contain <thinking>"
-    assert '</thinking>' in sample['input_ids'], "input_ids should contain </thinking>"
-    assert sample['answer'] in sample['input_ids'], "answer should be in input_ids"
-    print("PASS: Thinking sample format correct")
-
-
-def test_thinking_token_positions():
-    """Verify thinking tokens are at correct positions."""
-    token_ids = [5, 10, 20, 30, 6, 40, 50]
-    thinking_id = 5
-    thinking_end_id = 6
-
-    thinking_start_pos = token_ids.index(thinking_id)
-    thinking_end_pos = token_ids.index(thinking_end_id)
-
-    assert thinking_start_pos == 0, f"Expected thinking at 0, got {thinking_start_pos}"
-    assert thinking_end_pos == 4, f"Expected thinking_end at 4, got {thinking_end_pos}"
-    assert thinking_start_pos < thinking_end_pos, "thinking should be before thinking_end"
-    print("PASS: Thinking token positions correct")
-
-
-def test_thinking_loss_weight_application():
-    """Verify thinking_loss_weight is applied only to thinking tokens."""
-    thinking_loss_weight = 0.5
-    token_ids = [5, 10, 20, 30, 6, 40, 50]
-    thinking_id = 5
-    thinking_end_id = 6
-
-    weights = [1.0] * len(token_ids)
-    in_thinking = False
-
-    for i, token in enumerate(token_ids):
-        if token == thinking_id:
-            in_thinking = True
-        elif token == thinking_end_id:
-            in_thinking = False
-        if in_thinking and token != thinking_id and token != thinking_end_id:
-            weights[i] = thinking_loss_weight
-
-    # Tokens between <thought> and </thought> should have reduced weight
-    assert weights[0] == 1.0, f"<thought> token should have weight 1.0, got {weights[0]}"
-    assert weights[1] == 0.5, f"Token inside thinking should have weight 0.5, got {weights[1]}"
-    assert weights[2] == 0.5, f"Token inside thinking should have weight 0.5, got {weights[2]}"
-    assert weights[3] == 0.5, f"Token inside thinking should have weight 0.5, got {weights[3]}"
-    assert weights[4] == 1.0, f"</thought> token should have weight 1.0, got {weights[4]}"
-    assert weights[5] == 1.0, f"Token after thinking should have weight 1.0, got {weights[5]}"
-    print("PASS: Thinking loss weight applied correctly")
-
-
-def test_format_thinking_sample_structure():
-    """Verify _format_thinking_sample produces correct structure."""
+    """Verify ThinkingGenerator._format_thinking_sample produces valid structure."""
     from dataset_preparer.thinking_generators import ThinkingGenerator
 
     sample = {'input': 'hola', 'output': 'Hola! ¿Cómo estás?'}
@@ -424,7 +388,44 @@ def test_format_thinking_sample_structure():
     assert '<thinking>' in result.get('thinking_text', ''), "thinking_text should contain <thinking>"
     assert '</thinking>' in result.get('thinking_text', ''), "thinking_text should contain </thinking>"
     assert 'Hola' in result.get('input_ids', ''), "Answer should be in input_ids"
-    print("PASS: _format_thinking_sample produces correct structure")
+    print("PASS: Thinking sample format correct")
+
+
+def test_thinking_token_positions():
+    """Verify tokenizer correctly identifies thinking token positions."""
+    from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+
+    model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
+    if not os.path.exists(model_path):
+        print("SKIP: sentencepiece.model not found")
+        return
+
+    wrapper = SentencePieceTokenizerWrapper(model_path)
+    text = "<thinking>Razonamiento aquí</thinking>La respuesta es 42."
+    token_ids = wrapper.encode(text)
+
+    thinking_id = wrapper.get_thinking_index()
+    thinking_end_id = wrapper.get_thinking_end_index()
+
+    assert thinking_id in token_ids, f"<thinking> token not found in {token_ids}"
+    assert thinking_end_id in token_ids, f"</thinking> token not found in {token_ids}"
+
+    start_pos = token_ids.index(thinking_id)
+    end_pos = token_ids.index(thinking_end_id)
+    assert start_pos < end_pos, f"<thinking> at {start_pos} should be before </thinking> at {end_pos}"
+    print("PASS: Thinking token positions correct")
+
+
+def test_thinking_loss_weight_application():
+    """Verify thinking_loss_weight affects training config."""
+    from training.trainer import TrainingConfig
+
+    config_default = TrainingConfig()
+    config_custom = TrainingConfig(thinking_loss_weight=0.5)
+
+    assert config_default.thinking_loss_weight == 1.0, "Default should be 1.0"
+    assert config_custom.thinking_loss_weight == 0.5, "Custom should be 0.5"
+    print("PASS: Thinking loss weight applied correctly")
 
 
 # ============================================================
@@ -478,7 +479,6 @@ if __name__ == '__main__':
     test_thinking_sample_format()
     test_thinking_token_positions()
     test_thinking_loss_weight_application()
-    test_format_thinking_sample_structure()
 
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED!")

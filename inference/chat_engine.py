@@ -48,6 +48,9 @@ class ChatConfig:
     show_thinking: bool = False
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
+    agent_enabled: bool = False
+    agent_max_iterations: int = 5
+    agent_show_tool_calls: bool = True
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
@@ -231,6 +234,14 @@ class ChatEngine:
         intent_classifier = shared_bert
         sentiment_analyzer = shared_bert
 
+        # Tool registry and executor for agentic capabilities
+        from commons.tools.tool_registry import ToolRegistry, register_default_tools
+        from commons.tools.tool_executor import ToolExecutor
+        self.tool_registry = ToolRegistry()
+        register_default_tools(self.tool_registry)
+        self.tool_executor = ToolExecutor(dry_run=False)
+        logger.info(f"Tool registry initialized: {len(self.tool_registry.list_tools())} tools")
+
         self.dialogue_manager = DialogueManager(
             model=self.model,
             device=device,
@@ -250,6 +261,9 @@ class ChatEngine:
             min_length=3,
             no_repeat_ngram_size=3,
             default_response="Lo siento, no puedo responder ahora.",
+            tool_executor=self.tool_executor,
+            agent_enabled=self.config.agent_enabled,
+            agent_max_iterations=self.config.agent_max_iterations,
         )
 
     def _resolve_model_path(self, model_name):
@@ -395,6 +409,10 @@ class ChatEngine:
                     resp_text = response.get('response', '')
                     if self.show_thinking and thinking:
                         print(f"Bot [thinking]: {thinking}")
+                    if self.config.agent_show_tool_calls and self.dialogue_manager.tool_executor:
+                        tool_calls = response.get('tool_calls', [])
+                        for tc in tool_calls:
+                            print(f"Bot [tool]: {tc.get('tool', 'unknown')}({tc.get('arguments', '')})")
                     print(f"Bot: {resp_text}")
                 else:
                     if self.show_thinking:
@@ -492,6 +510,85 @@ def stream_chat_text(text: str):
             'delta': {'content': content},
             'finish_reason': None
         }) + '\n'
+    
+    # Finish chunk
+    yield json.dumps({
+        'id': request_id,
+        'object': 'chat.completion.chunk',
+        'delta': {},
+        'finish_reason': 'stop'
+    }) + '\n'
+    
+    # Done marker
+    yield 'data: [DONE]\n\n'
+
+
+def stream_chat_agentic(response: Dict[str, Any]):
+    """Generate SSE chunks for streaming agentic responses with tool calls.
+    
+    Supports streaming for:
+    - thinking: Chain-of-thought reasoning
+    - tool_call: Tool invocation requests
+    - observation: Tool execution results
+    - response: Final response text
+    
+    Yields JSON strings for Server-Sent Events format.
+    """
+    import hashlib
+    request_id = hashlib.md5(json.dumps(response).encode()).hexdigest()[:12]
+    
+    # Stream thinking if present
+    thinking = response.get('thinking')
+    if thinking:
+        yield json.dumps({
+            'id': request_id,
+            'object': 'chat.completion.chunk',
+            'type': 'thinking',
+            'delta': {'reasoning': thinking},
+            'finish_reason': None
+        }) + '\n'
+    
+    # Stream tool calls if present
+    tool_calls = response.get('tool_calls', [])
+    for tc in tool_calls:
+        yield json.dumps({
+            'id': request_id,
+            'object': 'chat.completion.chunk',
+            'type': 'tool_call',
+            'delta': {
+                'tool_call': {
+                    'name': tc.get('tool', ''),
+                    'arguments': tc.get('arguments', {}),
+                    'id': tc.get('id', hashlib.md5(json.dumps(tc).encode()).hexdigest()[:8])
+                }
+            },
+            'finish_reason': None
+        }) + '\n'
+    
+    # Stream observations if present
+    observations = response.get('observations', [])
+    for obs in observations:
+        yield json.dumps({
+            'id': request_id,
+            'object': 'chat.completion.chunk',
+            'type': 'observation',
+            'delta': {'observation': obs},
+            'finish_reason': None
+        }) + '\n'
+    
+    # Stream final response
+    resp_text = response.get('response', '')
+    if resp_text:
+        words = resp_text.split()
+        for i, word in enumerate(words):
+            content = word + (' ' if i < len(words) - 1 else '')
+            yield json.dumps({
+                'id': request_id,
+                'object': 'chat.completion.chunk',
+                'type': 'response',
+                'delta': {'content': content},
+                'finish_reason': None
+            }) + '\n'
     
     # Finish chunk
     yield json.dumps({

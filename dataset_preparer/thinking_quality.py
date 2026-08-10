@@ -565,7 +565,7 @@ def validate_thinking(thinking: str, answer: str = '', question: str = '') -> Qu
 
     # Final validation
     valid = (
-        score >= 0.5 and
+        score >= 0.7 and
         not (is_meta and not has_steps and not has_answer_derivation) and
         not is_re_declaration and
         not is_placeholder
@@ -605,7 +605,7 @@ def validate_thinking_batch(samples: List[Dict[str, Any]]) -> BatchQualityReport
     return report
 
 
-def filter_low_quality(samples: List[Dict[str, Any]], min_score: float = 0.4) -> List[Dict[str, Any]]:
+def filter_low_quality(samples: List[Dict[str, Any]], min_score: float = 0.5) -> List[Dict[str, Any]]:
     """Filter out low-quality thinking samples."""
     filtered = []
     for sample in samples:

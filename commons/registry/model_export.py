@@ -19,6 +19,7 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     """Export a .pth checkpoint to ONNX format."""
     try:
         from commons.model.chatmodel import ChatModel
+        from commons.model.chatmodel_moe import ChatModelMoE
     except ImportError:
         raise RuntimeError("Cannot import ChatModel. Ensure chatmodel.py is in the project root.")
 
@@ -41,10 +42,23 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
             raise RuntimeError("No tokenizer found in checkpoint. Cannot export to ONNX.")
 
     arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
-    model = ChatModel(tokenizer,
-        embed_size=arch.get('embed_size', 256),
-        num_layers=arch.get('num_layers', 4))
-    model.load_state_dict(new_state)
+    
+    # Check if this is a MoE model
+    is_moe = ckpt.get('is_moe', False) or any('moe' in k.lower() for k in new_state.keys())
+    
+    if is_moe:
+        # Use MoE model
+        model = ChatModelMoE(tokenizer,
+            embed_size=arch.get('embed_size', 256),
+            num_layers=arch.get('num_layers', 2),
+            num_experts=arch.get('num_experts', 4),
+            top_k=arch.get('top_k', 2))
+    else:
+        model = ChatModel(tokenizer,
+            embed_size=arch.get('embed_size', 256),
+            num_layers=arch.get('num_layers', 4))
+    
+    model.load_state_dict(new_state, strict=False)
     model.eval()
 
     os.makedirs(EXPORTED_DIR, exist_ok=True)
@@ -54,8 +68,24 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
 
     dummy_input = torch.randint(0, tokenizer.vocab_size, (1, seq_len))
 
+    # For MoE models, we need to handle the tuple output
+    if is_moe:
+        # Create a wrapper that only returns logits for ONNX export
+        class MoEWrapper(torch.nn.Module):
+            def __init__(self, moe_model):
+                super().__init__()
+                self.moe_model = moe_model
+            
+            def forward(self, input_ids):
+                logits, _ = self.moe_model(input_ids)
+                return logits
+        
+        export_model = MoEWrapper(model)
+    else:
+        export_model = model
+
     torch.onnx.export(
-        model,
+        export_model,
         dummy_input,
         output_path,
         input_names=['input_ids'],
@@ -67,9 +97,82 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         opset_version=14,
     )
 
+    # Save agentic token metadata for inference
+    agentic_metadata = _extract_agentic_metadata(tokenizer, ckpt)
+    if is_moe:
+        agentic_metadata['is_moe'] = True
+        agentic_metadata['moe_config'] = {
+            'num_experts': arch.get('num_experts', 4),
+            'top_k': arch.get('top_k', 2),
+            'load_balance_weight': arch.get('load_balance_weight', 0.01)
+        }
+    metadata_path = output_path.replace('.onnx', '_metadata.json')
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump(agentic_metadata, f, indent=2, ensure_ascii=False)
+
     size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
     logger.info(f"ONNX exported: {output_path} ({size_mb} MB)")
     return output_path
+
+
+def _extract_agentic_metadata(tokenizer, ckpt: dict) -> dict:
+    """Extract agentic token metadata from tokenizer for inference."""
+    metadata = {
+        "agentic_tokens": {},
+        "special_tokens": {},
+        "mode_tokens": {}
+    }
+    
+    # Extract agentic tokens
+    agentic_token_names = [
+        'thinking', 'thinking_end', 'tool_call', 'tool_call_end',
+        'observation', 'observation_end', 'action', 'action_end'
+    ]
+    
+    for token_name in agentic_token_names:
+        getter_name = f"get_{token_name}_index"
+        if hasattr(tokenizer, getter_name):
+            token_id = getattr(tokenizer, getter_name)()
+            if token_id >= 0:
+                token_str = f"<{token_name}>" if not token_name.startswith('thinking') else f"<{token_name.replace('_', ' ')}>"
+                metadata["agentic_tokens"][token_name] = {
+                    "id": token_id,
+                    "token": token_str
+                }
+    
+    # Extract mode tokens
+    mode_token_names = ['context', 'answer', 'thinking_mode']
+    for token_name in mode_token_names:
+        getter_name = f"get_{token_name}_index"
+        if hasattr(tokenizer, getter_name):
+            token_id = getattr(tokenizer, getter_name)()
+            if token_id >= 0:
+                metadata["mode_tokens"][token_name] = {
+                    "id": token_id,
+                    "token": f"<|{token_name}|>"
+                }
+    
+    # Extract standard special tokens
+    special_token_names = ['pad', 'unk', 'bos', 'eos']
+    for token_name in special_token_names:
+        getter_name = f"get_{token_name}_index"
+        if hasattr(tokenizer, getter_name):
+            token_id = getattr(tokenizer, getter_name)()
+            if token_id >= 0:
+                metadata["special_tokens"][token_name] = {
+                    "id": token_id,
+                    "token": f"<{token_name}>"
+                }
+    
+    # Add training config if present
+    if 'training_config' in ckpt:
+        metadata["training_config"] = ckpt['training_config']
+    
+    # Add architecture info
+    if 'architecture' in ckpt:
+        metadata["architecture"] = ckpt['architecture']
+    
+    return metadata
 
 
 def export_to_onnx_quantized(

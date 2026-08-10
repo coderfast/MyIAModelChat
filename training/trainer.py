@@ -69,7 +69,7 @@ TRAINING_CONFIG = {
     'warm_up_ratio': 0.1,  # use 10% of dataset for warm-up
     'warm_up_steps': 100,  # maximum batches for warm-up phase
     # Thinking settings
-    'thinking_loss_weight': 0.5,  # loss weight for thinking tokens (0.0-1.0)
+    'thinking_loss_weight': 1.0,  # loss weight for thinking tokens (0.0-1.0)
 }
 
 # Model checkpoint configuration
@@ -118,10 +118,19 @@ class TrainingConfig:
     num_threads: int = 0
     max_ram_fraction: float = 0.75
     max_ram_bytes: Optional[int] = None
-    thinking_loss_weight: float = 0.5
+    thinking_loss_weight: float = 1.0
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
     statistics: bool = False
+    agent_enabled: bool = False
+    agent_loss_weight: float = 1.0
+    agent_ratio: float = 0.3
+    # MoE (Mixture of Experts) fields
+    moe_enabled: bool = False
+    moe_num_experts: int = 4
+    moe_top_k: int = 2
+    moe_load_balance_weight: float = 0.01
+    moe_freeze_attention: bool = False
     # DDP fields (single-machine multi-GPU or multi-node)
     rank: int = 0                # global rank
     local_rank: int = 0          # rank within this machine
@@ -608,7 +617,7 @@ class Trainer:
         return model
 
     def _compute_loss(self, model, inputs, targets, criterion):
-        """Unified loss computation with thinking-aware and mode-aware loss weighting.
+        """Unified loss computation with thinking-aware, mode-aware, and agentic loss weighting.
 
         Loss rules by sample type:
         - CONTEXT samples (<|context|> prefix): tokens before <|answer|> get weight 0.0,
@@ -616,8 +625,15 @@ class Trainer:
         - THINKING samples (<|thinking|> prefix): tokens before <thinking> get weight 0.0,
           <thinking>...</thinking> tokens get thinking_loss_weight, <|answer|> and answer
           tokens get weight 1.0.
+        - AGENT samples (with <tool_call>): thinking gets thinking_loss_weight, tool_call and
+          observation tokens get full weight (1.0), answer tokens get full weight (1.0).
+        - MoE models: adds load balancing loss to encourage uniform expert usage.
         """
+        # Handle MoE model output (returns logits + gate_scores)
+        gate_scores = None
         outputs = model(inputs)
+        if isinstance(outputs, tuple):
+            outputs, gate_scores = outputs
         raw_outputs = outputs
 
         weights = torch.ones_like(targets, dtype=torch.float)
@@ -627,6 +643,13 @@ class Trainer:
         context_id = getattr(self.tokenizer, 'get_context_index', lambda: -1)()
         answer_id = getattr(self.tokenizer, 'get_answer_index', lambda: -1)()
         thinking_mode_id = getattr(self.tokenizer, 'get_thinking_mode_index', lambda: -1)()
+        tool_call_id = getattr(self.tokenizer, 'get_tool_call_index', lambda: -1)()
+        tool_call_end_id = getattr(self.tokenizer, 'get_tool_call_end_index', lambda: -1)()
+        observation_id = getattr(self.tokenizer, 'get_observation_index', lambda: -1)()
+        observation_end_id = getattr(self.tokenizer, 'get_observation_end_index', lambda: -1)()
+
+        agent_enabled = getattr(self.config, 'agent_enabled', False)
+        agent_loss_weight = getattr(self.config, 'agent_loss_weight', 1.0)
 
         batch_size, seq_len = targets.shape
 
@@ -700,6 +723,29 @@ class Trainer:
                     if in_thinking and token != thinking_id and token != thinking_end_id:
                         weights[b, s] = self.thinking_loss_weight
 
+            # Agentic masking: override weights for tool_call and observation tokens
+            if agent_enabled and tool_call_id >= 0:
+                in_tool_call = False
+                in_observation = False
+                for s in range(seq_len):
+                    token = targets[b, s].item()
+                    if token == tool_call_id:
+                        in_tool_call = True
+                        weights[b, s] = agent_loss_weight  # tool_call gets full weight
+                    elif token == tool_call_end_id:
+                        in_tool_call = False
+                        weights[b, s] = agent_loss_weight
+                    elif token == observation_id:
+                        in_observation = True
+                        weights[b, s] = agent_loss_weight
+                    elif token == observation_end_id:
+                        in_observation = False
+                        weights[b, s] = agent_loss_weight
+                    elif in_tool_call:
+                        weights[b, s] = agent_loss_weight  # JSON inside tool_call
+                    elif in_observation:
+                        weights[b, s] = agent_loss_weight  # observation content
+
         # Flatten outputs and targets
         outputs = outputs.contiguous().view(-1, outputs.size(-1))
         targets = targets.contiguous().view(-1)
@@ -717,6 +763,13 @@ class Trainer:
         if weight_sum <= 0:
             return torch.tensor(0.0, device=outputs.device, requires_grad=True), raw_outputs
         loss = (token_losses * weights).sum() / weight_sum
+        
+        # Add load balancing loss for MoE models
+        moe_loss = torch.tensor(0.0, device=loss.device)
+        if gate_scores is not None and hasattr(model, 'get_load_balancing_loss'):
+            moe_loss = model.get_load_balancing_loss(torch.stack(gate_scores))
+            loss = loss + self.config.moe_load_balance_weight * moe_loss
+        
         return loss, raw_outputs
 
     def _compute_thinking_metrics(self, model, inputs, targets, device, logits=None):
@@ -732,6 +785,9 @@ class Trainer:
 
         with torch.no_grad():
             outputs = logits if logits is not None else model(inputs)
+            # Handle MoE model output (returns logits + gate_scores)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
             predictions = outputs.argmax(dim=-1)
 
             thinking_open_correct = 0
@@ -787,6 +843,85 @@ class Trainer:
                 metrics['response_token_accuracy'] = response_correct / response_token_count
 
             return metrics
+
+    def _compute_agent_metrics(self, model, inputs, targets, device, logits=None):
+        """Compute metrics for agentic token generation if agent data is present."""
+        agent_enabled = getattr(self.config, 'agent_enabled', False)
+        if not agent_enabled:
+            return {}
+
+        tool_call_id = getattr(self.tokenizer, 'get_tool_call_index', lambda: -1)()
+        tool_call_end_id = getattr(self.tokenizer, 'get_tool_call_end_index', lambda: -1)()
+        observation_id = getattr(self.tokenizer, 'get_observation_index', lambda: -1)()
+
+        if tool_call_id < 0:
+            return {}
+
+        with torch.no_grad():
+            outputs = logits if logits is not None else model(inputs)
+            # Handle MoE model output (returns logits + gate_scores)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
+            predictions = outputs.argmax(dim=-1)
+
+            tool_call_count = 0
+            tool_call_correct = 0
+            tool_name_count = 0
+            tool_name_correct = 0
+            observation_count = 0
+            observation_correct = 0
+            total_agent_tokens = 0
+
+            for i in range(targets.size(0)):
+                in_tool_call = False
+                in_observation = False
+                is_tool_name = False
+
+                for j in range(targets.size(1)):
+                    target_token = targets[i, j].item()
+                    pred_token = predictions[i, j].item()
+
+                    if target_token == tool_call_id:
+                        in_tool_call = True
+                        is_tool_name = True
+                        tool_call_count += 1
+                        total_agent_tokens += 1
+                        if pred_token == tool_call_id:
+                            tool_call_correct += 1
+                    elif target_token == tool_call_end_id:
+                        in_tool_call = False
+                        is_tool_name = False
+                        tool_call_count += 1
+                        total_agent_tokens += 1
+                        if pred_token == tool_call_end_id:
+                            tool_call_correct += 1
+                    elif target_token == observation_id:
+                        in_observation = True
+                        in_tool_call = False
+                        observation_count += 1
+                        total_agent_tokens += 1
+                        if pred_token == observation_id:
+                            observation_correct += 1
+                    elif in_tool_call:
+                        total_agent_tokens += 1
+                        if pred_token == target_token:
+                            tool_call_correct += 1
+                    elif in_observation:
+                        total_agent_tokens += 1
+                        if pred_token == target_token:
+                            observation_correct += 1
+
+            metrics = {}
+            if tool_call_count > 0:
+                metrics['agent_tool_call_accuracy'] = tool_call_correct / tool_call_count
+                metrics['agent_tool_call_count'] = tool_call_count
+            if observation_count > 0:
+                metrics['agent_observation_accuracy'] = observation_correct / observation_count
+            if total_agent_tokens > 0:
+                metrics['agent_total_tokens'] = total_agent_tokens
+                metrics['agent_ratio'] = total_agent_tokens / max(1, targets.size(0) * targets.size(1))
+
+            return metrics
     
     def _backward_pass(self, loss, optimizer, scaler, accumulation_step=1):
         """Unified backward pass handling for mixed and standard precision."""
@@ -835,6 +970,8 @@ class Trainer:
 
         # Thinking metrics accumulators
         thinking_metrics_accum = {}
+        agent_metrics_accum = {}
+        last_loss = 0.0
 
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             if self.stop_event.is_set():
@@ -862,7 +999,8 @@ class Trainer:
                         # Unknown remaining: just show elapsed
                         e_m, e_s = divmod(int(elapsed), 60)
                         eta_str = f"elapsed {e_m}m {e_s}s" if e_m > 0 else f"elapsed {e_s}s"
-                    logger.info(f"{phase_label} batch {current_batch}{total_str} | ETA: {eta_str}")
+                    loss_str = f" | loss: {last_loss:.4f}" if last_loss > 0 else ""
+                    logger.info(f"{phase_label} batch {current_batch}{total_str} | ETA: {eta_str}{loss_str}")
                 else:
                     logger.info(f"{phase_label} batch {current_batch}{total_str} in progress...")
 
@@ -883,6 +1021,8 @@ class Trainer:
             else:
                 loss, logits = self._compute_loss(model, inputs, targets, criterion)
 
+            last_loss = loss.item()
+
             # Compute thinking metrics periodically (reuse logits from _compute_loss)
             if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
                 thinking_metrics = self._compute_thinking_metrics(model, inputs, targets, device, logits=logits)
@@ -890,6 +1030,15 @@ class Trainer:
                     if key not in thinking_metrics_accum:
                         thinking_metrics_accum[key] = []
                     thinking_metrics_accum[key].append(value)
+
+            # Compute agent metrics periodically
+            agent_enabled = getattr(self.config, 'agent_enabled', False)
+            if agent_enabled and (batch_idx + 1) % 50 == 0:
+                agent_metrics = self._compute_agent_metrics(model, inputs, targets, device, logits=logits)
+                for key, value in agent_metrics.items():
+                    if key not in agent_metrics_accum:
+                        agent_metrics_accum[key] = []
+                    agent_metrics_accum[key].append(value)
 
             # Backward pass — use no_sync() for DDP when not at accumulation boundary
             if self.world_size > 1 and hasattr(model, 'no_sync') and not is_last_micro_step:
@@ -962,6 +1111,13 @@ class Trainer:
         if thinking_metrics_accum and self.rank == 0:
             logger.info("Thinking Metrics Summary:")
             for key, values in thinking_metrics_accum.items():
+                avg_val = sum(values) / len(values) if values else 0
+                logger.info(f"    {key}: {avg_val:.4f}")
+
+        # Log agent metrics summary (rank-0 only)
+        if agent_metrics_accum and self.rank == 0:
+            logger.info("Agent Metrics Summary:")
+            for key, values in agent_metrics_accum.items():
                 avg_val = sum(values) / len(values) if values else 0
                 logger.info(f"    {key}: {avg_val:.4f}")
 
@@ -1162,10 +1318,25 @@ class Trainer:
             # Setup device with improved configuration for CPU-GPU combined training
             device = self._setup_device_and_config()
 
-            # Initialize model with device strategy
-            if self.rank == 0:
-                logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
-            model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
+            # Initialize model — resume from checkpoint if it exists
+            resume_checkpoint = None
+            if os.path.exists(self.model_output_path):
+                if self.rank == 0:
+                    logger.info(f"Found existing checkpoint: {self.model_output_path}")
+                    logger.info("Resuming training from checkpoint...")
+                resume_checkpoint = torch.load(self.model_output_path, map_location='cpu', weights_only=False)
+                arch = resume_checkpoint.get('architecture', {})
+                embed_size = arch.get('embed_size', TRAINING_CONFIG['embed_size'])
+                num_layers = arch.get('num_layers', 4)
+                model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
+                model.load_state_dict(resume_checkpoint['model_state_dict'])
+                if self.rank == 0:
+                    logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
+            else:
+                if self.rank == 0:
+                    logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
+                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
+
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:
                 logger.info(f" Model initialized and deployed")
@@ -1176,6 +1347,30 @@ class Trainer:
             
             # Add learning rate scheduler
             scheduler = lr_scheduler.StepLR(optimizer, step_size=max(1, self.epochs // 3), gamma=0.1)
+
+            # Restore optimizer and scheduler state if resuming
+            if resume_checkpoint is not None:
+                if 'optimizer_state_dict' in resume_checkpoint:
+                    try:
+                        optimizer.load_state_dict(resume_checkpoint['optimizer_state_dict'])
+                        if self.rank == 0:
+                            logger.info(" Optimizer state restored")
+                    except Exception as e:
+                        if self.rank == 0:
+                            logger.warning(f" Could not restore optimizer state: {e}")
+                if 'scheduler_state_dict' in resume_checkpoint:
+                    try:
+                        scheduler.load_state_dict(resume_checkpoint['scheduler_state_dict'])
+                        if self.rank == 0:
+                            logger.info(" Scheduler state restored")
+                    except Exception as e:
+                        if self.rank == 0:
+                            logger.warning(f" Could not restore scheduler state: {e}")
+                if 'loss' in resume_checkpoint:
+                    self.best_loss = resume_checkpoint['loss']
+                    if self.rank == 0:
+                        logger.info(f" Best loss restored: {self.best_loss:.4f}")
+
             if self.rank == 0:
                 logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
 
@@ -1433,7 +1628,7 @@ class Trainer:
 
         logger.info("Tokenizing cached dataset for faster training...")
 
-        PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking')
+        PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking', 'source', 'has_tool_call')
         columns_to_remove = [c for c in self.loaded_dataset.column_names if c not in PRESERVED_COLUMNS]
         num_proc = self._get_num_proc()
         try:

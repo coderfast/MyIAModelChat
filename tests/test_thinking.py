@@ -48,10 +48,10 @@ def test_dialogue_manager_dict_return():
 
     dm = DialogueManager(
         model=model, device=device, tokenizer=tokenizer,
-        thinking_enabled=False, thinking_max_tokens=64
+        agent_enabled=False
     )
 
-    # Even with thinking disabled, should return dict
+    # Even with agent disabled, should return dict
     result = dm.generate_response("hola")
     assert isinstance(result, dict), f"Expected dict, got {type(result)}"
     assert 'thinking' in result, "Missing 'thinking' key"
@@ -60,7 +60,7 @@ def test_dialogue_manager_dict_return():
 
 
 def test_thinking_enabled_flag():
-    """Verify thinking_enabled flag is stored."""
+    """Verify agent_enabled flag is stored."""
     from commons.dialogue.dialogmanager import DialogueManager
 
     tokenizer = FakeTokenizerPhase3()
@@ -69,19 +69,17 @@ def test_thinking_enabled_flag():
 
     dm = DialogueManager(
         model=model, device=device, tokenizer=tokenizer,
-        thinking_enabled=True, thinking_max_tokens=32
+        agent_enabled=True, agent_max_iterations=3
     )
-    assert dm.thinking_enabled is True
-    assert dm.thinking_max_tokens == 32
-    assert dm.thinking_end_id == 6
-    assert dm.thinking_id == 5
+    assert dm.agent_enabled is True
+    assert dm.agent_max_iterations == 3
 
     dm2 = DialogueManager(
         model=model, device=device, tokenizer=tokenizer,
-        thinking_enabled=False
+        agent_enabled=False
     )
-    assert dm2.thinking_enabled is False
-    print("PASS: Thinking flags stored correctly")
+    assert dm2.agent_enabled is False
+    print("PASS: Agent flags stored correctly")
 
 
 # ============================================================
@@ -234,29 +232,38 @@ def test_generate_thinking_dataset_with_lang():
 # ============================================================
 
 def test_cli_flags_exist():
-    """Verify thinking CLI flags are defined in main.py."""
-    import ast
+    """Verify thinking CLI flags are defined in argparse."""
+    import importlib.util
+    import sys
+    
+    # Load main.py as a module to access its argument parser
+    spec = importlib.util.spec_from_file_location("main_module", "main.py")
+    main_module = importlib.util.module_from_spec(spec)
+    
+    # We can't execute main.py, but we can check the source for argparse.add_argument calls
     with open('main.py', encoding='utf-8') as f:
         content = f.read()
-
-    assert 'thinking-loss-weight' in content
-    assert 'thinking-enabled' in content
-    assert 'thinking-max-tokens' in content
-    assert 'generate-thinking' in content
-    assert 'thinking-mode' in content
-    assert 'thinking-model' in content
+    
+    # Check for argparse argument definitions (not just string presence)
+    assert 'add_argument("--thinking-loss-weight"' in content, "Missing --thinking-loss-weight argument"
+    assert 'add_argument("--thinking-enabled"' in content, "Missing --thinking-enabled argument"
+    assert 'add_argument("--thinking-max-tokens"' in content, "Missing --thinking-max-tokens argument"
+    assert 'add_argument("--generate-thinking"' in content, "Missing --generate-thinking argument"
+    assert 'add_argument("--thinking-mode"' in content, "Missing --thinking-mode argument"
+    assert 'add_argument("--thinking-model"' in content, "Missing --thinking-model argument"
     print("PASS: CLI flags defined in main.py")
 
 
 def test_main_chat_thinking_flags():
-    """Verify ChatEngine passes thinking params to DialogueManager."""
-    import ast
-    with open('inference/chat_engine.py', encoding='utf-8') as f:
-        content = f.read()
-
-    assert 'thinking_enabled' in content
-    assert 'thinking_max_tokens' in content
-    print("PASS: ChatEngine passes thinking params")
+    """Verify ChatConfig has thinking params."""
+    from inference.chat_engine import ChatConfig
+    
+    config = ChatConfig()
+    assert hasattr(config, 'thinking_enabled'), "ChatConfig missing thinking_enabled"
+    assert hasattr(config, 'thinking_max_tokens'), "ChatConfig missing thinking_max_tokens"
+    assert config.thinking_enabled is True, "Default thinking_enabled should be True"
+    assert config.thinking_max_tokens == 64, "Default thinking_max_tokens should be 64"
+    print("PASS: ChatConfig has thinking params")
 
 
 # ============================================================
@@ -282,7 +289,7 @@ def test_backward_compatibility():
 
     dm = DialogueManager(
         model=model, device=device, tokenizer=tokenizer,
-        thinking_enabled=False
+        agent_enabled=False
     )
 
     result = dm.generate_response("test")

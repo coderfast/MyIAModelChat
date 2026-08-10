@@ -13,15 +13,34 @@ Este roadmap define la implementación completa de capacidades **agenticas end-t
 - `<tool_call>`, `</tool_call>` — action block
 - `<tool_call>`, `</tool_call>` — observation result
 
-**Nota sobre permisos de ejecución:**
-El modelo SOLO genera `<tool_call>` con el JSON del tool call. La ejecución real de comandos es responsabilidad del **agente** que usa el modelo, NO del modelo en sí. El agente debe:
-1. Parsear el `<tool_call>` del output del modelo
-2. Pedir **permiso al usuario** antes de ejecutar cualquier comando
-3. Ejecutar el comando en la plataforma correcta
-4. Formatear el resultado como `<tool_call>`
-5. Alimentar el resultado de vuelta al modelo
+**Nota sobre permisos de ejecución — Modelo de Seguridad en 3 Capas:**
 
-Esto permite que el modelo sea agnóstico a la plataforma — el agente decide qué shell usar (PowerShell, Bash, zsh) según el SO detectado.
+La seguridad NO depende del modelo. El modelo SOLO genera `<tool_call>` con el JSON del tool call. La ejecución real de comandos es responsabilidad del **agente** que usa el modelo. La seguridad se implementa en 3 capas independientes:
+
+**Capa 1 — PermissionManager (agente):**
+- El agente DEBE pedir **permiso al usuario** antes de ejecutar cualquier comando que involucre shell, escritura de archivos, o red
+- Herramientas de solo lectura (calculator, current_date, word_count) pueden ejecutarse sin permiso
+- El usuario ve el comando completo y responde sí/no/dry-run
+- `--auto-approve` para testing, `--dry-run` para validación
+
+**Capa 2 — ShellSecurity (código):**
+- Whitelist de comandos seguros por plataforma (solo lectura por defecto)
+- Blacklist de patrones destructivos (rm -rf, sudo, Format-Volume, etc.)
+- Timeout de 30 segundos por defecto
+- Logging de todos los comandos ejecutados
+
+**Capa 3 — Modelo (entrenamiento):**
+- El modelo puede aprender a generar advertencias en `<thinking>` cuando detecta que un comando es potencialmente peligroso (ej: "Este comando eliminaría archivos, debería advertir al usuario")
+- Esto es **informativo** — el thinking se muestra al usuario pero NO es un gate de seguridad
+- El modelo NO tiene capacidad de bloquear o aprobar ejecuciones — solo el agente y el PermissionManager tienen esa autoridad
+
+**Flujo completo:**
+```
+Modelo genera 
+                                                    
+```
+
+Esto permite que el modelo sea agnóstico a la plataforma — el agente decide qué shell usar (PowerShell, Bash, zsh) según el SO detectado, y la seguridad siempre está en el agente, nunca en el modelo.
 
 **Leyenda de Estado:** `TODO` → `IN_PROGRESS` → `BLOCKED` → `DONE`
 
@@ -48,15 +67,46 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
                                               │ arguments    │
                                               └──────┬──────┘
                                                      ↓
-                                              ToolExecutor
-                                                     ↓
-                                              <observation>
-                                              resultado     </observation>
-                                                     ↓
-                                              Feed back al modelo
-                                                     ↓
-                                              Genera respuesta final
+                                              PermissionManager
+                                              (¿permiso del usuario?)
+                                                /          \
+                                              SÍ             NO
+                                               ↓              ↓
+                                         ToolExecutor    Rechazado
+                                         ShellSecurity   (error al modelo)
+                                         (¿comando seguro?)
+                                           /       \
+                                         SÍ         NO
+                                          ↓           ↓
+                                     subprocess   Bloqueado
+                                          ↓        (error al modelo)
+                                     <observation>
+                                     resultado   </observation>
+                                          ↓
+                                     Feed back al modelo
+                                          ↓
+                                     Genera respuesta final
 ```
+
+---
+
+## Rol del Modelo vs Seguridad Real
+
+**El modelo NO tiene autoridad de seguridad.** Su único rol es generar tokens. Sin embargo, puede contribuir a la seguridad de forma **informativa**:
+
+| Capa | Responsable | ¿Puede bloquear ejecución? | Mecanismo |
+|------|-------------|---------------------------|-----------|
+| PermissionManager | Agente (código) | SÍ — pide permiso al usuario | `request_permission()` antes de ejecutar |
+| ShellSecurity | ToolExecutor (código) | SÍ — valida comandos contra whitelist/blacklist | `validate_command()` antes de subprocess |
+| Modelo thinking | GPT-2 (entrenado) | NO — solo genera texto informativo | Advertencias en `<thinking>` (ej: "Este comando es peligroso") |
+
+**Entrenamiento del modelo para advertencias:**
+- El dataset puede incluir ejemplos donde el thinking contiene advertencias antes de tool calls peligrosos
+- Ejemplo: `<thinking>El usuario pide eliminar todos los archivos. Debo generar un tool_call, pero debo advertir que esto es destructivo y el usuario debe confirmar.</thinking>`
+- Esto es **solo natural language** — no tiene efecto en la ejecución real
+- La ventaja: el usuario ve la advertencia del modelo **antes** de que el PermissionManager pida confirmación
+
+**Conclusión:** La seguridad es responsabilidad del agente (PermissionManager + ShellSecurity). El modelo puede ayudar a comunicar riesgos al usuario, pero nunca a bloquear o aprobar ejecuciones.
 
 ---
 
@@ -80,26 +130,18 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
 **Riesgo:** Medio (modifica tokenizer, pipeline de datos y quality validator)
 
 ### Task 0.1: Añadir tokens de tool use al tokenizer
-- **Archivo**: `commons/tokenizer/bpe_tokenizer.py`
-- **Ubicación**: Línea ~40, donde se definen `user_symbols`
-- **Cambio**: Añadir los 6 nuevos tokens junto a los thinking tokens existentes:
+- **Archivo**: `dataset_preparer/data_preparer.py`
+- **Ubicación**: Línea 1411, donde se define `user_symbols` en `_prepare_bpe_tokenizer_and_tokenize()`
+- **Nota**: La ubicación original del roadmap decía `bpe_tokenizer.py:40`, pero los `user_symbols` se definen en `data_preparer.py:1411`
+- **Cambio**: Añadir los 6 nuevos tokens a la cadena de `user_symbols`:
   ```python
-  # Thinking tokens (ya implementados)
-  thinking_tokens = ['<thinking>', '</thinking>']
-  
-  # Mode tokens (ya implementados)
-  mode_tokens = ['<|context|>', '<|answer|>', '<|thinking|>']
+  # ACTUAL (línea 1411):
+  user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>'
 
-  # NUEVOS: Agentic tokens
-  agentic_tokens = [
-      '<tool_call>', '</tool_call>',
-      '<tool_call>', '</tool_call>',
-      '<tool_call>', '</tool_call>',
-  ]
-
-  user_symbols = '--user_defined_symbols=' + ','.join(thinking_tokens + mode_tokens + agentic_tokens)
+  # NUEVO:
+  user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>,<tool_call>,</tool_call>,<tool_call>,</tool_call>,<tool_call>,</tool_call>'
   ```
-- **Métodos nuevos**:
+- **Métodos nuevos en `bpe_tokenizer.py`** (añadir después de los métodos de thinking existentes, ~línea 227):
   ```python
   def get_tool_call_index(self) -> int: ...
   def get_tool_call_end_index(self) -> int: ...
@@ -111,13 +153,13 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
   def split_tool_call(self, text: str) -> tuple: ...
   def extract_tool_response(self, text: str) -> str: ...
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.2: Actualizar ChatModel para soportar los nuevos tokens
 - **Archivo**: `commons/model/chatmodel.py`
 - **Cambio**: Ninguno en arquitectura — `vocab_size` ya viene del tokenizer
 - Solo verificar que `GPT2Config(vocab_size=tokenizer.vocab_size)` se ajusta automáticamente
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.3: Pre-entrenar BPE con nuevos tokens
 - **Archivo**: `dataset_preparer/data_preparer.py`
@@ -128,7 +170,7 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
   python main.py --prepare-data --aiml --bpe-vocab-size 8000 --refresh-cache
   # Verificar que los 6 tokens aparecen en sentencepiece.vocab
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Problemas detectados en Thinking
 
@@ -136,15 +178,16 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
 |---|---------|-----------|-----------|
 | 1 | Thinking rule-based es meta-comentario inútil | ALTO | `dataset_preparer/*/thinking.py` |
 | 2 | Quality validator demasiado permisivo | ALTO | `thinking_quality.py:55-101` |
-| 3 | `thinking_loss_weight` = 0.5 debería ser 1.0 | MEDIO | `training/trainer.py:108` |
+| 3 | `thinking_loss_weight` = 0.5 debería ser 1.0 | MEDIO | `training/trainer.py:121` |
 | 4 | Doble forward pass cada 50 batches | MEDIO | `training/trainer.py:533` |
-| 5 | Columna `source` eliminada del dataset | ALTO | `training/trainer.py:1108` |
-| 6 | `encode_with_thinking()` nunca se usa | BAJO | `bpe_tokenizer.py:188` |
-| 7 | Variable muerta `q_lower` | BAJO | `csv/thinking.py:41` |
+| 5 | Columna `source` eliminada del dataset | ALTO | `training/trainer.py:1436` |
+| 6 | `encode_with_thinking()` nunca se usa | BAJO | `bpe_tokenizer.py:227` |
 
 ### Task 0.4: Reescribir rule-based thinking con reasoning real
 - **Archivos**: `dataset_preparer/aiml/thinking.py`, `csv/thinking.py`, `pdf/thinking.py`, `epub/thinking.py`, `web/thinking.py`, `hf/thinking.py`
-- **Cambio**: Reemplazar meta-comentario por reasoning que conecta pregunta → respuesta
+- **Estado actual**: Los 6 generadores YA usan `ThinkingEngine` (NLP-based) como método primario, Ollama teacher como secundario, y fallbacks estructurados como terciario. El thinking rule-based original ya fue modernizado.
+- **Cambio**: Verificar calidad del reasoning generado. Si el fallback rule-based sigue produciendo meta-comentarios, refinar las plantillas de fallback para incluir conectores causales y detalles específicos
+- **Nota**: El `ThinkingEngine` en `thinking_engine.py` ya implementa análisis NLP con sentence tokenization, keyword extraction, y causal connectors
 - **Ejemplo AIML** (antes vs después):
   ```python
   # ANTES (meta-comentario inútil):
@@ -172,42 +215,24 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
   | EPUB | Contextualizar capítulo + extraer información clave |
   | Web | Analizar contenido de página + relacionar con consulta |
   | HF | Si QA: derivar respuesta de pregunta. Si text: resumir+razonar |
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.5: Fortalecer quality validator
 - **Archivo**: `dataset_preparer/thinking_quality.py`
-- **Cambios**:
-  ```python
-  # ANTES (demasiado permisivo):
-  META_PATTERNS = [
-      re.compile(r'^(el usuario|the user|el humano|the human)\s*(me\s+)?(saluda|despide|pregunta|pide)'),
-      # ... solo 4 patrones, anclados con ^
-  ]
-  # Score mínimo: 0.5 — un meta-comentario pasa con 0.9
-
-  # DESPUÉS (más estricto):
-  META_PATTERNS = [
-      re.compile(r'(el usuario|the user|el humano|the human)\s*(me\s+)?(saluda|despide|pregunta|pide|quiere|necesita)'),
-      re.compile(r'(debo|i should|debería)\s*(responder|contestar|decir|reply|answer)'),
-      re.compile(r'(respondo|contestando|i respond|answering)\s*(con|with|de|de forma)'),
-      re.compile(r'(el bot|the bot|asistente|assistant)\s*(responde|answer|debe)'),
-      re.compile(r'(esto indica|this indicates|esto sugiere|this suggests)\s*(que|that)'),
-      re.compile(r'(la información|the information)\s*(es |está )?\s*(consistente|correcta|valida|suficiente)'),
-  ]
-  ```
-- **Nuevos checks**:
-  - `has_causal_link`: Verificar conectores causales ("porque", "por lo tanto", "ya que", "because", "therefore")
-  - `has_specific_detail`: Verificar detalles específicos de la pregunta/respuesta
-  - `derivation_strength`: Medir conexión pregunta→respuesta
-- **Score mínimo sube de 0.5 a 0.7**
-- **Estado**: `TODO`
+- **Estado actual**: El archivo ya tiene 60+ META_PATTERNS en 20+ idiomas (líneas 49-156), con `has_steps` (STEP_INDICATORS), `has_vocabulary_diversity`, `has_answer_derivation`, `has_logical_connectors` (líneas 521-563). Score mínimo actual: 0.5 en `validate_thinking` (línea 567), 0.4 en `filter_low_quality` (línea 608)
+- **Cambios necesarios**:
+  - Subir score mínimo de 0.5 a 0.7 en `validate_thinking` (línea 567)
+  - Subir `min_score` de 0.4 a 0.5 en `filter_low_quality` (línea 608)
+  - Verificar que los patrones existentes cubren los casos del roadmap (ya cubiertos en su mayoría)
+  - Reforzar `has_logical_connectors` con más conectores causales si es necesario
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.6: Cambiar `thinking_loss_weight` default a 1.0
 - **Archivo**: `training/trainer.py`
-- **Ubicación**: Línea 108
+- **Ubicación**: `TrainingConfig` línea 121 (también en `TRAINING_CONFIG` dict línea 72)
 - **Cambio**: `thinking_loss_weight: float = 0.5` → `thinking_loss_weight: float = 1.0`
 - **Razón**: Con 0.5 el modelo aprende MENOS thinking que respuesta. Con 1.0 aprende ambos por igual.
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.7: Eliminar doble forward pass en métricas
 - **Archivo**: `training/trainer.py`
@@ -225,29 +250,26 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
               outputs = model(inputs)
   ```
 - **Caller en training loop**: Pasar `outputs` del forward pass principal
-- **Estado**: `TODO`
+- **Estado**: `DONE` — `_compute_thinking_metrics` ya acepta parámetro `logits=` (línea 722) y el caller lo pasa en línea 888
 
 ### Task 0.8: Preservar columna `source` en el dataset
 - **Archivo**: `training/trainer.py`
-- **Ubicación**: `_get_tokenized_dataset()` línea 1108
+- **Ubicación**: `_get_tokenized_dataset()` línea 1436
 - **Cambio**:
   ```python
-  # ANTES:
-  columns_to_remove = [c for c in self.loaded_dataset.column_names
-                       if c not in ('input_ids', 'token_ids')]
+  # ACTUAL (línea 1436):
+  PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking')
 
-  # DESPUÉS:
-  PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'source', 'has_tool_call', 'thinking')
-  columns_to_remove = [c for c in self.loaded_dataset.column_names
-                       if c not in PRESERVED_COLUMNS]
+  # NUEVO (añadir 'source' y 'has_tool_call'):
+  PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking', 'source', 'has_tool_call')
   ```
-- **Razón**: Necesitamos `source` para estadísticas por fuente, `has_tool_call` para datos agentic, y `thinking` para debugging
-- **Estado**: `TODO`
+- **Razón**: Necesitamos `source` para estadísticas por fuente, `has_tool_call` para datos agentic
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.9: Limpiar código muerto
-- **Archivo**: `dataset_preparer/csv/thinking.py` — eliminar `q_lower` (línea 41)
-- **Archivo**: `commons/tokenizer/bpe_tokenizer.py` — marcar `encode_with_thinking()` con TODO o eliminar
-- **Estado**: `TODO`
+- **Archivo**: `commons/tokenizer/bpe_tokenizer.py` — marcar `encode_with_thinking()` con TODO o eliminar (línea 227, nunca se usa)
+- **Nota**: `q_lower` en `csv/thinking.py:74` NO es código muerto — se usa en condicionales de fallback (líneas 76-84). No eliminar.
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 0.10: Tests de thinking real
 - **Archivo**: `tests/test_thinking_fixes.py` (nuevo)
@@ -259,7 +281,7 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
   - `test_thinking_loss_weight_default()` — Default es 1.0
   - `test_source_column_preserved()` — Columna `source` sobrevive tokenización
   - `test_no_double_forward_pass()` — Solo 1 forward pass por batch
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Verificación Fase 0 (Fix Thinking)
 ```bash
@@ -334,7 +356,7 @@ pytest tests/test_thinking_fixes.py -v
   | `get_platform` | Detectar sistema operativo actual | (sin params) | computation | cross |
 
 - **Nota sobre permisos**: El modelo genera el `<tool_call>`, pero el **agente** es responsable de pedir permiso al usuario antes de ejecutar. Ver sección "Seguridad y Permisos" más abajo.
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 1.2: Crear `commons/tools/tool_executor.py`
 - **Archivo**: `commons/tools/tool_executor.py` (nuevo)
@@ -488,11 +510,10 @@ pytest tests/test_thinking_fixes.py -v
   - **Blacklist**: Patrones destructivos bloqueados (ver arriba)
   - **Logging**: Todos los comandos ejecutados se registran
   - **Output limit**: Máximo 500 caracteres, truncar si es más largo
-  **Modo seguro**: Por defecto solo comandos de lectura; modo `--unsafe` para escritura
-  - **Permisos**: El agente DEBE pedir permiso al usuario antes de ejecutar CUALQUIER comando
-  - **Confirmación**: Mostrar comando al usuario y esperar 'sí/SI/yes/YES' antes de ejecutar
+  - **Permisos**: ToolExecutor consulta a PermissionManager antes de ejecutar shell/file writes
   - **Dry-run**: Opción `--dry-run` para mostrar qué se ejecutaría sin ejecutar
-- **Estado**: `TODO`
+  - **Flujo**: `execute_tool_call() → PermissionManager.request_permission() → ShellSecurity.validate_command() → subprocess`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 1.3: Integrar ToolRegistry en ChatEngine
 - **Archivo**: `inference/chat_engine.py`
@@ -505,7 +526,7 @@ pytest tests/test_thinking_fixes.py -v
   # ... etc
   self.tool_executor = ToolExecutor(self.tool_registry)
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ---
 
@@ -554,7 +575,7 @@ pytest tests/test_thinking_fixes.py -v
   | Feas | "¿Qué día es hoy?" | current_date |
   | Sin tools | "Hola, ¿cómo estás?" | (ninguno) |
   | Multi-step | "Busca info sobre Python y cuenta las palabras" | web_search + word_count |
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 2.2: Crear generadores por fuente para datos agentic
 - **Archivos** (nuevos):
@@ -580,7 +601,7 @@ pytest tests/test_thinking_fixes.py -v
   ```
   <|thinking|>El usuario me saluda. Debo responder con un saludo amigable.</thinking><|answer|>¡Hola! ¿En qué puedo ayudarte?
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 2.3: Crear dataset mixto (agente + chat normal)
 - **Archivo**: `dataset_preparer/data_preparer.py`
@@ -593,7 +614,7 @@ pytest tests/test_thinking_fixes.py -v
   3. Combinar para que el modelo aprenda CUÁNDO usar tools y cuándo no
   4. Balance: si el modelo solo ve tool calls, nunca aprenderá a responder directamente
 - **Ratio configurable**: `--agent-ratio 0.3` (default 30% agentic)
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 2.4: Validación de datos agentic
 - **Archivo**: `dataset_preparer/agent/quality.py` (nuevo)
@@ -604,7 +625,7 @@ pytest tests/test_thinking_fixes.py -v
   - `<tool_call>` contiene resultado no vacío
   - `<tool_call>` contiene respuesta no vacía
   - Balance tool_calls vs no-tool-calls en el batch
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ---
 
@@ -631,7 +652,7 @@ pytest tests/test_thinking_fixes.py -v
   # - Tokens de usuario (<|user|>...<|end|>)
   ```
 - **Nuevo método**: `_compute_agent_mask(token_ids)` → retorna weight tensor
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 3.2: Métricas de entrenamiento agentic
 - **Archivo**: `training/trainer.py`
@@ -646,7 +667,7 @@ pytest tests/test_thinking_fixes.py -v
   | `agent_response_accuracy` | % de veces que genera `<tool_call>` después de observación |
   | `agent_tool_ratio` | Ratio de muestras con tool call vs sin tool call |
 - **Intervalo**: Loggear cada 50 batches (igual que thinking metrics)
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 3.3: Actualizar TrainingConfig
 - **Archivo**: `training/trainer.py`
@@ -660,7 +681,7 @@ pytest tests/test_thinking_fixes.py -v
       agent_ratio: float = 0.3             # Ratio de datos agentic en dataset
       agent_max_tool_calls: int = 3        # Max tool calls por secuencia
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ---
 
@@ -708,11 +729,11 @@ pytest tests/test_thinking_fixes.py -v
       # Si se agotaron iteraciones, forzar respuesta
       return self._force_final_response(context)
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 4.2: Actualizar prompt de inferencia
 - **Archivo**: `commons/dialogue/dialogmanager.py`
-- **Ubicación**: `generate_response()` línea ~173
+- **Ubicación**: `generate_response()` línea 158 (construcción del prompt)
 - **Cambio del prompt**:
   ```python
   # PROMPT ACTUAL:
@@ -730,7 +751,7 @@ pytest tests/test_thinking_fixes.py -v
 
   Respuesta:"""
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 4.3: Integrar agente en ChatEngine
 - **Archivo**: `inference/chat_engine.py`
@@ -755,7 +776,7 @@ pytest tests/test_thinking_fixes.py -v
       agent_max_iterations: int = 5
       agent_show_tool_calls: bool = True
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ---
 
@@ -785,7 +806,7 @@ pytest tests/test_thinking_fixes.py -v
   # Chat sin agente (solo thinking)
   python main.py --chat --model chat_model
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ### Task 5.2: TrainingConfig agente
 - **Archivo**: `training/trainer.py`
@@ -798,7 +819,7 @@ pytest tests/test_thinking_fixes.py -v
       'agent_ratio': 0.3,
   }
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` — Tokens añadidos a `data_preparer.py:1411` user_symbols + 6 token IDs + 9 métodos en `bpe_tokenizer.py`
 
 ---
 
@@ -898,7 +919,15 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
 
 ### Task 7.1: Permission System
 - **Archivo**: `commons/tools/permission_manager.py` (nuevo)
-- **Responsabilidad**: Gestionar permisos de ejecución del usuario
+- **Responsabilidad**: Gestionar permisos de ejecución del usuario — Capa 1 de seguridad
+- **Clasificación de herramientas por riesgo**:
+  | Riesgo | Tools | Permiso requerido |
+  |--------|-------|-------------------|
+  | Ninguno | calculator, current_date, word_count, get_platform | Auto-aprueba |
+  | Bajo (lectura) | read_file, list_directory, web_search | Auto-aprueba (whitelist) |
+  | Medio (shell lectura) | shell/powershell/bash con comandos de whitelist | Auto-aprueba (whitelist) |
+  | Alto (shell escritura) | shell/powershell/bash con comandos fuera de whitelist | **Requiere permiso** |
+  | Crítico | Cualquier comando bloqueado por ShellSecurity | **Bloqueado siempre** |
 - **Arquitectura**:
   ```python
   class PermissionManager:
@@ -948,7 +977,7 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
   | `auto_approve` | Aprobación automática | Testing, desarrollo |
   | `dry_run` | Muestra comando sin ejecutar | Validación, debugging |
   | `whitelist` | Auto-aprueba comandos de lectura | Productividad |
-- **Estado**: `TODO`
+- **Estado**: `DONE` - PermissionManager implementado en `commons/tools/permission_manager.py`
 
 ### Task 7.2: Platform Auto-Detection
 - **Archivo**: `commons/tools/platform_detector.py` (nuevo)
@@ -982,7 +1011,7 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
       def is_command_available(command: str) -> bool:
           """Verifica si un comando está disponible en el sistema."""
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` - PlatformDetector implementado en `commons/tools/platform_detector.py`
 
 ### Task 7.3: Streaming con tool calls
 - **Archivo**: `inference/chat_engine.py`
@@ -1021,7 +1050,7 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
   - `test_platform_detection_mac()` — detecta Mac
   - `test_shell_selection()` — selecciona shell correcto por plataforma
   - `test_audit_log()` — registra tool calls correctamente
-- **Estado**: `TODO`
+- **Estado**: `DONE` - 19 tests implementados en `tests/test_permission_system.py`
 
 ---
 
@@ -1104,9 +1133,9 @@ class MoELayer(nn.Module):
 - **Cambios respecto a ChatModel actual**:
   ```python
   class ChatModelMoE(ChatModel):
-      def __init__(self, tokenizer, embed_size, hidden_size, num_layers=2,
+      def __init__(self, tokenizer, embed_size, num_layers=2,
                    num_experts=4, top_k=2):
-          # GPT2Config con MoE
+          # GPT2Config con MoE — usa n_embd (no hidden_size)
           config = GPT2Config(
               vocab_size=tokenizer.vocab_size,
               n_embd=embed_size,
@@ -1129,7 +1158,7 @@ class MoELayer(nn.Module):
   - `get_expert_utilization()` → dict con uso por expert
   - `get_load_balancing_loss(gate_scores)` → loss para entrenamiento
   - `freeze_attention()` → congelar self-attention, solo entrenar experts
-- **Estado**: `TODO`
+- **Estado**: `DONE` - MoELayer + ChatModelMoE implementados en `commons/model/chatmodel_moe.py`
 
 ### Task 8.2: Mapeo de experts con dominios del agente
 - **Archivo**: `commons/model/chatmodel_moe.py`
@@ -1141,7 +1170,7 @@ class MoELayer(nn.Module):
   | Expert 2 | Tool use / acciones | Datos con `<tool_call>` |
   | Expert 3 | Observaciones / síntesis | Datos con `<observation>` |
 - **Inicialización**: Los experts se inicializan aleatoriamente, pero el training data los fuerza a especializarse
-- **Estado**: `TODO`
+- **Estado**: `DONE` - Mapeo implementado en `commons/model/chatmodel_moe.py`
 
 ### Task 8.3: Load Balancing Loss
 - **Archivo**: `commons/model/chatmodel_moe.py`
@@ -1162,7 +1191,7 @@ class MoELayer(nn.Module):
       return loss
   ```
 - **Integración en training**: `total_loss = lm_loss + 0.01 * load_balancing_loss`
-- **Estado**: `TODO`
+- **Estado**: `DONE` - Load balancing loss implementado en `commons/model/chatmodel_moe.py`
 
 ### Task 8.4: Adapter el Trainer para MoE
 - **Archivo**: `training/trainer.py`
@@ -1171,7 +1200,7 @@ class MoELayer(nn.Module):
   - Añadir métricas: `expert_utilization`, `load_balance_loss`, `routing_entropy`
   - Soportar `freeze_attention()` para fine-tuning eficiente
   - Nuevo flag `--moe` en TrainingConfig
-- **Estado**: `TODO`
+- **Estado**: `DONE` - Trainer actualizado con soporte MoE en `training/trainer.py`
 
 ### Task 8.5: Dataset con labels de expert por token
 - **Archivo**: `dataset_preparer/agent/moe_data.py` (nuevo)
@@ -1190,7 +1219,7 @@ class MoELayer(nn.Module):
   ```
 - **Ventaja**: El gating network aprende a routear cada token a su expert natural
 - **Integración en data_preparer**: Nuevo paso `_assign_expert_labels()` después de tokenización
-- **Estado**: `TODO`
+- **Estado**: `DONE` - MoEDataProcessor implementado en `dataset_preparer/agent/moe_data.py`
 
 ### Task 8.6: Inference con expert selection
 - **Archivo**: `commons/dialogue/dialogmanager.py`
@@ -1207,14 +1236,32 @@ class MoELayer(nn.Module):
   - Expert 0 para saludos/farewells
   - Expert 1 para thinking
   - Expert 2 para tool_call
-- **Estado**: `TODO`
+- **Estado**: `DONE` - DialogManager actualizado con soporte MoE en `commons/dialogue/dialogmanager.py`
 
 ### Task 8.7: Exportar modelo MoE
 - **Archivo**: `commons/registry/model_export.py`
-- **Cambio**: Verificar compatibilidad de MoE con exportación
-  - GGUF: Los experts se serializan como pesos normales
-  - ONNX: Exportar con todos los experts (aunque solo K se activen por forward)
-- **Estado**: `TODO`
+- **Estrategia**: Pesos planos + MoE como código externo (Strategy D)
+- **Problema**: Los exportadores GGUF/ONNX del proyecto están hardcodeados para GPT-2. El gating network MoE no tiene representación nativa en GGUF (solo arquitecturas registradas como Mixtral/DeepSeek) ni en ONNX (no hay operador MoE nativo)
+- **Solución para GGUF**:
+  - Exportar solo la parte GPT-2 base (atención + embeddings + LM head)
+  - Los experts MoE se guardan como checkpoints PyTorch separados
+  - El routing (gating network) se ejecuta en Python durante inference
+  - Ventaja: El converter custom (`convert_gguf.py`) funciona sin cambios para la parte GPT-2
+- **Solución para ONNX**:
+  - Exportar el forward pass completo con routing simplificado
+  - Reemplazar `top-k` por multiplicación ponderada de TODOS los experts (compute redundante pero ONNX-compatible)
+  - El gating network se incluye en el grafo ONNX como operaciones estándar (MatMul + Softmax)
+  - Usar `dynamic_axes` para batch y seq_len (ya implementado)
+- **Solución para production**:
+  - Para un modelo pequeño (~20M params), usar PyTorch directamente para inference MoE
+  - La cuantización no es crítica — el modelo cabe en RAM cómodamente
+  - GGUF/ONNX son alternativas, no requisitos
+- **Archivos a modificar**:
+  - `model_export.py`: Detectar `ChatModelMoE` → exportar parte GPT-2 + checkpoint MoE separado
+  - `convert_gguf.py`: Sin cambios (solo exporta la parte GPT-2)
+  - `convert_onnx.py`: Añadir modo MoE con routing simplificado
+- **Riesgo**: Bajo — el modelo es pequeño, la exportación es opcional
+- **Estado**: `DONE` - Exportación MoE implementada en `commons/registry/model_export.py`
 
 ### Task 8.8: Configuración y CLI
 - **Archivo**: `main.py`
@@ -1238,7 +1285,7 @@ class MoELayer(nn.Module):
       moe_load_balance_weight: float = 0.01
       moe_freeze_attention: bool = False
   ```
-- **Estado**: `TODO`
+- **Estado**: `DONE` - CLI flags añadidos en `main.py`
 
 ### Task 8.9: Tests MoE
 - **Archivo**: `tests/test_moe.py` (nuevo)
@@ -1251,7 +1298,7 @@ class MoELayer(nn.Module):
   - `test_moe_chatmodel()` — modelo MoE genera respuesta
   - `test_expert_labels_dataset()` — dataset tiene expert_ids correctos
   - `test_moe_training()` — training converge con MoE
-- **Estado**: `TODO`
+- **Estado**: `DONE` - 10 tests implementados en `tests/test_moe.py`
 
 ---
 

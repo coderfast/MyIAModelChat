@@ -389,6 +389,26 @@ EXAMPLES:
                             help="Thinking depth level (default: adaptive)")
         parser.add_argument("--thinking-ollama", action='store_true',
                             help="Use Ollama teacher for enhanced thinking (optional)")
+        parser.add_argument("--generate-agent-data", action='store_true',
+                            help="Generate agentic data with tool calls during preparation")
+        parser.add_argument("--agent-ratio", type=float, default=0.3,
+                            help="Ratio of agentic samples in dataset (default: 0.3)")
+        parser.add_argument("--agent-enabled", action='store_true',
+                            help="Enable agentic mode during chat/training")
+        parser.add_argument("--agent-show-tool-calls", action='store_true', default=True,
+                            help="Show tool calls during chat (default: True)")
+
+        # MoE (Mixture of Experts) configuration
+        parser.add_argument("--moe-enabled", action='store_true',
+                            help="Enable Mixture of Experts architecture")
+        parser.add_argument("--moe-num-experts", type=int, default=4,
+                            help="Number of experts per MoE layer (default: 4)")
+        parser.add_argument("--moe-top-k", type=int, default=2,
+                            help="Number of experts to route each token to (default: 2)")
+        parser.add_argument("--moe-load-balance-weight", type=float, default=0.01,
+                            help="Weight for load balancing loss (default: 0.01)")
+        parser.add_argument("--moe-freeze-attention", action='store_true',
+                            help="Freeze attention layers during MoE training")
         parser.add_argument("--validate-sources", action='store_true',
                             help="Validate and clean each data source before training")
 
@@ -600,6 +620,14 @@ EXAMPLES:
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,
                 statistics=args.statistics,
+                agent_enabled=getattr(args, 'agent_enabled', False),
+                agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0),
+                agent_ratio=getattr(args, 'agent_ratio', 0.3),
+                moe_enabled=getattr(args, 'moe_enabled', False),
+                moe_num_experts=getattr(args, 'moe_num_experts', 4),
+                moe_top_k=getattr(args, 'moe_top_k', 2),
+                moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
+                moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
                 rank=args.rank,
                 local_rank=args.local_rank,
                 world_size=args.world_size,
@@ -649,6 +677,9 @@ EXAMPLES:
                 show_thinking=args.show_thinking,
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,
+                agent_enabled=getattr(args, 'agent_enabled', False),
+                agent_max_iterations=getattr(args, 'agent_max_iterations', 5),
+                agent_show_tool_calls=getattr(args, 'agent_show_tool_calls', True),
             )
             engine = ChatEngine(config)
             engine.start_chat_loop()

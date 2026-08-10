@@ -597,12 +597,25 @@ class DataPreparer:
             logger.warning(f"  Could not save to cache: {e}")
     
     def _clear_cache(self):
-        """Clear cached dataset."""
+        """Clear cached dataset, preserving readme.txt."""
         try:
             if os.path.exists(CACHE_DIR):
+                readme_path = os.path.join(CACHE_DIR, 'readme.txt')
+                readme_backup = None
+
+                # Preserve readme.txt
+                if os.path.exists(readme_path):
+                    readme_backup = readme_path + '.bak'
+                    shutil.copy2(readme_path, readme_backup)
+
                 shutil.rmtree(CACHE_DIR)
                 self._ensure_cache_dir()
-                logger.info("✅ Cache cleared")
+
+                # Restore readme.txt
+                if readme_backup and os.path.exists(readme_backup):
+                    shutil.move(readme_backup, readme_path)
+
+                logger.info("Cache cleared (readme.txt preserved)")
         except Exception as e:
             logger.warning(f"Could not clear cache: {e}")
     
@@ -726,6 +739,12 @@ class DataPreparer:
                 logger.info("[6.5/7] Generating real thinking data...")
                 self._generate_thinking_for_sources()
                 # Recombine after thinking generation
+
+            # Generate agentic data with tool calls (DESPUES de thinking)
+            generate_agent = getattr(self.args, 'generate_agent_data', False)
+            if generate_agent:
+                logger.info("[6.55/7] Generating agentic data with tool calls...")
+                self._generate_agent_data()
 
 
             # Apply deduplication if enabled
@@ -1407,8 +1426,8 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        # Add <thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|> as special tokens
-        user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>'
+        # Add thinking, mode, and agentic tokens as special tokens
+        user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>,<tool_call>,</tool_call>,<observation>,</observation>'
         
         # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
         current_vocab = vocab_size
@@ -1799,6 +1818,69 @@ class DataPreparer:
             self.combined_data = concatenate_datasets(thinking_datasets)
 
             logger.info(f"  Thinking generation complete: {total_thinking}/{total_samples} samples enriched")
+
+    def _generate_agent_data(self):
+        """Generate agentic data with tool calls for training."""
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        try:
+            from dataset_preparer.agent.thinking import AgentThinkingGenerator
+            from dataset_preparer.agent.quality import validate_agent_sample, filter_low_quality_agent
+            from dataset_preparer.thinking_generators import OllamaTeacher
+        except ImportError as e:
+            logger.warning(f"  Agent modules not found: {e}")
+            return
+
+        agent_ratio = getattr(self.args, 'agent_ratio', 0.3)
+        thinking_depth = getattr(self.args, 'thinking_depth', 'adaptive')
+
+        # Initialize agent generator
+        teacher = None
+        use_ollama = getattr(self.args, 'thinking_ollama', False)
+        if use_ollama:
+            try:
+                from config import OLLAMA_MODEL
+                teacher = OllamaTeacher(model=getattr(self.args, 'thinking_model', OLLAMA_MODEL))
+                if not teacher.is_model_available():
+                    teacher = None
+            except Exception:
+                pass
+
+        generator = AgentThinkingGenerator(teacher, depth=thinking_depth)
+
+        # Process all samples
+        samples = [dict(item) for item in self.combined_data]
+        total = len(samples)
+        agent_count = int(total * agent_ratio)
+
+        logger.info(f"  Processing {total} samples for agentic data (target: {agent_count} tool-call samples)...")
+
+        enriched = []
+        tool_count = 0
+        for i, sample in enumerate(samples):
+            if tool_count < agent_count:
+                # Force tool call for first N samples
+                result = generator.generate(sample)
+                if result.get('has_tool_call'):
+                    validation = validate_agent_sample(result)
+                    if validation.valid:
+                        tool_count += 1
+                        enriched.append(result)
+                        continue
+            # Normal sample (no tool call)
+            enriched.append(sample)
+
+        # Validate and filter
+        valid_enriched = filter_low_quality_agent(enriched, min_score=0.3)
+
+        # Convert to dataset
+        from datasets import Dataset
+        self.combined_data = Dataset.from_list(valid_enriched)
+
+        stats = generator.get_stats()
+        logger.info(f"  Agent data generation complete: {stats['tool_call_samples']} tool-call samples, "
+                    f"{stats['normal_samples']} normal samples (total: {len(valid_enriched)})")
 
     def _apply_deduplication(self):
         """Apply deduplication to the combined dataset using MinHash LSH."""

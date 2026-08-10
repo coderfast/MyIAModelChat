@@ -200,3 +200,106 @@ async def v1_chat_completions(request: Request):
     text = truncate_text_by_stop(text, stop)
     response = build_chat_completion_response(text, include_thinking=include_thinking)
     return response
+
+
+@router.post("/chat/completions/agentic")
+async def v1_chat_completions_agentic(request: Request):
+    """Agentic chat completions endpoint with tool call support.
+    
+    Supports:
+    - tool_calls: List of tool calls in the response
+    - observations: List of observation results
+    - thinking: Chain-of-thought reasoning
+    - agent_enabled: Enable agentic capabilities
+    """
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        return Response(content=json.dumps({"error": "invalid JSON body"}, ensure_ascii=False).encode("utf-8"), media_type="application/json; charset=utf-8", status_code=400)
+
+    messages = data.get("messages", [])
+    if not messages:
+        return Response(content=json.dumps({"error": "no messages provided"}, ensure_ascii=False).encode("utf-8"), media_type="application/json; charset=utf-8", status_code=400)
+
+    prompt = build_prompt_from_messages(messages)
+    stream = data.get("stream", False)
+    max_tokens = data.get("max_tokens", 512)
+    temperature = data.get("temperature", 0.0)
+    top_p = data.get("top_p", 1.0)
+    stop = normalize_stop(data.get("stop"))
+    include_thinking = data.get("include_thinking", True)
+    agent_enabled = data.get("agent_enabled", True)
+    
+    if stop is None:
+        stop = ["\nuser:", "\nassistant:"]
+
+    # Use agentic streaming if agent is enabled
+    if stream and agent_enabled:
+        async def agentic_event_stream():
+            from inference.chat_engine import get_chat_engine_instance, stream_chat_agentic
+            
+            engine = get_chat_engine_instance()
+            response = engine.generate_response(prompt, full=True)
+            
+            if isinstance(response, dict):
+                for chunk in stream_chat_agentic(response):
+                    yield chunk
+            else:
+                # Fallback to regular streaming
+                yield json.dumps({
+                    "id": None,
+                    "object": "chat.completion.chunk",
+                    "type": "response",
+                    "delta": {"content": response},
+                    "finish_reason": None
+                }) + '\n'
+                yield json.dumps({
+                    "id": None,
+                    "object": "chat.completion.chunk",
+                    "delta": {},
+                    "finish_reason": "stop"
+                }) + '\n'
+                yield 'data: [DONE]\n\n'
+
+        return StreamingResponse(agentic_event_stream(), media_type="text/event-stream")
+
+    loop = asyncio.get_running_loop()
+    try:
+        from inference.chat_engine import get_chat_engine_instance
+        
+        engine = get_chat_engine_instance()
+        response = engine.generate_response(prompt, full=True)
+        
+        # Build agentic response
+        result = {
+            "id": None,
+            "object": "chat.completion",
+            "model": MODEL_NAME,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response.get("response", "") if isinstance(response, dict) else response
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+        
+        # Add agentic fields if present
+        if isinstance(response, dict):
+            if response.get("thinking"):
+                result["choices"][0]["message"]["reasoning"] = response["thinking"]
+            if response.get("tool_calls"):
+                result["choices"][0]["message"]["tool_calls"] = response["tool_calls"]
+            if response.get("observations"):
+                result["choices"][0]["message"]["observations"] = response["observations"]
+        
+        return result
+        
+    except Exception as e:
+        return Response(content=json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8"), media_type="application/json; charset=utf-8", status_code=500)

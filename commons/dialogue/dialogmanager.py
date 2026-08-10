@@ -11,7 +11,9 @@ class DialogueManager:
                  top_k=12, top_p=0.8, temperature=0.65, max_len=128,
                  min_length=5, no_repeat_ngram_size=3,
                  pad_token_id=None, eos_token_id=None, unk_token_id=None,
-                 default_response="Lo siento, no puedo responder ahora."):
+                 default_response="Lo siento, no puedo responder ahora.",
+                 tool_executor=None, agent_enabled=False, agent_max_iterations=5,
+                 moe_enabled=False):
         self.model = model
         self.device = device
         self.tokenizer = tokenizer
@@ -36,6 +38,14 @@ class DialogueManager:
         self.context_id = getattr(tokenizer, "get_context_index", lambda: -1)()
         self.answer_id = getattr(tokenizer, "get_answer_index", lambda: -1)()
         self.thinking_mode_id = getattr(tokenizer, "get_thinking_mode_index", lambda: -1)()
+
+        # Agent support
+        self.tool_executor = tool_executor
+        self.agent_enabled = agent_enabled
+        self.agent_max_iterations = agent_max_iterations
+        
+        # MoE support
+        self.moe_enabled = moe_enabled
 
     def top_k_top_p_filtering(self, logits, top_k=0, top_p=1.0, filter_value=-float("Inf")):
         logits = logits.clone()
@@ -84,6 +94,9 @@ class DialogueManager:
             return int(torch.argmax(probs).item())
 
     def generate_response(self, user_text):
+        # Use agent loop if enabled
+        if self.agent_enabled and self.tool_executor:
+            return self.generate_response_agent(user_text)
         # Comando debug: "debug" o "debug N"
         txt = user_text.strip()
         if txt.lower().startswith("debug"):
@@ -313,6 +326,146 @@ class DialogueManager:
         # Ensure minimum response length
         tokens = response_text.split()
         if self.min_length is not None and len(tokens) < self.min_length:
+            return {'thinking': thinking_text, 'response': self.default_response}
+
+        return {'thinking': thinking_text, 'response': response_text}
+
+    def generate_response_agent(self, user_text):
+        """Agentic response generation with tool call loop.
+
+        Flow:
+        1. Generate response with model
+        2. If <tool_call> detected → parse, execute, add observation
+        3. Loop until no tool_call or max_iterations reached
+        4. Return final response
+        """
+        from commons.tools.tool_executor import format_observation
+
+        context = f"<|thinking|>{user_text.strip()}<|answer|>"
+        observations = []
+
+        for iteration in range(self.agent_max_iterations):
+            # Generate with model
+            raw_output = self._generate_tokens_from_context(context)
+
+            if not raw_output:
+                return {'thinking': None, 'response': self.default_response}
+
+            # Check for tool_call
+            if not self.tool_executor or not self.tool_executor.has_tool_call(raw_output):
+                # No tool call — parse final response
+                return self._parse_agent_response(raw_output)
+
+            # Parse tool_call
+            tool_name, arguments = self.tool_executor.parse_tool_call(raw_output)
+
+            # Execute tool
+            try:
+                result = self.tool_executor.execute_tool_call(raw_output, self.tool_executor._registry if hasattr(self.tool_executor, '_registry') else None)
+            except Exception as e:
+                result = format_observation(f"Error: {str(e)}")
+
+            observations.append(result)
+
+            # Add observation to context for next iteration
+            context = raw_output + result
+
+            logger.info(f"Agent iteration {iteration + 1}: tool={tool_name}")
+
+        # Max iterations reached — force final response
+        return {'thinking': f"Agent loop completed after {self.agent_max_iterations} iterations",
+                'response': f"Tool calls executed: {len(observations)}"}
+
+    def _generate_tokens_from_context(self, prompt_text):
+        """Generate tokens from a prompt context string."""
+        try:
+            input_ids = self.tokenizer.encode(prompt_text)
+        except Exception:
+            input_ids = [self.unk_token_id] if self.unk_token_id is not None else [0]
+
+        input_ids = [i for i in input_ids if i is not None]
+        if len(input_ids) == 0:
+            input_ids = [self.unk_token_id] if self.unk_token_id is not None else [0]
+
+        src = torch.LongTensor([input_ids]).to(self.device)
+        generated = []
+
+        src_buf = torch.full((1, len(input_ids) + self.max_len), self.pad_token_id or 0, dtype=torch.long, device=self.device)
+        src_buf[0, :len(input_ids)] = src
+        src_len = len(input_ids)
+
+        try:
+            with torch.no_grad():
+                for step in range(self.max_len):
+                    out = self.model(src_buf[:, :src_len])
+                    if isinstance(out, (tuple, list)):
+                        out = out[0]
+                    logits = out[:, -1, :]
+
+                    next_token = self.sample_next_token(logits.squeeze(0))
+                    if next_token is None:
+                        break
+
+                    generated.append(next_token)
+                    src_buf[0, src_len] = next_token
+                    src_len += 1
+
+                    # Stop on answer end or EOS
+                    if self.answer_id >= 0 and next_token == self.answer_id:
+                        break
+        except Exception as e:
+            logger.debug(f"Agent generation error: {e}")
+            return None
+
+        if not generated:
+            return None
+
+        try:
+            return self.tokenizer.decode(generated)
+        except Exception:
+            return " ".join(str(t) for t in generated)
+
+    def _parse_agent_response(self, raw_output):
+        """Parse agent response into thinking and response parts."""
+        thinking_text = None
+        response_text = None
+
+        try:
+            # Remove tool_call blocks if any remain
+            clean = raw_output
+            if '<tool_call>' in clean:
+                parts = clean.split('<tool_call>')
+                clean = parts[0]
+                for part in parts[1:]:
+                    if '</tool_call>' in part:
+                        clean += part.split('</tool_call>', 1)[1]
+                    else:
+                        clean += part
+
+            # Remove observation blocks
+            if '<observation>' in clean:
+                parts = clean.split('<observation>')
+                clean = parts[0]
+                for part in parts[1:]:
+                    if '</observation>' in part:
+                        clean += part.split('</observation>', 1)[1]
+                    else:
+                        clean += part
+
+            # Parse thinking/answer
+            if '<|thinking|>' in clean and '<|answer|>' in clean:
+                parts = clean.split('<|answer|>')
+                thinking_part = parts[0]
+                if '<|thinking|>' in thinking_part:
+                    thinking_text = thinking_part.split('<|thinking|>', 1)[1].strip()
+                response_text = parts[1].strip() if len(parts) > 1 else None
+            else:
+                response_text = clean.strip()
+
+        except Exception:
+            response_text = raw_output
+
+        if not response_text or response_text.strip() == "":
             return {'thinking': thinking_text, 'response': self.default_response}
 
         return {'thinking': thinking_text, 'response': response_text}
