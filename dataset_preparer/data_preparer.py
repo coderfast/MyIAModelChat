@@ -1407,8 +1407,8 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        # Add <thinking> and </thinking> as special tokens that won't be split by BPE
-        user_symbols = '--user_defined_symbols=<thinking>,</thinking>'
+        # Add <thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|> as special tokens
+        user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>'
         
         # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
         current_vocab = vocab_size

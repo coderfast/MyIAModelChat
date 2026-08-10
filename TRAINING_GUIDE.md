@@ -66,6 +66,21 @@ python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
 SentencePiece (BPE) is trained on extracted text and the prepared cache will include a `token_ids` column for each sample as well as `dataset_cache/sentencepiece.model` and `dataset_cache/cache_metadata.pkl` containing tokenizer metadata. Note: BPE is applied to textual sources (AIML/PDF/EPUB/HF). If `sentencepiece` is not installed the pipeline will skip BPE and continue preparing a non-tokenized cache (a warning is emitted).
 
+### BPE with Thinking Tokens
+
+When using `--thinking-mode`, the BPE model automatically registers 5 special tokens as `user_defined_symbols`:
+
+```
+<thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|>
+```
+
+These tokens are never fragmented into sub-tokens (always whole tokens). This ensures the model can learn to generate them correctly.
+
+```bash
+# Recommended: BPE with thinking
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
+```
+
 **Caching Benefits:**
 - 12x faster dataset loading
 - Consistent preprocessing across runs
@@ -138,6 +153,9 @@ python main.py --train \
 | `--num_threads` | Additional threads per worker | auto |
 | `--dataset PATH` | Path to dataset directory | `dataset_cache` |
 | `--statistics` | Show detailed per-step timing stats | False |
+| `--thinking-mode` | Generate thinking data (nlp, ollama) | none |
+| `--thinking-model` | Ollama model for thinking (with ollama mode) | llama3.2 |
+| `--show-thinking` | Show thinking in chat output | False |
 | `--web-url URL` | Seed URL to scrape | reads from urls.txt |
 | `--web-max-pages N` | Max pages to scrape | 50 |
 | `--web-max-depth N` | Max link-following depth | 3 |
@@ -164,6 +182,71 @@ python main.py --train \
 - 512: Current default
 - 256: Faster, lighter model
 - 1024+: More capacity, slower training
+
+## Training with Thinking
+
+### Overview
+
+The model supports chain-of-thought reasoning using a dual-token system:
+
+- **Mode tokens** (`<|thinking|>`, `<|context|>`, `<|answer|>`): Define sample structure
+- **Content tags** (`<thinking>`, `</thinking>`): Wrap reasoning content
+
+### Sample Formats
+
+```
+THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+CONTEXT:  <|context|>question<|answer|>answer
+```
+
+### Generating Thinking Data
+
+```bash
+# NLP-based thinking (no external dependencies)
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
+
+# Ollama teacher (higher quality, requires Ollama)
+python main.py --prepare-data --aiml --hf --thinking-mode ollama --bpe-vocab-size 8000 --refresh-cache
+
+# Multilingual support (30 languages)
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --allowed-languages es en fr de --refresh-cache
+```
+
+### Training with Thinking
+
+```bash
+python main.py --train --epochs 30
+```
+
+The trainer automatically:
+1. Detects thinking data via mode tokens or content tags
+2. Applies differentiated loss weighting:
+   - Preamble (before `<thinking>`): weight 0.0
+   - Reasoning content: weight 0.5
+   - Answer tokens: weight 1.0
+3. Tracks thinking metrics (delimiter accuracy, reasoning coverage)
+
+### Expected Training Metrics
+
+```
+Training batch 50/inf in progress...
+  Thinking Metrics Summary:
+    thinking_token_accuracy: 0.8234
+    thinking_open_accuracy: 0.8189
+    thinking_close_accuracy: 0.8278
+    thinking_coverage: 0.6543
+    response_token_accuracy: 0.7891
+```
+
+### Chat with Thinking
+
+```bash
+# With thinking visible
+python main.py --chat --show-thinking
+
+# Clean response only
+python main.py --chat
+```
 
 ## Tokenization
 
@@ -198,7 +281,10 @@ text = tokenizer.decode(token_ids)
 - Vocabulary size affects model parameters
 - Larger vocab = more flexibility, more memory
 - Common sizes: 2k, 8k, 16k, 32k tokens
-- Special tokens: <pad>, <unk>, <s>, </s>, <thinking>, </thinking>
+- Special tokens (automatically registered in BPE):
+  - `<pad>`, `<unk>`, `<s>`, `</s>` (structural)
+  - `<thinking>`, `</thinking>` (content tags for reasoning)
+  - `<|context|>`, `<|answer|>`, `<|thinking|>` (mode tokens)
 
 ### Issues & Solutions
 

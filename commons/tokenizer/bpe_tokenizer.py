@@ -41,6 +41,9 @@ class SentencePieceTokenizerWrapper:
         eos_id = _resolve_id('</s>', '<eos>', '<EOS>')
         thinking_id = _resolve_id('<thinking>')
         thinking_end_id = _resolve_id('</thinking>')
+        context_id = _resolve_id('<|context|>')
+        answer_id = _resolve_id('<|answer|>')
+        thinking_mode_id = _resolve_id('<|thinking|>')
 
         if pad_id < 0:
             pad_id = 0
@@ -57,6 +60,9 @@ class SentencePieceTokenizerWrapper:
         self._eos_id = eos_id
         self._thinking_id = thinking_id
         self._thinking_end_id = thinking_end_id
+        self._context_id = context_id
+        self._answer_id = answer_id
+        self._thinking_mode_id = thinking_mode_id
 
     def _build_vocab_dicts(self):
         self._idx2word = {}
@@ -184,6 +190,39 @@ class SentencePieceTokenizerWrapper:
         """Extract only the response part, removing <thinking> blocks."""
         _, response = self.split_thinking(text)
         return response
+
+    # ── Mode token helpers ─────────────────────────────────────────
+
+    def get_context_index(self) -> int:
+        """Return the token ID for <|context|>."""
+        self._ensure_special_token_ids()
+        return self._context_id
+
+    def get_answer_index(self) -> int:
+        """Return the token ID for <|answer|>."""
+        self._ensure_special_token_ids()
+        return self._answer_id
+
+    def get_thinking_mode_index(self) -> int:
+        """Return the token ID for <|thinking|>."""
+        self._ensure_special_token_ids()
+        return self._thinking_mode_id
+
+    def has_mode_tokens(self, text: str) -> bool:
+        """Check if text contains mode tokens."""
+        return '<|context|>' in text or '<|thinking|>' in text
+
+    def split_mode(self, text: str):
+        """Split text into (mode, content) where mode is 'context' or 'thinking'.
+
+        Returns:
+            Tuple[str, str]: ('context'|'thinking', content_without_mode_token)
+        """
+        if text.startswith('<|thinking|>'):
+            return ('thinking', text[len('<|thinking|>'):].strip())
+        elif text.startswith('<|context|>'):
+            return ('context', text[len('<|context|>'):].strip())
+        return ('context', text)
 
     def encode_with_thinking(self, text: str):
         """Encode text, returning (thinking_ids, response_ids, all_ids).

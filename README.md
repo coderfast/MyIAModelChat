@@ -15,7 +15,8 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **Sentiment Analysis**: BERT-based star rating detection (1-5 stars)
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
-- **Chain-of-Thought Reasoning**: Optional `<thinking>` reasoning in training and inference
+- **Chain-of-Thought Reasoning**: Dual-token system with mode tokens and content tags for structured thinking
+- **Multilingual Thinking**: 30-language support for chain-of-thought reasoning
 - **Model Library**: Train, combine, and export multiple independent models
 
 ### Data Sources & Processing
@@ -50,7 +51,11 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 
 ### 1. Prepare Your Data
 ```bash
+# Basic (no thinking)
 python main.py --prepare-data --aiml --pdf --epub
+
+# With thinking (recommended)
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
 ```
 
 ### 2. Train the Model
@@ -60,7 +65,11 @@ python main.py --train --epochs 30
 
 ### 3. Start Chatting
 ```bash
+# Clean responses only
 python main.py --chat
+
+# With thinking visible
+python main.py --chat --show-thinking
 ```
 
 ---
@@ -377,9 +386,7 @@ class TrainingConfig:
     num_cores: int = 0
     num_threads: int = 0
     max_ram_fraction: float = 0.75
-    thinking_loss_weight: float = 0.5
-    thinking_enabled: bool = True
-    thinking_max_tokens: int = 64
+    thinking_loss_weight: float = 0.5   # Weight for reasoning tokens (0.0-1.0)
     bpe_vocab_size: int = 8000
     onlytokenize: bool = False
     enable_chunking: bool = False
@@ -405,8 +412,6 @@ class ChatConfig:
     gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
     use_vulkan: bool = False
     show_thinking: bool = False
-    thinking_enabled: bool = True
-    thinking_max_tokens: int = 64
 ```
 
 ---
@@ -445,6 +450,9 @@ class ChatConfig:
 | `--refresh-cache` | Rebuild cache from scratch | (flag) |
 | `--onlytokenize` | Build vocabulary only | (flag) |
 | `--bpe-vocab-size` | BPE vocabulary size | `8000` |
+| `--thinking-mode` | Generate thinking data (nlp, ollama) | none |
+| `--thinking-model` | Ollama model for thinking | `llama3.2` |
+| `--show-thinking` | Show thinking in chat output | (flag) |
 
 ### Device Selection
 
@@ -521,17 +529,24 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 ```
 
 ### Chain-of-Thought Reasoning
-```
-User: What is 2+2?
 
-<thinking>
+The model supports chain-of-thought reasoning using a dual-token system:
+
+```
+THINKING sample:
+<|thinking|>What is 2+2?<thinking>
 The user is asking a simple arithmetic question.
 I need to add the numbers 2 and 2.
 2 + 2 = 4
-</thinking>
+</thinking><|answer|>4
 
-4
+CONTEXT sample (no reasoning):
+<|context|>What is 2+2?<|answer|>4
 ```
+
+- **Mode tokens** (`<|thinking|>`, `<|context|>`, `<|answer|>`): Define sample structure
+- **Content tags** (`<thinking>`, `</thinking>`): Wrap reasoning content
+- **Loss weighting**: Reasoning tokens get 0.5 weight, answer tokens get 1.0
 
 ---
 
@@ -548,6 +563,10 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
         Temperature Adjustment + Prompt Enrichment
                 ↓
         GPT-2 Transformer Generation
+                ↓
+        Mode Token Detection (<|thinking|> or <|context|>)
+                ↓
+        Thinking Extraction (if present)
 ```
 
 ### Module Dependencies
@@ -589,10 +608,11 @@ main.py
 
 - [APP_ARCHITECTURE.md](APP_ARCHITECTURE.md) - Complete system architecture
 - [APP_TECHNICALSTACK.md](APP_TECHNICALSTACK.md) - Technology stack and dependencies
-- [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup
+- [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Complete training setup with thinking
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Command reference
 - [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md) - Neural network architecture
-- [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning
+- [THINKING_GUIDE.md](THINKING_GUIDE.md) - Chain-of-thought reasoning (mode tokens + content tags)
+- [THINKING_DATASETS.md](THINKING_DATASETS.md) - Thinking dataset format and examples
 - [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Troubleshooting
 - [AGENTS.md](AGENTS.md) - Project agents and roles
 

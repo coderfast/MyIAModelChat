@@ -1,4 +1,4 @@
-﻿"""
+"""
 Inference module for MyIAModelChat.
 
 Provides the ChatEngine class and ChatConfig dataclass for chat/inference.
@@ -250,8 +250,6 @@ class ChatEngine:
             min_length=3,
             no_repeat_ngram_size=3,
             default_response="Lo siento, no puedo responder ahora.",
-            thinking_enabled=config.thinking_enabled,
-            thinking_max_tokens=config.thinking_max_tokens,
         )
 
     def _resolve_model_path(self, model_name):

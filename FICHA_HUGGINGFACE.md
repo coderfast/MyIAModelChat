@@ -56,7 +56,10 @@
   - `GET /v1/models` — Lista modelos disponibles
   - `GET /v1/health` — Health check
   - `GET /v1/version` — Versión del servidor
-- Soporte para **chain-of-thought reasoning** (`<thinking>`) via parámetro `include_thinking`
+- Soporte para **chain-of-thought reasoning** mediante sistema dual de tokens:
+  - Mode tokens: `<|thinking|>`, `<|context|>`, `<|answer|>`
+  - Content tags: `<thinking>`, `</thinking>`
+  - Parámetro `include_thinking` en endpoints API
 - Streaming de respuestas soportado
 
 ## Requisitos principales
@@ -81,7 +84,7 @@
 - `dataset_preparer/data_preparer.py` — preparación de datos multi-fuente
 - `dataset_preparer/aiml/loader.py` — carga de archivos AIML
 - `dataset_preparer/web/scraper.py` — scraping web para datos
-- `dataset_preparer/generate_thinking_data.py` — generador de datos con `<thinking>`
+- `dataset_preparer/thinking_generators.py` — generador de datos con thinking (mode tokens)
 - `training/trainer.py` — pipeline de entrenamiento
 - `inference/chat_engine.py` — lógica de inferencia
 - `envAIModels/app.py` — servidor FastAPI
@@ -96,9 +99,11 @@
 - El modelo funciona localmente y es compatible con Docker/entornos aislados si se adapta el entorno.
 - Se puede mejorar con fine-tuning adicional y mayores fuentes de datos en español.
 - La tokenización BPE permite soporte multilingüe sin cambiar la arquitectura del modelo.
-- El modelo soporta chain-of-thought reasoning (`<thinking>`) para mostrar el proceso de razonamiento.
+- El modelo soporta chain-of-thought reasoning mediante sistema dual de tokens:
+  - `<|thinking|>` / `<|context|>` / `<|answer|>` (mode tokens)
+  - `<thinking>` / `</thinking>` (content tags para razonamiento)
 - El servidor es compatible con clientes Ollama y OpenAI API (formato de mensajes idéntico).
-- Opciones de streaming y pensamiento incluido (`include_thinking`) disponibles en todos los endpoints.
+- Opciones de streaming y campo `reasoning` disponibles en todos los endpoints.
 
 ---
 

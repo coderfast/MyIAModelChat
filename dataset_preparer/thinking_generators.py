@@ -114,18 +114,32 @@ class ThinkingGenerator:
         raise NotImplementedError
 
     def _format_thinking_sample(self, sample: Dict[str, Any], thinking: str) -> Dict[str, Any]:
-        """Format a sample with thinking block for training."""
-        result = dict(sample)
-        result['thinking'] = thinking
+        """Format a sample with thinking block for training.
 
-        answer = sample.get('output', sample.get('input_ids', ''))
+        Produces two types of samples:
+        - THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+        - CONTEXT: <|context|>question<|answer|>answer
+        """
+        result = dict(sample)
+
+        question = sample.get('input', sample.get('question', ''))
+        answer = sample.get('output', sample.get('answer', sample.get('input_ids', '')))
+
+        result['question'] = question
+        result['answer'] = answer
+
         if thinking and answer:
-            thinking_text = f"<thinking>{thinking}</thinking>{answer}"
+            result['thinking'] = thinking
+            result['type'] = 'THINKING'
+            thinking_text = f"<|thinking|>{question}<thinking>{thinking}</thinking><|answer|>{answer}"
             result['thinking_text'] = thinking_text
-            result['input_ids'] = thinking_text  # Training needs thinking + response
-            result['original_text'] = answer  # Preserve original for reference
-        elif answer:
-            result['input_ids'] = answer
+            result['input_ids'] = thinking_text
+            result['original_text'] = answer
+        else:
+            result['thinking'] = ''
+            result['type'] = 'CONTEXT'
+            context_text = f"<|context|>{question}<|answer|>{answer}"
+            result['input_ids'] = context_text
             result['original_text'] = answer
 
         return result

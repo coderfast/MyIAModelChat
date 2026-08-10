@@ -1,4 +1,4 @@
-﻿"""
+"""
 MyIAModelChat - Main Entry Point
 
 This is the only CLI entry point for the application.
@@ -13,6 +13,11 @@ import threading
 import logging
 import multiprocessing as mp
 from config import OLLAMA_MODEL
+
+# Force CPU-only mode BEFORE torch import to prevent CUDA context initialization
+if '--cpu' in sys.argv:
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
 try:
     import psutil
@@ -113,18 +118,18 @@ def validate_arguments(args):
     if args.max_ram_fraction < 0 or args.max_ram_fraction > 1:
         return False, "--max-ram-fraction must be between 0 and 1"
 
-    # Device mutual exclusion
-    if args.cpu and args.gpu is not None:
-        return False, "--cpu and --gpu are mutually exclusive"
-
-    if args.vulkan and args.gpu is not None:
-        return False, "--vulkan and --gpu are mutually exclusive"
-
-    if args.vulkan and args.cpu:
-        return False, "--vulkan and --cpu are mutually exclusive"
-
-    if args.cpu_gpu is not None and (args.cpu or args.gpu is not None):
-        return False, "--cpu+gpu is mutually exclusive with --cpu and --gpu"
+    # Device mutual exclusion — only one of --cpu, --gpu, --cpu+gpu, --vulkan
+    device_flags = []
+    if args.cpu:
+        device_flags.append('--cpu')
+    if args.gpu is not None:
+        device_flags.append('--gpu')
+    if args.cpu_gpu is not None:
+        device_flags.append('--cpu+gpu')
+    if args.vulkan:
+        device_flags.append('--vulkan')
+    if len(device_flags) > 1:
+        return False, f"Only one device flag allowed at a time: {', '.join(device_flags)}"
 
     # Validate GPU indices
     if args.gpu is not None and args.gpu != '':

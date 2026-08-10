@@ -1,4 +1,4 @@
-﻿import os
+import os
 import pickle
 import sys
 import time
@@ -273,7 +273,7 @@ class Trainer:
             sys.exit(1)
 
     def _detect_thinking_data(self):
-        """Detect if the dataset contains <thinking> thinking data."""
+        """Detect if the dataset contains <thinking> or mode tokens (<|context|>/<|thinking|>)."""
         if self.loaded_dataset is None:
             return
 
@@ -283,20 +283,27 @@ class Trainer:
             logger.info("Thinking data detected (from cache metadata)")
             return
 
-        # Heuristic: sample first 100 items and check for <thinking> tags
+        # Heuristic: sample first 100 items and check for thinking/mode tokens
         sample_size = min(100, len(self.loaded_dataset))
         thinking_count = 0
-        # Get thinking token IDs for detecting pre-tokenized thinking data
         thinking_id = getattr(self.tokenizer, 'get_thinking_index', lambda: -1)()
         thinking_end_id = getattr(self.tokenizer, 'get_thinking_end_index', lambda: -1)()
+        context_id = getattr(self.tokenizer, 'get_context_index', lambda: -1)()
+        thinking_mode_id = getattr(self.tokenizer, 'get_thinking_mode_index', lambda: -1)()
+        answer_id = getattr(self.tokenizer, 'get_answer_index', lambda: -1)()
+
         for i in range(sample_size):
             item = self.loaded_dataset[i]
             value = item.get('input_ids', item.get('token_ids', ''))
-            if isinstance(value, str) and '<thinking>' in value:
+            if isinstance(value, str) and ('<thinking>' in value or '<|thinking|>' in value or '<|context|>' in value):
                 thinking_count += 1
-            elif isinstance(value, list) and thinking_id >= 0 and thinking_end_id >= 0:
-                if thinking_id in value and thinking_end_id in value:
-                    thinking_count += 1
+            elif isinstance(value, list):
+                if thinking_id >= 0 and thinking_end_id >= 0:
+                    if thinking_id in value and thinking_end_id in value:
+                        thinking_count += 1
+                elif context_id >= 0 or thinking_mode_id >= 0:
+                    if context_id in value or thinking_mode_id in value:
+                        thinking_count += 1
 
         if thinking_count > 0:
             self.has_thinking_data = True
@@ -601,22 +608,88 @@ class Trainer:
         return model
 
     def _compute_loss(self, model, inputs, targets, criterion):
-        """Unified loss computation with thinking-aware loss weighting.
+        """Unified loss computation with thinking-aware and mode-aware loss weighting.
 
-        Thinking tokens (between <thinking> and </thinking>) receive a lower loss weight
-        (thinking_loss_weight) so the model focuses more on learning the response.
+        Loss rules by sample type:
+        - CONTEXT samples (<|context|> prefix): tokens before <|answer|> get weight 0.0,
+          <|answer|> and answer tokens get weight 1.0.
+        - THINKING samples (<|thinking|> prefix): tokens before <thinking> get weight 0.0,
+          <thinking>...</thinking> tokens get thinking_loss_weight, <|answer|> and answer
+          tokens get weight 1.0.
         """
         outputs = model(inputs)
-        raw_outputs = outputs  # Keep full outputs for thinking metrics
+        raw_outputs = outputs
 
-        # Build weight mask on 2D tensors before flattening
         weights = torch.ones_like(targets, dtype=torch.float)
+
         thinking_id = self.tokenizer.get_thinking_index()
         thinking_end_id = self.tokenizer.get_thinking_end_index()
+        context_id = getattr(self.tokenizer, 'get_context_index', lambda: -1)()
+        answer_id = getattr(self.tokenizer, 'get_answer_index', lambda: -1)()
+        thinking_mode_id = getattr(self.tokenizer, 'get_thinking_mode_index', lambda: -1)()
 
-        if thinking_id >= 0 and thinking_end_id >= 0 and self.has_thinking_data:
-            batch_size, seq_len = targets.shape
-            for b in range(batch_size):
+        batch_size, seq_len = targets.shape
+
+        for b in range(batch_size):
+            has_context_prefix = False
+            has_thinking_prefix = False
+
+            # Detect mode from prefix token
+            first_non_pad = -1
+            for s in range(seq_len):
+                tok = targets[b, s].item()
+                if tok != self.tokenizer.get_pad_index() and tok != self.tokenizer.get_unk_index():
+                    first_non_pad = s
+                    break
+
+            if first_non_pad >= 0:
+                first_token = targets[b, first_non_pad].item()
+                if first_token == context_id:
+                    has_context_prefix = True
+                elif first_token == thinking_mode_id:
+                    has_thinking_prefix = True
+
+            if has_context_prefix:
+                # CONTEXT mode: zero loss for everything before <|answer|>
+                in_preamble = True
+                for s in range(seq_len):
+                    token = targets[b, s].item()
+                    if token == answer_id:
+                        in_preamble = False
+                        weights[b, s] = 1.0  # <|answer|> delimiter gets full weight
+                    elif in_preamble:
+                        weights[b, s] = 0.0
+
+            elif has_thinking_prefix:
+                # THINKING mode: zero loss for preamble (before <thinking>),
+                # reduced weight for thinking content, full weight after <|answer|>
+                in_preamble = True
+                in_thinking = False
+                past_answer = False
+
+                for s in range(seq_len):
+                    token = targets[b, s].item()
+
+                    if token == thinking_id:
+                        in_preamble = False
+                        in_thinking = True
+                        weights[b, s] = 1.0  # <thinking> delimiter gets full weight
+                    elif token == thinking_end_id:
+                        in_thinking = False
+                        weights[b, s] = 1.0  # </thinking> delimiter gets full weight
+                    elif token == answer_id:
+                        past_answer = True
+                        in_thinking = False
+                        weights[b, s] = 1.0  # <|answer|> delimiter gets full weight
+                    elif in_preamble:
+                        weights[b, s] = 0.0
+                    elif in_thinking:
+                        weights[b, s] = self.thinking_loss_weight
+                    else:
+                        weights[b, s] = 1.0
+
+            elif self.has_thinking_data:
+                # Legacy mode: detect <thinking>...</thinking> without mode prefix
                 in_thinking = False
                 for s in range(seq_len):
                     token = targets[b, s].item()
@@ -624,7 +697,6 @@ class Trainer:
                         in_thinking = False
                     if token == thinking_id:
                         in_thinking = True
-                    # Apply lower weight only to tokens BETWEEN delimiters (not the delimiters themselves)
                     if in_thinking and token != thinking_id and token != thinking_end_id:
                         weights[b, s] = self.thinking_loss_weight
 
@@ -643,7 +715,6 @@ class Trainer:
         token_losses = criterion(outputs, targets)
         weight_sum = weights.sum()
         if weight_sum <= 0:
-            # Fallback: all tokens are padding — return zero loss
             return torch.tensor(0.0, device=outputs.device, requires_grad=True), raw_outputs
         loss = (token_losses * weights).sum() / weight_sum
         return loss, raw_outputs
@@ -1362,7 +1433,8 @@ class Trainer:
 
         logger.info("Tokenizing cached dataset for faster training...")
 
-        columns_to_remove = [c for c in self.loaded_dataset.column_names if c not in ('input_ids', 'token_ids')]
+        PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking')
+        columns_to_remove = [c for c in self.loaded_dataset.column_names if c not in PRESERVED_COLUMNS]
         num_proc = self._get_num_proc()
         try:
             tokenized_ds = self.loaded_dataset.map(

@@ -1,356 +1,392 @@
-# Chain-of-Thought Reasoning (`<thinking>`)
+# Chain-of-Thought Reasoning
 
-## Qué es
+## Overview
 
-El modelo soporta **razonamiento encadenado** (chain-of-thought) usando la etiqueta `<thinking>`. Cuando el modelo genera una respuesta, puede incluir su proceso de pensamiento interno antes de la respuesta final.
+MyIAModelChat supports **chain-of-thought reasoning** using a dual-token system. The model learns to generate structured reasoning before answering, improving response quality through explicit thinking steps.
 
-### Formato
+---
+
+## Token System
+
+### Two Types of Tokens
+
+The system uses **mode tokens** (structural) and **content tags** (reasoning delimiters):
+
+#### Mode Tokens (structural, pipe-delimited)
+
+| Token | Role |
+|-------|------|
+| `<\|thinking\|>` | Prefix marking a THINKING sample (has chain-of-thought) |
+| `<\|context\|>` | Prefix marking a CONTEXT sample (direct Q&A) |
+| `<\|answer\|>` | Delimiter separating preamble from the final answer |
+
+#### Content Tags (reasoning delimiters, angle-bracket)
+
+| Token | Role |
+|-------|------|
+| `<thinking>` | Opens the reasoning block |
+| `</thinking>` | Closes the reasoning block |
+
+### Sample Formats
+
+#### THINKING sample (with chain-of-thought)
 
 ```
-<thinking>
-El usuario pregunta sobre X. Voy a analizar la información disponible...
-Voy a dar una respuesta clara y directa.
-</thinking>
-La respuesta es Y.
+<|thinking|>question<thinking>reasoning</thinking><|answer|>answer
 ```
 
-- **Dentro de `<thinking>`**: razonamiento interno, pasos intermedios, autocorrección
-- **Fuera de `<thinking>`**: la respuesta limpia que ve el usuario
+Breakdown:
+```
+<|thinking|>        ← MODE TOKEN: marks this as THINKING sample
+question            ← User's question (plain text)
+<thinking>           ← CONTENT TAG: opens reasoning block
+reasoning           ← Chain-of-thought text (NLP analysis)
+</thinking>         ← CONTENT TAG: closes reasoning block
+<|answer|>          ← MODE TOKEN: marks start of final answer
+answer              ← The actual answer
+```
 
-### Formato de datos de entrenamiento
-
-Cada par de entrenamiento tiene esta estructura:
+#### CONTEXT sample (direct Q&A, no reasoning)
 
 ```
-<|user|>pregunta del usuario<|end|>
-<thinking>razonamiento interno del modelo...</thinking>respuesta final limpia<|end|>
+<|context|>question<|answer|>answer
+```
+
+### Why Both Token Types?
+
+- **Mode tokens** define the **sample structure** and guide loss computation at the top level
+- **Content tags** enable **fine-grained loss weighting** within THINKING samples
+- The model learns to recognize when to think and when to answer directly
+
+---
+
+## Dataset Format
+
+Each training sample is stored with these columns:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `input_ids` | list[int] | Full token sequence (model input) |
+| `token_ids` | list[int] | Full token sequence (teacher-forced target) |
+| `question` | string | Raw question text |
+| `answer` | string | Raw answer text |
+| `type` | string | `CONTEXT` or `THINKING` |
+| `thinking` | string | Reasoning text (empty for CONTEXT samples) |
+
+### Example Dataset Row
+
+```json
+{
+  "question": "what is Python",
+  "answer": "Python is a high-level programming language",
+  "type": "THINKING",
+  "thinking": "The user is asking about Python. Python is a versatile programming language created by Guido van Rossum in 1991.",
+  "token_ids": [5, 123, 456, ..., 8, 789, 101, ..., 6, 321, 654, ...]
+}
+```
+
+---
+
+## Loss Weighting
+
+The trainer applies **differentiated loss** based on token position and sample type:
+
+### CONTEXT samples
+
+```
+<|context|>question<|answer|>answer
+───────────────────────── ────────────
+  weight = 0.0              weight = 1.0
+```
+
+### THINKING samples
+
+```
+<|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+────────────────────────── ──────────────────────  ──────────────
+  weight = 0.0                weight = 0.5            weight = 1.0
+  (preamble)                  (reasoning)             (answer)
+```
+
+| Segment | Weight | Rationale |
+|---------|--------|-----------|
+| Preamble (before `<thinking>`) | 0.0 | Don't penalize prefix learning |
+| `<thinking>` delimiter | 1.0 | Must learn delimiter |
+| Reasoning content | 0.5 | Learn structure, allow variation |
+| `</thinking>` delimiter | 1.0 | Must learn delimiter |
+| `<\|answer\|>` delimiter | 1.0 | Must learn delimiter |
+| Answer tokens | 1.0 | Full weight on response |
+
+### Configuration
+
+```python
+@dataclass
+class TrainingConfig:
+    thinking_loss_weight: float = 0.5  # Weight for reasoning tokens
 ```
 
 ---
 
 ## Flujo completo
 
-```
-1. Preparar datos con thinking (Ollama teacher o NLP)
-   python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
-
-2. Entrenar el modelo
-   python main.py --train --epochs 30
-
-3. Inferencia
-   python main.py --chat --show-thinking
-```
-
----
-
-## Generar datos con thinking
-
-### Opción A: Ollama Teacher (recomendada)
-
-Usa un LLM externo para generar `<thinking>` de alta calidad:
+### 1. Preparar datos con thinking
 
 ```bash
-# Configurar modelo en config.py (OLLAMA_MODEL)
-# Asegurarse de que Ollama esté corriendo en localhost:11434
-
-python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
-```
-
-### Opción B: NLP-based (sin dependencias externas)
-
-Genera thinking usando análisis NLP con ThinkingEngine:
-
-```bash
+# NLP-based thinking (no external dependencies)
 python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
+
+# Ollama teacher (higher quality, requires Ollama)
+python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
+
+# Multilingual support (30 languages)
+python main.py --prepare-data --aiml --hf --thinking-mode nlp --allowed-languages es,en,fr,de,it,pt,ca,gl,eu,ro,sv,no,da,fi,nl,pl,cs,sk,hu,bg,hr,sr,sl,bs,mk,sq,el,et,lv,lt --refresh-cache
 ```
 
-### Opción C: Script independiente
+### 2. Entrenar el modelo
 
 ```bash
-python -m dataset_preparer.generate_thinking_data --source all
+python main.py --train --epochs 30
+
+# With CPU-only mode
+python main.py --train --cpu --epochs 30
+
+# With specific checkpoint
+python main.py --train --checkpoint-name my_model --epochs 30
 ```
 
-### Desde CSV y AIML
+### 3. Inferencia
 
 ```bash
-python -m dataset_preparer.generate_thinking_data --source all
-```
+# Chat with thinking visible
+python main.py --chat --show-thinking
 
-Esto genera `datasets/thinking/thinking_data.csv` con el formato:
-
-```csv
-input,output,thinking,thinking_text,category
-"¿Quién es tu creador?","Mi creador es Eduardo Piñera Aznárez.","Pregunta de identidad. Respondo de forma clara y directa.","<thinking>Pregunta de identidad. Respondo de forma clara y directa.</thinking>Mi creador es Eduardo Piñera Aznárez.",identity
-```
-
-### Desde un CSV personalizado
-
-```bash
-python -m dataset_preparer.generate_thinking_data --source csv --input mi_dataset.csv --output datasets/thinking/mi_thinking.csv
-```
-
-### Desde directorio AIML
-
-```bash
-python -m dataset_preparer.generate_thinking_data --source aiml --input datasets_source/aiml
+# Chat with specific model
+python main.py --chat --model my_model --show-thinking
 ```
 
 ---
 
-## Preparar datos
+## Special Tokens in BPE
 
-La preparación incluye automáticamente los datos de thinking si se usa `--thinking-mode`.
+All thinking tokens are registered as `user_defined_symbols` during SentencePiece BPE training:
 
-```bash
-python main.py --prepare-data --aiml --hf --thinking-mode ollama --refresh-cache
+```
+--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>
 ```
 
-### Qué hace:
-- Genera datos thinking para cada fuente (AIML, PDF, HF, etc.)
-- Crea DOS samples por cada entrada original (uno sin thinking, uno con thinking)
-- Entrena modelo BPE con tokens `<thinking>` y `</thinking>`
-- Tokeniza todos los datos (incluyendo thinking)
-- Guarda en `dataset_cache/`
+This ensures they are **never fragmented** into sub-tokens (always whole tokens).
 
-### Tokens especiales en el BPE
+### Token IDs
 
-`<thinking>` y `</thinking>` se añaden como `user_defined_symbols` en el entrenamiento SentencePiece, asegurando que no se fragmenten (tokens indivisibles).
+| Token | Accessor Method |
+|-------|----------------|
+| `<pad>` | `get_pad_index()` |
+| `<unk>` | `get_unk_index()` |
+| `<s>` | `get_bos_index()` |
+| `</s>` | `get_eos_index()` |
+| `<thinking>` | `get_thinking_index()` |
+| `</thinking>` | `get_thinking_end_index()` |
+| `<\|context\|>` | `get_context_index()` |
+| `<\|answer\|>` | `get_answer_index()` |
+| `<\|thinking\|>` | `get_thinking_mode_index()` |
 
-### Archivos generados:
+---
+
+## Data Preparation
+
+### Sources with Thinking Support
+
+| Source | Thinking Generator | Quality |
+|--------|-------------------|---------|
+| AIML | AIML thinking module | High |
+| PDF | PDF thinking module | Medium |
+| EPUB | EPUB thinking module | Medium |
+| CSV | CSV thinking module | High |
+| HuggingFace | HF thinking module | Variable |
+| Web | Web thinking module | Medium |
+
+### What Data Preparation Does
+
+1. Generates thinking data for each source (AIML, PDF, HF, etc.)
+2. Creates TWO samples per entry (CONTEXT and THINKING)
+3. Trains BPE model with all 5 special tokens
+4. Tokenizes all data including thinking
+5. Stores in `dataset_cache/`
+
+### Generated Files
+
 ```
 dataset_cache/
-├── prepared_dataset/          # Dataset con token_ids
-├── sentencepiece.model        # Modelo BPE (incluye tokens <thinking>/</thinking>)
-├── cache_metadata.pkl         # Incluye has_thinking_tokens: true
-└── dataset_stats.pkl          # Estadísticas
+├── prepared_dataset/          # Dataset with token_ids
+├── sentencepiece.model        # BPE model (includes all special tokens)
+├── cache_metadata.pkl         # Includes has_thinking_tokens: true
+└── dataset_stats.pkl          # Statistics
 ```
 
 ---
 
-## Entrenar con thinking
+## Training
 
-```bash
-python main.py --train --epochs 30
+### What Training Does
+
+- Detects thinking data via mode tokens (`<|thinking|>`, `<|context|>`) or content tags
+- Applies differentiated loss weighting based on token position
+- Tracks thinking metrics (delimiter accuracy, reasoning coverage)
+- Registers metrics per epoch
+
+### Expected Output
+
 ```
-
-### Qué hace:
-- Detecta si el dataset contiene `<thinking>` (via `cache_metadata.pkl` o heurística)
-- Entrena el modelo para generar `<thinking>...</thinking>...`
-- Registra métricas de thinking durante entrenamiento
-
-### Generación de secuencias de entrenamiento
-
-Cada secuencia de entrenamiento se construye así:
-
-```python
-input_ids:  [..., token_antes_de_thinking]
-target_ids: [..., <thinking>, razonamiento, </thinking>, respuesta]
-```
-
-- El modelo recibe contexto previo y debe predecir la secuencia completa
-- Se usa teacher forcing: alimentar la secuencia real como input, predecir el siguiente token
-- El modelo GPT-2 genera tokens secuencialmente, sin cambios necesarios en `commons/model/chatmodel.py`
-
-### Función de pérdida
-
-Se usa la estrategia simple: tratar `<thinking>...</thinking>...` como texto continuo, con loss sobre todos los tokens. No hay ponderación adicional por el momento.
-
-### Métricas de entrenamiento
-
-Se registran las siguientes métricas:
-
-- `%` de ejemplos donde el modelo genera `<thinking>` correctamente
-- `%` de ejemplos donde `</thinking>` cierra correctamente
-- Coherencia del razonamiento generado (evaluación manual o con LLM)
-
-### Output esperado:
-```
-✓ Thinking data detected (from cache metadata)
-✓ Thinking data: ENABLED (model will learn <thinking>...</thinking> structure)
 Training batch 50/inf in progress...
   Thinking Metrics Summary:
-    thinking_token_accuracy: 0.0234
-    thinking_open_accuracy: 0.0189
-    thinking_close_accuracy: 0.0278
+    thinking_token_accuracy: 0.8234
+    thinking_open_accuracy: 0.8189
+    thinking_close_accuracy: 0.8278
+    thinking_coverage: 0.6543
+    response_token_accuracy: 0.7891
 ```
 
-Las métricas de thinking empiezan bajas y mejoran con más epochs.
+### Metrics Explained
+
+| Metric | Description |
+|--------|-------------|
+| `thinking_token_accuracy` | Combined accuracy for `<thinking>` and `</thinking>` delimiters |
+| `thinking_open_accuracy` | Accuracy for `<thinking>` opening tag |
+| `thinking_close_accuracy` | Accuracy for `</thinking>` closing tag |
+| `thinking_coverage` | Ratio of thinking tokens to total tokens |
+| `thinking_token_accuracy_full` | Accuracy on all thinking content tokens |
+| `response_token_accuracy` | Accuracy on answer tokens |
 
 ---
 
-## Inferencia con thinking
+## Inference
 
-### Consola
+### Console
 
 ```bash
-# Con thinking visible
+# With thinking visible
 python main.py --chat --show-thinking
+# You: What is Python?
+# Bot [thinking]: The user is asking about Python. Python is a programming language.
+# Bot: Python is a high-level programming language.
 
-# Salida:
-# You: Hola
-# Bot [thinking]: El usuario me saluda. Debo responder de forma amigable.
-# Bot: ¡Hola! ¿En qué puedo ayudarte?
-
-# Sin thinking (respuesta limpia)
+# Without thinking (clean response)
 python main.py --chat
-
-# Salida:
-# You: Hola
-# Bot: ¡Hola! ¿En qué puedo ayudarte?
+# You: What is Python?
+# Bot: Python is a high-level programming language.
 ```
 
-### Lógica de parsing
+### Response Parsing
+
+The dialogue manager uses mode tokens for inference:
 
 ```python
-from inference.chat_engine import parse_thinking_response
+# Builds prompt as:
+<|thinking|>question<|answer|>
 
-result = parse_thinking_response(raw_output)
-# Returns: {'thinking': str or None, 'response': str}
-thinking = result['thinking']
-response = result['response']
+# Parses response by splitting on <|answer|>
+# Extracts thinking portion and clean response
 ```
 
-Por defecto el thinking NO se muestra (solo respuesta). Usar `--show-thinking` para verlo.
+Fallback parsing uses content tags (`<thinking>...</thinking>`) when mode tokens are not present.
 
----
-
-## Endpoints API
-
-Todos los endpoints soportan `include_thinking`:
-
-### `/v1/chat/completions`
+### API
 
 ```bash
 curl -X POST http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [{"role": "user", "content": "¿Qué es Python?"}],
+    "messages": [{"role": "user", "content": "What is Python?"}],
     "include_thinking": true
   }'
 ```
 
-### `/api/chat/completions`
-
-```bash
-curl -X POST http://localhost:11434/api/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [{"role": "user", "content": "Hola"}],
-    "include_thinking": true
-  }'
-```
-
-### `/api/generate`
-
-```bash
-curl -X POST http://localhost:11434/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "¿Qué es inteligencia artificial?",
-    "include_thinking": true
-  }'
-```
-
-### Respuesta con thinking
-
+Response with thinking:
 ```json
 {
   "choices": [{
     "message": {
       "role": "assistant",
-      "content": "La inteligencia artificial es...",
-      "reasoning": "El usuario pregunta sobre IA. Voy a dar una definición clara."
+      "content": "Python is a high-level programming language",
+      "reasoning": "The user is asking about Python. Python is a programming language."
     }
   }]
 }
 ```
 
-### Respuesta sin thinking
+---
 
-```json
-{
-  "choices": [{
-    "message": {
-      "role": "assistant",
-      "content": "La inteligencia artificial es..."
-    }
-  }]
-}
-```
+## Multilingual Support
 
-> **Nota:** El campo `reasoning` no existe en la API estándar de OpenAI. Es una extensión no estándar del proyecto. Solo se incluye cuando `include_thinking: true` está en el request.
+The thinking engine supports 30 languages:
+
+### EU Languages
+English, Spanish, French, German, Italian, Portuguese, Catalan, Galician, Basque, Irish, Dutch, Danish, Swedish, Finnish, Polish, Czech, Slovak, Hungarian, Romanian, Bulgarian, Croatian, Slovenian, Greek, Estonian, Latvian, Lithuanian, Maltese
+
+### Eastern European
+Serbian, Bosnian, Macedonian, Albanian
+
+### How It Works
+
+1. Language detected from input text
+2. Appropriate reasoning template selected
+3. Language-specific patterns applied (greetings, question starters, etc.)
+4. Thinking generated in the same language as input
 
 ---
 
-## Archivos y ubicaciones
+## Files Reference
 
-### Archivos nuevos
-| Archivo | Descripción |
-|---------|-------------|
-| `config.py` | Configuración centralizada (OLLAMA_MODEL, OLLAMA_URL) |
-| `python -m dataset_preparer.generate_thinking_data` | Genera datos con `<thinking>` |
-| `dataset_preparer/thinking_engine.py` | Motor NLP para generación de thinking |
-| `datasets/thinking/thinking_data.csv` | Datos generados |
+### Core Files
 
-### Archivos modificados
-| Archivo | Descripción |
-|---------|-------------|
-| `commons/tokenizer/bpe_tokenizer.py` | Helpers: `has_thinking()`, `split_thinking()`, `extract_response()` |
-| `dataset_preparer/data_preparer.py` | Carga datos thinking, tokens `<thinking>`/`</thinking>` en BPE |
-| `dataset_preparer/thinking_generators.py` | Base ThinkingGenerator + OllamaTeacher |
-| `training/trainer.py` | Detecta thinking, métricas de entrenamiento |
-| `inference/chat_engine.py` | Parsing de thinking en inferencia |
-| `main.py` | Flag `--thinking-mode`, `--thinking-model`, `--show-thinking` |
-| `envAIModels/schemas.py` | Campo `include_thinking` en requests |
-| `envAIModels/utils.py` | `parse_thinking_response()` |
-| `envAIModels/routers_v1.py` | Endpoints v1 con thinking |
-| `envAIModels/routers_api.py` | Endpoints api con thinking |
+| File | Purpose |
+|------|---------|
+| `commons/tokenizer/bpe_tokenizer.py` | Special token definitions and helpers |
+| `dataset_preparer/thinking_generators.py` | `_format_thinking_sample()` with mode tokens |
+| `dataset_preparer/thinking_engine.py` | NLP reasoning generation (30 languages) |
+| `dataset_preparer/thinking_quality.py` | Quality validation with multilingual patterns |
+| `training/trainer.py` | Mode-aware loss computation and metrics |
+| `commons/dialogue/dialogmanager.py` | Inference with mode token parsing |
+| `inference/chat_engine.py` | Chat interface with thinking display |
+| `dataset_preparer/data_preparer.py` | BPE training with special tokens |
+
+### Legacy Files
+
+| File | Purpose |
+|------|---------|
+| `dataset_preparer/generate_thinking_data.py` | Older format without mode tokens |
 
 ---
 
-## Solución de problemas
+## Troubleshooting
 
-### El modelo no genera `<thinking>`
+### Model doesn't generate `<thinking>`
 
-- Verificar que el dataset contiene datos thinking: `head datasets/thinking/thinking_data.csv`
-- Verificar que el BPE fue entrenado con los tokens: `cache_metadata.pkl` debe tener `has_thinking_tokens: true`
-- Entrenar más epochs (el modelo necesita tiempo para aprender la estructura)
+- Verify dataset contains thinking data: check `type` column for THINKING samples
+- Verify BPE was trained with all special tokens
+- Train more epochs (model needs time to learn structure)
 
-### El thinking no aparece en la API
+### Thinking appears as `⁇`
 
-- Verificar que `include_thinking: true` está en el request
-- Verificar que la respuesta del modelo contiene `<thinking>` (puede que aún no lo genere)
+- BPE model was trained without the tokens
+- Re-run: `python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache`
+- Re-train the model
 
-### Tokens `<thinking>` aparecen como `⁇`
+### Thinking not visible in chat
 
-- El modelo BPE fue entrenado sin los tokens
-- Ejecutar: `python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache`
-- Reentrenar el modelo
+- Use `--show-thinking` flag
+- Verify model was trained with thinking data
+- Check that response actually contains `<|answer|>` delimiter
 
-### Verificación end-to-end completa
+### Validation checklist
 
-```bash
-# 1. Preparar datos con thinking (NLP, sin Ollama)
-python main.py --prepare-data --aiml --hf --thinking-mode nlp --refresh-cache
-
-# 2. Entrenar con datos de thinking
-python main.py --train --epochs 30
-
-# 3. Inferencia sin thinking
-python main.py --chat
-# → Respuesta limpia solamente
-
-# 4. Inferencia con thinking
-python main.py --chat --show-thinking
-# → Muestra razonamiento + respuesta
-
-# 5. Test endpoint
-curl -X POST http://localhost:11434/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "¿Qué es Python?"}], "include_thinking": true}'
-# → Respuesta con campo "reasoning"
-```
+- [ ] `<|thinking|>` prefix is present at start of THINKING samples
+- [ ] `<thinking>` and `</thinking>` delimiters are present in reasoning
+- [ ] `<|answer|>` delimiter separates reasoning from answer
+- [ ] Reasoning logically leads to the answer
+- [ ] Language matches between question, thinking, and answer
+- [ ] Appropriate length ratio (1:1 to 3:1 thinking:answer)
 
 ---
 
-*Updated: 2026-07-28 - Reflects new modular project structure, `<thinking>` tags, and Ollama teacher support*
+*Updated: 2026-08-09 - Reflects new mode token system, 30-language support, and differentiated loss weighting*

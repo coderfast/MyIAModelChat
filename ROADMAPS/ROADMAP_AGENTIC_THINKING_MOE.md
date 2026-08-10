@@ -4,6 +4,25 @@
 
 Este roadmap define la implementación completa de capacidades **agenticas end-to-end** para MyIAModelChat. El modelo GPT-2 aprenderá a generar `<tool_call>`, `<tool_call>`, y `<tool_call>` como parte de su generación, permitiendo planificación, ejecución de herramientas y razonamiento con observaciones — todo entrenado via el dataset, sin dependencia de un orquestador externo.
 
+**Sistema de Tokens Actual (ya implementado):**
+- Mode tokens: `<|thinking|>`, `<|context|>`, `<|answer|>`
+- Content tags: `<thinking>`, `</thinking>`
+
+**Nuevos Tokens Agentic (a implementar):**
+- `<tool_call>`, `</tool_call>` — tool call JSON
+- `<tool_call>`, `</tool_call>` — action block
+- `<tool_call>`, `</tool_call>` — observation result
+
+**Nota sobre permisos de ejecución:**
+El modelo SOLO genera `<tool_call>` con el JSON del tool call. La ejecución real de comandos es responsabilidad del **agente** que usa el modelo, NO del modelo en sí. El agente debe:
+1. Parsear el `<tool_call>` del output del modelo
+2. Pedir **permiso al usuario** antes de ejecutar cualquier comando
+3. Ejecutar el comando en la plataforma correcta
+4. Formatear el resultado como `<tool_call>`
+5. Alimentar el resultado de vuelta al modelo
+
+Esto permite que el modelo sea agnóstico a la plataforma — el agente decide qué shell usar (PowerShell, Bash, zsh) según el SO detectado.
+
 **Leyenda de Estado:** `TODO` → `IN_PROGRESS` → `BLOCKED` → `DONE`
 
 **Leyenda de Prioridad:**
@@ -63,10 +82,13 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
 ### Task 0.1: Añadir tokens de tool use al tokenizer
 - **Archivo**: `commons/tokenizer/bpe_tokenizer.py`
 - **Ubicación**: Línea ~40, donde se definen `user_symbols`
-- **Cambio**: Añadir los 6 nuevos tokens:
+- **Cambio**: Añadir los 6 nuevos tokens junto a los thinking tokens existentes:
   ```python
-  # Thinking tokens existentes
+  # Thinking tokens (ya implementados)
   thinking_tokens = ['<thinking>', '</thinking>']
+  
+  # Mode tokens (ya implementados)
+  mode_tokens = ['<|context|>', '<|answer|>', '<|thinking|>']
 
   # NUEVOS: Agentic tokens
   agentic_tokens = [
@@ -75,7 +97,7 @@ User Input → Tokenizer → GPT-2 Model → Tokens generados
       '<tool_call>', '</tool_call>',
   ]
 
-  user_symbols = '--user_defined_symbols=' + ','.join(thinking_tokens + agentic_tokens)
+  user_symbols = '--user_defined_symbols=' + ','.join(thinking_tokens + mode_tokens + agentic_tokens)
   ```
 - **Métodos nuevos**:
   ```python
@@ -310,6 +332,8 @@ pytest tests/test_thinking_fixes.py -v
   | `powershell` | Ejecutar comando Windows PowerShell | `command: str` | shell | windows |
   | `bash` | Ejecutar comando Bash | `command: str` | shell | linux/darwin |
   | `get_platform` | Detectar sistema operativo actual | (sin params) | computation | cross |
+
+- **Nota sobre permisos**: El modelo genera el `<tool_call>`, pero el **agente** es responsable de pedir permiso al usuario antes de ejecutar. Ver sección "Seguridad y Permisos" más abajo.
 - **Estado**: `TODO`
 
 ### Task 1.2: Crear `commons/tools/tool_executor.py`
@@ -358,24 +382,96 @@ pytest tests/test_thinking_fixes.py -v
 - **Seguridad Cross-Platform**:
   ```python
   class ShellSecurity:
+      # ============================================
+      # WINDOWS POWERSHELL - Comandos seguros (solo lectura)
+      # ============================================
       SAFE_COMMANDS_WINDOWS = [
-          'Get-ChildItem', 'Get-Content', 'Get-Date', 'Get-Help',
-          'Select-String', 'Measure-Object', 'Get-Process', 'Get-Service',
-          'Get-Command', 'Get-Alias', 'Get-Host', 'Get-Item',
-          'cat', 'ls', 'dir', 'echo', 'pwd', 'whoami', 'date'
+          # FileSystem - lectura
+          'Get-ChildItem', 'Get-Content', 'Get-Item', 'Get-ItemProperty',
+          'Get-ChildItem -Recurse', 'Test-Path', 'Resolve-Path',
+          'Get-FileHash', 'Get-AuthenticodeSignature',
+          # Procesos - lectura
+          'Get-Process', 'Get-Service', 'Get-WmiObject', 'Get-CimInstance',
+          # Sistema - lectura
+          'Get-Host', 'Get-Date', 'Get-History', 'Get-Command', 'Get-Alias',
+          'Get-Help', 'Get-Variable', 'Get-Option', 'Get-Debug',
+          'Get-Error', 'Get-Warning', 'Get-Information',
+          # Red - lectura
+          'Test-Connection', 'Test-NetConnection', 'Get-NetAdapter',
+          'Get-NetIPAddress', 'Get-DnsClientServerAddress',
+          # Seguridad - lectura
+          'Get-Acl', 'Get-Certificate', 'Get-AuthenticodeSignature',
+          # Variables de entorno
+          'Get-ChildItem Env:', 'Get-Content Env:PATH',
+          # Utilidades
+          'Select-String', 'Measure-Object', 'Sort-Object', 'Where-Object',
+          'Format-Table', 'Format-List', 'Out-String', 'Out-GridView',
+          'ConvertTo-Json', 'ConvertFrom-Json', 'ConvertTo-Csv',
+          # Compatibilidad Unix (PowerShell Core en Windows)
+          'cat', 'ls', 'dir', 'echo', 'pwd', 'whoami', 'date',
       ]
 
+      # ============================================
+      # LINUX/MAC - Comandos seguros (solo lectura)
+      # ============================================
       SAFE_COMMANDS_UNIX = [
-          'ls', 'cat', 'grep', 'find', 'wc', 'head', 'tail', 'echo',
-          'pwd', 'whoami', 'date', 'uname', 'df', 'du', 'file', 'stat',
-          'ps', 'top', 'uptime', 'which', 'env', 'printenv', 'curl'
+          # FileSystem - lectura
+          'ls', 'll', 'la', 'l', 'tree', 'find', 'locate', 'which', 'whereis',
+          'cat', 'head', 'tail', 'less', 'more', 'file', 'stat', 'du', 'df',
+          'touch', # crear archivo vacío (inocuo)
+          # Contenido - lectura
+          'grep', 'egrep', 'fgrep', 'ag', 'rg', 'rgrep',
+          'wc', 'diff', 'comm', 'cmp', 'md5sum', 'sha256sum',
+          # Procesos - lectura
+          'ps', 'top', 'htop', 'atop', 'pstree', 'pgrep',
+          'uptime', 'w', 'who', 'last', 'lastb', 'lastlog',
+          # Sistema - lectura
+          'uname', 'hostname', 'id', 'groups', 'whoami', 'date', 'cal',
+          'env', 'printenv', 'set', 'export', # solo lectura
+          'free', 'vmstat', 'iostat', 'sar', 'lscpu', 'lscpu',
+          'cat /proc/cpuinfo', 'cat /proc/meminfo', 'cat /proc/version',
+          # Red - lectura
+          'ifconfig', 'ip', 'ip addr', 'ip route', 'netstat', 'ss',
+          'ping', 'dig', 'nslookup', 'host', 'traceroute', 'tracepath',
+          'curl', 'wget', # solo lectura por defecto
+          # Disk - lectura
+          'mount', 'lsblk', 'fdisk -l', 'blkid', 'lsusb',
+          # Utilidades
+          'echo', 'printf', 'date', 'cal', 'bc', # calculadora
+          'seq', 'yes', 'true', 'false',
+          'base64', 'xxd', 'od', # hex dump
+          'jq', # JSON parser
+          'xargs', # con -n1 es seguro
       ]
 
+      # ============================================
+      # PATRONES BLOQUEADOS (destructivos/escritura)
+      # ============================================
       BLOCKED_PATTERNS = [
-          r'rm\s+-rf', r'del\s+/[sSqQfF]', r'Remove-Item\s+-Recurse',
-          r'>\s*/dev/', r'Format-Volume', r'Initialize-Disk',
+          # Windows - destructivos
+          r'Remove-Item\s+-Recurse', r'Remove-Item\s+-Force',
+          r'del\s+/[sSqQfF]', r'del\s+/[aA]',
+          r'Format-Volume', r'Initialize-Disk', r'Clear-Disk',
           r'Set-Content', r'Out-File', r'Tee-Object',
-          r'sudo', r'su\s+-', r'chmod\s+777', r'chown'
+          r'Start-Process\s+-Verb\s+RunAs', # UAC bypass
+          r'Invoke-WebRequest.*-OutFile', r'Invoke-RestMethod.*-OutFile',
+          r'Set-ItemProperty', r'New-ItemProperty',
+          
+          # Linux/Mac - destructivos
+          r'rm\s+-rf', r'rm\s+-r\s+-f', r'rmdir',
+          r'mkfs', r'fdisk.*-w', r'parted.*mklabel',
+          r'chmod\s+777', r'chmod\s+-R\s+777', r'chown',
+          r'>\s*/dev/', r'dd\s+.*of=/dev/',
+          r'sudo', r'su\s+-', r'su\s+root',
+          r'curl.*\|\s*(ba)?sh', r'wget.*\|\s*(ba)?sh', # pipe to shell
+          r'eval\s+', r'exec\s+',
+          r'iptables', r'ufw', r'firewall-cmd',
+          r'systemctl\s+(stop|disable|mask)',
+          r'service\s+.*stop',
+          
+          # Cross-platform
+          r'shutdown', r'reboot', r'poweroff', r'init\s+[06]',
+          r'dd\s+', r'mkfs', r'format\s+',
       ]
 
       @classmethod
@@ -389,10 +485,13 @@ pytest tests/test_thinking_fixes.py -v
 - **Restricciones de seguridad**:
   - **Timeout**: 30 segundos por defecto, configurable
   - **Whitelist**: Solo comandos de lectura por defecto (configurable)
-  - **Blacklist**: Patrones destructivos bloqueados (`rm -rf`, `Remove-Item -Recurse`, etc.)
+  - **Blacklist**: Patrones destructivos bloqueados (ver arriba)
   - **Logging**: Todos los comandos ejecutados se registran
   - **Output limit**: Máximo 500 caracteres, truncar si es más largo
-  - **Modo seguro**: Por defecto solo comandos de lectura; modo `--unsafe` para escritura
+  **Modo seguro**: Por defecto solo comandos de lectura; modo `--unsafe` para escritura
+  - **Permisos**: El agente DEBE pedir permiso al usuario antes de ejecutar CUALQUIER comando
+  - **Confirmación**: Mostrar comando al usuario y esperar 'sí/SI/yes/YES' antes de ejecutar
+  - **Dry-run**: Opción `--dry-run` para mostrar qué se ejecutaría sin ejecutar
 - **Estado**: `TODO`
 
 ### Task 1.3: Integrar ToolRegistry en ChatEngine
@@ -469,14 +568,17 @@ pytest tests/test_thinking_fixes.py -v
   4. Para samples que no necesitan: genera solo thinking + response
 - **Formato de salida por sample**:
   ```
-  <|user|>¿Cuánto es 15 * 37?<|end|>
-  <thinking>El usuario pregunta una multiplicación. Necesito usar la calculadora.</thinking>
+  <|thinking|>El usuario pregunta una multiplicación. Necesito usar la calculadora.<thinking>
   <tool_call>
   {"name": "calculator", "arguments": {"expression": "15 * 37"}}
   </tool_call>
   <observation>555</observation>
   </tool_call>
-  La multiplicación de 15 * 37 es 555.<|end|>
+  <|answer|>La multiplicación de 15 * 37 es 555.
+  ```
+- **Formato sin tools** (respuesta directa):
+  ```
+  <|thinking|>El usuario me saluda. Debo responder con un saludo amigable.</thinking><|answer|>¡Hola! ¿En qué puedo ayudarte?
   ```
 - **Estado**: `TODO`
 
@@ -718,11 +820,16 @@ pytest tests/test_thinking_fixes.py -v
   - `test_get_platform_tool()` — retorna 'windows', 'linux' o 'darwin'
   - `test_shell_tool_windows()` — ejecuta Get-Date en Windows
   - `test_shell_tool_linux()` — ejecuta date en Linux/Mac
+  - `test_shell_tool_mac()` — ejecuta date en Mac
   - `test_powershell_tool()` — ejecuta Get-Date y retorna resultado
   - `test_bash_tool()` — ejecuta date y retorna resultado
   - `test_shell_security_block()` — bloquea comandos destructivos
   - `test_shell_timeout()` — timeout después de N segundos
   - `test_shell_output_truncate()` — trunca output largo a 500 chars
+  - `test_platform_detection()` — detecta windows/linux/darwin
+  - `test_safe_commands_windows()` — whitelist PowerShell funciona
+  - `test_safe_commands_linux()` — whitelist Bash funciona
+  - `test_safe_commands_mac()` — whitelist zsh/Bash funciona
 
 ### Task 6.2: Tests unitarios — Tool Executor
 - **Archivo**: `tests/test_tool_executor.py` (nuevo)
@@ -786,10 +893,98 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
 ## Fase 7: Pulido y Optimización — P3 (Low)
 
 **Prioridad:** P3 — Nice-to-have
-**Tiempo estimado:** 4-6 horas
+**Tiempo estimado:** 6-8 horas
 **Riesgo:** Bajo
 
-### Task 7.1: Streaming con tool calls
+### Task 7.1: Permission System
+- **Archivo**: `commons/tools/permission_manager.py` (nuevo)
+- **Responsabilidad**: Gestionar permisos de ejecución del usuario
+- **Arquitectura**:
+  ```python
+  class PermissionManager:
+      """Gestiona permisos para ejecución de comandos.
+      
+      El modelo SOLO genera tool_call. La ejecución real es responsabilidad
+      del agente, que DEBE pedir permiso al usuario antes de ejecutar.
+      """
+      
+      def __init__(self, auto_approve: bool = False, dry_run: bool = False):
+          self.auto_approve = auto_approve  # Para testing
+          self.dry_run = dry_run            # Solo mostrar, no ejecutar
+          self.permission_log = []          # Historial de permisos
+      
+      def request_permission(self, tool_name: str, command: str, platform: str) -> bool:
+          """Pide permiso al usuario antes de ejecutar.
+          
+          Muestra:
+          - Herramienta a usar
+          - Comando completo
+          - Plataforma detectada
+          - Timeout configurado
+          
+          Retorna True si el usuario aprueba, False si rechaza.
+          """
+          
+      def format_permission_request(self, tool_name: str, command: str, platform: str) -> str:
+          """Formatea el request de permiso para mostrar al usuario.
+          
+          Ejemplo:
+          ┌─────────────────────────────────────────────┐
+          │ Tool Call Request                           │
+          ├─────────────────────────────────────────────┤
+          │ Tool: powershell                            │
+          │ Platform: windows                           │
+          │ Command: Get-ChildItem -Path . -Filter *.py │
+          │ Timeout: 30s                                │
+          ├─────────────────────────────────────────────┤
+          │ ¿Ejecutar? (sí/no/dry-run):                │
+          └─────────────────────────────────────────────┘
+          """
+  ```
+- **Modos de operación**:
+  | Modo | Descripción | Uso |
+  |------|-------------|-----|
+  | `interactive` | Pide permiso por cada tool call | Default, producción |
+  | `auto_approve` | Aprobación automática | Testing, desarrollo |
+  | `dry_run` | Muestra comando sin ejecutar | Validación, debugging |
+  | `whitelist` | Auto-aprueba comandos de lectura | Productividad |
+- **Estado**: `TODO`
+
+### Task 7.2: Platform Auto-Detection
+- **Archivo**: `commons/tools/platform_detector.py` (nuevo)
+- **Responsabilidad**: Detectar SO y configurar shell apropiado
+- **Arquitectura**:
+  ```python
+  import platform
+  import shutil
+  
+  class PlatformDetector:
+      """Detecta plataforma y configura shell apropiado."""
+      
+      def detect_platform() -> str:
+          """Retorna 'windows', 'linux', o 'darwin'."""
+          
+      def get_default_shell() -> str:
+          """Retorna shell por defecto:
+          - Windows: 'powershell' (powershell.exe o pwsh)
+          - Linux: 'bash' (/bin/bash)
+          - Mac: 'zsh' (/bin/zsh) o 'bash' (/bin/bash)
+          """
+          
+      def get_shell_executable(shell: str) -> str:
+          """Retorna path completo del ejecutable del shell."""
+          
+      def get_shell_args(shell: str) -> list[str]:
+          """Retorna argumentos para ejecutar comando."""
+          # PowerShell: ['-Command', command]
+          # Bash/zsh: ['-c', command]
+          
+      def is_command_available(command: str) -> bool:
+          """Verifica si un comando está disponible en el sistema."""
+  ```
+- **Estado**: `TODO`
+
+### Task 7.3: Streaming con tool calls
 - **Archivo**: `inference/chat_engine.py`
 - **Cambio**: Soportar streaming SSE para cada paso del agente
   ```json
@@ -799,20 +994,34 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
   {"type": "response", "content": "La respuesta es 555."}
   ```
 
-### Task 7.2: API endpoints agentic
+### Task 7.4: API endpoints agentic
 - **Archivo**: `envAIModels/routers_v1.py`
 - **Nuevo campo en request**: `"agent_enabled": true`
 - **Nuevo campo en response**: `"tool_calls": [...]`, `"observations": [...]`
 
-### Task 7.3: Exportar modelo agentic
+### Task 7.5: Exportar modelo agentic
 - **Archivo**: `commons/registry/model_export.py`
 - **Cambio**: Asegurar que los tokens de agente se exportan correctamente a GGUF/ONNX
 
-### Task 7.4: Documentación
+### Task 7.6: Documentación
 - **Archivos**:
   - `AGENTIC_GUIDE.md` — Guía de uso del agente
   - `README.md` — Añadir sección de capacidades agenticas
   - `AGENTS.md` — Actualizar con nuevas herramientas
+
+### Task 7.7: Tests de Permission System
+- **Archivo**: `tests/test_permission_system.py` (nuevo)
+- **Tests**:
+  - `test_request_permission_interactive()` — pide permiso correctamente
+  - `test_request_permission_auto_approve()` — auto-aprueba en modo testing
+  - `test_request_permission_dry_run()` — no ejecuta en dry-run
+  - `test_permission_denied()` — maneja rechazo del usuario
+  - `test_platform_detection_windows()` — detecta Windows
+  - `test_platform_detection_linux()` — detecta Linux
+  - `test_platform_detection_mac()` — detecta Mac
+  - `test_shell_selection()` — selecciona shell correcto por plataforma
+  - `test_audit_log()` — registra tool calls correctamente
+- **Estado**: `TODO`
 
 ---
 
@@ -1097,8 +1306,14 @@ Fase 6 (Testing) — P2 — 6-8h
   → Task 6.5 (test manual)
   → [VERIFY] Todos los tests pasan
 
-Fase 7 (Pulido) — P3 — 4-6h
-  → Task 7.1-7.4
+Fase 7 (Pulido) — P3 — 6-8h
+  → Task 7.1 (permission_manager)
+  → Task 7.2 (platform_detector)
+  → Task 7.3 (streaming)
+  → Task 7.4 (API endpoints)
+  → Task 7.5 (export)
+  → Task 7.6 (docs)
+  → Task 7.7 (tests)
   → [VERIFY] Funcionalidad completa
 
 Fase 8 (MoE) — P3 — 20-30h
@@ -1114,7 +1329,7 @@ Fase 8 (MoE) — P3 — 20-30h
   → [VERIFY] Experts se especializan, routing balanceado
 ```
 
-**Tiempo total estimado: 62-90 horas**
+**Tiempo total estimado: 66-98 horas**
 
 ---
 
@@ -1129,8 +1344,11 @@ Fase 8 (MoE) — P3 — 20-30h
 | `dataset_preparer/thinking_quality.py` | 0.5 | Modificado — validator más estricto |
 | `training/trainer.py` | 0.6, 0.7, 0.8, 3.1, 3.2, 3.3, 8.4 | Modificado — loss weight, no double pass, preservar source, agentic, MoE |
 | `tests/test_thinking_fixes.py` | 0.10 | Nuevo |
-| `commons/tools/tool_registry.py` | 1.1 | Nuevo |
-| `commons/tools/tool_executor.py` | 1.2 | Nuevo |
+| `commons/tools/tool_registry.py` | 1.1 | Nuevo — registro de herramientas |
+| `commons/tools/tool_executor.py` | 1.2 | Nuevo — ejecución cross-platform |
+| `commons/tools/permission_manager.py` | 7.1 | Nuevo — permisos de usuario |
+| `commons/tools/platform_detector.py` | 7.2 | Nuevo — detección de SO |
+| `commons/tools/audit_log.py` | 7.3 | Nuevo — logging de tool calls |
 | `inference/chat_engine.py` | 1.3, 4.3 | Modificado |
 | `dataset_preparer/agent/thinking.py` | 2.1 | Nuevo — generador principal |
 | `dataset_preparer/agent/quality.py` | 2.4 | Nuevo — validación |
@@ -1139,10 +1357,11 @@ Fase 8 (MoE) — P3 — 20-30h
 | `dataset_preparer/hf/agent_thinking.py` | 2.2 | Nuevo |
 | `commons/dialogue/dialogmanager.py` | 4.1, 4.2 | Modificado |
 | `main.py` | 5.1, 8.8 | Modificado |
-| `envAIModels/routers_v1.py` | 7.2 | Modificado |
+| `envAIModels/routers_v1.py` | 7.4 | Modificado |
 | `commons/model/chatmodel_moe.py` | 8.1, 8.2, 8.3 | Nuevo |
 | `dataset_preparer/agent/moe_data.py` | 8.5 | Nuevo |
 | `tests/test_moe.py` | 8.9 | Nuevo |
+| `tests/test_permission_system.py` | 7.7 | Nuevo |
 
 ---
 
@@ -1176,7 +1395,13 @@ Fase 8 (MoE) — P3 — 20-30h
 | 5.1 | 4.3 | P2 |
 | 5.2 | 3.3 | P2 |
 | 6.1-6.5 | Todas | P2 |
-| 7.1-7.4 | 4.3 | P3 |
+| 7.1 | 4.3 | P3 |
+| 7.2 | 7.1 | P3 |
+| 7.3 | 4.3 | P3 |
+| 7.4 | 4.3 | P3 |
+| 7.5 | 4.3 | P3 |
+| 7.6 | 7.1-7.5 | P3 |
+| 7.7 | 7.1, 7.2 | P3 |
 | 8.1 | 0.1, 0.2 | P3 |
 | 8.2 | 8.1 | P3 |
 | 8.3 | 8.1 | P3 |
@@ -1204,7 +1429,9 @@ Fase 8 (MoE) — P3 — 20-30h
 | Tokens de agente fragmentados por BPE | Bajo | `user_defined_symbols` garantiza tokens indivisibles |
 | Observation demasiado larga agota contexto | Medio | Truncar observation a 200 tokens, `agent_max_iterations=5` |
 | PowerShell ejecuta comandos destructivos | ALTO | Whitelist de comandos seguros (solo lectura), timeout 30s, logging |
-| Modelo genera comandos PowerShell maliciosos | Alto | Validación de sintaxis + whitelist + sandbox |
+| Modelo genera comandos maliciosos | Alto | Validación de sintaxis + whitelist + sandbox |
+| Ejecución sin permiso del usuario | CRÍTICO | Agente DEBE pedir confirmación antes de ejecutar; `--dry-run` para testing |
+| Comandos cross-platform incompatibles | Medio | Auto-detectar SO, usar shell nativo (PowerShell/Bash/zsh) |
 | MoE gating colapsa a 1 expert | Alto | Load balancing loss + monitoreo de expert utilization |
 | Modelo MoE demasiado grande para hardware | Medio | Empezar con 2 experts, escalar gradualmente; `freeze_attention` para fine-tuning |
 | Experts no se especializan | Medio | Dataset con expert_labels por token; monitorear routing entropy |

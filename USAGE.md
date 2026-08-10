@@ -79,6 +79,10 @@ Primary Mode Arguments (choose one):
         - Requires `sentencepiece` package to be installed (`pip install sentencepiece`)
         - When used, prepared cache will include `token_ids` per sample and a `sentencepiece.model` in `dataset_cache/`
         - Omit this flag to skip BPE and use raw text
+        - BPE automatically registers 5 special tokens as user_defined_symbols:
+          <thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|>
+        - These tokens are never fragmented (always whole tokens)
+        - Recommended vocab size: 8000 (default), increase for larger datasets
 
 ================================================================================
 
@@ -501,6 +505,70 @@ Training Arguments:
         - Recommended before long training runs
 
 ================================================================================
+                        THINKING GENERATION
+================================================================================
+
+The model supports chain-of-thought reasoning using special tokens:
+- Mode tokens: <|thinking|>, <|context|>, <|answer|>
+- Content tags: <thinking>, </thinking>
+
+Sample formats:
+  THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+  CONTEXT:  <|context|>question<|answer|>answer
+
+================================================================================
+
+Thinking Arguments:
+================================================================================
+
+--thinking-mode <mode>
+    Description: Generate thinking/reasoning data for each sample
+    Type: String (nlp, ollama)
+    Default: none (no thinking generation)
+    Example: python main.py --prepare-data --aiml --hf --thinking-mode nlp
+    Notes:
+        - nlp: Uses ThinkingEngine (NLP-based, no external dependencies)
+        - ollama: Uses Ollama LLM teacher (requires Ollama running locally)
+        - Creates TWO samples per entry (CONTEXT and THINKING)
+        - Thinking tokens are registered in BPE automatically
+        - Requires --bpe-vocab-size to be specified
+
+--show-thinking
+    Description: Show thinking/reasoning in chat output
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --chat --show-thinking
+    Notes:
+        - Without flag: only shows final answer
+        - With flag: shows [thinking] section before answer
+        - Thinking is hidden by default to keep responses clean
+
+--thinking-model <model>
+    Description: Ollama model to use for thinking generation (only with --thinking-mode ollama)
+    Type: String
+    Default: llama3.2
+    Example: python main.py --prepare-data --aiml --thinking-mode ollama --thinking-model llama3.2
+    Notes:
+        - Requires Ollama running locally on localhost:11434
+        - Higher quality thinking but slower
+        - nlp mode is recommended for most cases
+
+================================================================================
+
+Training with Thinking:
+================================================================================
+
+When training with thinking data, the model learns:
+1. When to generate <thinking>...</thinking> (reasoning)
+2. When to generate <|answer|> (direct response)
+3. Loss weighting: reasoning tokens get 0.5 weight, answer tokens get 1.0
+
+Expected metrics during training:
+  thinking_token_accuracy: 0.8+ (delimiter accuracy)
+  thinking_coverage: 0.6+ (reasoning vs total tokens)
+  response_token_accuracy: 0.7+ (answer accuracy)
+
+================================================================================
                             USAGE EXAMPLES
 ================================================================================
 
@@ -530,6 +598,21 @@ TRAINING EXAMPLES:
 
 8. Train CPU+GPU hybrid:
     python main.py --train --cpu+gpu 0 --epochs 30
+
+9. Prepare data with thinking (NLP-based, no Ollama):
+    python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
+
+10. Prepare data with thinking (Ollama teacher):
+    python main.py --prepare-data --aiml --hf --thinking-mode ollama --bpe-vocab-size 8000 --refresh-cache
+
+11. Prepare data with thinking + multilingual support:
+    python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --allowed-languages es en fr de --refresh-cache
+
+12. Train with thinking data:
+    python main.py --train --epochs 30
+
+13. Chat with thinking visible:
+    python main.py --chat --show-thinking
 
 ================================================================================
 
@@ -607,7 +690,15 @@ ADVANCED DATA PROCESSING EXAMPLES:
 13. Prepare data with language filtering (Spanish only):
     python main.py --prepare-data --pdf --enable-lang-filter --allowed-languages es
 
-14. Full advanced workflow with all features:
+14. Prepare data with thinking + BPE (recommended workflow):
+    python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
+    python main.py --train --epochs 30
+    python main.py --chat --show-thinking
+
+15. Prepare data without thinking (context only):
+    python main.py --prepare-data --aiml --pdf --epub
+    python main.py --train --epochs 30
+    python main.py --chat
     python main.py --prepare-data --aiml --pdf --epub \
         --enable-chunking \
         --enable-dedup \

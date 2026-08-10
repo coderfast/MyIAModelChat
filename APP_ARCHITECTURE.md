@@ -2,7 +2,7 @@
 
 ## System Overview
 
-MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transformer** architecture using PyTorch. It supports bilingual operation (Spanish/English), chain-of-thought reasoning via `<thinking>` tags, intent classification and sentiment analysis via BERT, and multi-source data ingestion (AIML, PDF, EPUB, HuggingFace, Web scraping, CSV). It provides both an interactive CLI and an Ollama-compatible REST API server (FastAPI), plus a secondary GGUF/llama.cpp inference server.
+MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transformer** architecture using PyTorch. It supports bilingual operation (Spanish/English), chain-of-thought reasoning via dual-token system (mode tokens + content tags), intent classification and sentiment analysis via BERT, and multi-source data ingestion (AIML, PDF, EPUB, HuggingFace, Web scraping, CSV). It provides both an interactive CLI and an Ollama-compatible REST API server (FastAPI), plus a secondary GGUF/llama.cpp inference server.
 
 ---
 
@@ -166,15 +166,19 @@ Wraps a SentencePiece BPE model with special token support.
 | `<unk>` | 1 | Unknown |
 | `<s>` | 2 | Start of sequence |
 | `</s>` | 3 | End of sequence |
-| `<thinking>` | varies | Chain-of-thought start |
-| `</thinking>` | varies | Chain-of-thought end |
+| `<thinking>` | varies | Content tag: opens reasoning block |
+| `</thinking>` | varies | Content tag: closes reasoning block |
+| `<\|context\|>` | varies | Mode token: marks CONTEXT sample |
+| `<\|answer\|>` | varies | Mode token: answer delimiter |
+| `<\|thinking\|>` | varies | Mode token: marks THINKING sample |
 
 **Key Methods:**
 - `encode(text)` / `decode(indices)` - Basic tokenization
 - `batch_encode(texts)` - Batch encoding
-- `get_thinking_index()` / `get_thinking_end_index()` - CoT token IDs
-- `has_thinking(text)` / `split_thinking(text)` / `extract_response(text)` - Thinking utilities
-- `encode_with_thinking(text)` - Thinking-aware encoding
+- `get_thinking_index()` / `get_thinking_end_index()` - Content tag IDs
+- `get_context_index()` / `get_answer_index()` / `get_thinking_mode_index()` - Mode token IDs
+- `has_thinking(text)` / `split_thinking(text)` / `extract_response(text)` - Content tag utilities
+- `has_mode_tokens(text)` / `split_mode(text)` - Mode token utilities
 - `save_vocabulary(filepath)` - Persist vocabulary metadata
 
 **Vocab Size:** Configurable via `--bpe-vocab-size` (default: 8000)
@@ -225,8 +229,6 @@ class TrainingConfig:
     num_threads: int = 0
     max_ram_fraction: float = 0.75
     thinking_loss_weight: float = 0.5
-    thinking_enabled: bool = True
-    thinking_max_tokens: int = 64
     bpe_vocab_size: int = 8000
     onlytokenize: bool = False
     enable_chunking: bool = False
@@ -347,8 +349,6 @@ class ChatConfig:
     gpu_indices: Optional[List[int]] = None  # [0, 1, 2] or None=auto
     use_vulkan: bool = False
     show_thinking: bool = False
-    thinking_enabled: bool = True
-    thinking_max_tokens: int = 64
 ```
 
 **Model Loading:**

@@ -11,8 +11,7 @@ class DialogueManager:
                  top_k=12, top_p=0.8, temperature=0.65, max_len=128,
                  min_length=5, no_repeat_ngram_size=3,
                  pad_token_id=None, eos_token_id=None, unk_token_id=None,
-                 default_response="Lo siento, no puedo responder ahora.",
-                 thinking_enabled=True, thinking_max_tokens=64):
+                 default_response="Lo siento, no puedo responder ahora."):
         self.model = model
         self.device = device
         self.tokenizer = tokenizer
@@ -33,11 +32,10 @@ class DialogueManager:
 
         self.default_response = default_response
 
-        # Thinking support
-        self.thinking_enabled = thinking_enabled
-        self.thinking_max_tokens = thinking_max_tokens
-        self.thinking_end_id = getattr(tokenizer, "get_thinking_end_index", lambda: -1)()
-        self.thinking_id = getattr(tokenizer, "get_thinking_index", lambda: -1)()
+        # Mode token IDs for structured generation
+        self.context_id = getattr(tokenizer, "get_context_index", lambda: -1)()
+        self.answer_id = getattr(tokenizer, "get_answer_index", lambda: -1)()
+        self.thinking_mode_id = getattr(tokenizer, "get_thinking_mode_index", lambda: -1)()
 
     def top_k_top_p_filtering(self, logits, top_k=0, top_p=1.0, filter_value=-float("Inf")):
         logits = logits.clone()
@@ -156,23 +154,8 @@ class DialogueManager:
 
         print(f"Intent: {intent_label} | Sentiment: {sentiment_label} | Temp: {adjusted_temperature:.2f}")
 
-        # Build enriched prompt with human-readable context
-        prompt_parts = [f"Pregunta: {user_text.strip()}"]
-
-        if intent_label:
-            intent_map = {
-                'POSITIVE': 'El usuario expresa algo positivo',
-                'NEGATIVE': 'El usuario expresa queja o frustración',
-                '1 star': 'El usuario está muy molesto',
-                '2 stars': 'El usuario está frustrado',
-                '3 stars': 'El usuario tiene una consulta neutral',
-                '4 stars': 'El usuario está satisfecho',
-                '5 stars': 'El usuario está muy contento',
-            }
-            intent_desc = intent_map.get(intent_label, f'Tono: {intent_label}')
-            prompt_parts.append(f"Contexto: {intent_desc}")
-
-        prompt_text = "\n".join(prompt_parts) + "\nPiensa paso a paso antes de responder.\n\nRespuesta:"
+        # Build prompt with mode tokens: <|thinking|>question<|answer|>
+        prompt_text = f"<|thinking|>{user_text.strip()}<|answer|>"
         try:
             input_ids = self.tokenizer.encode(prompt_text)
         except Exception:
@@ -185,10 +168,8 @@ class DialogueManager:
         src = torch.LongTensor([input_ids]).to(self.device)
 
         generated = []
-        in_thinking_phase = False
-        thinking_tokens = []
+        in_answer_phase = False
         response_tokens = []
-        thinking_token_count = 0
 
         # Pre-allocate token buffer to avoid O(n^2) torch.cat growth
         src_buf = torch.full((1, len(input_ids) + self.max_len), self.pad_token_id or 0, dtype=torch.long, device=self.device)
@@ -222,32 +203,18 @@ class DialogueManager:
                         break
 
                     # Enforce min_length: don't stop on EOS until minimum length reached
-                    # Also don't allow EOS during thinking phase
+                    # Don't stop during thinking phase (before <|answer|>)
                     if (self.eos_token_id is not None and next_token == self.eos_token_id
-                            and len(generated) >= self.min_length and not in_thinking_phase):
+                            and len(generated) >= self.min_length and in_answer_phase):
                         break
 
                     generated.append(next_token)
 
-                    # Thinking phase detection
-                    if self.thinking_enabled and self.thinking_end_id >= 0:
-                        if not in_thinking_phase and next_token == self.thinking_id and self.thinking_id >= 0:
-                            in_thinking_phase = True
-                            thinking_token_count = 0
-
-                        if in_thinking_phase:
-                            thinking_tokens.append(next_token)
-                            thinking_token_count += 1
-                            # Stop thinking phase on </thinking> or max thinking tokens
-                            if next_token == self.thinking_end_id or thinking_token_count >= self.thinking_max_tokens:
-                                in_thinking_phase = False
-                                # If we've used most of our generation budget on thinking,
-                                # break to avoid returning thinking-only output
-                                if len(generated) >= self.max_len * 0.75:
-                                    break
-                        else:
-                            response_tokens.append(next_token)
-                    else:
+                    # Answer phase detection: after <|answer|> token
+                    if self.answer_id >= 0 and next_token == self.answer_id:
+                        in_answer_phase = True
+                        response_tokens = []
+                    elif in_answer_phase:
                         response_tokens.append(next_token)
 
                     # Append token to context for autoregressive generation
@@ -315,18 +282,23 @@ class DialogueManager:
         response_text = None
 
         try:
-            if thinking_tokens and self.thinking_enabled:
-                # Decode thinking (skip the opening <thinking> token if present)
-                think_start = 0
-                if thinking_tokens and thinking_tokens[0] == self.thinking_id:
-                    think_start = 1
-                thinking_text = self.tokenizer.decode(thinking_tokens[think_start:])
-
-            if response_tokens:
-                response_text = self.tokenizer.decode(response_tokens)
+            # Decode all generated tokens to extract thinking
+            full_text = self.tokenizer.decode(generated)
+            
+            # Extract thinking from <|thinking|> to <|answer|>
+            if '<|thinking|>' in full_text and '<|answer|>' in full_text:
+                parts = full_text.split('<|answer|>')
+                thinking_part = parts[0]
+                # Remove the <|thinking|> prefix
+                if '<|thinking|>' in thinking_part:
+                    thinking_text = thinking_part.split('<|thinking|>', 1)[1].strip()
+                response_text = parts[1].strip() if len(parts) > 1 else None
             else:
-                # Fallback: decode all generated tokens
-                response_text = self.tokenizer.decode(generated)
+                # Fallback: use response_tokens if no mode tokens found
+                if response_tokens:
+                    response_text = self.tokenizer.decode(response_tokens)
+                else:
+                    response_text = full_text
         except Exception:
             try:
                 response_text = " ".join(self.tokenizer.convert_ids_to_tokens(response_tokens or generated))
