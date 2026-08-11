@@ -1,10 +1,12 @@
 """
 Model export: converts .pth checkpoints to GGUF, ONNX, and quantized formats.
+Includes license files and metadata for GPT-2 compliance.
 """
 import os
 import sys
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,6 +15,54 @@ import torch
 from commons.registry.model_registry import load_model_metadata, MODELS_DIR, EXPORTED_DIR
 
 logger = logging.getLogger(__name__)
+
+# Project root directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _copy_license_files(output_dir: str, used_pretrained: bool = False):
+    """Copy LICENSE and NOTICE files to the output directory.
+    
+    Args:
+        output_dir: Directory where license files will be copied
+        used_pretrained: Whether GPT-2 pretrained weights were used
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Copy LICENSE file
+    license_src = os.path.join(PROJECT_ROOT, "LICENSE")
+    if os.path.exists(license_src):
+        shutil.copy2(license_src, os.path.join(output_dir, "LICENSE"))
+    
+    # Copy NOTICE file
+    notice_src = os.path.join(PROJECT_ROOT, "NOTICE")
+    if os.path.exists(notice_src):
+        shutil.copy2(notice_src, os.path.join(output_dir, "NOTICE"))
+
+
+def _get_license_metadata(used_pretrained: bool = False) -> dict:
+    """Get license metadata for the model.
+    
+    Args:
+        used_pretrained: Whether GPT-2 pretrained weights were used
+        
+    Returns:
+        Dictionary with license information
+    """
+    license_info = {
+        "project_license": "MIT",
+        "project_copyright": "Copyright (c) 2026 MyIAModelChat"
+    }
+    
+    if used_pretrained:
+        license_info["pretrained_weights"] = {
+            "model": "GPT-2",
+            "license": "Modified MIT",
+            "copyright": "Copyright (c) 2019 OpenAI",
+            "notice": "This model uses pre-trained weights from GPT-2, licensed under the Modified MIT License."
+        }
+    
+    return license_info
 
 
 def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: int = 512) -> str:
@@ -106,10 +156,18 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
             'top_k': arch.get('top_k', 2),
             'load_balance_weight': arch.get('load_balance_weight', 0.01)
         }
+    
+    # Add license metadata
+    used_pretrained = ckpt.get('used_pretrained', False)
+    agentic_metadata['license'] = _get_license_metadata(used_pretrained)
+    
     metadata_path = output_path.replace('.onnx', '_metadata.json')
     with open(metadata_path, 'w', encoding='utf-8') as f:
         json.dump(agentic_metadata, f, indent=2, ensure_ascii=False)
-
+    
+    # Copy license files to exported directory
+    _copy_license_files(os.path.dirname(output_path), used_pretrained)
+    
     size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
     logger.info(f"ONNX exported: {output_path} ({size_mb} MB)")
     return output_path
@@ -293,6 +351,15 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
 
     # Save tokenizer files
     tokenizer.save_vocabulary(os.path.join(hf_dir, "tokenizer_vocab.json"))
+    
+    # Copy license files
+    used_pretrained = ckpt.get('used_pretrained', False)
+    _copy_license_files(hf_dir, used_pretrained)
+    
+    # Add license metadata
+    license_metadata = _get_license_metadata(used_pretrained)
+    with open(os.path.join(hf_dir, "LICENSE_INFO.json"), 'w') as f:
+        json.dump(license_metadata, f, indent=2)
 
     # Generate conversion scripts for the user (with absolute paths)
     hf_dir_abs = os.path.abspath(hf_dir)

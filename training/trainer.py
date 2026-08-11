@@ -1333,8 +1333,36 @@ class Trainer:
                 arch = resume_checkpoint.get('architecture', {})
                 embed_size = arch.get('embed_size', TRAINING_CONFIG['embed_size'])
                 num_layers = arch.get('num_layers', 4)
+                checkpoint_vocab_size = arch.get('vocab_size', self.tokenizer.vocab_size)
+                current_vocab_size = self.tokenizer.vocab_size
+                
                 model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
-                model.load_state_dict(resume_checkpoint['model_state_dict'])
+                
+                # Handle vocab_size mismatch
+                if checkpoint_vocab_size != current_vocab_size:
+                    if self.rank == 0:
+                        logger.warning(f" vocab_size mismatch: checkpoint={checkpoint_vocab_size}, current={current_vocab_size}")
+                        logger.info(" Loading only transformer layers (skipping embedding/head layers)...")
+                    
+                    # Filter out embedding and head layers
+                    state_dict = resume_checkpoint['model_state_dict']
+                    filtered_state_dict = {}
+                    for k, v in state_dict.items():
+                        # Skip embedding and head layers if vocab_size mismatch
+                        if 'wte.weight' in k or 'lm_head.weight' in k:
+                            if v.shape[0] != current_vocab_size:
+                                if self.rank == 0:
+                                    logger.info(f"   Skipping {k}: shape {v.shape} -> will be retrained")
+                                continue
+                        filtered_state_dict[k] = v
+                    
+                    # Load with strict=False to allow missing keys
+                    missing, unexpected = model.load_state_dict(filtered_state_dict, strict=False)
+                    if self.rank == 0 and missing:
+                        logger.info(f" Missing keys (will be retrained): {len(missing)}")
+                else:
+                    model.load_state_dict(resume_checkpoint['model_state_dict'])
+                
                 if self.rank == 0:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
             else:
@@ -1358,22 +1386,28 @@ class Trainer:
 
             # Restore optimizer and scheduler state if resuming
             if resume_checkpoint is not None:
-                if 'optimizer_state_dict' in resume_checkpoint:
-                    try:
-                        optimizer.load_state_dict(resume_checkpoint['optimizer_state_dict'])
-                        if self.rank == 0:
-                            logger.info(" Optimizer state restored")
-                    except Exception as e:
-                        if self.rank == 0:
-                            logger.warning(f" Could not restore optimizer state: {e}")
-                if 'scheduler_state_dict' in resume_checkpoint:
-                    try:
-                        scheduler.load_state_dict(resume_checkpoint['scheduler_state_dict'])
-                        if self.rank == 0:
-                            logger.info(" Scheduler state restored")
-                    except Exception as e:
-                        if self.rank == 0:
-                            logger.warning(f" Could not restore scheduler state: {e}")
+                # Skip optimizer state if vocab_size mismatch (shapes won't match)
+                if checkpoint_vocab_size != current_vocab_size:
+                    if self.rank == 0:
+                        logger.info(" Skipping optimizer/scheduler restore due to vocab_size mismatch")
+                else:
+                    if 'optimizer_state_dict' in resume_checkpoint:
+                        try:
+                            optimizer.load_state_dict(resume_checkpoint['optimizer_state_dict'])
+                            if self.rank == 0:
+                                logger.info(" Optimizer state restored")
+                        except Exception as e:
+                            if self.rank == 0:
+                                logger.warning(f" Could not restore optimizer state: {e}")
+                    if 'scheduler_state_dict' in resume_checkpoint:
+                        try:
+                            scheduler.load_state_dict(resume_checkpoint['scheduler_state_dict'])
+                            if self.rank == 0:
+                                logger.info(" Scheduler state restored")
+                        except Exception as e:
+                            if self.rank == 0:
+                                logger.warning(f" Could not restore scheduler state: {e}")
+                
                 if 'loss' in resume_checkpoint:
                     self.best_loss = resume_checkpoint['loss']
                     if self.rank == 0:
@@ -1475,6 +1509,7 @@ class Trainer:
                                 'vocab_size': self.tokenizer.vocab_size,
                             },
                             'dataset_source': self.dataset_source,
+                            'used_pretrained': getattr(self.config, 'pretrained', False),
                         }, epoch_path)
                         logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
                     # Synchronize all processes after checkpoint save
@@ -1526,6 +1561,7 @@ class Trainer:
                         'vocab_size': self.tokenizer.vocab_size,
                     },
                     'dataset_source': self.dataset_source,
+                    'used_pretrained': getattr(self.config, 'pretrained', False),
                 }, self.model_output_path)
                 logger.info(f" Model + tokenizer saved to {self.model_output_path}")
 
