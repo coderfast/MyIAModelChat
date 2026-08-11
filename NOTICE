@@ -1,0 +1,35 @@
+MyIAModelChat
+Copyright (c) 2026
+
+This project is licensed under the MIT License.
+
+================================================================================
+THIRD-PARTY SOFTWARE NOTICES
+================================================================================
+
+GPT-2 (Pre-trained Weights)
+Licensed under the Modified MIT License
+Copyright (c) 2019 OpenAI
+
+This project may load pre-trained weights from GPT-2, which are subject to
+the following license:
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software.
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+================================================================================
+MAJOR DEPENDENCIES
+================================================================================
+
+- PyTorch: BSD License
+- Transformers (Hugging Face): Apache License 2.0
+- SentencePiece: Apache License 2.0
+- FastAPI: MIT License
+- NumPy: BSD License
+- Hugging Face Hub: Apache License 2.0
