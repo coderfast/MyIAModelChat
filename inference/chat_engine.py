@@ -66,18 +66,17 @@ def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
 
 
 def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
-    """Build prompt from message list."""
+    """Build prompt from message list using GPT-2 standard tokens."""
     parts: List[str] = []
     for message in messages:
         role = str(message.get('role', 'user')).lower()
         content = str(message.get('content', ''))
         if role == 'system':
-            parts.append(f"System: {content}")
+            parts.append(f"<|user|>{content}<|assistant|>")
         elif role == 'assistant':
-            parts.append(f"Assistant: {content}")
+            parts.append(f"{content}")
         else:
-            parts.append(f"User: {content}")
-    parts.append('Assistant:')
+            parts.append(f"<|user|>{content}<|assistant|>")
     return '\n'.join(parts)
 
 

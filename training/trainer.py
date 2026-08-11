@@ -118,6 +118,7 @@ class TrainingConfig:
     num_threads: int = 0
     max_ram_fraction: float = 0.75
     max_ram_bytes: Optional[int] = None
+    pretrained: bool = False
     thinking_loss_weight: float = 1.0
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
@@ -1318,9 +1319,13 @@ class Trainer:
             # Setup device with improved configuration for CPU-GPU combined training
             device = self._setup_device_and_config()
 
-            # Initialize model — resume from checkpoint if it exists
+            # Initialize model — resume from checkpoint if it exists (skip if --pretrained)
             resume_checkpoint = None
-            if os.path.exists(self.model_output_path):
+            use_pretrained = getattr(self.config, 'pretrained', False)
+            if use_pretrained and self.rank == 0:
+                logger.info("--pretrained flag detected, ignoring existing checkpoint (fresh start with GPT-2 weights)")
+
+            if not use_pretrained and os.path.exists(self.model_output_path):
                 if self.rank == 0:
                     logger.info(f"Found existing checkpoint: {self.model_output_path}")
                     logger.info("Resuming training from checkpoint...")
@@ -1334,8 +1339,11 @@ class Trainer:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
             else:
                 if self.rank == 0:
-                    logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, hidden_size={TRAINING_CONFIG['hidden_size']}, num_layers=4)...")
-                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
+                    msg = f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4"
+                    if use_pretrained:
+                        msg += ", pretrained=True"
+                    logger.info(f"{msg})...")
+                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4, pretrained=use_pretrained)
 
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:

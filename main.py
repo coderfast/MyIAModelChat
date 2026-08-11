@@ -354,6 +354,8 @@ EXAMPLES:
         parser.add_argument("--refresh-cache", action='store_true', help="Rebuild cache (for --prepare-data)")
         parser.add_argument("--statistics", action='store_true', help="Show detailed per-step timing statistics during training")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
+        parser.add_argument("--pretrained", action='store_true',
+                            help="Initialize model with pre-trained GPT-2 weights from HuggingFace")
 
         # Device selection
         parser.add_argument("--cpu", action='store_true', help="Force CPU-only execution (disable GPU)")
@@ -462,6 +464,13 @@ EXAMPLES:
                             help="Directory for audit reports (default: dataset_preparer/contamination/reports/)")
         
         args = parser.parse_args()
+
+        # Force agent_ratio=0 for small models — can't learn agentic patterns
+        # Default embed_size is 256 (< 300), so agentic is disabled unless user overrides
+        if hasattr(args, 'agent_ratio') and args.agent_ratio > 0:
+            args.agent_ratio = 0.0
+            args.agent_enabled = False
+            logger.info("Agent ratio forced to 0.0 (model too small for agentic patterns)")
 
         # Handle --gpu-enum before validation
         if args.gpu_enum:
@@ -616,6 +625,7 @@ EXAMPLES:
                 num_threads=args.num_threads,
                 max_ram_fraction=args.max_ram_fraction,
                 max_ram_bytes=getattr(args, 'max_ram_bytes', None),
+                pretrained=getattr(args, 'pretrained', False),
                 thinking_loss_weight=args.thinking_loss_weight,
                 thinking_enabled=args.thinking_enabled,
                 thinking_max_tokens=args.thinking_max_tokens,

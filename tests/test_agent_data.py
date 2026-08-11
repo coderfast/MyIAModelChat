@@ -12,7 +12,7 @@ class TestAgentThinkingGenerator:
         result = gen.generate(sample)
         assert result is not None
         assert result.get('has_tool_call') is True
-        assert "<tool_call>" in result.get('input_ids', '')
+        assert "<|tool_call|>" in result.get('input_ids', '')
         assert "calculator" in result.get('tool_name', '')
 
     def test_generate_date_tool_call(self):

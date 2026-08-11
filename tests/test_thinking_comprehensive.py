@@ -17,7 +17,7 @@ DATASET_CACHE = os.path.join(os.path.dirname(__file__), '..', 'dataset_cache')
 # ============================================================
 
 def test_bpe_thinking_symbols_registered():
-    """Verify <thought> and </thought> are in the BPE vocabulary."""
+    """Verify <|problem|>, <|thinking|>, <|final|> are in the BPE vocabulary."""
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
@@ -27,23 +27,26 @@ def test_bpe_thinking_symbols_registered():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    thinking_id = wrapper.get_thinking_index()
-    thinking_end_id = wrapper.get_thinking_end_index()
+    problem_id = wrapper.get_problem_index()
+    thinking_mode_id = wrapper.get_thinking_mode_index()
+    final_id = wrapper.get_final_index()
 
-    assert thinking_id >= 0, f"thinking_id should be >= 0, got {thinking_id}"
-    assert thinking_end_id >= 0, f"thinking_end_id should be >= 0, got {thinking_end_id}"
-    assert thinking_id != thinking_end_id, "thinking and thinking_end should have different ids"
+    assert problem_id >= 0, f"problem_id should be >= 0, got {problem_id}"
+    assert thinking_mode_id >= 0, f"thinking_mode_id should be >= 0, got {thinking_mode_id}"
+    assert final_id >= 0, f"final_id should be >= 0, got {final_id}"
 
     # Verify they decode to the correct strings
-    decoded = wrapper.sp.id_to_piece(thinking_id)
-    assert 'thought' in decoded.lower() or '<thinking>' in decoded, f"Unexpected token: {decoded}"
-    decoded_end = wrapper.sp.id_to_piece(thinking_end_id)
-    assert 'thought' in decoded_end.lower() or '</thinking>' in decoded_end, f"Unexpected token: {decoded_end}"
-    print("PASS: BPE thinking symbols registered and working")
+    decoded_problem = wrapper.sp.id_to_piece(problem_id)
+    assert '<|problem|>' in decoded_problem, f"Unexpected token: {decoded_problem}"
+    decoded_thinking = wrapper.sp.id_to_piece(thinking_mode_id)
+    assert '<|thinking|>' in decoded_thinking, f"Unexpected token: {decoded_thinking}"
+    decoded_final = wrapper.sp.id_to_piece(final_id)
+    assert '<|final|>' in decoded_final, f"Unexpected token: {decoded_final}"
+    print("PASS: BPE GPT-2 standard symbols registered and working")
 
 
 def test_bpe_encode_preserves_thinking_tags():
-    """Verify BPE encode preserves <think> tags in text."""
+    """Verify BPE encode preserves <|problem|>, <|thinking|>, <|final|> tokens."""
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
@@ -53,22 +56,22 @@ def test_bpe_encode_preserves_thinking_tags():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    text_with_thinking = "<thinking>El usuario pregunta sobre Python. Python es un lenguaje.</thinking>La respuesta es 42."
-    encoded = wrapper.encode(text_with_thinking, add_bos=False, add_eos=False)
+    text_with_thinking = "<|problem|>Pregunta<thinking>El usuario pregunta sobre Python. Python es un lenguaje.</thinking><|final|>La respuesta es 42."
+    encoded = wrapper.encode(text_with_thinking)
 
     assert len(encoded) > 0, "Encoded should not be empty"
 
-    # Check that thinking tokens are present
-    thinking_id = wrapper.get_thinking_index()
-    thinking_end_id = wrapper.get_thinking_end_index()
-    assert thinking_id in encoded, f"<thought> token not found in encoded: {encoded}"
-    assert thinking_end_id in encoded, f"</thought> token not found in encoded: {encoded}"
+    # Check that problem and final tokens are present (GPT-2 standard)
+    problem_id = wrapper.get_problem_index()
+    final_id = wrapper.get_final_index()
+    assert problem_id in encoded, f"<|problem|> token not found in encoded: {encoded}"
+    assert final_id in encoded, f"<|final|> token not found in encoded: {encoded}"
 
-    # Verify ordering: <thought> before </thought>
-    open_pos = encoded.index(thinking_id)
-    close_pos = encoded.index(thinking_end_id)
-    assert open_pos < close_pos, f"<thought> at {open_pos} should be before </thought> at {close_pos}"
-    print("PASS: BPE encode preserves thinking tags")
+    # Verify ordering: <|problem|> before <|final|>
+    problem_pos = encoded.index(problem_id)
+    final_pos = encoded.index(final_id)
+    assert problem_pos < final_pos, f"<|problem|> at {problem_pos} should be before <|final|> at {final_pos}"
+    print("PASS: BPE encode preserves GPT-2 standard tokens")
 
 
 def test_bpe_has_thinking_method():
@@ -355,21 +358,23 @@ def test_thinking_metrics_accumulation():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    # Encode a text with thinking tags
-    text = "<thinking>Análizo la pregunta.</thinking>La respuesta es 42."
+    # Encode a text with GPT-2 standard tokens
+    text = "<|problem|>Pregunta<|thinking|>Análizo la pregunta.<|final|>La respuesta es 42."
     token_ids = wrapper.encode(text)
 
-    thinking_id = wrapper.get_thinking_index()
-    thinking_end_id = wrapper.get_thinking_end_index()
+    problem_id = wrapper.get_problem_index()
+    thinking_mode_id = wrapper.get_thinking_mode_index()
+    final_id = wrapper.get_final_index()
 
-    # Count thinking positions
-    thinking_positions = sum(1 for t in token_ids if t == thinking_id or t == thinking_end_id)
-    assert thinking_positions == 2, f"Expected 2 thinking positions, got {thinking_positions}"
+    # Count GPT-2 standard token positions
+    gpt2_positions = sum(1 for t in token_ids if t in (problem_id, thinking_mode_id, final_id))
+    assert gpt2_positions == 3, f"Expected 3 GPT-2 standard positions, got {gpt2_positions}"
 
     # Verify ordering
-    first_thinking = token_ids.index(thinking_id)
-    first_end = token_ids.index(thinking_end_id)
-    assert first_thinking < first_end, "Opening tag should come before closing tag"
+    first_problem = token_ids.index(problem_id)
+    first_thinking = token_ids.index(thinking_mode_id)
+    first_final = token_ids.index(final_id)
+    assert first_problem < first_thinking < first_final, "Order should be problem -> thinking -> final"
     print("PASS: Thinking metrics computed correctly")
 
 
@@ -392,7 +397,7 @@ def test_thinking_sample_format():
 
 
 def test_thinking_token_positions():
-    """Verify tokenizer correctly identifies thinking token positions."""
+    """Verify tokenizer correctly identifies GPT-2 standard token positions."""
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 
     model_path = os.path.join(DATASET_CACHE, 'sentencepiece.model')
@@ -401,19 +406,22 @@ def test_thinking_token_positions():
         return
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
-    text = "<thinking>Razonamiento aquí</thinking>La respuesta es 42."
+    text = "<|problem|>Pregunta<|thinking|>Razonamiento aquí<|final|>La respuesta es 42."
     token_ids = wrapper.encode(text)
 
-    thinking_id = wrapper.get_thinking_index()
-    thinking_end_id = wrapper.get_thinking_end_index()
+    problem_id = wrapper.get_problem_index()
+    thinking_mode_id = wrapper.get_thinking_mode_index()
+    final_id = wrapper.get_final_index()
 
-    assert thinking_id in token_ids, f"<thinking> token not found in {token_ids}"
-    assert thinking_end_id in token_ids, f"</thinking> token not found in {token_ids}"
+    assert problem_id in token_ids, f"<|problem|> token not found in {token_ids}"
+    assert thinking_mode_id in token_ids, f"<|thinking|> token not found in {token_ids}"
+    assert final_id in token_ids, f"<|final|> token not found in {token_ids}"
 
-    start_pos = token_ids.index(thinking_id)
-    end_pos = token_ids.index(thinking_end_id)
-    assert start_pos < end_pos, f"<thinking> at {start_pos} should be before </thinking> at {end_pos}"
-    print("PASS: Thinking token positions correct")
+    problem_pos = token_ids.index(problem_id)
+    thinking_pos = token_ids.index(thinking_mode_id)
+    final_pos = token_ids.index(final_id)
+    assert problem_pos < thinking_pos < final_pos, f"Order should be <|problem|> ({problem_pos}) < <|thinking|> ({thinking_pos}) < <|final|> ({final_pos})"
+    print("PASS: GPT-2 standard token positions correct")
 
 
 def test_thinking_loss_weight_application():

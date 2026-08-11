@@ -47,7 +47,7 @@ class TestChatModel:
         params = list(sig.parameters.keys())
         # Remove 'self'
         params = [p for p in params if p != 'self']
-        assert params == ['tokenizer', 'embed_size', 'num_layers'], f"Unexpected params: {params}"
+        assert params == ['tokenizer', 'embed_size', 'num_layers', 'pretrained'], f"Unexpected params: {params}"
 
     def test_forward_output_shape(self):
         from commons.model.chatmodel import ChatModel

@@ -26,14 +26,14 @@ class TestModeTokens:
         assert isinstance(ctx_id, int)
         if ctx_id >= 0:
             token = sp_tokenizer.idx2word.get(ctx_id, '')
-            assert '<|context|>' in token
+            assert '<|problem|>' in token
 
     def test_get_answer_index(self, sp_tokenizer):
         ans_id = sp_tokenizer.get_answer_index()
         assert isinstance(ans_id, int)
         if ans_id >= 0:
             token = sp_tokenizer.idx2word.get(ans_id, '')
-            assert '<|answer|>' in token
+            assert '<|final|>' in token
 
     def test_get_thinking_mode_index(self, sp_tokenizer):
         tm_id = sp_tokenizer.get_thinking_mode_index()
@@ -56,16 +56,16 @@ class TestModeTokens:
         assert "AI is artificial intelligence." in content
 
     def test_split_mode_context(self, sp_tokenizer):
-        text = "<|context|>What is AI?<|answer|>AI is artificial intelligence."
+        text = "<|problem|>What is AI?<|final|>AI is artificial intelligence."
         mode, content = sp_tokenizer.split_mode(text)
-        assert mode == "context"
+        assert mode == "problem"
         assert "What is AI?" in content
         assert "AI is artificial intelligence." in content
 
     def test_split_mode_no_tokens(self, sp_tokenizer):
         text = "What is AI?"
         mode, content = sp_tokenizer.split_mode(text)
-        assert mode == "context"
+        assert mode == "problem"
         assert content == "What is AI?"
 
     def test_encode_decode_with_mode_tokens(self, sp_tokenizer):

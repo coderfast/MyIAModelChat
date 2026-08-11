@@ -4,6 +4,16 @@
 
 MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, chain-of-thought reasoning (`<thinking>`), and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
 
+**GPT-2 Standard Tokens:**
+- `<|problem|>` - Question/problem prefix
+- `<|thinking|>` - Reasoning prefix
+- `<|final|>` - Answer prefix
+- `<|user|>` - User prefix (agentic)
+- `<|assistant|>` - Assistant prefix (agentic)
+- `<tool_call>` - Tool call start
+- `</tool_call>` - Tool call end
+- `<|tool_result|>` - Tool result prefix
+
 ---
 
 ## Project Structure
@@ -171,12 +181,15 @@ pytest tests/test_thinking.py tests/test_thinking_engine.py tests/test_thinking_
 
 ### Training Commands
 
-`ash
+```bash
 # Prepare data with BPE tokenizer
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
 
 # Train model (default checkpoint name)
 python main.py --train --epochs 30
+
+# Train with pre-trained GPT-2 weights (ignores existing checkpoint)
+python main.py --train --epochs 30 --pretrained
 
 # Train with custom name and dataset
 python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
@@ -192,18 +205,34 @@ python main.py --chat --model ciencias_naturales+programacion
 
 # Export model
 python main.py --export ciencias_naturales --formats gguf,onnx
-`
+```
 
 ### API Server
 
-`ash
+```bash
 # Start FastAPI server (from envAIModels/)
 python -m envAIModels.app
 
 # API endpoints
 POST /v1/chat/completions  # Chat completion
 GET  /v1/models            # List available models
-`
+```
+
+### `--pretrained` Flag
+
+**What it does:** Loads GPT-2 Small (117M) weights into our small architecture.
+
+**Behavior:**
+| Scenario | Result |
+|----------|--------|
+| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
+| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
+| No `--pretrained` + checkpoint | Continues training from checkpoint |
+| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
+
+**Expected improvement:**
+- Without `--pretrained`: Loss ~6.0 → ~4.75 (1 epoch)
+- With `--pretrained`: Loss ~4.5 → ~3.5 (1 epoch)
 
 ---
 

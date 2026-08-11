@@ -34,10 +34,23 @@ class DialogueManager:
 
         self.default_response = default_response
 
-        # Mode token IDs for structured generation
+        # GPT-2 standard token IDs
+        self.problem_id = getattr(tokenizer, "get_problem_index", lambda: -1)()
+        self.final_id = getattr(tokenizer, "get_final_index", lambda: -1)()
+        self.user_id = getattr(tokenizer, "get_user_index", lambda: -1)()
+        self.assistant_id = getattr(tokenizer, "get_assistant_index", lambda: -1)()
+        self.tool_result_id = getattr(tokenizer, "get_tool_result_index", lambda: -1)()
+
+        # Legacy token IDs (backward compat)
         self.context_id = getattr(tokenizer, "get_context_index", lambda: -1)()
         self.answer_id = getattr(tokenizer, "get_answer_index", lambda: -1)()
         self.thinking_mode_id = getattr(tokenizer, "get_thinking_mode_index", lambda: -1)()
+
+        # Agentic token IDs
+        self.tool_call_id = getattr(tokenizer, "get_tool_call_index", lambda: -1)()
+        self.tool_call_end_id = getattr(tokenizer, "get_tool_call_end_index", lambda: -1)()
+        self.observation_id = getattr(tokenizer, "get_observation_index", lambda: -1)()
+        self.observation_end_id = getattr(tokenizer, "get_observation_end_index", lambda: -1)()
 
         # Agent support
         self.tool_executor = tool_executor
@@ -215,16 +228,21 @@ class DialogueManager:
                     if next_token is None:
                         break
 
+                    # Stop on agentic end tokens (model finished tool call or observation)
+                    if (self.tool_call_end_id >= 0 and next_token == self.tool_call_end_id):
+                        break
+                    if (self.observation_end_id >= 0 and next_token == self.observation_end_id):
+                        break
+
                     # Enforce min_length: don't stop on EOS until minimum length reached
-                    # Don't stop during thinking phase (before <|answer|>)
                     if (self.eos_token_id is not None and next_token == self.eos_token_id
-                            and len(generated) >= self.min_length and in_answer_phase):
+                            and len(generated) >= self.min_length):
                         break
 
                     generated.append(next_token)
 
-                    # Answer phase detection: after <|answer|> token
-                    if self.answer_id >= 0 and next_token == self.answer_id:
+                    # Answer phase detection: after <|final|> token
+                    if self.final_id >= 0 and next_token == self.final_id:
                         in_answer_phase = True
                         response_tokens = []
                     elif in_answer_phase:
@@ -410,8 +428,8 @@ class DialogueManager:
                     src_buf[0, src_len] = next_token
                     src_len += 1
 
-                    # Stop on answer end or EOS
-                    if self.answer_id >= 0 and next_token == self.answer_id:
+                    # Stop on final token or EOS
+                    if self.final_id >= 0 and next_token == self.final_id:
                         break
         except Exception as e:
             logger.debug(f"Agent generation error: {e}")

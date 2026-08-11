@@ -116,9 +116,9 @@ class ThinkingGenerator:
     def _format_thinking_sample(self, sample: Dict[str, Any], thinking: str) -> Dict[str, Any]:
         """Format a sample with thinking block for training.
 
-        Produces two types of samples:
-        - THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
-        - CONTEXT: <|context|>question<|answer|>answer
+        GPT-2 standard format:
+        - THINKING: <|problem|>question<thinking>reasoning</thinking><|final|>answer
+        - TEXT: <|problem|>question<|final|>answer
         """
         result = dict(sample)
 
@@ -131,14 +131,14 @@ class ThinkingGenerator:
         if thinking and answer:
             result['thinking'] = thinking
             result['type'] = 'THINKING'
-            thinking_text = f"<|thinking|>{question}<thinking>{thinking}</thinking><|answer|>{answer}"
+            thinking_text = f"<|problem|>{question}<thinking>{thinking}</thinking><|final|>{answer}"
             result['thinking_text'] = thinking_text
             result['input_ids'] = thinking_text
             result['original_text'] = answer
         else:
             result['thinking'] = ''
-            result['type'] = 'CONTEXT'
-            context_text = f"<|context|>{question}<|answer|>{answer}"
+            result['type'] = 'TEXT'
+            context_text = f"<|problem|>{question}<|final|>{answer}"
             result['input_ids'] = context_text
             result['original_text'] = answer
 

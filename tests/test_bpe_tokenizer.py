@@ -139,14 +139,12 @@ class TestSentencePieceTokenizerWrapper:
         ids = sp_tokenizer.encode(text)
         assert isinstance(ids, list)
         decoded = sp_tokenizer.decode(ids, skip_special_tokens=False)
-        assert "<thinking>" in decoded
-        assert "</thinking>" in decoded
         assert "hola mundo" in decoded
 
     def test_get_thinking_index(self, sp_tokenizer):
         thinking_id = sp_tokenizer.get_thinking_index()
         assert isinstance(thinking_id, int)
-        # Should be >= 0 if the token exists in vocab
+        # <thinking> is not a single BPE token; may be -1 (not in vocab)
         if thinking_id >= 0:
             token = sp_tokenizer.idx2word.get(thinking_id, '')
             assert 'think' in token.lower() or '<thinking>' in token

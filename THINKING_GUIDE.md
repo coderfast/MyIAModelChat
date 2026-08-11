@@ -2,61 +2,50 @@
 
 ## Overview
 
-MyIAModelChat supports **chain-of-thought reasoning** using a dual-token system. The model learns to generate structured reasoning before answering, improving response quality through explicit thinking steps.
+MyIAModelChat supports **chain-of-thought reasoning** using GPT-2 standard tokens. The model learns to generate structured reasoning before answering, improving response quality through explicit thinking steps.
 
 ---
 
 ## Token System
 
-### Two Types of Tokens
-
-The system uses **mode tokens** (structural) and **content tags** (reasoning delimiters):
-
-#### Mode Tokens (structural, pipe-delimited)
+### GPT-2 Standard Tokens
 
 | Token | Role |
 |-------|------|
-| `<\|thinking\|>` | Prefix marking a THINKING sample (has chain-of-thought) |
-| `<\|context\|>` | Prefix marking a CONTEXT sample (direct Q&A) |
-| `<\|answer\|>` | Delimiter separating preamble from the final answer |
-
-#### Content Tags (reasoning delimiters, angle-bracket)
-
-| Token | Role |
-|-------|------|
-| `<thinking>` | Opens the reasoning block |
-| `</thinking>` | Closes the reasoning block |
+| `<\|problem\|>` | Prefix marking the question/problem |
+| `<\|thinking\|>` | Prefix marking the reasoning section |
+| `<\|final\|>` | Prefix marking the final answer |
 
 ### Sample Formats
 
 #### THINKING sample (with chain-of-thought)
 
 ```
-<|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+<|problem|>question<|thinking|>reasoning<|final|>answer
 ```
 
 Breakdown:
 ```
-<|thinking|>        ← MODE TOKEN: marks this as THINKING sample
+<|problem|>         ← TOKEN: marks the question
 question            ← User's question (plain text)
-<thinking>           ← CONTENT TAG: opens reasoning block
+<|thinking|>        ← TOKEN: marks start of reasoning
 reasoning           ← Chain-of-thought text (NLP analysis)
-</thinking>         ← CONTENT TAG: closes reasoning block
-<|answer|>          ← MODE TOKEN: marks start of final answer
+<|final|>           ← TOKEN: marks start of final answer
 answer              ← The actual answer
 ```
 
-#### CONTEXT sample (direct Q&A, no reasoning)
+#### TEXT sample (direct Q&A, no reasoning)
 
 ```
-<|context|>question<|answer|>answer
+<|problem|>question<|final|>answer
 ```
 
-### Why Both Token Types?
+### Why These Tokens?
 
-- **Mode tokens** define the **sample structure** and guide loss computation at the top level
-- **Content tags** enable **fine-grained loss weighting** within THINKING samples
-- The model learns to recognize when to think and when to answer directly
+- **`<|problem|>`** clearly marks the input question
+- **`<|thinking|>`** enables chain-of-thought reasoning
+- **`<|final|>`** separates reasoning from the answer
+- Follows GPT-2 standard format for compatibility
 
 ---
 
@@ -91,10 +80,10 @@ Each training sample is stored with these columns:
 
 The trainer applies **differentiated loss** based on token position and sample type:
 
-### CONTEXT samples
+### TEXT samples (no thinking)
 
 ```
-<|context|>question<|answer|>answer
+<|problem|>question<|final|>answer
 ───────────────────────── ────────────
   weight = 0.0              weight = 1.0
 ```
@@ -102,19 +91,18 @@ The trainer applies **differentiated loss** based on token position and sample t
 ### THINKING samples
 
 ```
-<|thinking|>question<thinking>reasoning</thinking><|answer|>answer
-────────────────────────── ──────────────────────  ──────────────
+<|problem|>question<thinking|>reasoning<|final|>answer
+────────────────────────── ────────────────────  ──────────────
   weight = 0.0                weight = 0.5            weight = 1.0
   (preamble)                  (reasoning)             (answer)
 ```
 
 | Segment | Weight | Rationale |
 |---------|--------|-----------|
-| Preamble (before `<thinking>`) | 0.0 | Don't penalize prefix learning |
-| `<thinking>` delimiter | 1.0 | Must learn delimiter |
+| Preamble (before `<|thinking|>`) | 0.0 | Don't penalize prefix learning |
+| `<|thinking|>` delimiter | 1.0 | Must learn delimiter |
 | Reasoning content | 0.5 | Learn structure, allow variation |
-| `</thinking>` delimiter | 1.0 | Must learn delimiter |
-| `<\|answer\|>` delimiter | 1.0 | Must learn delimiter |
+| `<|final|>` delimiter | 1.0 | Must learn delimiter |
 | Answer tokens | 1.0 | Full weight on response |
 
 ### Configuration
@@ -145,13 +133,20 @@ python main.py --prepare-data --aiml --hf --thinking-mode nlp --allowed-language
 ### 2. Entrenar el modelo
 
 ```bash
+# Standard training (random init)
 python main.py --train --epochs 30
 
-# With CPU-only mode
+# With pre-trained GPT-2 weights (better initialization)
+python main.py --train --epochs 30 --pretrained
+
+# CPU-only mode
 python main.py --train --cpu --epochs 30
 
+# With pre-trained + CPU
+python main.py --train --cpu --epochs 30 --pretrained
+
 # With specific checkpoint
-python main.py --train --checkpoint-name my_model --epochs 30
+python main.py --train --checkpoint-name my_model --epochs 30 --pretrained
 ```
 
 ### 3. Inferencia
@@ -171,7 +166,7 @@ python main.py --chat --model my_model --show-thinking
 All thinking tokens are registered as `user_defined_symbols` during SentencePiece BPE training:
 
 ```
---user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>
+--user_defined_symbols=<|problem|>,<|thinking|>,<|final|>,<|user|>,<|assistant|>,<tool_call>,</tool_call>,<|tool_result|>
 ```
 
 This ensures they are **never fragmented** into sub-tokens (always whole tokens).
@@ -184,11 +179,13 @@ This ensures they are **never fragmented** into sub-tokens (always whole tokens)
 | `<unk>` | `get_unk_index()` |
 | `<s>` | `get_bos_index()` |
 | `</s>` | `get_eos_index()` |
-| `<thinking>` | `get_thinking_index()` |
-| `</thinking>` | `get_thinking_end_index()` |
-| `<\|context\|>` | `get_context_index()` |
-| `<\|answer\|>` | `get_answer_index()` |
-| `<\|thinking\|>` | `get_thinking_mode_index()` |
+| `<\|problem\|>` | `get_problem_index()` |
+| `<\|thinking\|>` | `get_thinking_index()` |
+| `<\|final\|>` | `get_final_index()` |
+| `<\|user\|>` | `get_user_index()` |
+| `<\|assistant\|>` | `get_assistant_index()` |
+| `<tool_call>` | `get_tool_call_index()` |
+| `<\|tool_result\|>` | `get_tool_result_index()` |
 
 ---
 
@@ -250,9 +247,9 @@ Training batch 50/inf in progress...
 
 | Metric | Description |
 |--------|-------------|
-| `thinking_token_accuracy` | Combined accuracy for `<thinking>` and `</thinking>` delimiters |
-| `thinking_open_accuracy` | Accuracy for `<thinking>` opening tag |
-| `thinking_close_accuracy` | Accuracy for `</thinking>` closing tag |
+| `thinking_token_accuracy` | Combined accuracy for `<\|thinking\|>` and `<\|final\|>` delimiters |
+| `thinking_open_accuracy` | Accuracy for `<\|thinking\|>` opening token |
+| `thinking_close_accuracy` | Accuracy for `<\|final\|>` closing token |
 | `thinking_coverage` | Ratio of thinking tokens to total tokens |
 | `thinking_token_accuracy_full` | Accuracy on all thinking content tokens |
 | `response_token_accuracy` | Accuracy on answer tokens |
@@ -278,17 +275,25 @@ python main.py --chat
 
 ### Response Parsing
 
-The dialogue manager uses mode tokens for inference:
+The dialogue manager uses GPT-2 standard tokens for inference:
 
 ```python
 # Builds prompt as:
-<|thinking|>question<|answer|>
+<|problem|>question<|thinking|>
 
-# Parses response by splitting on <|answer|>
+# Parses response by splitting on <|final|>
 # Extracts thinking portion and clean response
 ```
 
-Fallback parsing uses content tags (`<thinking>...</thinking>`) when mode tokens are not present.
+### Token Reference
+
+| Token | Purpose |
+|-------|---------|
+| `<\|problem\|>` | Marks the question |
+| `<\|thinking\|>` | Opens reasoning block |
+| `<\|final\|>` | Opens final answer |
+| `<\|user\|>` | User message (agentic) |
+| `<\|assistant\|>` | Assistant response (agentic) |
 
 ### API
 
@@ -313,6 +318,34 @@ Response with thinking:
   }]
 }
 ```
+
+---
+
+## `--pretrained` Flag
+
+### What it does
+Loads GPT-2 Small (117M) weights into our small architecture (4 layers, 256 hidden, 4 heads).
+
+### Usage
+```bash
+# Standard training (random init)
+python main.py --train --epochs 30
+
+# With GPT-2 pre-trained weights (better initialization)
+python main.py --train --epochs 30 --pretrained
+```
+
+### Behavior
+| Scenario | Result |
+|----------|--------|
+| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
+| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
+| No `--pretrained` + checkpoint | Continues training from checkpoint |
+| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
+
+### Expected improvement
+- **Without `--pretrained`**: Loss ~6.0 → ~4.75 (1 epoch)
+- **With `--pretrained`**: Loss ~4.5 → ~3.5 (1 epoch)
 
 ---
 

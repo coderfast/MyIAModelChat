@@ -725,8 +725,8 @@ class AIMLParser:
         clean_pattern = self._ensure_no_wildcards(pattern)
         clean_template = self._ensure_no_wildcards(template)
 
-        # Build input_ids as "PATTERN: RESPONSE"
-        input_ids = f"{clean_pattern}: {clean_template}"
+        # GPT-2 standard format: <|problem|>question<|final|>answer
+        input_ids = f"<|problem|>{clean_pattern}<|final|>{clean_template}"
 
         # Check if wildcards were resolved
         wildcards_resolved = (

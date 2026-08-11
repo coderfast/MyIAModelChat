@@ -575,47 +575,84 @@ class DataPreparer:
             if self.combined_data is None:
                 return
             
-            logger.info("💾 Saving dataset to cache...")
+            logger.info("Saving dataset to cache...")
             
             # Save dataset
             self.combined_data.save_to_disk(CACHE_DATASET_FILE)
-            logger.info(f"  ✓ Saved dataset: {CACHE_DATASET_FILE}")
+            logger.info(f"  Saved dataset: {CACHE_DATASET_FILE}")
             
             # Save statistics
             with open(CACHE_STATS_FILE, 'wb') as f:
                 pickle.dump(self.statistics, f)
-            logger.info(f"  ✓ Saved statistics: {CACHE_STATS_FILE}")
+            logger.info(f"  Saved statistics: {CACHE_STATS_FILE}")
             # Save metadata (e.g., tokenizer info)
             metadata = getattr(self, 'cache_metadata', {})
             with open(CACHE_METADATA_FILE, 'wb') as f:
                 pickle.dump(metadata, f)
-            logger.info(f"  ✓ Saved cache metadata: {CACHE_METADATA_FILE}")
+            logger.info(f"  Saved cache metadata: {CACHE_METADATA_FILE}")
+
+            # Export JSONL (GPT-2 standard format)
+            self._export_jsonl()
             
-            logger.info("  ✓ Cache ready for future runs")
+            logger.info("  Cache ready for future runs")
             
         except Exception as e:
             logger.warning(f"  Could not save to cache: {e}")
+
+    def _export_jsonl(self):
+        """Export dataset as JSONL files (GPT-2 standard format)."""
+        try:
+            jsonl_dir = os.path.join(CACHE_DIR, 'jsonl')
+            os.makedirs(jsonl_dir, exist_ok=True)
+
+            if self.combined_data is None or len(self.combined_data) == 0:
+                logger.warning("  No data to export as JSONL")
+                return
+
+            # Split into train/val/test (80/10/10)
+            total = len(self.combined_data)
+            train_end = int(total * 0.8)
+            val_end = int(total * 0.9)
+
+            splits = {
+                'train': range(0, train_end),
+                'val': range(train_end, val_end),
+                'test': range(val_end, total),
+            }
+
+            for split_name, indices in splits.items():
+                jsonl_path = os.path.join(jsonl_dir, f'{split_name}.jsonl')
+                count = 0
+                with open(jsonl_path, 'w', encoding='utf-8') as f:
+                    for i in indices:
+                        sample = self.combined_data[i]
+                        # GPT-2 standard: {"text": "<|problem|>...<|thinking|>...<|final|>..."}
+                        text = sample.get('bpe_text', sample.get('input_ids', ''))
+                        if isinstance(text, str) and text.strip():
+                            import json
+                            line = json.dumps({"text": text}, ensure_ascii=False)
+                            f.write(line + '\n')
+                            count += 1
+
+                logger.info(f"  Exported {split_name}.jsonl: {count} samples")
+
+        except Exception as e:
+            logger.warning(f"  Could not export JSONL: {e}")
     
     def _clear_cache(self):
-        """Clear cached dataset, preserving readme.txt."""
+        """Clear cached dataset, preserving README.txt."""
         try:
             if os.path.exists(CACHE_DIR):
-                readme_path = os.path.join(CACHE_DIR, 'readme.txt')
-                readme_backup = None
+                for item in os.listdir(CACHE_DIR):
+                    if item == 'README.txt':
+                        continue
+                    item_path = os.path.join(CACHE_DIR, item)
+                    if os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                    else:
+                        os.remove(item_path)
 
-                # Preserve readme.txt
-                if os.path.exists(readme_path):
-                    readme_backup = readme_path + '.bak'
-                    shutil.copy2(readme_path, readme_backup)
-
-                shutil.rmtree(CACHE_DIR)
-                self._ensure_cache_dir()
-
-                # Restore readme.txt
-                if readme_backup and os.path.exists(readme_backup):
-                    shutil.move(readme_backup, readme_path)
-
-                logger.info("Cache cleared (readme.txt preserved)")
+                logger.info("Cache cleared (README.txt preserved)")
         except Exception as e:
             logger.warning(f"Could not clear cache: {e}")
     
@@ -1426,8 +1463,8 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        # Add thinking, mode, and agentic tokens as special tokens
-        user_symbols = '--user_defined_symbols=<thinking>,</thinking>,<|context|>,<|answer|>,<|thinking|>,<tool_call>,</tool_call>,<observation>,</observation>'
+        # GPT-2 standard special tokens
+        user_symbols = '--user_defined_symbols=<|problem|>,<|thinking|>,<|final|>,<|user|>,<|assistant|>,<tool_call>,</tool_call>,<|tool_result|>'
         
         # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
         current_vocab = vocab_size
@@ -1498,12 +1535,12 @@ class DataPreparer:
             for i in range(sample_size):
                 sample = self.combined_data[i]
                 text = sample.get('input_ids', '') if isinstance(sample.get('input_ids'), str) else str(sample.get('input_ids', ''))
-                if '<thinking>' in text and '</thinking>' in text:
+                if '<|thinking|>' in text and '<|final|>' in text:
                     has_thinking = True
                     break
         self.cache_metadata['has_thinking_tokens'] = has_thinking
         if has_thinking:
-            logger.info("  ✓ Detected thinking tokens (<thinking>/</thinking>) in dataset")
+            logger.info("  ✓ Detected GPT-2 standard thinking tokens (<|thinking|>/<|final|>) in dataset")
 
         # Cleanup temporary corpus
         try:

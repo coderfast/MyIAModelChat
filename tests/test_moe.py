@@ -223,9 +223,10 @@ class TestMoEData:
         
         assert len(expert_labels) == len(token_ids)
         assert expert_labels[0] == 0  # conversation
-        assert expert_labels[2] == 1  # thinking
-        assert expert_labels[3] == 1  # thinking
-        assert expert_labels[5] == 1  # thinking
+        assert expert_labels[2] == 1  # thinking start
+        assert expert_labels[3] == 1  # thinking content
+        assert expert_labels[4] == 1  # thinking content
+        assert expert_labels[5] == 1  # thinking end
         assert expert_labels[6] == 0  # conversation
     
     def test_moe_dataset_processing(self):

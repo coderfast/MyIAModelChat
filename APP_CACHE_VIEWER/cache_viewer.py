@@ -322,6 +322,10 @@ class CacheViewer(QMainWindow):
         # Setup UI
         self._setup_ui()
         
+        # JSONL data
+        self.jsonl_data = {}  # {split_name: [records]}
+        self.current_jsonl_split = None
+        
         # Set cache directory
         if cache_dir:
             self._set_cache_dir(cache_dir)
@@ -359,6 +363,7 @@ class CacheViewer(QMainWindow):
         self._create_statistics_tab()
         self._create_samples_tab()
         self._create_vocabulary_tab()
+        self._create_jsonl_tab()
         
         # Status bar
         self.status_bar = QStatusBar()
@@ -701,6 +706,307 @@ class CacheViewer(QMainWindow):
         
         self.tab_widget.addTab(tab, "Vocabulary")
     
+    # ==================== TAB 5: JSONL ====================
+    
+    def _create_jsonl_tab(self):
+        """Create the JSONL viewer tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # Title
+        title = QLabel("JSONL Export (GPT-2 Standard)")
+        title.setFont(QFont("Arial", 14, QFont.Bold))
+        layout.addWidget(title)
+        
+        # Split selector
+        selector_layout = QHBoxLayout()
+        
+        selector_layout.addWidget(QLabel("Split:"))
+        self.jsonl_split_combo = QComboBox()
+        self.jsonl_split_combo.addItems(["train", "val", "test"])
+        self.jsonl_split_combo.currentTextChanged.connect(self._on_jsonl_split_changed)
+        selector_layout.addWidget(self.jsonl_split_combo)
+        
+        selector_layout.addStretch()
+        
+        self.jsonl_count_label = QLabel("Records: 0")
+        selector_layout.addWidget(self.jsonl_count_label)
+        
+        self.jsonl_size_label = QLabel("Size: 0 B")
+        selector_layout.addWidget(self.jsonl_size_label)
+        
+        layout.addLayout(selector_layout)
+        
+        # Search/filter
+        filter_layout = QHBoxLayout()
+        
+        filter_layout.addWidget(QLabel("Search:"))
+        self.jsonl_search_input = QLineEdit()
+        self.jsonl_search_input.setPlaceholderText("Filter by text content...")
+        self.jsonl_search_input.textChanged.connect(self._filter_jsonl)
+        filter_layout.addWidget(self.jsonl_search_input)
+        
+        filter_layout.addWidget(QLabel("Show:"))
+        self.jsonl_show_combo = QComboBox()
+        self.jsonl_show_combo.addItems(["All", "Thinking", "Text Only", "Agent"])
+        self.jsonl_show_combo.currentIndexChanged.connect(self._filter_jsonl)
+        filter_layout.addWidget(self.jsonl_show_combo)
+        
+        layout.addLayout(filter_layout)
+        
+        # Splitter for table and detail
+        splitter = QSplitter(Qt.Vertical)
+        
+        # JSONL table
+        self.jsonl_table = QTableWidget()
+        self.jsonl_table.setColumnCount(5)
+        self.jsonl_table.setHorizontalHeaderLabels(["#", "Type", "Problem", "Thinking", "Answer"])
+        self.jsonl_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.jsonl_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.jsonl_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.jsonl_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.jsonl_table.clicked.connect(self._on_jsonl_row_clicked)
+        splitter.addWidget(self.jsonl_table)
+        
+        # Detail view
+        detail_widget = QWidget()
+        detail_layout = QVBoxLayout(detail_widget)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        
+        detail_tabs = QTabWidget()
+        
+        # Raw text tab
+        self.jsonl_raw_text = QTextEdit()
+        self.jsonl_raw_text.setReadOnly(True)
+        self.jsonl_raw_text.setFont(QFont("Consolas", 10))
+        detail_tabs.addTab(self.jsonl_raw_text, "Raw Text")
+        
+        # Parsed tab
+        self.jsonl_parsed_text = QTextEdit()
+        self.jsonl_parsed_text.setReadOnly(True)
+        detail_tabs.addTab(self.jsonl_parsed_text, "Parsed")
+        
+        # Token IDs tab
+        self.jsonl_tokens_text = QTextEdit()
+        self.jsonl_tokens_text.setReadOnly(True)
+        self.jsonl_tokens_text.setFont(QFont("Consolas", 10))
+        detail_tabs.addTab(self.jsonl_tokens_text, "Token IDs")
+        
+        splitter.addWidget(detail_tabs)
+        splitter.setSizes([400, 200])
+        
+        layout.addWidget(splitter)
+        
+        self.tab_widget.addTab(tab, "JSONL")
+    
+    def _on_jsonl_split_changed(self, split: str):
+        """Handle JSONL split selection change."""
+        self.current_jsonl_split = split
+        self._load_jsonl_data(split)
+    
+    def _load_jsonl_data(self, split: str):
+        """Load JSONL data for a specific split."""
+        jsonl_dir = os.path.join(self.cache_dir, "jsonl")
+        jsonl_file = os.path.join(jsonl_dir, f"{split}.jsonl")
+        
+        if not os.path.exists(jsonl_file):
+            self.jsonl_count_label.setText("Records: 0")
+            self.jsonl_size_label.setText("Size: N/A")
+            self.jsonl_table.setRowCount(0)
+            return
+        
+        try:
+            # Get file size
+            file_size = os.path.getsize(jsonl_file)
+            if file_size < 1024:
+                size_str = f"{file_size} B"
+            elif file_size < 1024 * 1024:
+                size_str = f"{file_size / 1024:.2f} KB"
+            else:
+                size_str = f"{file_size / (1024 * 1024):.2f} MB"
+            self.jsonl_size_label.setText(f"Size: {size_str}")
+            
+            # Load JSONL data
+            self.jsonl_data[split] = []
+            with open(jsonl_file, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f):
+                    line = line.strip()
+                    if line:
+                        try:
+                            import json
+                            record = json.loads(line)
+                            self.jsonl_data[split].append(record)
+                        except json.JSONDecodeError:
+                            continue
+            
+            total_records = len(self.jsonl_data[split])
+            self.jsonl_count_label.setText(f"Records: {total_records:,}")
+            
+            # Populate table
+            self._populate_jsonl_table(self.jsonl_data[split])
+            
+            self.status_bar.showMessage(
+                f"JSONL {split} loaded: {total_records:,} records", 3000
+            )
+        
+        except Exception as e:
+            self.status_bar.showMessage(f"Error loading JSONL: {e}")
+    
+    def _populate_jsonl_table(self, records: List[Dict]):
+        """Populate the JSONL table with records."""
+        self.jsonl_table.setRowCount(len(records))
+        
+        for i, record in enumerate(records):
+            text = record.get('text', '')
+            
+            # Parse the text to extract components
+            record_type, problem, thinking, answer = self._parse_jsonl_record(text)
+            
+            # Row number
+            row_item = QTableWidgetItem(str(i))
+            row_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.jsonl_table.setItem(i, 0, row_item)
+            
+            # Type
+            self.jsonl_table.setItem(i, 1, QTableWidgetItem(record_type))
+            
+            # Problem (truncated)
+            problem_display = problem[:100] + "..." if len(problem) > 100 else problem
+            self.jsonl_table.setItem(i, 2, QTableWidgetItem(problem_display))
+            
+            # Thinking (truncated, show first 50 chars)
+            thinking_display = thinking[:50] + "..." if len(thinking) > 50 else thinking
+            self.jsonl_table.setItem(i, 3, QTableWidgetItem(thinking_display))
+            
+            # Answer (truncated)
+            answer_display = answer[:100] + "..." if len(answer) > 100 else answer
+            self.jsonl_table.setItem(i, 4, QTableWidgetItem(answer_display))
+    
+    def _parse_jsonl_record(self, text: str) -> tuple:
+        """Parse a JSONL record text into components."""
+        record_type = "Text"
+        problem = ""
+        thinking = ""
+        answer = ""
+        
+        # Try to parse GPT-2 standard format
+        if '<|problem|>' in text:
+            parts = text.split('<|problem|>')
+            if len(parts) > 1:
+                problem_part = parts[1]
+                
+                if '<|thinking|>' in problem_part:
+                    # Thinking format: <|problem|>q<|thinking|>r<|final|>a
+                    thinking_parts = problem_part.split('<|thinking|>')
+                    problem = thinking_parts[0]
+                    
+                    if '<|final|>' in thinking_parts[1]:
+                        final_parts = thinking_parts[1].split('<|final|>')
+                        thinking = final_parts[0]
+                        answer = final_parts[1]
+                        record_type = "Thinking"
+                    else:
+                        thinking = thinking_parts[1]
+                        record_type = "Thinking"
+                
+                elif '<|final|>' in problem_part:
+                    # Text format: <|problem|>q<|final|>a
+                    final_parts = problem_part.split('<|final|>')
+                    problem = final_parts[0]
+                    answer = final_parts[1]
+                    record_type = "Text"
+                
+                elif '<|user|>' in problem_part:
+                    # Agent format
+                    record_type = "Agent"
+                    problem = problem_part[:200]
+                
+                else:
+                    problem = problem_part[:200]
+        
+        elif '<|user|>' in text:
+            # Agent format
+            record_type = "Agent"
+            parts = text.split('<|user|>')
+            if len(parts) > 1:
+                problem = parts[1][:200]
+        
+        else:
+            # Unknown format, show raw
+            problem = text[:200]
+        
+        return record_type, problem, thinking, answer
+    
+    def _filter_jsonl(self):
+        """Filter JSONL table based on search and type filter."""
+        if not self.current_jsonl_split or self.current_jsonl_split not in self.jsonl_data:
+            return
+        
+        records = self.jsonl_data[self.current_jsonl_split]
+        search_text = self.jsonl_search_input.text().lower()
+        filter_type = self.jsonl_show_combo.currentText()
+        
+        filtered = []
+        for record in records:
+            text = record.get('text', '')
+            record_type, problem, thinking, answer = self._parse_jsonl_record(text)
+            
+            # Apply type filter
+            if filter_type != "All":
+                if filter_type == "Thinking" and record_type != "Thinking":
+                    continue
+                elif filter_type == "Text Only" and record_type != "Text":
+                    continue
+                elif filter_type == "Agent" and record_type != "Agent":
+                    continue
+            
+            # Apply search filter
+            if search_text:
+                if search_text in text.lower():
+                    filtered.append(record)
+            else:
+                filtered.append(record)
+        
+        self._populate_jsonl_table(filtered)
+        self.jsonl_count_label.setText(f"Records: {len(filtered):,} / {len(records):,}")
+    
+    def _on_jsonl_row_clicked(self, index: QModelIndex):
+        """Handle JSONL row click to show details."""
+        row = index.row()
+        
+        if not self.current_jsonl_split or self.current_jsonl_split not in self.jsonl_data:
+            return
+        
+        records = self.jsonl_data[self.current_jsonl_split]
+        if row >= len(records):
+            return
+        
+        record = records[row]
+        text = record.get('text', '')
+        
+        # Raw text
+        self.jsonl_raw_text.setPlainText(text)
+        
+        # Parsed view
+        record_type, problem, thinking, answer = self._parse_jsonl_record(text)
+        parsed_parts = []
+        parsed_parts.append(f"Type: {record_type}")
+        parsed_parts.append(f"\n--- Problem ---\n{problem}")
+        if thinking:
+            parsed_parts.append(f"\n--- Thinking ---\n{thinking}")
+        parsed_parts.append(f"\n--- Answer ---\n{answer}")
+        self.jsonl_parsed_text.setPlainText("\n".join(parsed_parts))
+        
+        # Token IDs (if present)
+        token_ids = record.get('token_ids', [])
+        if token_ids:
+            tokens_str = ", ".join(str(t) for t in token_ids[:200])
+            if len(token_ids) > 200:
+                tokens_str += f"\n... ({len(token_ids)} total tokens)"
+            self.jsonl_tokens_text.setPlainText(tokens_str)
+        else:
+            self.jsonl_tokens_text.setPlainText("No token_ids in this record")
+    
     # ==================== DATA LOADING ====================
     
     def _load_cache_data(self):
@@ -721,8 +1027,31 @@ class CacheViewer(QMainWindow):
         self._load_statistics_data()
         self._init_samples()
         self._load_vocabulary()
+        self._load_jsonl_splits()
         
         self.status_bar.showMessage("Cache loaded successfully", 3000)
+    
+    def _load_jsonl_splits(self):
+        """Load available JSONL splits."""
+        jsonl_dir = os.path.join(self.cache_dir, "jsonl")
+        
+        if not os.path.exists(jsonl_dir):
+            return
+        
+        # Find available splits
+        available_splits = []
+        for split in ["train", "val", "test"]:
+            jsonl_file = os.path.join(jsonl_dir, f"{split}.jsonl")
+            if os.path.exists(jsonl_file):
+                available_splits.append(split)
+        
+        if available_splits:
+            self.jsonl_split_combo.clear()
+            self.jsonl_split_combo.addItems(available_splits)
+            
+            # Auto-load first split
+            if available_splits:
+                self._load_jsonl_data(available_splits[0])
     
     def _load_summary_data(self):
         """Load summary tab data."""
@@ -761,6 +1090,8 @@ class CacheViewer(QMainWindow):
                     file_type = "Vocabulary"
                 elif file.endswith(".json"):
                     file_type = "JSON Metadata"
+                elif file.endswith(".jsonl"):
+                    file_type = "JSONL (GPT-2 Standard)"
                 
                 files_info.append({
                     "name": rel_path,
@@ -949,13 +1280,21 @@ class CacheViewer(QMainWindow):
         filter_type = self.filter_combo.currentText()
         
         filtered = []
+        # GPT-2 standard special tokens
+        special_tokens = {
+            '<unk>', '<s>', '</s>',
+            '<|problem|>', '<|thinking|>', '<|final|>',
+            '<|user|>', '<|assistant|>',
+            '<tool_call>', '</tool_call>', '<|tool_result|>',
+            '<thinking>', '</thinking>',
+        }
         for item in self.vocab_data:
             # Apply filter
             if filter_type == "Special Tokens":
-                if item['token'] not in ['<unk>', '<s>', '</s>', '<thinking>', '</thinking>']:
+                if item['token'] not in special_tokens:
                     continue
             elif filter_type == "Regular Tokens":
-                if item['token'] in ['<unk>', '<s>', '</s>', '<thinking>', '</thinking>']:
+                if item['token'] in special_tokens:
                     continue
             
             # Apply search

@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 class AgentThinkingGenerator(ThinkingGenerator):
     """Generate agentic thinking data with tool calls and observations.
 
-    Produces training samples in the format:
-        <|thinking|>reasoning<tool_call>{"name":"tool","arguments":{...}}</tool_call>
-        <observation>result</observation></tool_call><|answer|>response
+    GPT-2 standard format:
+        <|problem|>question<thinking>reasoning</thinking>
+        <|assistant|><|tool_call|>tool: args<|tool_call|><|tool_result|>result<|assistant|>response
 
     For samples that don't need tools:
-        <|thinking|>reasoning</thinking><|answer|>response
+        <|problem|>question<thinking>reasoning</thinking><|final|>response
     """
 
     TOOL_CATEGORIES = {
@@ -177,7 +177,6 @@ class AgentThinkingGenerator(ThinkingGenerator):
             # Build tool call JSON
             tool_call_obj = {"name": tool_name, "arguments": {}}
             if tool_args:
-                # Parse arguments - could be expression, path, query, etc.
                 if tool_name == 'calculator':
                     tool_call_obj["arguments"] = {"expression": tool_args}
                 elif tool_name in ('read_file', 'list_directory'):
@@ -189,13 +188,13 @@ class AgentThinkingGenerator(ThinkingGenerator):
 
             tool_call_json = json.dumps(tool_call_obj, ensure_ascii=False)
 
-            # Full agentic text
+            # GPT-2 standard agentic format
             agent_text = (
-                f"<|thinking|>{question}"
+                f"<|problem|>{question}"
                 f"<thinking>{thinking}</thinking>"
-                f"<tool_call>{tool_call_json}</tool_call>"
-                f"<observation>{observation}</observation>"
-                f"<|answer|>{answer}"
+                f"<|assistant|><|tool_call|>{tool_name}: {tool_args}<|tool_call|>"
+                f"<|tool_result|>{observation}<|tool_result|>"
+                f"<|assistant|>{answer}"
             )
 
             result['thinking'] = thinking
@@ -207,8 +206,8 @@ class AgentThinkingGenerator(ThinkingGenerator):
             result['original_text'] = answer
             self._tool_call_count += 1
         else:
-            # Normal thinking sample
-            normal_text = f"<|thinking|>{question}<thinking>{thinking}</thinking><|answer|>{answer}"
+            # GPT-2 standard thinking format (no tool)
+            normal_text = f"<|problem|>{question}<thinking>{thinking}</thinking><|final|>{answer}"
             result['thinking'] = thinking
             result['has_tool_call'] = False
             result['tool_name'] = ''

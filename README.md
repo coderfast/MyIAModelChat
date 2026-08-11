@@ -15,9 +15,20 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **Sentiment Analysis**: BERT-based star rating detection (1-5 stars)
 - **Context Management**: Maintains conversation history and coherence
 - **Persona Modeling**: Customizable AI personality traits
-- **Chain-of-Thought Reasoning**: Dual-token system with mode tokens and content tags for structured thinking
+- **Chain-of-Thought Reasoning**: GPT-2 standard tokens (`<|problem|>`, `<|thinking|>`, `<|final|>`)
 - **Multilingual Thinking**: 30-language support for chain-of-thought reasoning
 - **Model Library**: Train, combine, and export multiple independent models
+
+### GPT-2 Standard Tokens
+| Token | Purpose |
+|-------|---------|
+| `<\|problem\|>` | Question/problem prefix |
+| `<\|thinking\|>` | Reasoning prefix |
+| `<\|final\|>` | Answer prefix |
+| `<\|user\|>` | User prefix (agentic) |
+| `<\|assistant\|>` | Assistant prefix (agentic) |
+| `<\|tool_call\|>` | Tool call start |
+| `<\|tool_result\|>` | Tool result prefix |
 
 ### Data Sources & Processing
 - **AIML 2.0 Smart Parser**: Resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
@@ -27,6 +38,7 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **Web Scraping**: Documentation crawling with trafilatura + BeautifulSoup
 - **CSV Datasets**: Curated QA pairs from CSV files
 - **Dataset Caching**: 12x faster training with intelligent caching system
+- **JSONL Export**: GPT-2 standard format export for each split (train/val/test)
 - **Contamination Filtering**: 6-phase pipeline (noise, quality, dedup, balance, leakage, language)
 
 ### Advanced Text Processing
@@ -60,7 +72,11 @@ python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8
 
 ### 2. Train the Model
 ```bash
+# Standard training
 python main.py --train --epochs 30
+
+# Train with pre-trained GPT-2 weights (better initialization)
+python main.py --train --epochs 30 --pretrained
 ```
 
 ### 3. Start Chatting
@@ -447,6 +463,7 @@ class ChatConfig:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--epochs NUM` | Number of training epochs | `1` |
+| `--pretrained` | Load GPT-2 weights (ignores existing checkpoint) | (flag) |
 | `--refresh-cache` | Rebuild cache from scratch | (flag) |
 | `--onlytokenize` | Build vocabulary only | (flag) |
 | `--bpe-vocab-size` | BPE vocabulary size | `8000` |
@@ -470,6 +487,46 @@ class ChatConfig:
 | `--num_cores` | CPU cores to use | 50% of available |
 | `--num_threads` | Training threads | 50% of available |
 | `--max-ram-fraction` | Max RAM usage (0.0-1.0) | `0.75` |
+
+---
+
+## Pre-trained Weights (`--pretrained`)
+
+### What it does
+Loads GPT-2 Small (117M) weights into our small architecture (4 layers, 256 hidden, 4 heads, ~3M params).
+
+### Usage
+```bash
+# Standard training (random init)
+python main.py --train --epochs 30
+
+# With GPT-2 pre-trained weights (better initialization)
+python main.py --train --epochs 30 --pretrained
+```
+
+### Behavior
+| Scenario | Result |
+|----------|--------|
+| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
+| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
+| No `--pretrained` + checkpoint | Continues training from checkpoint |
+| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
+
+### Expected improvement
+- **Without `--pretrained`**: Loss ~6.0 → ~4.75 (1 epoch)
+- **With `--pretrained`**: Loss ~4.5 → ~3.5 (1 epoch)
+
+### Manual download (optional)
+```bash
+# Create folder and download weights
+mkdir -p pretrained/gpt2
+python -c "
+from transformers import GPT2LMHeadModel
+model = GPT2LMHeadModel.from_pretrained('gpt2')
+model.save_pretrained('pretrained/gpt2')
+print('Done!')
+"
+```
 
 ---
 
