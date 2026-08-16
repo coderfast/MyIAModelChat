@@ -398,49 +398,16 @@ def detect_language(text: str) -> str:
     """
     Detect the language of a text.
 
+    Uses commons.language_utils for 32 EU/European languages.
+
     Args:
         text: Input text
 
     Returns:
         Language code (e.g., 'es', 'en', 'fr') or 'unknown'
     """
-    if not text or not isinstance(text, str):
-        return 'unknown'
-
-    try:
-        from langdetect import detect, LangDetectException
-        HAS_LANGDETECT = True
-    except ImportError:
-        HAS_LANGDETECT = False
-
-    if not HAS_LANGDETECT:
-        # Simple heuristic-based language detection
-        text_lower = text.lower()
-
-        # Spanish indicators
-        spanish_indicators = [' el ', ' la ', ' los ', ' las ', ' de ', ' del ', ' en ', ' un ', ' una ']
-        spanish_count = sum(1 for ind in spanish_indicators if ind in text_lower)
-
-        # English indicators
-        english_indicators = [' the ', ' is ', ' are ', ' was ', ' were ', ' have ', ' has ', ' had ']
-        english_count = sum(1 for ind in english_indicators if ind in text_lower)
-
-        if spanish_count > english_count:
-            return 'es'
-        elif english_count > spanish_count:
-            return 'en'
-        else:
-            return 'unknown'
-
-    try:
-        # Use first 1000 chars for detection (faster and more accurate)
-        sample = text[:1000]
-        lang = detect(sample)
-        return lang
-    except LangDetectException:
-        return 'unknown'
-    except Exception:
-        return 'unknown'
+    from commons.language_utils import detect_language as _detect
+    return _detect(text)
 
 
 def filter_by_language(texts: List[str], allowed_languages: List[str]) -> List[str]:
@@ -494,6 +461,7 @@ class DataPreparer:
         self.epub_data = None
         self.web_data = None
         self.csv_data = None
+        self.tagengo_data = None
         self.combined_data = None
         self.statistics = {}
 
@@ -727,10 +695,26 @@ class DataPreparer:
                 logger.info("[5/7] Loading CSV data...")
                 self.csv_data = self._load_csv()
 
+            # Load Tagengo-GPT4 multilingual conversations (EN/ES)
+            if hasattr(self.args, 'tagengo') and self.args.tagengo:
+                logger.info("[5.5/7] Loading Tagengo-GPT4 data...")
+                self.tagengo_data = self._load_tagengo_data()
+
             # Combine datasets
             logger.info("[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
+
+            # Tag languages from datasets_source/language_manifest.json
+            manifest_path = os.path.join('datasets_source', 'language_manifest.json')
+            if os.path.exists(manifest_path):
+                logger.info(f"[6.1/7] Tagging languages from manifest: {manifest_path}...")
+                self._tag_languages(manifest_path=manifest_path)
+                # Remove file_path column (used only for manifest lookup)
+                if 'file_path' in self.combined_data.column_names:
+                    self.combined_data = self.combined_data.remove_columns(['file_path'])
+            else:
+                logger.info("[6.1/7] No language_manifest.json found, skipping language tagging")
 
             # Initialize audit reporter if enabled
             audit = None
@@ -957,11 +941,11 @@ class DataPreparer:
                 else:
                     ds = load_dataset(dataset_name, split='train[:1000]')
                 
-                # Convert to input_ids format for consistency
+                # Convert to input_ids format with GPT-2 tokens
                 if 'text' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': x['text']})
+                    ds = ds.map(lambda x: {'input_ids': f'<|problem|>{x["text"]}<|final|>{x["text"]}'})
                 elif 'sentence' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': x['sentence']})
+                    ds = ds.map(lambda x: {'input_ids': f'<|problem|>{x["sentence"]}<|final|>{x["sentence"]}'})
                 
                 # Keep only input_ids column
                 ds = ds.select_columns(['input_ids'])
@@ -980,6 +964,51 @@ class DataPreparer:
             return combined
         else:
             logger.warning("  ⚠ No HuggingFace datasets loaded successfully")
+            return Dataset.from_list([])
+
+    def _load_tagengo_data(self) -> Dataset:
+        """
+        Load Tagengo-GPT4 multilingual conversations (EN/ES only).
+
+        Dataset: lightblue/tagengo-gpt4
+        Format: Human-GPT-4 conversations in 74 languages.
+        We filter to English and Spanish only.
+
+        Returns:
+            Hugging Face Dataset with tagengo data
+        """
+        try:
+            logger.info("  Loading Tagengo-GPT4 dataset...")
+            ds = load_dataset('lightblue/tagengo-gpt4', split='train')
+
+            # Filter to EN and ES only
+            ds = ds.filter(lambda x: x.get('language') in ('English', 'Spanish'))
+            logger.info(f"  Filtered to EN/ES: {len(ds)} samples")
+
+            # Convert to GPT-2 format
+            def format_tagengo(example):
+                conversations = example.get('conversations', [])
+                if len(conversations) < 2:
+                    return None
+                human = conversations[0].get('value', '')
+                gpt = conversations[1].get('value', '')
+                if not human or not gpt:
+                    return None
+                lang = 'en' if example.get('language') == 'English' else 'es'
+                return {
+                    'input_ids': f'<|problem|>{human}<|final|>{gpt}',
+                    'source': 'tagengo',
+                    'language': lang
+                }
+
+            ds = ds.map(format_tagengo, remove_columns=ds.column_names)
+            ds = ds.filter(lambda x: x is not None and x.get('input_ids'))
+
+            logger.info(f"  ✓ Loaded tagengo: {len(ds)} samples (EN/ES)")
+            return ds
+
+        except Exception as e:
+            logger.warning(f"  ⚠ Error loading tagengo dataset: {e}")
             return Dataset.from_list([])
 
     def _load_csv(self) -> Dataset:
@@ -1043,8 +1072,8 @@ class DataPreparer:
                             if not input_text or not output_text:
                                 continue
 
-                            # Standardized format: question/answer pair
-                            prompt_text = f"{input_text} {output_text}"
+                            # GPT-2 format: question/answer pair
+                            prompt_text = f'<|problem|>{input_text}<|final|>{output_text}'
 
                             # Oversample with moderate repetition (5x)
                             for _ in range(5):
@@ -1140,9 +1169,9 @@ class DataPreparer:
                     if enable_chunking and len(sentence.split()) > max_tokens:
                         chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
                         for chunk in chunks:
-                            web_items.append({'input_ids': chunk})
+                            web_items.append({'input_ids': f'<|problem|>{chunk}<|final|>{chunk}'})
                     else:
-                        web_items.append({'input_ids': sentence})
+                        web_items.append({'input_ids': f'<|problem|>{sentence}<|final|>{sentence}'})
 
         dataset = Dataset.from_list(web_items)
         logger.info(f"  Total web pages scraped: {len(all_texts)}")
@@ -1226,7 +1255,10 @@ class DataPreparer:
                                 # Additional cleaning
                                 sentence = clean_text(sentence)
                                 if len(sentence) > 10:  # Skip very short sentences
-                                    sample = {'input_ids': sentence}
+                                    sample = {
+                                        'input_ids': f'<|problem|>{sentence}<|final|>{sentence}',
+                                        'file_path': file_path
+                                    }
 
                                     # Add metadata if enabled
                                     if preserve_metadata and metadata:
@@ -1236,7 +1268,10 @@ class DataPreparer:
                                     if enable_chunking and len(sentence.split()) > max_tokens:
                                         chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
                                         for chunk in chunks:
-                                            chunk_sample = {'input_ids': chunk}
+                                            chunk_sample = {
+                                                'input_ids': f'<|problem|>{chunk}<|final|>{chunk}',
+                                                'file_path': file_path
+                                            }
                                             if preserve_metadata and metadata:
                                                 chunk_sample['metadata'] = metadata
                                             pdf_texts.append(chunk_sample)
@@ -1343,7 +1378,10 @@ class DataPreparer:
                             # Additional cleaning
                             sentence = clean_text(sentence)
                             if len(sentence) > 10:  # Skip very short sentences
-                                sample = {'input_ids': sentence}
+                                sample = {
+                                    'input_ids': f'<|problem|>{sentence}<|final|>{sentence}',
+                                    'file_path': file_path
+                                }
 
                                 # Add metadata if enabled
                                 if preserve_metadata and metadata:
@@ -1353,7 +1391,10 @@ class DataPreparer:
                                 if enable_chunking and len(sentence.split()) > max_tokens:
                                     chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
                                     for chunk in chunks:
-                                        chunk_sample = {'input_ids': chunk}
+                                        chunk_sample = {
+                                            'input_ids': f'<|problem|>{chunk}<|final|>{chunk}',
+                                            'file_path': file_path
+                                        }
                                         if preserve_metadata and metadata:
                                             chunk_sample['metadata'] = metadata
                                         epub_texts.append(chunk_sample)
@@ -1616,6 +1657,12 @@ class DataPreparer:
             total_samples += len(self.csv_data)
             logger.info(f"  Adding CSV data: {len(self.csv_data)} samples")
 
+        if self.tagengo_data is not None and len(self.tagengo_data) > 0:
+            tagengo_with_source = self._add_source_column(self.tagengo_data, 'Tagengo')
+            datasets_to_combine.append(tagengo_with_source)
+            total_samples += len(self.tagengo_data)
+            logger.info(f"  Adding Tagengo data: {len(self.tagengo_data)} samples")
+
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
             return Dataset.from_list([])
@@ -1672,6 +1719,122 @@ class DataPreparer:
                 num_proc=1,
                 remove_columns=columns_to_remove
             )
+
+    def _tag_languages(self, manifest_path: Optional[str] = None):
+        """Tag each dataset sample with language code.
+
+        Priority:
+        1. Check if file is in manifest 'files' section → use that language
+        2. Check if source is in manifest 'sources' section → use that language
+        3. Use manifest 'default' if set
+        4. Fall back to automatic detection
+
+        Manifest format (datasets_source/language_manifest.json):
+        {
+            "sources": {
+                "aiml": "en",
+                "hf": "en"
+            },
+            "files": {
+                "datasets_source/ciencias/naturaleza.jsonl": "es",
+                "datasets_source/pdf/physics.pdf": "en"
+            },
+            "default": "unknown"
+        }
+        """
+        if self.combined_data is None or len(self.combined_data) == 0:
+            return
+
+        from commons.language_utils import detect_language as _detect, get_language_name
+
+        # Load manifest if provided
+        manifest_sources = {}
+        manifest_files = {}
+        manifest_default = None
+        if manifest_path:
+            import json
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+                manifest_sources = manifest.get('sources', {})
+                manifest_files = manifest.get('files', {})
+                manifest_default = manifest.get('default')
+                if manifest_files:
+                    logger.info(f"  Loaded language manifest: {len(manifest_sources)} sources, {len(manifest_files)} files")
+                    for src, lang in manifest_sources.items():
+                        logger.info(f"    source:{src} -> {lang} ({get_language_name(lang)})")
+                    for fpath, lang in manifest_files.items():
+                        logger.info(f"    file:{fpath} -> {lang} ({get_language_name(lang)})")
+                else:
+                    logger.info(f"  Loaded language manifest: {len(manifest_sources)} sources")
+                    for src, lang in manifest_sources.items():
+                        logger.info(f"    source:{src} -> {lang} ({get_language_name(lang)})")
+            except Exception as e:
+                logger.warning(f"  Could not load language manifest: {e}. Using detection fallback.")
+                manifest_sources = {}
+                manifest_files = {}
+
+        def add_language_tag(example):
+            source = example.get('source', '')
+            filepath = example.get('file_path', '') or example.get('path', '')
+
+            # 1. Check file-level mapping (highest priority)
+            if filepath:
+                # Try exact match first
+                if filepath in manifest_files:
+                    return {'language': manifest_files[filepath]}
+                # Try normalized path match
+                norm_path = filepath.replace('\\', '/').lstrip('./')
+                for fpath, lang in manifest_files.items():
+                    norm_fpath = fpath.replace('\\', '/').lstrip('./')
+                    if norm_path.endswith(norm_fpath) or norm_fpath.endswith(norm_path):
+                        return {'language': lang}
+
+            # 2. Check source-level mapping (case-insensitive)
+            if source:
+                source_lower = source.lower()
+                if source_lower in manifest_sources:
+                    return {'language': manifest_sources[source_lower]}
+
+            # 3. Use default if set
+            if manifest_default is not None:
+                return {'language': manifest_default}
+
+            # 4. Fallback to detection
+            text = example.get('input_ids', '')
+            if not text:
+                for field in ('input', 'output', 'text', 'sentence'):
+                    if field in example and example[field]:
+                        text = example[field]
+                        break
+            lang = _detect(text) if text else 'unknown'
+            return {'language': lang}
+
+        num_proc = self._get_num_proc()
+        logger.info(f"  Tagging languages with num_proc={num_proc}...")
+
+        try:
+            self.combined_data = self.combined_data.map(
+                add_language_tag,
+                batched=False,
+                num_proc=num_proc,
+            )
+        except Exception as e:
+            logger.warning(f"Could not tag languages with num_proc={num_proc}: {e}. Falling back to num_proc=1...")
+            self.combined_data = self.combined_data.map(
+                add_language_tag,
+                batched=False,
+                num_proc=1,
+            )
+
+        # Log language distribution
+        lang_counts = Counter(self.combined_data['language'])
+        total = len(self.combined_data)
+        logger.info(f"  Language distribution ({total} samples):")
+        for lang, count in lang_counts.most_common():
+            pct = count / total * 100
+            name = get_language_name(lang)
+            logger.info(f"    {lang:5s} ({name:20s}): {count:6d} ({pct:5.1f}%)")
 
     def _validate_and_clean_sources(self):
         """Validate and clean each source dataset using source-specific validators."""

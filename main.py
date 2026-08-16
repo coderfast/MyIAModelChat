@@ -342,6 +342,7 @@ EXAMPLES:
         parser.add_argument("--epub", action='store_true', help="Include EPUB data")
         parser.add_argument("--web", action='store_true', help="Include web documentation data")
         parser.add_argument("--csv", action='store_true', help="Include CSV data")
+        parser.add_argument("--tagengo", action='store_true', help="Include Tagengo-GPT4 multilingual conversations (EN/ES)")
         parser.add_argument("--web-url", type=str, default=None,
                             help="Seed URL to scrape (reads from datasets_source/web/urls.txt if not set)")
         parser.add_argument("--web-max-pages", type=int, default=50,
@@ -437,6 +438,7 @@ EXAMPLES:
                             help="Enable language filtering")
         parser.add_argument("--allowed-languages", type=str, nargs='+', default=['es', 'en'],
                             help="Allowed language codes for filtering (default: es en)")
+
 
         # Contamination filtering options (NEW)
         parser.add_argument("--filter-noise", action='store_true',

@@ -81,7 +81,8 @@ class DatasetWorker(QThread):
                     'index': idx,
                     'text': text,
                     'token_count': len(token_ids),
-                    'source': source
+                    'source': source,
+                    'language': row.get('language', '-')
                 })
             
             if not self._is_cancelled:
@@ -146,7 +147,8 @@ class ContinuousLoaderWorker(QThread):
                         'index': idx,
                         'text': text,
                         'token_count': token_count,
-                        'source': source
+                        'source': source,
+                        'language': row.get('language', '-')
                     })
                 
                 if items and not self._is_cancelled:
@@ -174,7 +176,7 @@ class LazyTableModel(QAbstractTableModel):
         self._data: List[Optional[Dict]] = []
         self._total_count = 0
         self._loaded_count = 0
-        self._headers = ["#", "Text", "Token Count", "Source"]
+        self._headers = ["#", "Text", "Token Count", "Source", "Language"]
     
     def rowCount(self, parent=QModelIndex()) -> int:
         return self._total_count
@@ -201,6 +203,8 @@ class LazyTableModel(QAbstractTableModel):
                     return str(item['token_count'])
                 elif col == 3:
                     return item.get('source', 'Unknown')
+                elif col == 4:
+                    return item.get('language', '-')
             
             # Placeholder for unloaded rows
             if col == 0:
@@ -210,6 +214,8 @@ class LazyTableModel(QAbstractTableModel):
             elif col == 2:
                 return "..."
             elif col == 3:
+                return "..."
+            elif col == 4:
                 return "..."
         
         elif role == Qt.TextAlignmentRole:
@@ -305,8 +311,10 @@ class CacheViewer(QMainWindow):
         
         # Source filtering
         self.source_indices: Dict[str, List[int]] = {}
+        self.language_indices: Dict[str, List[int]] = {}
         self.all_indices: List[int] = []
         self.current_source = "All"
+        self.current_language = "All"
         
         # Lazy loading state
         self.model = LazyTableModel()
@@ -489,6 +497,20 @@ class CacheViewer(QMainWindow):
         source_group.setLayout(source_layout)
         layout.addWidget(source_group)
         
+        # Language breakdown table
+        language_group = QGroupBox("Samples by Language")
+        language_layout = QVBoxLayout()
+        
+        self.language_stats_table = QTableWidget()
+        self.language_stats_table.setColumnCount(3)
+        self.language_stats_table.setHorizontalHeaderLabels(["Language", "Code", "Samples"])
+        self.language_stats_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.language_stats_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        language_layout.addWidget(self.language_stats_table)
+        
+        language_group.setLayout(language_layout)
+        layout.addWidget(language_group)
+        
         self.tab_widget.addTab(tab, "Statistics")
     
     # ==================== TAB 3: SAMPLES ====================
@@ -513,6 +535,13 @@ class CacheViewer(QMainWindow):
         self.source_combo.setMinimumWidth(150)
         self.source_combo.currentTextChanged.connect(self._on_source_changed)
         title_layout.addWidget(self.source_combo)
+        
+        # Language filter combo
+        title_layout.addWidget(QLabel("Filter by Language:"))
+        self.language_combo = QComboBox()
+        self.language_combo.setMinimumWidth(100)
+        self.language_combo.currentTextChanged.connect(self._on_language_changed)
+        title_layout.addWidget(self.language_combo)
         
         layout.addLayout(title_layout)
         
@@ -576,18 +605,28 @@ class CacheViewer(QMainWindow):
         self.current_source = source
         self._reload_with_filter()
     
+    def _on_language_changed(self, language: str):
+        """Handle language filter change."""
+        self.current_language = language
+        self._reload_with_filter()
+    
     def _reload_with_filter(self):
-        """Reload samples with current source filter."""
+        """Reload samples with current source and language filters."""
         # Cancel any ongoing worker
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(500)
         
-        # Get indices for current filter
+        # Get indices for current filters
         if self.current_source == "All":
             indices = self.all_indices
         else:
             indices = self.source_indices.get(self.current_source, [])
+        
+        # Apply language filter
+        if self.current_language != "All":
+            lang_set = set(self.language_indices.get(self.current_language, []))
+            indices = [i for i in indices if i in lang_set]
         
         # Reset model
         self.model.set_total_count(len(indices))
@@ -597,7 +636,7 @@ class CacheViewer(QMainWindow):
         self.samples_progress.setMaximum(len(indices))
         self.samples_progress.setValue(0)
         self.samples_count_label.setText(f"Loaded: 0 / {len(indices):,}")
-        self.source_info_label.setText(f"Source: {self.current_source} ({len(indices):,} samples)")
+        self.source_info_label.setText(f"Source: {self.current_source} | Language: {self.current_language} ({len(indices):,} samples)")
         
         # Start loading first block
         if indices:
@@ -609,6 +648,11 @@ class CacheViewer(QMainWindow):
             indices = self.all_indices
         else:
             indices = self.source_indices.get(self.current_source, [])
+        
+        # Apply language filter
+        if self.current_language != "All":
+            lang_set = set(self.language_indices.get(self.current_language, []))
+            indices = [i for i in indices if i in lang_set]
         
         loaded = self.model.get_loaded_count()
         total = len(indices)
@@ -657,8 +701,9 @@ class CacheViewer(QMainWindow):
         if item:
             text = item['text']
             source = item.get('source', 'Unknown')
+            language = item.get('language', '-')
             self.detail_text.setPlainText(
-                f"[Source: {source}]\n\n{text}"
+                f"[Source: {source} | Language: {language}]\n\n{text}"
             )
         else:
             self.detail_text.setPlainText("Loading...")
@@ -1171,6 +1216,38 @@ class CacheViewer(QMainWindow):
             for i, (source, count) in enumerate(sorted(source_data.items())):
                 self.source_table.setItem(i, 0, QTableWidgetItem(source))
                 self.source_table.setItem(i, 1, QTableWidgetItem(f"{count:,}"))
+            
+            # Populate language breakdown from dataset if available
+            if self.dataset and 'language' in self.dataset.column_names:
+                from collections import Counter
+                all_langs = self.dataset['language']
+                lang_counts = Counter(all_langs)
+                
+                # Language name mapping
+                lang_names = {
+                    'es': 'Spanish', 'en': 'English', 'fr': 'French', 'de': 'German',
+                    'it': 'Italian', 'pt': 'Portuguese', 'nl': 'Dutch', 'pl': 'Polish',
+                    'cs': 'Czech', 'sv': 'Swedish', 'da': 'Danish', 'nb': 'Norwegian',
+                    'fi': 'Finnish', 'el': 'Greek', 'hu': 'Hungarian', 'ro': 'Romanian',
+                    'bg': 'Bulgarian', 'hr': 'Croatian', 'sk': 'Slovak', 'sl': 'Slovenian',
+                    'lt': 'Lithuanian', 'lv': 'Latvian', 'et': 'Estonian', 'ga': 'Irish',
+                    'ca': 'Catalan', 'gl': 'Galician', 'sq': 'Albanian', 'is': 'Icelandic',
+                    'lb': 'Luxembourgish', 'mk': 'Macedonian', 'sr': 'Serbian', 'uk': 'Ukrainian',
+                }
+                
+                self.language_stats_table.setRowCount(len(lang_counts))
+                for i, (lang, count) in enumerate(lang_counts.most_common()):
+                    name = lang_names.get(lang, lang)
+                    self.language_stats_table.setItem(i, 0, QTableWidgetItem(name))
+                    self.language_stats_table.setItem(i, 1, QTableWidgetItem(lang))
+                    count_item = QTableWidgetItem(f"{count:,}")
+                    count_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.language_stats_table.setItem(i, 2, count_item)
+            else:
+                self.language_stats_table.setRowCount(1)
+                self.language_stats_table.setItem(0, 0, QTableWidgetItem("No language data"))
+                self.language_stats_table.setItem(0, 1, QTableWidgetItem("-"))
+                self.language_stats_table.setItem(0, 2, QTableWidgetItem("-"))
         
         except Exception as e:
             self.status_bar.showMessage(f"Error loading statistics: {e}")
@@ -1196,9 +1273,11 @@ class CacheViewer(QMainWindow):
             
             # Build source indices
             self.source_indices.clear()
+            self.language_indices.clear()
             self.all_indices = list(range(total))
             
             has_source_column = 'source' in self.dataset.column_names
+            has_language_column = 'language' in self.dataset.column_names
             
             if has_source_column:
                 # Fast column access instead of row-by-row
@@ -1215,22 +1294,38 @@ class CacheViewer(QMainWindow):
                 self.source_combo.addItem("All")
                 for source in sorted(sources_set):
                     self.source_combo.addItem(source)
+            
+            if has_language_column:
+                all_languages = self.dataset['language']
+                
+                languages_set = set(all_languages)
+                self.language_indices = {l: [] for l in languages_set}
+                
+                for idx, lang in enumerate(all_languages):
+                    self.language_indices[lang].append(idx)
+                
+                # Populate language combo
+                self.language_combo.clear()
+                self.language_combo.addItem("All")
+                for lang in sorted(languages_set):
+                    self.language_combo.addItem(lang)
                 
                 self.status_bar.showMessage(
                     f"Dataset loaded: {total:,} samples, "
-                    f"{len(sources_set)} sources", 3000
+                    f"{len(sources_set) if has_source_column else 0} sources, "
+                    f"{len(languages_set)} languages", 3000
                 )
             else:
+                # No language column - show message
+                self.language_combo.clear()
+                self.language_combo.addItem("All")
+            
+            if not has_source_column:
                 # No source column - show message
                 self.source_combo.clear()
                 self.source_combo.addItem("All")
                 self.source_info_label.setText(
                     "Source: All (no source column in dataset)"
-                )
-                
-                self.status_bar.showMessage(
-                    f"Dataset loaded: {total:,} samples "
-                    "(no source information available)", 3000
                 )
             
             # Initialize model

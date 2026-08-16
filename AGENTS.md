@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, bilingual support (English/Spanish), intent recognition, sentiment analysis, chain-of-thought reasoning (`<thinking>`), and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
+MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, multilingual support (English/Spanish and all EU and european languages), intent recognition, sentiment analysis, chain-of-thought reasoning (`<thinking>`), and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
 
 **GPT-2 Standard Tokens:**
 - `<|problem|>` - Question/problem prefix
@@ -18,7 +18,7 @@ MyIAModelChat is an advanced conversational AI system built with PyTorch, featur
 
 ## Project Structure
 
-`
+```
 MyIAModelChat/
 ├── main.py                              # Primary entry point (CLI) - ONLY file that processes args
 ├── config.py                            # Centralized config (OLLAMA_MODEL, OLLAMA_URL)
@@ -42,6 +42,12 @@ MyIAModelChat/
 │   │   ├── model_merge.py               # Model merging
 │   │   ├── model_export.py              # Export to GGUF/ONNX
 │   │   └── model_downloader.py          # HuggingFace downloader
+│   ├── tools/                           # Agentic tool system
+│   │   ├── __init__.py
+│   │   ├── tool_registry.py             # Tool registration and platform detection
+│   │   ├── tool_executor.py             # Tool execution engine
+│   │   ├── permission_manager.py        # Tool permission management
+│   │   └── platform_detector.py         # Platform-specific tool filtering
 │   └── utils/                           # Shared utilities
 │       ├── __init__.py
 │       └── device_utils.py              # GPU detection, device resolution
@@ -61,11 +67,16 @@ MyIAModelChat/
 │   │   ├── balance.py                   # Class balancing
 │   │   ├── audit.py                     # Data audit
 │   │   └── leakage.py                   # Leakage detection
+│   ├── agent/                           # Agentic data generation
+│   │   ├── __init__.py
+│   │   ├── moe_data.py                  # MoE (Mixture of Experts) data
+│   │   ├── quality.py                   # Agent data quality validation
+│   │   └── thinking.py                  # Agent thinking generation
 │   ├── aiml/
 │   │   ├── __init__.py
-│   │   ├── parser.py                      # AIML Parser (resolve elements, wildcards, quality)
-│   │   ├── loader.py                      # AIML file processing
-│   │   └── thinking.py                    # AIML thinking
+│   │   ├── parser.py                    # AIML Parser (resolve elements, wildcards, quality)
+│   │   ├── loader.py                    # AIML file processing
+│   │   └── thinking.py                  # AIML thinking
 │   ├── pdf/
 │   │   ├── __init__.py
 │   │   └── thinking.py                  # PDF thinking
@@ -91,7 +102,7 @@ MyIAModelChat/
 │   ├── __init__.py
 │   └── chat_engine.py                   # ChatEngine class + ChatConfig
 │
-├── envAIModels/                         # FastAPI server (unchanged)
+├── envAIModels/                         # FastAPI server
 │   ├── __init__.py
 │   ├── app.py
 │   ├── routers_api.py
@@ -105,14 +116,15 @@ MyIAModelChat/
 │   ├── intent/                          # BERT intent classifier
 │   ├── sentiment/                       # BERT sentiment analyzer
 │   └── exported/                        # Exported models
+├── pretrained/                          # Pre-trained model weights (GPT-2)
 ├── dataset_cache/                       # Cached datasets
 ├── datasets_source/                     # Data sources
-├── tests/                               # Test suite (13 test files)
+├── tests/                               # Test suite (21 test files)
 ├── requirements.txt                     # Python dependencies
 ├── APP_CACHE_VIEWER/                    # PyQt5 dataset cache viewer
 ├── DOCS/                                # Documentation
 └── ROADMAPS/                            # Project roadmaps
-`
+```
 
 ---
 
@@ -132,9 +144,16 @@ MyIAModelChat/
 | commons/registry/model_merge.py | Model merging by weight averaging |
 | commons/registry/model_export.py | Export to GGUF, ONNX |
 | commons/utils/device_utils.py | GPU detection, device resolution |
+| commons/tools/tool_registry.py | Tool registration and platform detection |
+| commons/tools/tool_executor.py | Tool execution engine |
+| commons/tools/permission_manager.py | Tool permission management |
+| commons/tools/platform_detector.py | Platform-specific tool filtering |
 | dataset_preparer/data_preparer.py | Multi-source data loading |
 | dataset_preparer/thinking_engine.py | NLP-based chain-of-thought reasoning |
 | dataset_preparer/thinking_quality.py | Thinking quality validation |
+| dataset_preparer/agent/moe_data.py | MoE (Mixture of Experts) data generation |
+| dataset_preparer/agent/quality.py | Agent data quality validation |
+| dataset_preparer/agent/thinking.py | Agent thinking generation |
 | dataset_preparer/aiml/parser.py | AIML Parser (resolve elements, wildcards, quality) |
 | dataset_preparer/aiml/loader.py | AIML file processing |
 | dataset_preparer/contamination/ | Data contamination filtering pipeline |
@@ -168,7 +187,7 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
 
 ### Testing
 
-`
+```bash
 # Run all tests
 pytest tests/
 
@@ -177,7 +196,19 @@ pytest tests/test_chatmodel.py
 
 # Run thinking tests
 pytest tests/test_thinking.py tests/test_thinking_engine.py tests/test_thinking_quality_v2.py -v
-`
+
+# Run agent/tool tests
+pytest tests/test_agent_data.py tests/test_tool_registry.py tests/test_tool_executor.py tests/test_permission_system.py -v
+
+# Run MoE tests
+pytest tests/test_moe.py -v
+
+# Run tokenizer tests
+pytest tests/test_bpe_tokenizer.py -v
+
+# Run AIML parser tests
+pytest tests/test_aiml_parser.py -v
+```
 
 ### Training Commands
 
@@ -205,6 +236,24 @@ python main.py --chat --model ciencias_naturales+programacion
 
 # Export model
 python main.py --export ciencias_naturales --formats gguf,onnx
+
+# Generate thinking data with NLP engine
+python main.py --prepare-data --aiml --generate-thinking --thinking-mode nlp
+
+# Generate agentic data with tool calls
+python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
+
+# Enable Mixture of Experts (MoE) training
+python main.py --train --moe-enabled --moe-num-experts 4 --moe-top-k 2
+
+# Apply contamination filtering
+python main.py --prepare-data --aiml --filter-noise --filter-contamination --filter-dedup --filter-balance
+
+# Validate data sources
+python main.py --prepare-data --aiml --validate-sources
+
+# Text chunking for large documents
+python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 512
 ```
 
 ### API Server
@@ -217,6 +266,45 @@ python -m envAIModels.app
 POST /v1/chat/completions  # Chat completion
 GET  /v1/models            # List available models
 ```
+
+### Agentic Tool System
+
+The project includes an agentic tool system for extending model capabilities:
+
+```python
+# Tool registration and execution
+from commons.tools.tool_registry import ToolRegistry, register_default_tools
+from commons.tools.tool_executor import execute_tool_call
+from commons.tools.permission_manager import PermissionManager
+from commons.tools.platform_detector import detect_platform
+
+# Default tools: calculator, current_date, word_count, get_platform, read_file, list_directory, web_search
+```
+
+**Key Features:**
+- Platform-aware tool filtering (Windows/Linux/macOS)
+- Permission management for shell/file operations
+- Tool call parsing from model output (`<tool_call>` tokens)
+- Extensible registry for custom tools
+
+### MoE (Mixture of Experts) Architecture
+
+Support for Mixture of Experts training for improved model capacity:
+
+```bash
+# Enable MoE during training
+python main.py --train --moe-enabled --moe-num-experts 4 --moe-top-k 2
+
+# MoE data generation
+python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
+```
+
+**MoE Configuration:**
+- `--moe-enabled`: Enable MoE architecture
+- `--moe-num-experts`: Number of experts per layer (default: 4)
+- `--moe-top-k`: Experts to route each token to (default: 2)
+- `--moe-load-balance-weight`: Load balancing loss weight (default: 0.01)
+- `--moe-freeze-attention`: Freeze attention layers during MoE training
 
 ### `--pretrained` Flag
 
@@ -361,7 +449,10 @@ open → in_progress → done
 - AIML 2.0 Smart Parser: resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
 - Contamination Filtering Pipeline: 6 phases (noise, quality, dedup, balance, leakage, language)
 - Source Validators: improved detection of URLs, emails, phone numbers, code, boilerplate
+- Agentic Tool System: platform-aware tool registry, permission management, tool call parsing
+- MoE (Mixture of Experts) architecture support for training
+- Enhanced testing suite with 21 test files covering tools, agents, MoE, and thinking
 
 ---
 
-*Last updated: 2026-08-05*
+*Last updated: 2026-08-16*

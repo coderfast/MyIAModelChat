@@ -1,0 +1,16 @@
+{
+    "files": {
+        "datasets_source/pdf/Free E-book march 2024 v2.pdf": "en",
+		"datasets_source/epub/Translated ES - How to succeed - Jose Maria Franco Reverte.epub": "es"
+    },
+	"sources": {
+        "aiml": "en",
+        "hf": "en",
+        "pdf": "en",
+        "epub": "en",
+        "web": "en",
+        "csv": "en",
+        "tagengo": "en"
+    },    
+    "default": "unknown"
+}
