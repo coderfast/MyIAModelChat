@@ -95,11 +95,7 @@ def quantize_onnx_model(
 
     print(f"Loading tokenizer from {hf_dir}...")
     from transformers import GPT2Tokenizer
-    try:
-        tokenizer = GPT2Tokenizer.from_pretrained(hf_dir)
-    except Exception:
-        # Fallback: try loading just vocab
-        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    tokenizer = GPT2Tokenizer.from_pretrained(hf_dir)
 
     print(f"Generating {calibration_samples} calibration samples...")
     calibration_texts = [

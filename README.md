@@ -34,7 +34,7 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 - **AIML 2.0 Smart Parser**: Resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
 - **PDF Text Extraction**: Automatic content extraction from PDF documents
 - **EPUB E-Book Support**: Full e-book parsing and integration
-- **Hugging Face Datasets**: Integration with pre-trained datasets
+- **Hugging Face Datasets**: Integration with datasets
 - **Web Scraping**: Documentation crawling with trafilatura + BeautifulSoup
 - **CSV Datasets**: Curated QA pairs from CSV files
 - **Dataset Caching**: 12x faster training with intelligent caching system

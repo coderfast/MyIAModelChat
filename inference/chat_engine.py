@@ -197,10 +197,10 @@ class ChatEngine:
             self.model.load_state_dict(new_state)
             self.model.to(device)
             self.model.eval()
-            logger.info("Pre-trained model loaded successfully.")
+            logger.info("Model loaded successfully.")
 
         except Exception as e:
-            logger.exception("Error loading pre-trained model: %s", e)
+            logger.exception("Error loading model: %s", e)
             if self.tokenizer is None:
                 raise RuntimeError(
                     f"Error loading model checkpoint: {e}. "

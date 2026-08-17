@@ -48,7 +48,7 @@ Primary Mode Arguments (choose one):
     Default: False
     Example: python main.py --chat
     Notes:
-        - Loads pre-trained model from checkpoints/chat_model.pth
+        - Loads model from checkpoints/chat_model.pth
         - Loads tokenizer from checkpoints/tokenizer_vocab.json
         - Provides interactive chat interface with dynamic n-gram penalization
         - Uses intent classification and sentiment analysis
