@@ -20,8 +20,8 @@ models/**/*.onnx
 models/**/*.gguf
 models/**/*.safetensors
 models/**/__pycache__/
-envAIModels/models/*.gguf
-envAIModels/__pycache__/
+ServerFastAPI/models/*.gguf
+ServerFastAPI/__pycache__/
 
 # BERT models (intent/sentiment)
 /models/intent/
@@ -73,5 +73,9 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+# Notas de trabajo / errores (no subir)
+error.txt
+
 /models/exported/chat_model_hf/tokenizer_vocab.json
 /models/exported/chat_model_hf/config.json
