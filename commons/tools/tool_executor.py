@@ -133,27 +133,33 @@ class ToolExecutor:
         """Detect if text contains <tool_call>."""
         return '<tool_call>' in text and '</tool_call>' in text
 
-    def parse_tool_call(self, text: str) -> tuple[str, dict]:
-        """Extract (tool_name, arguments) from a tool_call."""
+    def parse_tool_call(self, text: str) -> tuple[str, str]:
+        """Extract (tool_name, args_string) from a tool_call.
+
+        Function-call notation per plan Formato 2: <tool_call>search_places(arg1, arg2)</tool_call>.
+        """
         try:
-            json_str = text.split('<tool_call>')[1].split('</tool_call>')[0].strip()
-            data = json.loads(json_str)
-            name = data.get('name', '')
-            arguments = data.get('arguments', {})
-            return name, arguments
-        except (IndexError, json.JSONDecodeError) as e:
+            call = text.split('<tool_call>')[1].split('</tool_call>')[0].strip()
+            match = re.match(r'^([A-Za-z_]\w*)\s*\((.*)\)$', call, re.DOTALL)
+            if not match:
+                logger.warning(f"Failed to parse tool_call: {call}")
+                return '', ''
+            return match.group(1), match.group(2).strip()
+        except (IndexError, ValueError) as e:
             logger.warning(f"Failed to parse tool_call: {e}")
-            return '', {}
+            return '', ''
 
     def execute_tool_call(self, tool_call_text: str, registry) -> str:
         """Execute a tool_call and return observation."""
-        tool_name, arguments = self.parse_tool_call(tool_call_text)
+        tool_name, args_string = self.parse_tool_call(tool_call_text)
         if not tool_name:
             return format_observation("Error: Could not parse tool_call")
 
         tool = registry.get(tool_name)
         if tool is None:
             return format_observation(f"Error: Unknown tool '{tool_name}'")
+
+        arguments = self._map_arguments(tool, args_string)
 
         # Shell commands need security check and permission
         if tool.category == 'shell':
@@ -182,9 +188,29 @@ class ToolExecutor:
         result = registry.call(tool_name, arguments)
         return format_observation(result)
 
+    def _map_arguments(self, tool, args_string: str) -> dict:
+        """Map a positional args string to named arguments using the tool parameter schema.
+
+        Formato 2 notation: <tool_call>web_search(que es python)</tool_call>
+        becomes {"query": "que es python"} for the web_search tool.
+        """
+        if not args_string:
+            return {}
+        params = list(tool.parameters.keys())
+        if not params:
+            return {}
+        if len(params) == 1:
+            return {params[0]: args_string}
+        # Multiple params: split on commas (simple positional mapping)
+        parts = [p.strip() for p in args_string.split(',')]
+        return {params[i]: parts[i] for i in range(min(len(params), len(parts)))}
+
 
 def format_observation(result: str, max_length: int = 500) -> str:
-    """Format result as  observation>."""
+    """Format result as a <|tool_result|> prefix block (no closing tag).
+
+    The observation content runs until the next <|end|>/<|assistant|> turn marker.
+    """
     if len(result) > max_length:
         result = result[:max_length] + "\n... (truncated)"
-    return f"<observation>{result}</observation>"
+    return f"<|tool_result|>{result}"

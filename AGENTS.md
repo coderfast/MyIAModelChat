@@ -4,15 +4,22 @@
 
 MyIAModelChat is an advanced conversational AI system built with PyTorch, featuring GPT-2 Transformer architecture, multilingual support (English/Spanish and all EU and european languages), intent recognition, sentiment analysis, chain-of-thought reasoning (`<thinking>`), and multi-source data processing (AIML, PDF, EPUB, HuggingFace, Web, CSV).
 
-**GPT-2 Standard Tokens:**
+**GPT-2 Standard Tokens (consolidated):**
 - `<|problem|>` - Question/problem prefix
-- `<|thinking|>` - Reasoning prefix
-- `<|final|>` - Answer prefix
+- `<|thinking|>` - Reasoning prefix (opens thinking block)
+- `<|final|>` - Answer prefix (also closes thinking block)
 - `<|user|>` - User prefix (agentic)
 - `<|assistant|>` - Assistant prefix (agentic)
+- `<|system|>` - System instructions prefix
+- `<|end|>` - End of message/turn
+- `<|sep|>` - Intra-message separator
 - `<tool_call>` - Tool call start
 - `</tool_call>` - Tool call end
-- `<|tool_result|>` - Tool result prefix
+- `<|tool_result|>` - Tool result prefix (no closing tag; runs until `<|end|>`)
+
+**Legacy tokens (deprecated, consolidated):** `<|context|>`→`<|problem|>`,
+`<|answer|>`→`<|final|>`, `<thinking>`→`<|thinking|>`, `</thinking>`→`<|final|>`,
+`<observation>`/`</observation>`→`<|tool_result|>`. See `PLAN_SPECIAL_TOKENS.md`.
 
 ---
 
@@ -116,7 +123,6 @@ MyIAModelChat/
 │   ├── intent/                          # BERT intent classifier
 │   ├── sentiment/                       # BERT sentiment analyzer
 │   └── exported/                        # Exported models
-├── pretrained/                          # Pre-trained model weights (GPT-2)
 ├── dataset_cache/                       # Cached datasets
 ├── datasets_source/                     # Data sources
 ├── tests/                               # Test suite (21 test files)
@@ -219,9 +225,6 @@ python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
 # Train model (default checkpoint name)
 python main.py --train --epochs 30
 
-# Train with pre-trained GPT-2 weights (ignores existing checkpoint)
-python main.py --train --epochs 30 --pretrained
-
 # Train with custom name and dataset
 python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
 
@@ -254,6 +257,10 @@ python main.py --prepare-data --aiml --validate-sources
 
 # Text chunking for large documents
 python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 512
+
+# PDF/EPUB samples are whole paragraphs (or whole EPUB chapters when they fit
+# the context window). Repeated headers/footers and standalone page numbers are
+# removed automatically via cross-page detection (clean_page_artifacts).
 ```
 
 ### API Server
@@ -305,24 +312,6 @@ python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
 - `--moe-top-k`: Experts to route each token to (default: 2)
 - `--moe-load-balance-weight`: Load balancing loss weight (default: 0.01)
 - `--moe-freeze-attention`: Freeze attention layers during MoE training
-
-### `--pretrained` Flag
-
-**What it does:** Loads GPT-2 Small (117M) weights into our small architecture.
-
-**Behavior:**
-| Scenario | Result |
-|----------|--------|
-| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
-| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
-| No `--pretrained` + checkpoint | Continues training from checkpoint |
-| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
-
-**Expected improvement:**
-- Without `--pretrained`: Loss ~6.0 → ~4.75 (1 epoch)
-- With `--pretrained`: Loss ~4.5 → ~3.5 (1 epoch)
-
----
 
 ## Architecture Patterns
 
@@ -417,7 +406,7 @@ open → in_progress → done
 
 ### Data Processing
 - python-aiml (AIML parsing)
-- PyPDF2 (PDF extraction)
+- pypdf (PDF extraction)
 - ebooklib (EPUB support)
 - trafilatura (web scraping)
 - beautifulsoup4 (HTML parsing)
@@ -446,13 +435,15 @@ open → in_progress → done
 - Dataclass-based configuration (TrainingConfig, ChatConfig)
 - Removed CLI dependency from training/inference modules
 - Improved code organization for better maintainability
-- AIML 2.0 Smart Parser: resolves `<srai>`, `<random>`, wildcards, `<thinking>`, HTML tags
+- AIML 2.0 Smart Parser: resolves `<srai>`, `<random>`, wildcards, HTML tags
+- Special Tokens Consolidation: unified legacy tokens to GPT-2 standard set, added `<|system|>`/`<|end|>`/`<|sep|>`, `<|tool_result|>` prefix-only format, dataset migrator (`dataset_preparer/migrator.py`)
 - Contamination Filtering Pipeline: 6 phases (noise, quality, dedup, balance, leakage, language)
 - Source Validators: improved detection of URLs, emails, phone numbers, code, boilerplate
 - Agentic Tool System: platform-aware tool registry, permission management, tool call parsing
 - MoE (Mixture of Experts) architecture support for training
 - Enhanced testing suite with 21 test files covering tools, agents, MoE, and thinking
+- PDF/EPUB Whole-Paragraph Extraction: PDF samples are whole paragraphs; EPUB uses native chapters (whole chapter when it fits, else paragraphs via BeautifulSoup); repeated headers/footers and standalone page numbers removed via cross-page detection (`clean_page_artifacts`)
 
 ---
 
-*Last updated: 2026-08-16*
+*Last updated: 2026-08-17*

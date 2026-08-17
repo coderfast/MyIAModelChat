@@ -61,7 +61,7 @@ Output Logits
 
 ### DataLoading with Multiple Sources
 1. Load AIML data via `dataset_preparer/aiml/loader.py`
-2. Load PDF documents via `dataset_preparer/data_preparer.py` (PyPDF2)
+2. Load PDF documents via `dataset_preparer/data_preparer.py` (pypdf)
 3. Load EPUB e-books via `dataset_preparer/data_preparer.py` (ebooklib)
 4. Load Hugging Face datasets
 5. Combine datasets using `concatenate_datasets()` with schema alignment
@@ -97,8 +97,8 @@ trainer.run()
 
 **DataPreparer** (dataset_preparer/data_preparer.py)
 - Multi-source data loading and processing
-- PDF text extraction with PyPDF2
-- EPUB parsing with ebooklib
+- PDF page text extraction with pypdf, header/footer/page-number removal, whole-paragraph samples
+- EPUB native chapter extraction with ebooklib + BeautifulSoup, whole chapters/paragraphs, header/footer removal
 - Dataset caching system (12x speedup)
 - Schema alignment for concatenation
 - Advanced text processing (chunking, dedup, quality filtering)

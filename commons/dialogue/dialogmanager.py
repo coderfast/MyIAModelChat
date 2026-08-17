@@ -40,6 +40,10 @@ class DialogueManager:
         self.user_id = getattr(tokenizer, "get_user_index", lambda: -1)()
         self.assistant_id = getattr(tokenizer, "get_assistant_index", lambda: -1)()
         self.tool_result_id = getattr(tokenizer, "get_tool_result_index", lambda: -1)()
+        self.system_id = getattr(tokenizer, "get_system_index", lambda: -1)()
+        self.end_id = getattr(tokenizer, "get_end_index", lambda: -1)()
+        self.sep_id = getattr(tokenizer, "get_sep_index", lambda: -1)()
+        self.thinking_id = getattr(tokenizer, "get_thinking_index", lambda: -1)()
 
         # Legacy token IDs (backward compat)
         self.context_id = getattr(tokenizer, "get_context_index", lambda: -1)()
@@ -180,8 +184,8 @@ class DialogueManager:
 
         print(f"Intent: {intent_label} | Sentiment: {sentiment_label} | Temp: {adjusted_temperature:.2f}")
 
-        # Build prompt with mode tokens: <|thinking|>question<|answer|>
-        prompt_text = f"<|thinking|>{user_text.strip()}<|answer|>"
+        # Build prompt with chat format (Formato 1): <|user|>text<|end|><|assistant|>
+        prompt_text = f"<|user|>{user_text.strip()}<|end|><|assistant|>"
         try:
             input_ids = self.tokenizer.encode(prompt_text)
         except Exception:
@@ -315,10 +319,13 @@ class DialogueManager:
         try:
             # Decode all generated tokens to extract thinking
             full_text = self.tokenizer.decode(generated)
-            
-            # Extract thinking from <|thinking|> to <|answer|>
-            if '<|thinking|>' in full_text and '<|answer|>' in full_text:
-                parts = full_text.split('<|answer|>')
+
+            # Extract thinking from <|thinking|> to <|final|> (or legacy <|answer|>)
+            thinking_text = None
+            response_text = None
+            if '<|thinking|>' in full_text and ('<|final|>' in full_text or '<|answer|>' in full_text):
+                end_marker = '<|final|>' if '<|final|>' in full_text else '<|answer|>'
+                parts = full_text.split(end_marker)
                 thinking_part = parts[0]
                 # Remove the <|thinking|> prefix
                 if '<|thinking|>' in thinking_part:
@@ -330,6 +337,13 @@ class DialogueManager:
                     response_text = self.tokenizer.decode(response_tokens)
                 else:
                     response_text = full_text
+
+            # Strip trailing <|end|> / <|assistant|> / <|final|> markers from response
+            if response_text:
+                for marker in ('<|end|>', '<|assistant|>', '<|final|>', '<|answer|>'):
+                    if marker in response_text:
+                        response_text = response_text.split(marker, 1)[0]
+                    response_text = response_text.strip()
         except Exception:
             try:
                 response_text = " ".join(self.tokenizer.convert_ids_to_tokens(response_tokens or generated))
@@ -359,7 +373,7 @@ class DialogueManager:
         """
         from commons.tools.tool_executor import format_observation
 
-        context = f"<|thinking|>{user_text.strip()}<|answer|>"
+        context = f"<|user|>{user_text.strip()}<|end|><|assistant|>"
         observations = []
 
         for iteration in range(self.agent_max_iterations):
@@ -460,25 +474,40 @@ class DialogueManager:
                     else:
                         clean += part
 
-            # Remove observation blocks
-            if '<observation>' in clean:
-                parts = clean.split('<observation>')
+            # Remove <|tool_result|> blocks (prefix, run until next turn marker)
+            if '<|tool_result|>' in clean:
+                parts = clean.split('<|tool_result|>')
                 clean = parts[0]
                 for part in parts[1:]:
-                    if '</observation>' in part:
-                        clean += part.split('</observation>', 1)[1]
+                    marker = None
+                    for m in ('<|end|>', '<|assistant|>'):
+                        if m in part:
+                            marker = m
+                            break
+                    if marker:
+                        clean += part.split(marker, 1)[1]
                     else:
                         clean += part
 
             # Parse thinking/answer
-            if '<|thinking|>' in clean and '<|answer|>' in clean:
-                parts = clean.split('<|answer|>')
+            thinking_text = None
+            response_text = None
+            if '<|thinking|>' in clean and ('<|final|>' in clean or '<|answer|>' in clean):
+                end_marker = '<|final|>' if '<|final|>' in clean else '<|answer|>'
+                parts = clean.split(end_marker)
                 thinking_part = parts[0]
                 if '<|thinking|>' in thinking_part:
                     thinking_text = thinking_part.split('<|thinking|>', 1)[1].strip()
                 response_text = parts[1].strip() if len(parts) > 1 else None
             else:
                 response_text = clean.strip()
+
+            # Strip trailing turn markers from response
+            if response_text:
+                for marker in ('<|end|>', '<|assistant|>', '<|final|>', '<|answer|>'):
+                    if marker in response_text:
+                        response_text = response_text.split(marker, 1)[0]
+                    response_text = response_text.strip()
 
         except Exception:
             response_text = raw_output

@@ -1,6 +1,5 @@
 """Quality validation for agentic data samples."""
 
-import json
 import re
 import logging
 from dataclasses import dataclass, field
@@ -21,7 +20,7 @@ def validate_agent_sample(sample: Dict[str, Any], known_tools: Optional[List[str
     """Validate an agentic data sample.
 
     Checks:
-    - tool_call has valid JSON
+    - tool_call uses valid notation: tool_name(args)
     - tool_name exists in registry
     - arguments match tool schema
     - observation is not empty
@@ -48,23 +47,24 @@ def validate_agent_sample(sample: Dict[str, Any], known_tools: Optional[List[str
         score -= 0.2
         return AgentQualityResult(valid=score > 0.3, score=max(0.0, score), issues=issues)
 
-    # Validate tool_call JSON
+    # Validate tool_call notation (Formato 2: tool_name(args))
     tool_call_match = re.search(r'<tool_call>(.*?)</tool_call>', input_text, re.DOTALL)
     if not tool_call_match:
         issues.append('missing_tool_call_tags')
         score -= 0.5
         return AgentQualityResult(valid=False, score=max(0.0, score), issues=issues)
 
-    tool_call_json = tool_call_match.group(1).strip()
-    try:
-        tool_call_data = json.loads(tool_call_json)
-    except json.JSONDecodeError as e:
-        issues.append(f'invalid_tool_call_json: {e}')
+    tool_call_str = tool_call_match.group(1).strip()
+    tool_call_parse = re.match(r'^([A-Za-z_]\w*)\s*\((.*)\)$', tool_call_str, re.DOTALL)
+    if not tool_call_parse:
+        issues.append('invalid_tool_call_format')
         score -= 0.5
         return AgentQualityResult(valid=False, score=max(0.0, score), issues=issues)
 
+    name = tool_call_parse.group(1)
+    args_str = tool_call_parse.group(2).strip()
+
     # Validate tool name
-    name = tool_call_data.get('name', '')
     if not name:
         issues.append('missing_tool_name')
         score -= 0.3
@@ -72,14 +72,13 @@ def validate_agent_sample(sample: Dict[str, Any], known_tools: Optional[List[str
         issues.append(f'unknown_tool: {name}')
         score -= 0.2
 
-    # Validate arguments exist
-    args = tool_call_data.get('arguments', {})
-    if not isinstance(args, dict):
-        issues.append('arguments_not_dict')
+    # Validate arguments present (may be empty for parameterless tools)
+    if name and name not in ('current_date', 'get_platform') and not args_str:
+        issues.append('missing_arguments')
         score -= 0.2
 
-    # Validate observation exists
-    obs_match = re.search(r'<observation>(.*?)</observation>', input_text, re.DOTALL)
+    # Validate observation exists (prefix <|tool_result|>, runs until <|end|>/<|assistant|>)
+    obs_match = re.search(r'<\|tool_result\|>(.*?)(?:<\|end\|>|<\|assistant\|>)', input_text, re.DOTALL)
     if not obs_match:
         issues.append('missing_observation')
         score -= 0.3
@@ -92,7 +91,7 @@ def validate_agent_sample(sample: Dict[str, Any], known_tools: Optional[List[str
         issues.append('thinking_mismatches_tool')
         score -= 0.1
 
-    valid = score >= 0.5 and not any(i.startswith('invalid_tool_call') or i == 'missing_tool_call_tags' for i in issues)
+    valid = score >= 0.5 and 'invalid_tool_call_format' not in issues and 'missing_tool_call_tags' not in issues
     return AgentQualityResult(valid=valid, score=max(0.0, score), issues=issues)
 
 

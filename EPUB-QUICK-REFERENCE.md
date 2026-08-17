@@ -69,13 +69,14 @@ python main.py --chat
 ## How It Works
 
 1. **Detect EPUBs** - Finds all `.epub` files in `datasets_source/epub/` directory
-2. **Extract Text** - Reads each e-book and extracts chapter text
-3. **Remove HTML** - Strips all markup tags for clean text
-4. **Split Sentences** - Splits by periods into training samples
-5. **Filter Short** - Removes sentences < 10 characters
-6. **Create Dataset** - Converts to HuggingFace Dataset format
-7. **Combine** - Merges with AIML/PDF/HF data if specified
-8. **Cache** - Saves to `dataset_cache/` for fast future runs
+2. **Extract Chapters** - Reads each e-book and extracts each native chapter (`ITEM_DOCUMENT`) separately
+3. **Remove HTML** - Strips markup and extracts structured paragraphs (BeautifulSoup, keeps `<thinking>` tags)
+4. **Remove Page Artifacts** - Drops repeated headers/footers (cross-chapter detection) and standalone page numbers
+5. **Whole Chapters / Paragraphs** - A chapter becomes one sample if it fits the context window; otherwise it is split into whole paragraphs
+6. **Filter Short** - Removes samples < 10 characters
+7. **Create Dataset** - Converts to HuggingFace Dataset format
+8. **Combine** - Merges with AIML/PDF/HF data if specified
+9. **Cache** - Saves to `dataset_cache/` for fast future runs
 
 ---
 
@@ -107,16 +108,16 @@ python main.py --chat
 
 | Metric | What It Means |
 |--------|---------------|
-| **Total samples** | Number of sentences extracted |
-| **Avg text length** | Average words per sentence |
-| **Min/Max length** | Shortest/longest sentence |
+| **Total samples** | Number of chapters/paragraphs extracted |
+| **Avg text length** | Average words per sample |
+| **Min/Max length** | Shortest/longest sample |
 
 ### Example Stats
 
-- **Small e-book (100 pages):** ~500-1000 samples
-- **Medium e-book (300 pages):** ~1500-2500 samples
-- **Large e-book (600 pages):** ~3000-5000 samples
-- **Multiple books (1000 pages):** ~5000-10000 samples
+- **Small e-book (100 pages):** ~50-150 samples (whole chapters + paragraphs)
+- **Medium e-book (300 pages):** ~150-400 samples
+- **Large e-book (600 pages):** ~300-800 samples
+- **Multiple books (1000 pages):** ~500-1600 samples
 
 ---
 
@@ -318,9 +319,9 @@ python main.py --chat
 
 **EPUB Support Added:**
 - ✅ Automatic EPUB detection in `datasets_source/epub/` directory
-- ✅ Text extraction from all chapters
-- ✅ HTML tag removal for clean text
-- ✅ Sentence splitting and filtering
+- ✅ Native chapter extraction (whole chapter as sample when it fits the context window)
+- ✅ Structured paragraph extraction via BeautifulSoup (keeps `<thinking>` tags)
+- ✅ Page artifact removal (repeated headers/footers, page numbers)
 - ✅ Integration with existing data sources
 - ✅ Automatic caching for fast iterations
 - ✅ Statistics and validation included

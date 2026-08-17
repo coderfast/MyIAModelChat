@@ -153,8 +153,8 @@ def test_format_thinking_sample():
     sample = {'input': 'hello', 'output': 'Hello!'}
     result = gen.generate(sample)
     assert 'thinking_text' in result
-    assert '<thinking>' in result['thinking_text']
-    assert '</thinking>' in result['thinking_text']
+    assert '<|thinking|>' in result['thinking_text']
+    assert '<|final|>' in result['thinking_text']
     print("PASS: test_format_thinking_sample")
 
 

@@ -10,6 +10,9 @@ python main.py --export chat_model --formats gguf --quantization q5_0
 
 # Direct conversion
 python models/exported/convert_gguf.py <hf_dir> --outfile output.gguf --outtype q5_0
+
+# With custom model name (appears in GGUF metadata)
+python models/exported/convert_gguf.py <hf_dir> --outfile output.gguf --outtype q8_0 --name my_model
 ```
 
 ## Supported Quantization Types
@@ -119,6 +122,55 @@ python main.py --export chat_model --formats gguf --quantization iq4_xs
 
 # Export with smallest possible size
 python main.py --export chat_model --formats gguf --quantization iq1_s
+```
+
+## Ollama Integration
+
+After GGUF export, the HF directory includes a `Modelfile` for Ollama:
+
+```bash
+# 1. Export to GGUF
+python main.py --export chat_model --formats gguf --quantization q8_0
+
+# 2. Convert to GGUF (run from the _hf directory)
+cd models/exported/chat_model_hf
+convert_to_gguf.bat   # Windows
+# or: bash convert_to_gguf.sh   # Linux/Mac
+
+# 3. Create Ollama model
+# Copy Modelfile to where the .gguf file is, then:
+ollama create chat_model -f Modelfile
+
+# 4. Use
+ollama run chat_model
+```
+
+The generated `Modelfile` includes:
+- `FROM` pointing to the GGUF file
+- `TEMPLATE` with `<|system|>`, `<|user|>`, `<|assistant|>` tokens
+- `PARAMETER stop` for `<|user|>`, `<|end_of_text|>`, `</s>`
+- `SYSTEM` prompt
+
+## Exported Directory Structure
+
+After GGUF export, the `_hf` directory contains:
+
+```
+chat_model_hf/
+  pytorch_model.bin           # Model weights
+  config.json                 # Architecture (with BOS/EOS/pad IDs)
+  sentencepiece.model         # Tokenizer model
+  tokenizer.json              # HuggingFace tokenizer
+  tokenizer_config.json       # Tokenizer config
+  special_tokens_map.json     # Special tokens
+  tokenizer_vocab.json        # SentencePiece reference
+  metadata.json               # Model metadata
+  Modelfile                   # Ollama Modelfile
+  convert_to_gguf.bat         # Windows conversion script
+  convert_to_gguf.sh          # Linux/Mac conversion script
+  LICENSE                     # MIT
+  NOTICE                      # GPT-2 Modified MIT
+  LICENSE_INFO.json           # License metadata
 ```
 
 ## Requirements

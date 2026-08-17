@@ -1,6 +1,6 @@
 """Agent thinking generator — produces tool_call + observation data for training."""
 
-import json
+import re
 import random
 import logging
 from typing import Dict, Any, Optional, List
@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 class AgentThinkingGenerator(ThinkingGenerator):
     """Generate agentic thinking data with tool calls and observations.
 
-    GPT-2 standard format:
-        <|problem|>question<thinking>reasoning</thinking>
-        <|assistant|><|tool_call|>tool: args<|tool_call|><|tool_result|>result<|assistant|>response
+    GPT-2 standard format (Formato 2):
+        <|user|>{question}<|end|>
+        <|assistant|><tool_call>{tool_name}({args})</tool_call><|tool_result|>{result}<|end|>
+        <|assistant|>{response}<|end|>
 
-    For samples that don't need tools:
-        <|problem|>question<thinking>reasoning</thinking><|final|>response
+    For samples that don't need tools (Formato 3):
+        <|problem|>{question}<|thinking|>{reasoning}<|final|>{response}
     """
 
     TOOL_CATEGORIES = {
@@ -86,7 +87,6 @@ class AgentThinkingGenerator(ThinkingGenerator):
 
         for category, config in self.TOOL_CATEGORIES.items():
             for pattern, tool_name, args_fn in config['patterns']:
-                import re
                 if re.search(pattern, q_lower):
                     arguments = args_fn(re.search(pattern, q_lower))
                     simulated = self._simulate_tool_result(tool_name, arguments, answer)
@@ -174,27 +174,15 @@ class AgentThinkingGenerator(ThinkingGenerator):
         result['answer'] = answer
 
         if with_tool and tool_name:
-            # Build tool call JSON
-            tool_call_obj = {"name": tool_name, "arguments": {}}
-            if tool_args:
-                if tool_name == 'calculator':
-                    tool_call_obj["arguments"] = {"expression": tool_args}
-                elif tool_name in ('read_file', 'list_directory'):
-                    tool_call_obj["arguments"] = {"path": tool_args}
-                elif tool_name == 'web_search':
-                    tool_call_obj["arguments"] = {"query": tool_args}
-                else:
-                    tool_call_obj["arguments"] = {}
+            # Build tool call string in function notation: tool_name(args)
+            args_str = f"({tool_args})" if tool_args else "()"
+            tool_call_str = f"{tool_name}{args_str}"
 
-            tool_call_json = json.dumps(tool_call_obj, ensure_ascii=False)
-
-            # GPT-2 standard agentic format
+            # GPT-2 standard agentic format (Formato 2, no thinking block)
             agent_text = (
-                f"<|problem|>{question}"
-                f"<thinking>{thinking}</thinking>"
-                f"<|assistant|><|tool_call|>{tool_name}: {tool_args}<|tool_call|>"
-                f"<|tool_result|>{observation}<|tool_result|>"
-                f"<|assistant|>{answer}"
+                f"<|user|>{question}<|end|>"
+                f"<|assistant|><tool_call>{tool_call_str}</tool_call><|tool_result|>{observation}<|end|>"
+                f"<|assistant|>{answer}<|end|>"
             )
 
             result['thinking'] = thinking
@@ -206,8 +194,8 @@ class AgentThinkingGenerator(ThinkingGenerator):
             result['original_text'] = answer
             self._tool_call_count += 1
         else:
-            # GPT-2 standard thinking format (no tool)
-            normal_text = f"<|problem|>{question}<thinking>{thinking}</thinking><|final|>{answer}"
+            # GPT-2 standard thinking format (Formato 3, no tool)
+            normal_text = f"<|problem|>{question}<|thinking|>{thinking}<|final|>{answer}"
             result['thinking'] = thinking
             result['has_tool_call'] = False
             result['tool_name'] = ''

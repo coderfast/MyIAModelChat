@@ -43,6 +43,8 @@ Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reas
 
 ### Advanced Text Processing
 - **Professional Sentence Tokenization**: spaCy-based sentence splitting (replaces naive `split('.')`)
+- **Whole-Paragraph Extraction**: PDF/EPUB samples are whole paragraphs (or whole EPUB chapters when they fit), preserving semantic coherence
+- **Page Artifact Removal**: Repeated headers/footers and standalone page numbers are removed via cross-page detection
 - **Unicode Normalization**: NFKC normalization for consistent text
 - **Text Chunking**: Split long documents into overlapping token windows
 - **Deduplication**: MinHash LSH for removing duplicate/near-duplicate texts
@@ -74,9 +76,6 @@ python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8
 ```bash
 # Standard training
 python main.py --train --epochs 30
-
-# Train with pre-trained GPT-2 weights (better initialization)
-python main.py --train --epochs 30 --pretrained
 ```
 
 ### 3. Start Chatting
@@ -463,7 +462,6 @@ class ChatConfig:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--epochs NUM` | Number of training epochs | `1` |
-| `--pretrained` | Load GPT-2 weights (ignores existing checkpoint) | (flag) |
 | `--refresh-cache` | Rebuild cache from scratch | (flag) |
 | `--onlytokenize` | Build vocabulary only | (flag) |
 | `--bpe-vocab-size` | BPE vocabulary size | `8000` |
@@ -490,46 +488,6 @@ class ChatConfig:
 
 ---
 
-## Pre-trained Weights (`--pretrained`)
-
-### What it does
-Loads GPT-2 Small (117M) weights into our small architecture (4 layers, 256 hidden, 4 heads, ~3M params).
-
-### Usage
-```bash
-# Standard training (random init)
-python main.py --train --epochs 30
-
-# With GPT-2 pre-trained weights (better initialization)
-python main.py --train --epochs 30 --pretrained
-```
-
-### Behavior
-| Scenario | Result |
-|----------|--------|
-| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
-| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
-| No `--pretrained` + checkpoint | Continues training from checkpoint |
-| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
-
-### Expected improvement
-- **Without `--pretrained`**: Loss ~6.0 → ~4.75 (1 epoch)
-- **With `--pretrained`**: Loss ~4.5 → ~3.5 (1 epoch)
-
-### Manual download (optional)
-```bash
-# Create folder and download weights
-mkdir -p pretrained/gpt2
-python -c "
-from transformers import GPT2LMHeadModel
-model = GPT2LMHeadModel.from_pretrained('gpt2')
-model.save_pretrained('pretrained/gpt2')
-print('Done!')
-"
-```
-
----
-
 ## Data Sources
 
 ### AIML Files
@@ -538,13 +496,16 @@ print('Done!')
 - Place `.aiml` files in `datasets_source/aiml/`
 
 ### PDF Documents
-- Automatic text extraction using PyPDF2
-- Supports complex layouts and formatting
+- Automatic text extraction using pypdf
+- Repeated headers/footers and page numbers removed via cross-page detection
+- Whole-paragraph samples for semantic coherence
 - Place PDFs in `datasets_source/pdf/`
 
 ### EPUB E-books
 - Full e-book parsing with ebooklib
-- Chapter-by-chapter content extraction
+- Native chapter-by-chapter extraction (whole chapter as sample when it fits the context window)
+- Structured paragraph extraction with BeautifulSoup
+- Repeated headers/footers and page numbers removed
 - Supports metadata and structure
 - Place EPUBs in `datasets_source/epub/`
 
@@ -694,7 +655,7 @@ main.py
 
 ### Data Processing
 - python-aiml (AIML parsing)
-- PyPDF2
+- pypdf
 - ebooklib
 - beautifulsoup4
 - trafilatura

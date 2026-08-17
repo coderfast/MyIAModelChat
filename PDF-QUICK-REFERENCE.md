@@ -69,12 +69,13 @@ python main.py --chat
 ## How It Works
 
 1. **Detect PDFs** - Finds all `.pdf` files in `datasets_source/pdf/` directory
-2. **Extract Text** - Reads each PDF file and extracts text
-3. **Split Sentences** - Splits by periods into training samples
-4. **Filter Short** - Removes sentences < 10 characters
-5. **Create Dataset** - Converts to HuggingFace Dataset format
-6. **Combine** - Merges with AIML/HF data if specified
-7. **Cache** - Saves to `dataset_cache/` for fast future runs
+2. **Extract Text** - Reads each PDF file and extracts text page by page (pypdf)
+3. **Remove Page Artifacts** - Drops repeated headers/footers (cross-page detection) and standalone page numbers
+4. **Split Paragraphs** - Splits the cleaned text into whole paragraphs (keeps semantic coherence)
+5. **Filter Short** - Removes paragraphs < 10 characters
+6. **Create Dataset** - Converts to HuggingFace Dataset format (whole paragraph per sample)
+7. **Combine** - Merges with AIML/HF data if specified
+8. **Cache** - Saves to `dataset_cache/` for fast future runs
 
 ---
 
@@ -106,22 +107,22 @@ python main.py --chat
 
 | Metric | What It Means |
 |--------|---------------|
-| **Total samples** | Number of sentences extracted |
-| **Avg text length** | Average words per sentence |
-| **Min/Max length** | Shortest/longest sentence |
+| **Total samples** | Number of paragraphs extracted |
+| **Avg text length** | Average words per paragraph |
+| **Min/Max length** | Shortest/longest paragraph |
 
 ### Example Stats
 
-- **Single 10-page PDF:** ~100-300 samples
-- **Multiple PDFs (50 pages):** ~500-1000 samples
-- **Large documents (200 pages):** ~2000-5000 samples
+- **Single 10-page PDF:** ~30-100 paragraphs
+- **Multiple PDFs (50 pages):** ~150-300 paragraphs
+- **Large documents (200 pages):** ~600-1500 paragraphs
 
 ---
 
 ## Installation Requirements
 
 ### Required
-- `PyPDF2` - Installed via: `pip install PyPDF2`
+- `pypdf` - Installed via: `pip install pypdf`
 
 ### Already Included
 - HuggingFace `datasets` library
@@ -178,16 +179,16 @@ dir pdfs  # On Windows
 # Verify file extensions are .pdf (lowercase)
 ```
 
-### PyPDF2 not installed?
+### pypdf not installed?
 ```bash
-pip install PyPDF2
+pip install pypdf
 
 # Or in project venv:
-.\envMyIAModelChat\Scripts\pip install PyPDF2
+.\envMyIAModelChat\Scripts\pip install pypdf
 ```
 
 ### Not many samples extracted?
-- PDFs may be too short
+- PDFs may be too short or contain few whole paragraphs
 - Consider adding more/longer PDFs
 - Some PDFs may have encoding issues
 
@@ -284,7 +285,8 @@ python main.py --chat
 **PDF Support Added:**
 - ✅ Automatic PDF detection in `datasets_source/pdf/` directory
 - ✅ Text extraction from all PDF pages
-- ✅ Sentence splitting and filtering
+- ✅ Page artifact removal (repeated headers/footers, page numbers)
+- ✅ Whole-paragraph splitting and filtering
 - ✅ Integration with existing AIML and HF data
 - ✅ Automatic caching for fast iterations
 - ✅ Statistics and validation included

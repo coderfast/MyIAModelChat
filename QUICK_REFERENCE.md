@@ -228,8 +228,8 @@ export_to_gguf("model.pth")
 ## Dataset Sources
 
 1. **AIML** (`datasets_source/aiml/` folder): ~60 AIML pattern files from A.L.I.C.E.
-2. **PDF Documents** (`datasets_source/pdf/` folder): Automatic text extraction via PyPDF2
-3. **EPUB E-books** (`datasets_source/epub/` folder): Full e-book parsing via ebooklib
+2. **PDF Documents** (`datasets_source/pdf/` folder): Page-by-page text extraction via pypdf; headers/footers/page numbers removed; whole-paragraph samples
+3. **EPUB E-books** (`datasets_source/epub/` folder): Native chapter extraction via ebooklib; whole chapters or paragraphs with header/footer removal
 4. **Hugging Face**: Dialogue datasets (wikitext, bookcorpus, etc.)
 5. **CSV** (`datasets_source/csv/` folder): Curated QA pairs
 6. **Web** (`datasets_source/web/` folder): Documentation scraping
@@ -272,7 +272,7 @@ python -c "import pickle; print(pickle.load(open('dataset_cache/cache_metadata.p
 | Tokenizer mismatch | Use same checkpoint for train & inference |
 | No data loaded | Run `--prepare-data` first, check source folders |
 | Slow training | Increase `num_workers`, use GPU with `--gpu` |
-| PDF/EPUB not loading | Verify PyPDF2/ebooklib installed, files in correct folders |
+| PDF/EPUB not loading | Verify pypdf/ebooklib installed, files in correct folders |
 | Repetitive responses | Adjust `no_repeat_ngram_size`, `temperature` |
 | Short responses | Increase `min_length` parameter |
 

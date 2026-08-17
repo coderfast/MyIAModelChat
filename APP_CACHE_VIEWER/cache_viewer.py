@@ -1380,6 +1380,7 @@ class CacheViewer(QMainWindow):
             '<unk>', '<s>', '</s>',
             '<|problem|>', '<|thinking|>', '<|final|>',
             '<|user|>', '<|assistant|>',
+            '<|system|>', '<|end|>', '<|sep|>',
             '<tool_call>', '</tool_call>', '<|tool_result|>',
             '<thinking>', '</thinking>',
         }

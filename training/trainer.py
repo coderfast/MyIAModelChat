@@ -118,7 +118,6 @@ class TrainingConfig:
     num_threads: int = 0
     max_ram_fraction: float = 0.75
     max_ram_bytes: Optional[int] = None
-    pretrained: bool = False
     thinking_loss_weight: float = 1.0
     thinking_enabled: bool = True
     thinking_max_tokens: int = 64
@@ -283,7 +282,7 @@ class Trainer:
             sys.exit(1)
 
     def _detect_thinking_data(self):
-        """Detect if the dataset contains <thinking> or mode tokens (<|context|>/<|thinking|>)."""
+        """Detect if the dataset contains thinking or mode tokens (<|thinking|>/<|final|>)."""
         if self.loaded_dataset is None:
             return
 
@@ -309,7 +308,7 @@ class Trainer:
                 thinking_count += 1
             elif isinstance(value, list):
                 if thinking_id >= 0 and thinking_end_id >= 0:
-                    if thinking_id in value and thinking_end_id in value:
+                    if thinking_id in value:
                         thinking_count += 1
                 elif context_id >= 0 or thinking_mode_id >= 0:
                     if context_id in value or thinking_mode_id in value:
@@ -621,10 +620,10 @@ class Trainer:
         """Unified loss computation with thinking-aware, mode-aware, and agentic loss weighting.
 
         Loss rules by sample type:
-        - CONTEXT samples (<|context|> prefix): tokens before <|answer|> get weight 0.0,
-          <|answer|> and answer tokens get weight 1.0.
-        - THINKING samples (<|thinking|> prefix): tokens before <thinking> get weight 0.0,
-          <thinking>...</thinking> tokens get thinking_loss_weight, <|answer|> and answer
+        - CONTEXT samples (<|problem|> prefix, no <|thinking|>): tokens before <|final|> get
+          weight 0.0, <|final|> and answer tokens get weight 1.0.
+        - THINKING samples (contain <|thinking|>): tokens before <|thinking|> get weight 0.0,
+          <|thinking|>...<|final|> tokens get thinking_loss_weight, <|final|> and answer
           tokens get weight 1.0.
         - AGENT samples (with <tool_call>): thinking gets thinking_loss_weight, tool_call and
           observation tokens get full weight (1.0), answer tokens get full weight (1.0).
@@ -648,6 +647,8 @@ class Trainer:
         tool_call_end_id = getattr(self.tokenizer, 'get_tool_call_end_index', lambda: -1)()
         observation_id = getattr(self.tokenizer, 'get_observation_index', lambda: -1)()
         observation_end_id = getattr(self.tokenizer, 'get_observation_end_index', lambda: -1)()
+        end_id = getattr(self.tokenizer, 'get_end_index', lambda: -1)()
+        assistant_id = getattr(self.tokenizer, 'get_assistant_index', lambda: -1)()
 
         agent_enabled = getattr(self.config, 'agent_enabled', False)
         agent_loss_weight = getattr(self.config, 'agent_loss_weight', 1.0)
@@ -658,20 +659,23 @@ class Trainer:
             has_context_prefix = False
             has_thinking_prefix = False
 
-            # Detect mode from prefix token
-            first_non_pad = -1
-            for s in range(seq_len):
-                tok = targets[b, s].item()
-                if tok != self.tokenizer.get_pad_index() and tok != self.tokenizer.get_unk_index():
-                    first_non_pad = s
-                    break
+            # Detect thinking by presence of <|thinking|> token anywhere in the row
+            # (Formato 3 thinking samples start with <|problem|>, not <|thinking|>)
+            if thinking_id >= 0 and thinking_id in targets[b]:
+                has_thinking_prefix = True
+            elif context_id >= 0:
+                # Detect mode from prefix token (only when no thinking present)
+                first_non_pad = -1
+                for s in range(seq_len):
+                    tok = targets[b, s].item()
+                    if tok != self.tokenizer.get_pad_index() and tok != self.tokenizer.get_unk_index():
+                        first_non_pad = s
+                        break
 
-            if first_non_pad >= 0:
-                first_token = targets[b, first_non_pad].item()
-                if first_token == context_id:
-                    has_context_prefix = True
-                elif first_token == thinking_mode_id:
-                    has_thinking_prefix = True
+                if first_non_pad >= 0:
+                    first_token = targets[b, first_non_pad].item()
+                    if first_token == context_id:
+                        has_context_prefix = True
 
             if has_context_prefix:
                 # CONTEXT mode: zero loss for everything before <|answer|>
@@ -724,7 +728,9 @@ class Trainer:
                     if in_thinking and token != thinking_id and token != thinking_end_id:
                         weights[b, s] = self.thinking_loss_weight
 
-            # Agentic masking: override weights for tool_call and observation tokens
+            # Agentic masking: override weights for tool_call and observation tokens.
+            # Observation is a prefix-only marker (<|tool_result|>) that runs until
+            # the next turn marker (<|end|> or <|assistant|>).
             if agent_enabled and tool_call_id >= 0:
                 in_tool_call = False
                 in_observation = False
@@ -732,16 +738,24 @@ class Trainer:
                     token = targets[b, s].item()
                     if token == tool_call_id:
                         in_tool_call = True
+                        in_observation = False
                         weights[b, s] = agent_loss_weight  # tool_call gets full weight
                     elif token == tool_call_end_id:
                         in_tool_call = False
-                        weights[b, s] = agent_loss_weight
-                    elif token == observation_id:
-                        in_observation = True
-                        weights[b, s] = agent_loss_weight
-                    elif token == observation_end_id:
                         in_observation = False
                         weights[b, s] = agent_loss_weight
+                    elif token == observation_id:
+                        in_tool_call = False
+                        in_observation = True
+                        weights[b, s] = agent_loss_weight
+                    elif end_id >= 0 and token == end_id:
+                        in_tool_call = False
+                        in_observation = False
+                        weights[b, s] = agent_loss_weight  # <|end|> turn delimiter
+                    elif assistant_id >= 0 and token == assistant_id:
+                        in_tool_call = False
+                        in_observation = False
+                        weights[b, s] = agent_loss_weight  # <|assistant|> new turn
                     elif in_tool_call:
                         weights[b, s] = agent_loss_weight  # JSON inside tool_call
                     elif in_observation:
@@ -1319,13 +1333,9 @@ class Trainer:
             # Setup device with improved configuration for CPU-GPU combined training
             device = self._setup_device_and_config()
 
-            # Initialize model — resume from checkpoint if it exists (skip if --pretrained)
+            # Initialize model — resume from checkpoint if it exists
             resume_checkpoint = None
-            use_pretrained = getattr(self.config, 'pretrained', False)
-            if use_pretrained and self.rank == 0:
-                logger.info("--pretrained flag detected, ignoring existing checkpoint (fresh start with GPT-2 weights)")
-
-            if not use_pretrained and os.path.exists(self.model_output_path):
+            if os.path.exists(self.model_output_path):
                 if self.rank == 0:
                     logger.info(f"Found existing checkpoint: {self.model_output_path}")
                     logger.info("Resuming training from checkpoint...")
@@ -1367,11 +1377,8 @@ class Trainer:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
             else:
                 if self.rank == 0:
-                    msg = f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4"
-                    if use_pretrained:
-                        msg += ", pretrained=True"
-                    logger.info(f"{msg})...")
-                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4, pretrained=use_pretrained)
+                    logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4)...")
+                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
 
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:
@@ -1509,7 +1516,6 @@ class Trainer:
                                 'vocab_size': self.tokenizer.vocab_size,
                             },
                             'dataset_source': self.dataset_source,
-                            'used_pretrained': getattr(self.config, 'pretrained', False),
                         }, epoch_path)
                         logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
                     # Synchronize all processes after checkpoint save
@@ -1561,7 +1567,6 @@ class Trainer:
                         'vocab_size': self.tokenizer.vocab_size,
                     },
                     'dataset_source': self.dataset_source,
-                    'used_pretrained': getattr(self.config, 'pretrained', False),
                 }, self.model_output_path)
                 logger.info(f" Model + tokenizer saved to {self.model_output_path}")
 

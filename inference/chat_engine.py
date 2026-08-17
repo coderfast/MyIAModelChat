@@ -54,7 +54,17 @@ class ChatConfig:
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
-    """Parse <thinking> tags from response text."""
+    """Parse thinking tags from response text.
+
+    Supports new format (<|thinking|>...<|final|>) and legacy (<thinking>...</thinking>).
+    """
+    if '<|thinking|>' in text and '<|final|>' in text:
+        try:
+            thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
+            response = text.split('<|final|>')[1].strip()
+            return {'thinking': thinking, 'response': response}
+        except (IndexError, ValueError):
+            return {'thinking': None, 'response': text}
     if '<thinking>' not in text or '</thinking>' not in text:
         return {'thinking': None, 'response': text}
     try:
@@ -66,17 +76,18 @@ def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
 
 
 def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
-    """Build prompt from message list using GPT-2 standard tokens."""
+    """Build prompt from message list using GPT-2 standard tokens (Formato 1)."""
     parts: List[str] = []
     for message in messages:
         role = str(message.get('role', 'user')).lower()
         content = str(message.get('content', ''))
         if role == 'system':
-            parts.append(f"<|user|>{content}<|assistant|>")
+            parts.append(f"<|system|>{content}<|end|>")
         elif role == 'assistant':
-            parts.append(f"{content}")
+            parts.append(f"<|assistant|>{content}<|end|>")
         else:
-            parts.append(f"<|user|>{content}<|assistant|>")
+            parts.append(f"<|user|>{content}<|end|>")
+    parts.append("<|assistant|>")
     return '\n'.join(parts)
 
 

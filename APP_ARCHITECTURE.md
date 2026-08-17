@@ -100,10 +100,10 @@ HuggingFace Datasets
   -> load_dataset() -> first 1000 samples
 
 PDF Documents
-  -> PyPDF2 -> sentence splitting -> optional chunking
+  -> pypdf (page text) -> header/footer/page-number removal -> whole paragraphs -> optional chunking
 
 EPUB E-Books
-  -> ebooklib -> HTML stripping -> text
+  -> ebooklib (native chapters) -> BeautifulSoup paragraph extraction -> whole chapters/paragraphs -> header/footer/page-number removal
 
 Web Scraping
   -> web/scraper.py (trafilatura + BeautifulSoup) -> sentences
@@ -117,6 +117,8 @@ CSV Files
 Raw Text
   -> Unicode NFKC Normalization (clean_text)
   -> Sentence Splitting (spaCy sentencizer / regex fallback)
+  -> Paragraph Splitting (whole paragraphs for PDF/EPUB samples)
+  -> Page Artifact Removal (repeated headers/footers, page numbers)
   -> Optional: Quality Filtering (word count, alpha ratio, diversity)
   -> Optional: Deduplication (MinHash LSH / exact match)
   -> Optional: Language Filtering (langdetect / heuristic)

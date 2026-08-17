@@ -39,6 +39,14 @@ class TestChatModel:
         params = list(sig.parameters.keys())
         assert 'hidden_size' not in params, f"hidden_size should be removed, got params: {params}"
 
+    def test_no_pretrained_parameter(self):
+        """ChatModel should NOT accept pretrained parameter (removed)."""
+        from commons.model.chatmodel import ChatModel
+        import inspect
+        sig = inspect.signature(ChatModel.__init__)
+        params = list(sig.parameters.keys())
+        assert 'pretrained' not in params, f"pretrained should be removed, got params: {params}"
+
     def test_constructor_signature(self):
         """ChatModel should only accept tokenizer, embed_size, num_layers."""
         from commons.model.chatmodel import ChatModel
@@ -47,7 +55,7 @@ class TestChatModel:
         params = list(sig.parameters.keys())
         # Remove 'self'
         params = [p for p in params if p != 'self']
-        assert params == ['tokenizer', 'embed_size', 'num_layers', 'pretrained'], f"Unexpected params: {params}"
+        assert params == ['tokenizer', 'embed_size', 'num_layers'], f"Unexpected params: {params}"
 
     def test_forward_output_shape(self):
         from commons.model.chatmodel import ChatModel

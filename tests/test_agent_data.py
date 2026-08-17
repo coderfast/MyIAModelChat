@@ -12,7 +12,7 @@ class TestAgentThinkingGenerator:
         result = gen.generate(sample)
         assert result is not None
         assert result.get('has_tool_call') is True
-        assert "<|tool_call|>" in result.get('input_ids', '')
+        assert "<tool_call>" in result.get('input_ids', '')
         assert "calculator" in result.get('tool_name', '')
 
     def test_generate_date_tool_call(self):
@@ -64,7 +64,7 @@ class TestAgentThinkingGenerator:
 class TestAgentQualityValidation:
     def test_validate_good_agent_sample(self):
         sample = {
-            "input_ids": '<tool_call>{"name": "calculator", "arguments": {"expression": "2+2"}}</tool_call><observation>4</observation>',
+            "input_ids": '<tool_call>calculator(2+2)</tool_call><|tool_result|>4<|end|>',
             "thinking": "Necesito calcular 2+2.",
             "answer": "La respuesta es 4",
             "has_tool_call": True,
@@ -106,7 +106,7 @@ class TestAgentQualityValidation:
 
     def test_validate_malformed_tool_call(self):
         sample = {
-            "input_ids": '<tool_call>{invalid json}</tool_call>',
+            "input_ids": '<tool_call>invalid_format</tool_call>',
             "thinking": "test",
             "answer": "test",
             "has_tool_call": True,
@@ -123,7 +123,7 @@ class TestAgentQualityValidation:
                 "has_tool_call": False,
             },
             {
-                "input_ids": '<tool_call>{"name": "calculator", "arguments": {"expression": "1+1"}}</tool_call><observation>2</observation>test',
+                "input_ids": '<tool_call>calculator(1+1)</tool_call><|tool_result|>2<|end|>test',
                 "thinking": "Necesito calcular 1+1.",
                 "answer": "2",
                 "has_tool_call": True,

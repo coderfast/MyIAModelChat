@@ -11,6 +11,7 @@ tokens = [
     '<|thinking|>', '<tool_call>', '</tool_call>',
     '<|tool_result|>', '<observation>', '</observation>',
     '<|user|>', '<|assistant|>',
+    '<|system|>', '<|end|>', '<|sep|>',
 ]
 print("=== piece_to_id lookup ===")
 for tok in tokens:

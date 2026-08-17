@@ -136,17 +136,11 @@ python main.py --prepare-data --aiml --hf --thinking-mode nlp --allowed-language
 # Standard training (random init)
 python main.py --train --epochs 30
 
-# With pre-trained GPT-2 weights (better initialization)
-python main.py --train --epochs 30 --pretrained
-
 # CPU-only mode
 python main.py --train --cpu --epochs 30
 
-# With pre-trained + CPU
-python main.py --train --cpu --epochs 30 --pretrained
-
 # With specific checkpoint
-python main.py --train --checkpoint-name my_model --epochs 30 --pretrained
+python main.py --train --checkpoint-name my_model --epochs 30
 ```
 
 ### 3. Inferencia
@@ -318,34 +312,6 @@ Response with thinking:
   }]
 }
 ```
-
----
-
-## `--pretrained` Flag
-
-### What it does
-Loads GPT-2 Small (117M) weights into our small architecture (4 layers, 256 hidden, 4 heads).
-
-### Usage
-```bash
-# Standard training (random init)
-python main.py --train --epochs 30
-
-# With GPT-2 pre-trained weights (better initialization)
-python main.py --train --epochs 30 --pretrained
-```
-
-### Behavior
-| Scenario | Result |
-|----------|--------|
-| `--pretrained` + no checkpoint | Fresh start with GPT-2 weights |
-| `--pretrained` + checkpoint exists | **Ignores checkpoint**, fresh start with GPT-2 weights |
-| No `--pretrained` + checkpoint | Continues training from checkpoint |
-| No `--pretrained` + no checkpoint | Fresh start with random Xavier init |
-
-### Expected improvement
-- **Without `--pretrained`**: Loss ~6.0 → ~4.75 (1 epoch)
-- **With `--pretrained`**: Loss ~4.5 → ~3.5 (1 epoch)
 
 ---
 

@@ -20,6 +20,27 @@ python models/exported/convert_onnx.py <hf_dir> --outfile output.onnx --quant-ty
 python models/exported/convert_onnx.py <hf_dir> --outfile output.onnx --quant-type fp8_e4m3fn --static
 ```
 
+## Standalone Usage
+
+After export, the `_onnx` directory is a self-contained package. No project code needed:
+
+```bash
+cd models/exported/chat_model_onnx
+pip install -r requirements.txt
+
+# Interactive chat
+python inference.py
+
+# Single prompt
+python inference.py --prompt "Que es la fotosintesis?"
+
+# With parameters
+python inference.py --prompt "Hola" --max-tokens 200 --temperature 0.5
+
+# Use specific model directory
+python inference.py --model-dir /path/to/onnx_package
+```
+
 ## Supported Quantization Types
 
 ### Phase 1: Dynamic Quantization
@@ -139,6 +160,36 @@ python models/exported/convert_onnx.py models/exported/chat_model_hf \
     --outfile model.onnx --quant-type static_int8_qdq --static \
     --calibration-samples 200
 ```
+
+## Exported Directory Structure
+
+After ONNX export, the `_onnx` directory contains everything needed for independent usage:
+
+```
+chat_model_onnx/
+  chat_model.onnx              # ONNX model
+  chat_model_int8.onnx         # Quantized variant (if applicable)
+  config.json                  # Architecture (BOS/EOS/pad IDs)
+  sentencepiece.model          # Tokenizer model
+  tokenizer.json               # HuggingFace tokenizer
+  tokenizer_config.json        # Tokenizer config
+  special_tokens_map.json      # Special tokens
+  tokenizer_vocab.json         # SentencePiece reference
+  chat_model_metadata.json     # ONNX metadata (tokens, arch)
+  metadata.json                # Export metadata
+  inference.py                 # Standalone inference script
+  requirements.txt             # onnxruntime, sentencepiece, numpy
+  LICENSE                      # MIT
+  NOTICE                       # GPT-2 Modified MIT
+  LICENSE_INFO.json            # License metadata
+```
+
+The `inference.py` script supports:
+- Interactive chat mode (default)
+- Single prompt mode (`--prompt`)
+- Temperature control (`--temperature`)
+- Max tokens control (`--max-tokens`)
+- Automatic detection of quantized models
 
 ## Requirements
 

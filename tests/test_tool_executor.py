@@ -37,13 +37,12 @@ class TestShellSecurity:
 class TestFormatObservation:
     def test_format_observation(self):
         result = format_observation("56088")
-        assert "<observation>" in result
-        assert "</observation>" in result
+        assert "<|tool_result|>" in result
         assert "56088" in result
 
     def test_format_observation_multiline(self):
         result = format_observation("line1\nline2")
-        assert "<observation>" in result
+        assert "<|tool_result|>" in result
         assert "line1" in result
         assert "line2" in result
 
@@ -59,14 +58,14 @@ class TestToolExecutor:
 
     def test_parse_tool_call_valid(self):
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{"name": "calculator", "arguments": {"expression": "2+2"}}</tool_call>'
+        text = '<tool_call>calculator(2+2)</tool_call>'
         name, args = executor.parse_tool_call(text)
         assert name == "calculator"
-        assert args == {"expression": "2+2"}
+        assert args == "2+2"
 
     def test_parse_tool_call_invalid(self):
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{invalid json}</tool_call>'
+        text = '<tool_call>invalid_format</tool_call>'
         name, args = executor.parse_tool_call(text)
         assert name == ''
 
@@ -78,7 +77,7 @@ class TestToolExecutor:
 
     def test_has_tool_call_true(self):
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{"name": "test"}</tool_call>'
+        text = '<tool_call>calculator(2+2)</tool_call>'
         assert executor.has_tool_call(text)
 
     def test_has_tool_call_false(self):
@@ -90,15 +89,15 @@ class TestToolExecutor:
         registry = ToolRegistry()
         register_default_tools(registry)
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{"name": "calculator", "arguments": {"expression": "2+2"}}</tool_call>'
+        text = '<tool_call>calculator(2+2)</tool_call>'
         result = executor.execute_tool_call(text, registry)
-        assert "<observation>" in result
+        assert "<|tool_result|>" in result
         assert "4" in result
 
     def test_execute_tool_call_unknown_tool(self):
         registry = ToolRegistry()
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{"name": "nonexistent", "arguments": {}}</tool_call>'
+        text = '<tool_call>nonexistent()</tool_call>'
         result = executor.execute_tool_call(text, registry)
         assert "Error" in result
 
@@ -109,16 +108,16 @@ class TestToolExecutor:
         # Calculator is non-shell (category='computation'), dry_run only applies to shell
         # So we test dry_run by calling execute_tool_call with a shell-like text
         # But shell tools aren't in default registry, so test with unknown tool
-        text = '<tool_call>{"name": "calculator", "arguments": {"expression": "2+2"}}</tool_call>'
+        text = '<tool_call>calculator(2+2)</tool_call>'
         result = executor.execute_tool_call(text, registry)
         # Non-shell tools execute normally even in dry_run mode
-        assert "<observation>" in result
+        assert "<|tool_result|>" in result
 
     def test_execute_tool_call_blocked_command(self):
         registry = ToolRegistry()
         register_default_tools(registry)
         executor = ToolExecutor(dry_run=False)
-        text = '<tool_call>{"name": "shell", "arguments": {"command": "rm -rf /"}}</tool_call>'
+        text = '<tool_call>shell(rm -rf /)</tool_call>'
         result = executor.execute_tool_call(text, registry)
         assert "Error" in result
 

@@ -344,8 +344,9 @@ Data Source Arguments (for --prepare-data only):
     Example: python main.py --prepare-data --pdf
     Notes:
         - Loads PDF files from datasets_source/pdf/ directory
-        - Uses PyPDF2 for automatic text extraction
-        - Supports complex layouts and formatting
+        - Uses pypdf for page-by-page text extraction
+        - Removes repeated headers/footers and standalone page numbers
+        - Samples are whole paragraphs for semantic coherence
         - Place PDF files in datasets_source/pdf/ folder
 
 --epub
@@ -355,8 +356,10 @@ Data Source Arguments (for --prepare-data only):
     Example: python main.py --prepare-data --epub
     Notes:
         - Loads EPUB files from datasets_source/epub/ directory
-        - Uses ebooklib for e-book parsing
-        - Extracts chapter-by-chapter content
+        - Uses ebooklib for native chapter extraction
+        - Structured paragraph extraction with BeautifulSoup
+        - Whole chapter as sample when it fits the context window; otherwise split into whole paragraphs
+        - Removes repeated headers/footers and standalone page numbers
         - Supports metadata and structure
         - Place EPUB files in datasets_source/epub/ folder
 
@@ -779,7 +782,7 @@ Error: Directory "datasets_source/aiml/" not found
     → Files should be in: G:\PROJECTS\MyIAModelChat\datasets_source\aiml\
 
 Error: PDF/EPUB loading fails
-    → Install dependencies: pip install PyPDF2 ebooklib
+    → Install dependencies: pip install pypdf ebooklib
     → Check files exist in datasets_source/pdf/ or datasets_source/epub/ directories
     → Verify file formats are valid
 
@@ -847,7 +850,7 @@ Recommended:
 Dependencies:
     - PyTorch 2.0+
     - Transformers (Hugging Face)
-    - PyPDF2 (for PDF support)
+    - pypdf (for PDF support)
     - ebooklib (for EPUB support)
     - datasets (for Hugging Face integration)
     - NVIDIA GPU with CUDA support

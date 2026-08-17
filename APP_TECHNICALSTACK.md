@@ -58,7 +58,7 @@
 | Library | Purpose | Used In |
 |---------|---------|---------|
 | **datasets** (HuggingFace) | Dataset loading, caching, and saving | `dataset_preparer/data_preparer.py`, `training/trainer.py`, `dataset_preparer/aiml/loader.py` |
-| **PyPDF2** | PDF text extraction | `dataset_preparer/data_preparer.py` |
+| **pypdf** | PDF text extraction | `dataset_preparer/data_preparer.py` |
 | **ebooklib** | EPUB e-book parsing | `dataset_preparer/data_preparer.py` |
 | **beautifulsoup4** | HTML parsing (EPUB/web) | `dataset_preparer/data_preparer.py`, `dataset_preparer/web/scraper.py` |
 | **trafilatura** | Web content extraction | `dataset_preparer/web/scraper.py` |
@@ -250,7 +250,7 @@ ollama run mi-model
 | `fastapi` | No* | - | X | - | - |
 | `uvicorn` | No* | - | X | - | - |
 | `pydantic` | No* | - | X | - | - |
-| `PyPDF2` | No | - | - | X | - |
+| `pypdf` | No | - | - | X | - |
 | `ebooklib` | No | - | - | X | - |
 | `beautifulsoup4` | No | - | - | X | - |
 | `trafilatura` | No | - | - | X | - |

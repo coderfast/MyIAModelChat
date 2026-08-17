@@ -12,7 +12,7 @@
 
 2. **PDF Document Datasets**
    - Source: `datasets_source/pdf/` directory
-   - Processing: `dataset_preparer/data_preparer.py` uses PyPDF2 for text extraction
+   - Processing: `dataset_preparer/data_preparer.py` uses pypdf for text extraction
    - Format: Automatic page-by-page text extraction
    - Flag: `--pdf` enables PDF processing
 
@@ -369,7 +369,7 @@ for epoch in range(epochs):
 - Profile code to find bottlenecks
 
 **PDF/EPUB parsing errors**
-- Verify PyPDF2 and ebooklib are installed
+- Verify pypdf and ebooklib are installed
 - Check file formats are valid
 - Use `--prepare-data` to test loading
 - Check extracted text quality

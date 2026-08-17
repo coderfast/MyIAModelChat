@@ -31,9 +31,13 @@ try:
 except Exception:
     spm = None
 try:
-    from PyPDF2 import PdfReader
+    from pypdf import PdfReader
 except ImportError:
     PdfReader = None
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 try:
     import ebooklib
     from ebooklib import epub
@@ -144,6 +148,47 @@ def split_sentences(text: str) -> List[str]:
     return sentences
 
 
+def split_paragraphs(text: str, min_length: int = 20) -> List[str]:
+    """
+    Split text into paragraphs by blank lines, falling back to grouped sentences.
+
+    Preserves semantic coherence better than single sentences. If the text has
+    no blank-line separators, groups 2-3 consecutive sentences into paragraphs.
+
+    Args:
+        text: Input text to split
+        min_length: Minimum character length for a paragraph to be kept
+
+    Returns:
+        List of paragraphs
+    """
+    if not text or not isinstance(text, str):
+        return []
+
+    text = clean_text(text)
+    if not text:
+        return []
+
+    # Split on blank lines / double newlines
+    raw_paragraphs = re.split(r'\n\s*\n', text)
+    paragraphs = [clean_text(p) for p in raw_paragraphs]
+    paragraphs = [p for p in paragraphs if p]
+
+    # If no blank-line separated paragraphs, group sentences into paragraphs
+    if len(paragraphs) <= 1:
+        sentences = split_sentences(text)
+        if len(sentences) <= 1:
+            paragraphs = sentences
+        else:
+            paragraphs = []
+            for i in range(0, len(sentences), 3):
+                grouped = ' '.join(sentences[i:i + 3])
+                if grouped.strip():
+                    paragraphs.append(grouped)
+
+    return [p for p in paragraphs if len(p) >= min_length]
+
+
 def chunk_text_by_tokens(text: str, max_tokens: int = 512, overlap_tokens: int = 50) -> List[str]:
     """
     Split text into overlapping chunks by token count.
@@ -184,6 +229,73 @@ def chunk_text_by_tokens(text: str, max_tokens: int = 512, overlap_tokens: int =
             break
 
     return chunks
+
+
+# Patterns for removing page artifacts (headers, footers, page numbers)
+PAGE_NUMBER_ONLY = re.compile(r'^\s*\d{1,4}\s*$')
+PAGE_REF_LINE = re.compile(
+    r'^\s*(?:p(?:ágina|ag)?\.?\s*\d+|page\s*\d+|'
+    r'p\.\s*\d+\s*(?:de|of|/)\s*\d+|\d+\s*[-–/]\s*\d+)\s*$',
+    re.IGNORECASE
+)
+
+
+def clean_page_artifacts(page_texts: List[str], min_repeat_pages: int = 2) -> List[str]:
+    """
+    Remove headers, footers and page numbers from extracted page texts.
+
+    Uses cross-page repetition: a short line that appears at the top or bottom
+    of two or more pages is treated as a repeated header/footer and dropped.
+    Standalone page numbers and page-reference lines are removed from every page.
+
+    Args:
+        page_texts: List of raw text extracted per page (order matters)
+        min_repeat_pages: Minimum pages where a line must repeat to be considered
+                          a header/footer
+
+    Returns:
+        List of cleaned page texts
+    """
+    if not page_texts:
+        return page_texts
+
+    # Collect candidate header/footer lines from the first and last lines of each page
+    header_candidates = Counter()
+    footer_candidates = Counter()
+
+    for page_text in page_texts:
+        lines = [ln.strip() for ln in page_text.split('\n') if ln.strip()]
+        if not lines:
+            continue
+        # First 3 lines = potential header; last 3 lines = potential footer
+        for ln in lines[:3]:
+            header_candidates[ln] += 1
+        for ln in lines[-3:]:
+            footer_candidates[ln] += 1
+
+    repeated_headers = {ln for ln, count in header_candidates.items()
+                        if count >= min_repeat_pages and len(ln) <= 60}
+    repeated_footers = {ln for ln, count in footer_candidates.items()
+                        if count >= min_repeat_pages and len(ln) <= 60}
+
+    cleaned = []
+    for page_text in page_texts:
+        lines = page_text.split('\n')
+        out_lines = []
+        for i, ln in enumerate(lines):
+            stripped = ln.strip()
+            if not stripped:
+                out_lines.append('')
+                continue
+            if PAGE_NUMBER_ONLY.match(stripped) or PAGE_REF_LINE.match(stripped):
+                continue
+            if stripped in repeated_headers or stripped in repeated_footers:
+                continue
+            # Fix hyphen line breaks (word-wrapped words split across lines)
+            out_lines.append(stripped)
+        cleaned.append('\n'.join(out_lines))
+
+    return cleaned
 
 
 def deduplicate_texts(texts: List[str], threshold: float = 0.8) -> List[str]:
@@ -704,6 +816,10 @@ class DataPreparer:
             logger.info("[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
             self._standardize_combined_dataset()
+            # Migrate any legacy special tokens to the consolidated GPT-2 format
+            from dataset_preparer.migrator import migrate_dataset_texts
+            self.combined_data = migrate_dataset_texts(self.combined_data)
+            self._tag_format_types()
 
             # Tag languages from datasets_source/language_manifest.json
             manifest_path = os.path.join('datasets_source', 'language_manifest.json')
@@ -766,6 +882,9 @@ class DataPreparer:
             if generate_agent:
                 logger.info("[6.55/7] Generating agentic data with tool calls...")
                 self._generate_agent_data()
+
+            # Re-tag format_type after thinking/agent enrichment
+            self._tag_format_types()
 
 
             # Apply deduplication if enabled
@@ -941,11 +1060,11 @@ class DataPreparer:
                 else:
                     ds = load_dataset(dataset_name, split='train[:1000]')
                 
-                # Convert to input_ids format with GPT-2 tokens
+                # Convert to input_ids format with GPT-2 standard tokens (texto plano: next-token prediction)
                 if 'text' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': f'<|problem|>{x["text"]}<|final|>{x["text"]}'})
+                    ds = ds.map(lambda x: {'input_ids': x["text"]})
                 elif 'sentence' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': f'<|problem|>{x["sentence"]}<|final|>{x["sentence"]}'})
+                    ds = ds.map(lambda x: {'input_ids': x["sentence"]})
                 
                 # Keep only input_ids column
                 ds = ds.select_columns(['input_ids'])
@@ -996,7 +1115,7 @@ class DataPreparer:
                     return None
                 lang = 'en' if example.get('language') == 'English' else 'es'
                 return {
-                    'input_ids': f'<|problem|>{human}<|final|>{gpt}',
+                    'input_ids': f'<|user|>{human}<|end|><|assistant|>{gpt}<|end|>',
                     'source': 'tagengo',
                     'language': lang
                 }
@@ -1072,8 +1191,8 @@ class DataPreparer:
                             if not input_text or not output_text:
                                 continue
 
-                            # GPT-2 format: question/answer pair
-                            prompt_text = f'<|problem|>{input_text}<|final|>{output_text}'
+                            # GPT-2 chat format (Formato 1): <|user|>...<|end|><|assistant|>...<|end|>
+                            prompt_text = f'<|user|>{input_text}<|end|><|assistant|>{output_text}<|end|>'
 
                             # Oversample with moderate repetition (5x)
                             for _ in range(5):
@@ -1169,9 +1288,9 @@ class DataPreparer:
                     if enable_chunking and len(sentence.split()) > max_tokens:
                         chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
                         for chunk in chunks:
-                            web_items.append({'input_ids': f'<|problem|>{chunk}<|final|>{chunk}'})
+                            web_items.append({'input_ids': chunk})
                     else:
-                        web_items.append({'input_ids': f'<|problem|>{sentence}<|final|>{sentence}'})
+                        web_items.append({'input_ids': sentence})
 
         dataset = Dataset.from_list(web_items)
         logger.info(f"  Total web pages scraped: {len(all_texts)}")
@@ -1198,7 +1317,7 @@ class DataPreparer:
             Hugging Face Dataset with PDF text data
         """
         if PdfReader is None:
-            logger.warning("  ⚠ PyPDF2 not installed. Install with: pip install PyPDF2")
+            logger.warning("  ⚠ pypdf not installed. Install with: pip install pypdf")
             return Dataset.from_list([])
 
         pdf_dir = os.path.join('datasets_source', 'pdf')
@@ -1243,20 +1362,23 @@ class DataPreparer:
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting page {page_num} from {filename}: {e}")
 
-                        text = " ".join(text_parts)
+                        # Remove headers, footers and page numbers (cross-page repetition)
+                        text_parts = clean_page_artifacts(text_parts)
 
-                        # Split text by sentences/paragraphs into samples
+                        # Join pages preserving paragraph boundaries
+                        text = "\n\n".join(text_parts)
+
+                        # Split text into paragraphs into samples
                         if text.strip():
-                            # Use professional sentence tokenization
-                            sentences = split_sentences(text)
-                            sentence_count = 0
+                            paragraphs = split_paragraphs(text)
+                            paragraph_count = 0
 
-                            for sentence in sentences:
+                            for paragraph in paragraphs:
                                 # Additional cleaning
-                                sentence = clean_text(sentence)
-                                if len(sentence) > 10:  # Skip very short sentences
+                                paragraph = clean_text(paragraph)
+                                if len(paragraph) > 10:  # Skip very short paragraphs
                                     sample = {
-                                        'input_ids': f'<|problem|>{sentence}<|final|>{sentence}',
+                                        'input_ids': paragraph,
                                         'file_path': file_path
                                     }
 
@@ -1265,23 +1387,23 @@ class DataPreparer:
                                         sample['metadata'] = metadata
 
                                     # Apply chunking if enabled
-                                    if enable_chunking and len(sentence.split()) > max_tokens:
-                                        chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
+                                    if enable_chunking and len(paragraph.split()) > max_tokens:
+                                        chunks = chunk_text_by_tokens(paragraph, max_tokens, overlap_tokens)
                                         for chunk in chunks:
                                             chunk_sample = {
-                                                'input_ids': f'<|problem|>{chunk}<|final|>{chunk}',
+                                                'input_ids': chunk,
                                                 'file_path': file_path
                                             }
                                             if preserve_metadata and metadata:
                                                 chunk_sample['metadata'] = metadata
                                             pdf_texts.append(chunk_sample)
-                                            sentence_count += 1
+                                            paragraph_count += 1
                                     else:
                                         pdf_texts.append(sample)
-                                        sentence_count += 1
+                                        paragraph_count += 1
 
                             pdf_count += 1
-                            logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
+                            logger.info(f"  ✓ Loaded: {filename} ({paragraph_count} samples)")
                         else:
                             logger.warning(f"  ⚠ No text extracted from {filename}")
 
@@ -1339,9 +1461,9 @@ class DataPreparer:
 
                     # Open and parse EPUB
                     book = epub.read_epub(file_path)
-                    text_parts = []
+                    chapters = []
 
-                    # Extract text from all chapters
+                    # Extract text from each native chapter (ITEM_DOCUMENT)
                     for item in book.get_items():
                         if item.get_type() == ebooklib.ITEM_DOCUMENT:
                             try:
@@ -1352,59 +1474,92 @@ class DataPreparer:
                                 content = re.sub(r'<thinking>', '§THINKING_START§', content)
                                 content = re.sub(r'</thinking>', '§THINKING_END§', content)
 
-                                # Remove HTML tags (simple regex approach)
-                                content = re.sub(r'<[^>]+>', '', content)
+                                # Extract structured paragraphs with BeautifulSoup if available
+                                chapter_paragraphs = []
+                                if BeautifulSoup is not None:
+                                    try:
+                                        soup = BeautifulSoup(content, 'html.parser')
+                                        for p in soup.find_all(['p', 'div', 'li', 'blockquote', 'pre']):
+                                            para = p.get_text(separator=' ', strip=True)
+                                            if para:
+                                                chapter_paragraphs.append(para)
+                                        if not chapter_paragraphs:
+                                            chapter_paragraphs = [soup.get_text(separator=' ', strip=True)]
+                                    except Exception:
+                                        chapter_paragraphs = []
+
+                                if not chapter_paragraphs:
+                                    # Fallback: remove HTML tags (simple regex approach)
+                                    content = re.sub(r'<[^>]+>', '', content)
+                                    if content.strip():
+                                        chapter_paragraphs = [content]
 
                                 # Restore <thinking> tags
-                                content = re.sub(r'§THINKING_START§', '<thinking>', content)
-                                content = re.sub(r'§THINKING_END§', '</thinking>', content)
+                                restored = []
+                                for para in chapter_paragraphs:
+                                    para = para.replace('§THINKING_START§', '<thinking>')
+                                    para = para.replace('§THINKING_END§', '</thinking>')
+                                    restored.append(para)
 
                                 # Clean up whitespace
-                                content = re.sub(r'\s+', ' ', content)
-                                if content.strip():
-                                    text_parts.append(content)
+                                chapter_text = '\n\n'.join(
+                                    re.sub(r'\s+', ' ', p).strip() for p in restored if p.strip()
+                                )
+                                if chapter_text.strip():
+                                    chapters.append(chapter_text)
                             except Exception as e:
                                 logger.warning(f"    ⚠ Error extracting chapter from {filename}: {e}")
 
-                    text = " ".join(text_parts)
+                    # Remove headers, footers and page numbers (cross-chapter repetition)
+                    chapters = clean_page_artifacts(chapters)
 
-                    # Split text into samples
-                    if text.strip():
-                        # Use professional sentence tokenization
-                        sentences = split_sentences(text)
-                        sentence_count = 0
+                    # Split chapters into samples: whole chapter if it fits, else paragraphs
+                    if chapters:
+                        sample_count = 0
+                        for chapter in chapters:
+                            chapter = clean_text(chapter)
+                            if len(chapter) <= 10:
+                                continue
 
-                        for sentence in sentences:
-                            # Additional cleaning
-                            sentence = clean_text(sentence)
-                            if len(sentence) > 10:  # Skip very short sentences
+                            # Whole native chapter fits context window
+                            if not enable_chunking or len(chapter.split()) <= max_tokens:
                                 sample = {
-                                    'input_ids': f'<|problem|>{sentence}<|final|>{sentence}',
+                                    'input_ids': chapter,
                                     'file_path': file_path
                                 }
-
-                                # Add metadata if enabled
                                 if preserve_metadata and metadata:
                                     sample['metadata'] = metadata
+                                epub_texts.append(sample)
+                                sample_count += 1
+                                continue
 
-                                # Apply chunking if enabled
-                                if enable_chunking and len(sentence.split()) > max_tokens:
-                                    chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
-                                    for chunk in chunks:
-                                        chunk_sample = {
-                                            'input_ids': f'<|problem|>{chunk}<|final|>{chunk}',
-                                            'file_path': file_path
-                                        }
-                                        if preserve_metadata and metadata:
-                                            chunk_sample['metadata'] = metadata
-                                        epub_texts.append(chunk_sample)
-                                        sentence_count += 1
-                                else:
-                                    epub_texts.append(sample)
-                                    sentence_count += 1
+                            # Chapter too long: split into paragraphs
+                            paragraphs = split_paragraphs(chapter)
+                            for paragraph in paragraphs:
+                                if len(paragraph) > 10:
+                                    sample = {
+                                        'input_ids': paragraph,
+                                        'file_path': file_path
+                                    }
+                                    if preserve_metadata and metadata:
+                                        sample['metadata'] = metadata
+                                    if enable_chunking and len(paragraph.split()) > max_tokens:
+                                        chunks = chunk_text_by_tokens(paragraph, max_tokens, overlap_tokens)
+                                        for chunk in chunks:
+                                            chunk_sample = {
+                                                'input_ids': chunk,
+                                                'file_path': file_path
+                                            }
+                                            if preserve_metadata and metadata:
+                                                chunk_sample['metadata'] = metadata
+                                            epub_texts.append(chunk_sample)
+                                            sample_count += 1
+                                    else:
+                                        epub_texts.append(sample)
+                                        sample_count += 1
 
                         epub_count += 1
-                        logger.info(f"  ✓ Loaded: {filename} ({sentence_count} samples)")
+                        logger.info(f"  ✓ Loaded: {filename} ({sample_count} samples)")
                     else:
                         logger.warning(f"  ⚠ No text extracted from {filename}")
 
@@ -1436,8 +1591,8 @@ class DataPreparer:
         try:
             sample = self.combined_data[0]
             input_text = sample.get('input_ids', '')
-            if isinstance(input_text, str) and '<thinking>' in input_text:
-                logger.info("  ✓ Dataset contains <thinking> tokens in input_ids - will use for BPE training")
+            if isinstance(input_text, str) and ('<thinking>' in input_text or '<|thinking|>' in input_text):
+                logger.info("  ✓ Dataset contains thinking tokens in input_ids - will use for BPE training")
             else:
                 logger.info("  ℹ No thinking tokens detected in input_ids - using for BPE training")
         except Exception:
@@ -1504,8 +1659,8 @@ class DataPreparer:
                 f.write(t.replace('\n', ' ') + "\n")
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
-        # GPT-2 standard special tokens
-        user_symbols = '--user_defined_symbols=<|problem|>,<|thinking|>,<|final|>,<|user|>,<|assistant|>,<tool_call>,</tool_call>,<|tool_result|>'
+        # GPT-2 standard special tokens (canonical consolidated set)
+        user_symbols = '--user_defined_symbols=<|system|>,<|user|>,<|assistant|>,<|end|>,<|sep|>,<|problem|>,<|thinking|>,<|final|>,<tool_call>,</tool_call>,<|tool_result|>'
         
         # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
         current_vocab = vocab_size
@@ -1720,14 +1875,46 @@ class DataPreparer:
                 remove_columns=columns_to_remove
             )
 
+    def _tag_format_types(self):
+        """Tag each sample with a 'format_type' column: normal, agentic, or thinking.
+
+        - agentic: contains <tool_call>/<|tool_result|>
+        - thinking: contains <|thinking|>/<|final|>
+        - normal: chat format <|user|>/<|assistant|>/<|end|> or text completion
+        """
+        if self.combined_data is None or 'input_ids' not in self.combined_data.column_names:
+            return
+
+        def detect_format(example):
+            text = str(example.get('input_ids', ''))
+            if '<tool_call>' in text or '<|tool_result|>' in text:
+                return {'format_type': 'agentic'}
+            if '<|thinking|>' in text and '<|final|>' in text:
+                return {'format_type': 'thinking'}
+            return {'format_type': 'normal'}
+
+        num_proc = self._get_num_proc()
+        try:
+            logger.info(f"  Tagging format_type with num_proc={num_proc}...")
+            self.combined_data = self.combined_data.map(
+                detect_format, batched=False, num_proc=num_proc
+            )
+        except Exception as e:
+            logger.warning(f"Could not tag format_type with num_proc={num_proc}: {e}. Falling back to num_proc=1...")
+            self.combined_data = self.combined_data.map(
+                detect_format, batched=False, num_proc=1
+            )
+
     def _tag_languages(self, manifest_path: Optional[str] = None):
         """Tag each dataset sample with language code.
 
         Priority:
         1. Check if file is in manifest 'files' section → use that language
-        2. Check if source is in manifest 'sources' section → use that language
-        3. Use manifest 'default' if set
-        4. Fall back to automatic detection
+        2. Keep the sample's existing per-sample language tag if already set
+           (e.g. multilingual sources like Tagengo that tag each sample)
+        3. Check if source is in manifest 'sources' section → use that language
+        4. Use manifest 'default' if set
+        5. Fall back to automatic detection
 
         Manifest format (datasets_source/language_manifest.json):
         {
@@ -1790,17 +1977,24 @@ class DataPreparer:
                     if norm_path.endswith(norm_fpath) or norm_fpath.endswith(norm_path):
                         return {'language': lang}
 
-            # 2. Check source-level mapping (case-insensitive)
+            # 2. Keep an existing per-sample language tag (multilingual sources
+            #    such as Tagengo tag each sample individually and should not be
+            #    overridden by a source-level manifest entry)
+            existing = example.get('language', None)
+            if existing and existing not in ('unknown', 'Unknown', ''):
+                return {'language': existing}
+
+            # 3. Check source-level mapping (case-insensitive)
             if source:
                 source_lower = source.lower()
                 if source_lower in manifest_sources:
                     return {'language': manifest_sources[source_lower]}
 
-            # 3. Use default if set
+            # 4. Use default if set
             if manifest_default is not None:
                 return {'language': manifest_default}
 
-            # 4. Fallback to detection
+            # 5. Fallback to detection
             text = example.get('input_ids', '')
             if not text:
                 for field in ('input', 'output', 'text', 'sentence'):

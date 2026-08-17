@@ -34,7 +34,7 @@ class GPT2TokenizerWrapper:
         if add_special_tokens:
             special_tokens = [
                 '<|problem|>', '<|thinking|>', '<|final|>',
-                '<|user|>', '<|assistant|>',
+                '<|user|>', '<|assistant|>', '<|system|>', '<|end|>', '<|sep|>',
                 '<tool_call>', '</tool_call>', '<|tool_result|>',
                 '<thinking>', '</thinking>',
                 '<|context|>', '<|answer|>',
@@ -62,39 +62,41 @@ class GPT2TokenizerWrapper:
 
         # GPT-2 standard tokens — try to find them, fallback to -1
         self._problem_id = _get_id('<|problem|>')
-        self._thinking_id = _get_id('<thinking>')
-        self._thinking_end_id = _get_id('</thinking>')
+        self._thinking_id = _get_id('<|thinking|>')
+        self._thinking_end_id = _get_id('<|final|>')
         self._thinking_mode_id = _get_id('<|thinking|>')
         self._final_id = _get_id('<|final|>')
         self._user_id = _get_id('<|user|>')
         self._assistant_id = _get_id('<|assistant|>')
+        self._system_id = _get_id('<|system|>')
+        self._end_id = _get_id('<|end|>')
+        self._sep_id = _get_id('<|sep|>')
         self._tool_call_id = _get_id('<tool_call>')
         self._tool_call_end_id = _get_id('</tool_call>')
         self._tool_result_id = _get_id('<|tool_result|>')
 
-        # Legacy tokens
-        self._context_id = _get_id('<|context|>')
-        self._answer_id = _get_id('<|answer|>')
-        self._observation_id = _get_id('<observation>')
-        self._observation_end_id = _get_id('</observation>')
+        # Legacy tokens (deprecated, mapped to GPT-2 standard IDs)
+        self._legacy_thinking_id = _get_id('<thinking>')
+        self._legacy_thinking_end_id = _get_id('</thinking>')
+        self._legacy_context_id = _get_id('<|context|>')
+        self._legacy_answer_id = _get_id('<|answer|>')
+        self._legacy_observation_id = _get_id('<observation>')
+        self._legacy_observation_end_id = _get_id('</observation>')
 
-        # Map legacy to GPT-2 standard
-        if self._context_id < 0:
-            self._context_id = self._problem_id
-        if self._answer_id < 0:
-            self._answer_id = self._final_id
-        if self._observation_id < 0:
-            self._observation_id = self._tool_result_id
-        if self._observation_end_id < 0:
-            self._observation_end_id = self._tool_result_id
+        # Legacy getters map to GPT-2 standard IDs
+        self._context_id = self._problem_id
+        self._answer_id = self._final_id
+        self._observation_id = self._tool_result_id
+        self._observation_end_id = self._tool_result_id
 
         for name, tid in [
             ('pad', self._pad_id), ('unk', self._unk_id),
             ('bos', self._bos_id), ('eos', self._eos_id),
             ('<|problem|>', self._problem_id), ('<|thinking|>', self._thinking_mode_id),
-            ('<thinking>', self._thinking_id), ('</thinking>', self._thinking_end_id),
+            ('<thinking>', self._legacy_thinking_id), ('</thinking>', self._legacy_thinking_end_id),
             ('<|final|>', self._final_id),
             ('<|user|>', self._user_id), ('<|assistant|>', self._assistant_id),
+            ('<|system|>', self._system_id), ('<|end|>', self._end_id), ('<|sep|>', self._sep_id),
             ('<tool_call>', self._tool_call_id), ('</tool_call>', self._tool_call_end_id),
             ('<|tool_result|>', self._tool_result_id),
         ]:
@@ -183,6 +185,15 @@ class GPT2TokenizerWrapper:
     def get_assistant_index(self) -> int:
         return self._assistant_id
 
+    def get_system_index(self) -> int:
+        return self._system_id
+
+    def get_end_index(self) -> int:
+        return self._end_id
+
+    def get_sep_index(self) -> int:
+        return self._sep_id
+
     def get_tool_result_index(self) -> int:
         return self._tool_result_id
 
@@ -198,14 +209,18 @@ class GPT2TokenizerWrapper:
         return self._thinking_mode_id
 
     def has_thinking(self, text: str) -> bool:
-        return '<thinking>' in text and '</thinking>' in text
+        return ('<|thinking|>' in text and '<|final|>' in text) or ('<thinking>' in text and '</thinking>' in text)
 
     def split_thinking(self, text: str):
         if not self.has_thinking(text):
             return ('', text)
         try:
-            thinking = text.split('<thinking>')[1].split('</thinking>')[0]
-            response = text.split('</thinking>')[1].strip()
+            if '<|thinking|>' in text:
+                thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
+                response = text.split('<|final|>')[1].strip()
+            else:
+                thinking = text.split('<thinking>')[1].split('</thinking>')[0]
+                response = text.split('</thinking>')[1].strip()
             return (thinking, response)
         except (IndexError, ValueError):
             return ('', text)

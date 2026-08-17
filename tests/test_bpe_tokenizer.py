@@ -144,14 +144,15 @@ class TestSentencePieceTokenizerWrapper:
     def test_get_thinking_index(self, sp_tokenizer):
         thinking_id = sp_tokenizer.get_thinking_index()
         assert isinstance(thinking_id, int)
-        # <thinking> is not a single BPE token; may be -1 (not in vocab)
+        # <thinking> is consolidated to <|thinking|>; may be -1 if not in vocab
         if thinking_id >= 0:
             token = sp_tokenizer.idx2word.get(thinking_id, '')
-            assert 'think' in token.lower() or '<thinking>' in token
+            assert 'think' in token.lower() or '<thinking>' in token or '<|thinking|>' in token
 
     def test_get_thinking_end_index(self, sp_tokenizer):
         thinking_end_id = sp_tokenizer.get_thinking_end_index()
         assert isinstance(thinking_end_id, int)
+        # </thinking> is consolidated to <|final|>; may be -1 if not in vocab
         if thinking_end_id >= 0:
             token = sp_tokenizer.idx2word.get(thinking_end_id, '')
-            assert 'think' in token.lower() or '</thinking>' in token
+            assert 'think' in token.lower() or '</thinking>' in token or '<|final|>' in token

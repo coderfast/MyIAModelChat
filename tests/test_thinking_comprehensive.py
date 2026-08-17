@@ -390,8 +390,8 @@ def test_thinking_sample_format():
     result = ThinkingGenerator._format_thinking_sample(None, sample, "El usuario me despuda amablemente.")
 
     assert 'thinking' in result, "Result should have 'thinking' key"
-    assert '<thinking>' in result.get('thinking_text', ''), "thinking_text should contain <thinking>"
-    assert '</thinking>' in result.get('thinking_text', ''), "thinking_text should contain </thinking>"
+    assert '<|thinking|>' in result.get('thinking_text', ''), "thinking_text should contain <|thinking|>"
+    assert '<|final|>' in result.get('thinking_text', ''), "thinking_text should contain <|final|>"
     assert 'Hola' in result.get('input_ids', ''), "Answer should be in input_ids"
     print("PASS: Thinking sample format correct")
 

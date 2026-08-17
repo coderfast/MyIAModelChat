@@ -14,7 +14,7 @@ python-aiml
 transformers
 keyboard
 datasets
-PyPDF2
+pypdf
 ebooklib
 fastapi
 uvicorn
