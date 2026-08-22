@@ -1,2 +1,0 @@
-https://docs.blender.org/manual/en/latest/
-https://docs.blender.org/api/current/

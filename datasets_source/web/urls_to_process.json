@@ -1,0 +1,30 @@
+{
+    "urls": [
+        {
+            "url": "https://docs.blender.org/manual/en/latest/",
+            "max_pages": 50,
+            "max_depth": 3,
+            "rate_limit": 1.0,
+            "timeout": 15,
+            "path_prefix": null,
+            "enabled": true
+        },
+        {
+            "url": "https://docs.blender.org/api/current/",
+            "max_pages": 50,
+            "max_depth": 3,
+            "rate_limit": 1.0,
+            "timeout": 15,
+            "path_prefix": null,
+            "enabled": true
+        }
+    ],
+    "defaults": {
+        "max_pages": 50,
+        "max_depth": 3,
+        "rate_limit": 1.0,
+        "timeout": 15,
+        "path_prefix": null,
+        "enabled": true
+    }
+}

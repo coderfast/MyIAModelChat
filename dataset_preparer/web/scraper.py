@@ -282,6 +282,82 @@ def load_urls_from_file(filepath: str) -> List[str]:
     return urls
 
 
+def load_urls_from_json(filepath: str) -> List[dict]:
+    """
+    Load URL configurations from a JSON file with per-URL settings and shared defaults.
+
+    JSON format:
+    {
+        "urls": [
+            {
+                "url": "https://example.com/docs/",
+                "max_pages": 50,
+                "max_depth": 3,
+                "rate_limit": 1.0,
+                "timeout": 15,
+                "path_prefix": null,
+                "enabled": true
+            }
+        ],
+        "defaults": {
+            "max_pages": 50,
+            "max_depth": 3,
+            "rate_limit": 1.0,
+            "timeout": 15,
+            "path_prefix": null,
+            "enabled": true
+        }
+    }
+
+    Args:
+        filepath: Path to the JSON config file
+
+    Returns:
+        List of config dicts, one per enabled URL with resolved defaults
+    """
+    import json as json_mod
+
+    if not os.path.exists(filepath):
+        return []
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            config = json_mod.load(f)
+    except Exception as e:
+        logger.warning(f"Error reading web config: {e}")
+        return []
+
+    defaults = config.get('defaults', {})
+    urls_config = config.get('urls', [])
+
+    if not urls_config:
+        logger.warning("No URLs defined in web config")
+        return []
+
+    result = []
+    for entry in urls_config:
+        url = entry.get('url', '')
+        if not url:
+            continue
+
+        enabled = entry.get('enabled', defaults.get('enabled', True))
+        if not enabled:
+            logger.info(f"  Skipping disabled URL: {url}")
+            continue
+
+        resolved = {
+            'url': url,
+            'max_pages': entry.get('max_pages', defaults.get('max_pages', 50)),
+            'max_depth': entry.get('max_depth', defaults.get('max_depth', 3)),
+            'rate_limit': entry.get('rate_limit', defaults.get('rate_limit', 1.0)),
+            'timeout': entry.get('timeout', defaults.get('timeout', 15)),
+            'path_prefix': entry.get('path_prefix', defaults.get('path_prefix')),
+        }
+        result.append(resolved)
+
+    return result
+
+
 def scrape_web_docs(
     url: Optional[str] = None,
     urls_file: Optional[str] = None,

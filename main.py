@@ -242,7 +242,7 @@ DATA SOURCES (required with --prepare-data only):
   --pdf                Include PDF data from datasets_source/pdf directory
   --epub               Include EPUB data from datasets_source/epub directory
   --web                Include web documentation data (scrapes from URL)
-  --web-url URL        Seed URL to scrape (reads datasets_source/web/urls.txt if not set)
+  --web-url URL        Seed URL to scrape (reads datasets_source/web/urls_to_process.json if not set)
   --web-max-pages N    Max pages per URL (default: 50)
   --web-max-depth N    Max link-following depth (default: 3)
 
@@ -267,7 +267,7 @@ EXAMPLES:
   # Prepare data (create/update cache)
   python main.py --prepare-data --aiml --hf --pdf --epub
   python main.py --prepare-data --aiml --bpe-vocab-size 8000
-  python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls.txt)
+  python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls_to_process.json)
 
   # Train model (always uses cached dataset from prepare-data)
   python main.py --train --epochs 10
@@ -343,7 +343,7 @@ EXAMPLES:
         parser.add_argument("--web", action='store_true', help="Include web documentation data")
         parser.add_argument("--csv", action='store_true', help="Include CSV data")
         parser.add_argument("--web-url", type=str, default=None,
-                            help="Seed URL to scrape (reads from datasets_source/web/urls.txt if not set)")
+                            help="Seed URL to scrape (reads from datasets_source/web/urls_to_process.json if not set)")
         parser.add_argument("--web-max-pages", type=int, default=50,
                             help="Maximum pages to scrape per URL (default: 50)")
         parser.add_argument("--web-max-depth", type=int, default=3,

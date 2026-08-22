@@ -21,145 +21,70 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QComboBox,
     QTextEdit, QSplitter, QHeaderView, QMessageBox, QStatusBar,
     QAbstractItemView, QGroupBox, QFormLayout, QApplication,
-    QFileDialog, QPushButton, QProgressBar, QTableView, QSplashScreen
+    QFileDialog, QPushButton, QProgressBar, QTableView
 )
 from PyQt5.QtCore import (
-    Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex
+    Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex, QTimer
 )
-from PyQt5.QtGui import QFont, QPixmap, QPainter, QColor
+from PyQt5.QtGui import QFont
 
 
 # ==================== CONSTANTS ====================
 
 BLOCK_SIZE = 500
-SCROLL_THRESHOLD = 100
 
 
-# ==================== WORKER THREAD ====================
+# ==================== CONTINUOUS LOADER WORKER ====================
 
-class DatasetWorker(QThread):
-    """Worker thread to load dataset blocks in background."""
+class ContinuousLoaderWorker(QThread):
+    """Worker thread that loads a single block of samples."""
     
-    block_ready = pyqtSignal(list, int, int)  # items, start_idx, total
+    block_ready = pyqtSignal(list, int, int)  # items, offset, total
     error_occurred = pyqtSignal(str)
     
-    def __init__(self, indices: List[int], dataset, block_size: int):
-        """
-        Initialize worker.
-        
-        Args:
-            indices: List of dataset indices to load (filtered or all)
-            dataset: HuggingFace Dataset object
-            block_size: Number of items to load per block
-        """
+    def __init__(self, indices: List[int], dataset, offset: int, block_size: int, token_lengths: List[int] = None):
         super().__init__()
         self.indices = indices
         self.dataset = dataset
+        self.offset = offset
         self.block_size = block_size
         self._is_cancelled = False
+        self._token_lengths = token_lengths or []
     
     def cancel(self):
         self._is_cancelled = True
     
     def run(self):
         try:
-            items = []
             total = len(self.indices)
-            end_idx = min(self.block_size, total)
+            items = []
+            end_idx = min(self.offset + self.block_size, total)
             
-            for i in range(end_idx):
+            for i in range(self.offset, end_idx):
                 if self._is_cancelled:
                     return
                 
                 idx = self.indices[i]
                 row = self.dataset[idx]
                 text = row.get('input_ids', row.get('bpe_text', ''))
-                token_ids = row.get('token_ids', [])
                 source = row.get('source', 'Unknown')
+                
+                token_count = self._token_lengths[idx] if idx < len(self._token_lengths) else 0
                 
                 items.append({
                     'index': idx,
                     'text': text,
-                    'token_count': len(token_ids),
+                    'token_count': token_count,
                     'source': source,
                     'language': row.get('language', '-')
                 })
             
-            if not self._is_cancelled:
-                self.block_ready.emit(items, 0, total)
+            if items and not self._is_cancelled:
+                self.block_ready.emit(items, self.offset, total)
         
         except Exception as e:
             if not self._is_cancelled:
                 self.error_occurred.emit(str(e))
-
-
-# ==================== CONTINUOUS LOADER WORKER ====================
-
-class ContinuousLoaderWorker(QThread):
-    """Worker thread for continuous loading as user scrolls."""
-    
-    block_ready = pyqtSignal(list, int, int)  # items, offset, total
-    error_occurred = pyqtSignal(str)
-    loading_finished = pyqtSignal()
-    
-    def __init__(self, indices: List[int], dataset, block_size: int, token_lengths: List[int] = None):
-        super().__init__()
-        self.indices = indices
-        self.dataset = dataset
-        self.block_size = block_size
-        self._is_cancelled = False
-        self._current_offset = 0
-        self._lock = False
-        self._token_lengths = token_lengths or []
-    
-    def cancel(self):
-        self._is_cancelled = True
-    
-    def start_loading(self, from_offset: int = 0):
-        """Start or resume loading from offset."""
-        if not self._lock:
-            self._current_offset = from_offset
-            self._lock = True
-            if not self.isRunning():
-                self.start()
-    
-    def run(self):
-        try:
-            total = len(self.indices)
-            
-            while self._current_offset < total and not self._is_cancelled:
-                items = []
-                end_idx = min(self._current_offset + self.block_size, total)
-                
-                for i in range(self._current_offset, end_idx):
-                    if self._is_cancelled:
-                        return
-                    
-                    idx = self.indices[i]
-                    row = self.dataset[idx]
-                    text = row.get('input_ids', row.get('bpe_text', ''))
-                    source = row.get('source', 'Unknown')
-                    
-                    # Use pre-computed token length
-                    token_count = self._token_lengths[idx] if idx < len(self._token_lengths) else 0
-                    
-                    items.append({
-                        'index': idx,
-                        'text': text,
-                        'token_count': token_count,
-                        'source': source,
-                        'language': row.get('language', '-')
-                    })
-                
-                if items and not self._is_cancelled:
-                    self.block_ready.emit(items, self._current_offset, total)
-                
-                self._current_offset = end_idx
-            
-            self._lock = False
-            if not self._is_cancelled:
-                self.loading_finished.emit()
-        
         except Exception as e:
             self._lock = False
             if not self._is_cancelled:
@@ -239,21 +164,22 @@ class LazyTableModel(QAbstractTableModel):
         self.endResetModel()
     
     def add_block(self, items: List[Dict], start_idx: int):
-        """Add a block of loaded items."""
+        """Add a block of loaded items by updating existing rows."""
         first_row = start_idx
         last_row = min(start_idx + len(items), self._total_count) - 1
         
         if first_row > last_row:
             return
         
-        self.beginInsertRows(QModelIndex(), first_row, last_row)
-        
         for i, item in enumerate(items):
             idx = start_idx + i
             if idx < len(self._data):
                 self._data[idx] = item
         
-        self.endInsertRows()
+        top_left = self.index(first_row, 0)
+        bottom_right = self.index(last_row, self.columnCount() - 1)
+        self.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
+        
         self._loaded_count = sum(1 for x in self._data if x is not None)
     
     def get_item(self, row: int) -> Optional[Dict]:
@@ -278,18 +204,39 @@ class LazyTableModel(QAbstractTableModel):
 # ==================== VIRTUAL SCROLL TABLE ====================
 
 class VirtualScrollTable(QTableView):
-    """QTableView with virtual scroll signal."""
+    """QTableView with virtual scroll - signals when user approaches unloaded data."""
     
-    scroll_near_bottom = pyqtSignal()
+    scroll_changed = pyqtSignal(int)  # first_visible_row
+    prefetch_needed = pyqtSignal(int)  # first_visible_row
+    
+    PREFETCH_VIEWPORTS = 20  # prefetch when this many viewports away from loaded boundary
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.verticalScrollBar().valueChanged.connect(self._check_scroll)
+        self._loaded_row_count = 0
+        self.verticalScrollBar().valueChanged.connect(self._on_scroll)
     
-    def _check_scroll(self, value):
-        scrollbar = self.verticalScrollBar()
-        if scrollbar.maximum() - value < SCROLL_THRESHOLD:
-            self.scroll_near_bottom.emit()
+    def set_loaded_row_count(self, count: int):
+        self._loaded_row_count = count
+    
+    def _viewport_row_count(self) -> int:
+        if not self.model() or self.model().rowCount() == 0:
+            return 20
+        row_h = self.sizeHintForRow(0)
+        if row_h <= 0:
+            return 20
+        return max(1, self.viewport().height() // row_h)
+    
+    def _on_scroll(self, value: int):
+        viewport_rows = self._viewport_row_count()
+        last_visible = value + viewport_rows
+        
+        self.scroll_changed.emit(value)
+        
+        if self._loaded_row_count > 0:
+            prefetch_threshold = self._loaded_row_count - (viewport_rows * self.PREFETCH_VIEWPORTS)
+            if last_visible >= prefetch_threshold:
+                self.prefetch_needed.emit(value)
 
 
 # ==================== MAIN VIEWER ====================
@@ -320,7 +267,7 @@ class CacheViewer(QMainWindow):
         self.model = LazyTableModel()
         self.worker: Optional[ContinuousLoaderWorker] = None
         self._loaded_blocks = 0
-        self._splash: Optional[QSplashScreen] = None
+        self._tray_icon = None
         
         # Cache file paths
         self.cache_dataset_file = None
@@ -389,7 +336,7 @@ class CacheViewer(QMainWindow):
             self._set_cache_dir(folder)
     
     def _set_cache_dir(self, path: str):
-        """Set the cache directory and load data."""
+        """Set the cache directory and schedule data loading."""
         # Cancel any ongoing worker
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
@@ -410,8 +357,8 @@ class CacheViewer(QMainWindow):
         self.current_source = "All"
         self._loaded_blocks = 0
         
-        # Load data
-        self._load_cache_data()
+        # Schedule data loading after init completes (so tray icon is set)
+        QTimer.singleShot(0, self._load_cache_data)
     
     # ==================== TAB 1: SUMMARY ====================
     
@@ -577,7 +524,7 @@ class CacheViewer(QMainWindow):
         self.samples_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.Stretch
         )
-        self.samples_table.scroll_near_bottom.connect(self._on_scroll_bottom)
+        self.samples_table.prefetch_needed.connect(self._on_prefetch_needed)
         self.samples_table.clicked.connect(self._on_sample_clicked)
         splitter.addWidget(self.samples_table)
         
@@ -643,14 +590,16 @@ class CacheViewer(QMainWindow):
         if indices:
             self._load_samples_block(indices, 0)
     
-    def _on_scroll_bottom(self):
-        """Handle scroll near bottom - load next block."""
+    def _on_prefetch_needed(self, first_visible_row: int):
+        """Handle prefetch request from scroll - load next block."""
+        if self.worker and self.worker.isRunning():
+            return
+        
         if self.current_source == "All":
             indices = self.all_indices
         else:
             indices = self.source_indices.get(self.current_source, [])
         
-        # Apply language filter
         if self.current_language != "All":
             lang_set = set(self.language_indices.get(self.current_language, []))
             indices = [i for i in indices if i in lang_set]
@@ -661,20 +610,24 @@ class CacheViewer(QMainWindow):
         if loaded >= total:
             return
         
-        # Load next block
         self._load_samples_block(indices, loaded)
     
     def _load_samples_block(self, indices: List[int], start_offset: int):
         """Load a block of samples in background thread."""
         if self.worker and self.worker.isRunning():
-            # Don't cancel if it's already loading from same offset
             return
         
-        self.worker = ContinuousLoaderWorker(indices, self.dataset, BLOCK_SIZE, getattr(self, '_token_lengths', None))
+        if self.worker:
+            try:
+                self.worker.block_ready.disconnect(self._on_block_ready)
+                self.worker.error_occurred.disconnect(self._on_block_error)
+            except (TypeError, RuntimeError):
+                pass
+        
+        self.worker = ContinuousLoaderWorker(indices, self.dataset, start_offset, BLOCK_SIZE, getattr(self, '_token_lengths', None))
         self.worker.block_ready.connect(self._on_block_ready)
         self.worker.error_occurred.connect(self._on_block_error)
-        self.worker.loading_finished.connect(self._on_loading_finished)
-        self.worker.start_loading(start_offset)
+        self.worker.start()
     
     def _on_block_ready(self, items: List[Dict], offset: int, total: int):
         """Handle loaded block from worker."""
@@ -684,15 +637,18 @@ class CacheViewer(QMainWindow):
         self.samples_count_label.setText(f"Loaded: {loaded:,} / {total:,}")
         self.samples_progress.setMaximum(total)
         self.samples_progress.setValue(loaded)
+        
+        # Update virtual scroll table with new loaded count
+        self.samples_table.set_loaded_row_count(loaded)
+        
+        # Re-check if more prefetch needed (scroll position didn't change, so signal won't fire)
+        if loaded < total:
+            current_pos = self.samples_table.verticalScrollBar().value()
+            self.samples_table._on_scroll(current_pos)
     
     def _on_block_error(self, error: str):
         """Handle worker error."""
         self.status_bar.showMessage(f"Error loading samples: {error}", 5000)
-    
-    def _on_loading_finished(self):
-        """Handle loading completion."""
-        loaded = self.model.get_loaded_count()
-        self.status_bar.showMessage(f"All {loaded:,} samples loaded", 3000)
     
     def _on_sample_clicked(self, index: QModelIndex):
         """Handle sample click to show full text."""
@@ -1055,8 +1011,12 @@ class CacheViewer(QMainWindow):
     
     # ==================== DATA LOADING ====================
     
+    def set_tray_icon(self, tray_icon):
+        """Set the system tray icon reference for progress updates."""
+        self._tray_icon = tray_icon
+    
     def _load_cache_data(self):
-        """Load all cache data with splash screen progress updates."""
+        """Load all cache data with tray icon progress updates."""
         self.status_bar.showMessage("Loading cache data...")
 
         # Check if cache exists
@@ -1071,8 +1031,8 @@ class CacheViewer(QMainWindow):
         # Define loading phases: (name, method, weight)
         phases = [
             ("Loading summary...", self._load_summary_data, 1),
-            ("Loading statistics...", self._load_statistics_data, 1),
             ("Loading dataset...", self._init_samples, 5),
+            ("Loading statistics...", self._load_statistics_data, 1),
             ("Loading vocabulary...", self._load_vocabulary, 1),
             ("Loading JSONL splits...", self._load_jsonl_splits, 1),
         ]
@@ -1082,77 +1042,33 @@ class CacheViewer(QMainWindow):
         for i, (label, method, weight) in enumerate(phases):
             phase_base = int(completed_weight / total_weight * 100)
             phase_step = weight / total_weight * 100
-            # Report initial phase start
-            self._update_splash(
-                f"{label}\n\n"
-                f"[{phase_base}%] Phase {i+1}/{len(phases)}"
-            )
+            if self._tray_icon:
+                self._tray_icon.update(phase_base, f"Phase {i+1}/{len(phases)}")
             try:
-                def _cb(p, _base=phase_base, _step=phase_step, _label=label, _i=i, _n=len(phases)):
-                    # Support both formats: float or (float, str)
-                    if isinstance(p, tuple):
-                        pct_val, desc = p
-                        detail = f"\n{desc}" if desc else ""
+                def _cb(p_or_tuple, _desc="", _base=phase_base, _step=phase_step, _label=label, _i=i, _n=len(phases)):
+                    if isinstance(p_or_tuple, tuple):
+                        pct_val, desc = p_or_tuple
+                    elif isinstance(_desc, str) and _desc:
+                        pct_val = p_or_tuple
+                        desc = _desc
                     else:
-                        pct_val = p
-                        detail = ""
+                        pct_val = p_or_tuple
+                        desc = ""
                     pct = int(_base + pct_val * _step)
-                    self._update_splash(
-                        f"{_label}{detail}\n\n"
-                        f"[{pct}%] Phase {_i+1}/{_n}"
-                    )
+                    if self._tray_icon:
+                        desc_text = f": {desc}" if desc else ""
+                        self._tray_icon.update(pct, f"Phase {_i+1}/{_n}{desc_text}")
                 method(progress_callback=_cb)
             except Exception as e:
                 self.status_bar.showMessage(f"Error during load: {e}")
             completed_weight += weight
 
-        self._update_splash("Ready\n\n[100%]")
-        if self._splash:
-            self._splash.finish(self)
-            self._splash = None
+        # Set ready state on tray icon
+        loaded = self.model.get_loaded_count()
+        if self._tray_icon:
+            self._tray_icon.set_ready(loaded)
 
         self.status_bar.showMessage("Cache loaded successfully", 3000)
-
-    def _update_splash(self, message: str):
-        """Update splash screen message, creating splash on first call."""
-        if self._splash is None:
-            pixmap = self._create_splash_pixmap()
-            self._splash = QSplashScreen(pixmap)
-            self._splash.setWindowFlags(
-                Qt.SplashScreen | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
-            )
-            self._splash.show()
-        self._splash.showMessage(
-            message,
-            Qt.AlignBottom | Qt.AlignCenter,
-            QColor(220, 220, 220),
-        )
-        QApplication.processEvents()
-
-    @staticmethod
-    def _create_splash_pixmap(width=420, height=160) -> QPixmap:
-        """Create a splash screen pixmap with title and empty progress area."""
-        pixmap = QPixmap(width, height)
-        pixmap.fill(QColor(45, 45, 48))
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        # Title
-        painter.setPen(QColor(220, 220, 220))
-        font = QFont("Segoe UI", 16, QFont.Bold)
-        painter.setFont(font)
-        painter.drawText(pixmap.rect().adjusted(20, 15, -20, -60), Qt.AlignLeft | Qt.AlignTop, "Dataset Cache Viewer")
-
-        # Subtitle
-        painter.setPen(QColor(140, 140, 140))
-        font.setPointSize(10)
-        font.setBold(False)
-        painter.setFont(font)
-        painter.drawText(pixmap.rect().adjusted(20, 55, -20, -30), Qt.AlignLeft | Qt.AlignTop, "Loading data...")
-
-        painter.end()
-        return pixmap
     
     def _load_jsonl_splits(self, progress_callback=None):
         """Load available JSONL splits."""
@@ -1404,11 +1320,13 @@ class CacheViewer(QMainWindow):
                 for idx, source in enumerate(all_sources):
                     self.source_indices[source].append(idx)
                 
-                # Populate source combo
+                # Populate source combo (block signals to avoid spurious _reload_with_filter)
+                self.source_combo.blockSignals(True)
                 self.source_combo.clear()
                 self.source_combo.addItem("All")
                 for source in sorted(sources_set):
                     self.source_combo.addItem(source)
+                self.source_combo.blockSignals(False)
             
             if progress_callback:
                 progress_callback(0.55, "Building language indices...")
@@ -1422,11 +1340,13 @@ class CacheViewer(QMainWindow):
                 for idx, lang in enumerate(all_languages):
                     self.language_indices[lang].append(idx)
                 
-                # Populate language combo
+                # Populate language combo (block signals to avoid spurious _reload_with_filter)
+                self.language_combo.blockSignals(True)
                 self.language_combo.clear()
                 self.language_combo.addItem("All")
                 for lang in sorted(languages_set):
                     self.language_combo.addItem(lang)
+                self.language_combo.blockSignals(False)
                 
                 self.status_bar.showMessage(
                     f"Dataset loaded: {total:,} samples, "
@@ -1435,13 +1355,17 @@ class CacheViewer(QMainWindow):
                 )
             else:
                 # No language column - show message
+                self.language_combo.blockSignals(True)
                 self.language_combo.clear()
                 self.language_combo.addItem("All")
+                self.language_combo.blockSignals(False)
             
             if not has_source_column:
                 # No source column - show message
+                self.source_combo.blockSignals(True)
                 self.source_combo.clear()
                 self.source_combo.addItem("All")
+                self.source_combo.blockSignals(False)
                 self.source_info_label.setText(
                     "Source: All (no source column in dataset)"
                 )
@@ -1455,9 +1379,24 @@ class CacheViewer(QMainWindow):
             if progress_callback:
                 progress_callback(0.9)
             
-            # Load first block
+            # Load first block synchronously so data is available immediately
             if total > 0:
-                self._load_samples_block(self.all_indices, 0)
+                block_size = min(BLOCK_SIZE, total)
+                items = []
+                for i in range(block_size):
+                    idx = self.all_indices[i]
+                    row = self.dataset[idx]
+                    items.append({
+                        'index': idx,
+                        'text': row.get('input_ids', row.get('bpe_text', '')),
+                        'token_count': self._token_lengths[idx] if idx < len(self._token_lengths) else 0,
+                        'source': row.get('source', 'Unknown'),
+                        'language': row.get('language', '-')
+                    })
+                self.model.add_block(items, 0)
+                self.samples_count_label.setText(f"Loaded: {block_size:,} / {total:,}")
+                self.samples_progress.setValue(block_size)
+                self.samples_table.set_loaded_row_count(block_size)
 
             if progress_callback:
                 progress_callback(1.0)
@@ -1559,15 +1498,23 @@ class CacheViewer(QMainWindow):
         )
     
     def closeEvent(self, event):
-        """Clean up worker thread on close."""
+        """Clean up worker thread and tray icon on close."""
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(1000)
+        if self._tray_icon:
+            self._tray_icon.stop()
+            self._tray_icon = None
         event.accept()
 
 
 def main():
-    """Run the cache viewer."""
+    """Run the cache viewer with optional system tray icon."""
+    try:
+        from APP_CACHE_VIEWER.system_tray import SystemTrayIcon
+    except ModuleNotFoundError:
+        from system_tray import SystemTrayIcon
+
     parser = argparse.ArgumentParser(
         description="Dataset Cache Viewer - Inspect cached dataset files"
     )
@@ -1577,15 +1524,38 @@ def main():
         default=None,
         help="Path to dataset_cache directory"
     )
+    parser.add_argument(
+        "--no-tray",
+        action="store_true",
+        help="Run without system tray icon"
+    )
     args = parser.parse_args()
-    
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    
+
+    # Create tray icon first (before window)
+    tray_icon = None
+    if not args.no_tray:
+        tray_icon = SystemTrayIcon(
+            on_quit=lambda: (tray_icon.stop(), app.quit()) if tray_icon else app.quit(),
+        )
+        if tray_icon.available:
+            tray_icon.run()
+        else:
+            tray_icon = None
+
+    # Create and show viewer
     viewer = CacheViewer(cache_dir=args.cache_dir)
+    if tray_icon:
+        viewer.set_tray_icon(tray_icon)
     viewer.show()
-    
-    sys.exit(app.exec_())
+
+    exit_code = app.exec_()
+
+    if tray_icon:
+        tray_icon.stop()
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

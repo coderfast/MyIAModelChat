@@ -45,10 +45,11 @@ except ImportError:
     ebooklib = None
     epub = None
 try:
-    from dataset_preparer.web.scraper import scrape_web_docs, load_urls_from_file, WEB_SCRAPER_DIR
+    from dataset_preparer.web.scraper import scrape_web_docs, load_urls_from_file, load_urls_from_json, WEB_SCRAPER_DIR
 except ImportError:
     scrape_web_docs = None
     load_urls_from_file = None
+    load_urls_from_json = None
     WEB_SCRAPER_DIR = os.path.join('datasets_source', 'web')
 
 # Contamination filtering module
@@ -1236,8 +1237,9 @@ class DataPreparer:
         """
         Load text data by scraping documentation from web URLs.
 
-        Reads URLs from --web-url flag or datasets_source/web/urls.txt.
-        Saves scraped text to datasets_source/web/.
+        Reads URL configurations from datasets_source/web/urls_to_process.json
+        with per-URL settings (max_pages, max_depth, rate_limit, etc.) and
+        shared defaults. Falls back to --web-url CLI arg if provided.
 
         Returns:
             Hugging Face Dataset with web-scraped text data
@@ -1247,32 +1249,49 @@ class DataPreparer:
             return Dataset.from_list([])
 
         web_url = getattr(self.args, 'web_url', None)
-        urls_file = os.path.join(WEB_SCRAPER_DIR, 'urls.txt')
+        config_file = os.path.join(WEB_SCRAPER_DIR, 'urls_to_process.json')
 
-        # Determine URLs to scrape
-        urls_to_scrape = []
+        # CLI args as overrides
+        cli_max_pages = getattr(self.args, 'web_max_pages', None)
+        cli_max_depth = getattr(self.args, 'web_max_depth', None)
+
+        # Determine URLs and per-URL configs
+        url_configs = []
         if web_url:
-            urls_to_scrape.append(web_url)
-        elif os.path.exists(urls_file):
-            urls_to_scrape = load_urls_from_file(urls_file)
-            if urls_to_scrape:
-                logger.info(f"  Loaded {len(urls_to_scrape)} URLs from {urls_file}")
+            # Single URL from CLI: use CLI overrides or defaults
+            url_configs.append({
+                'url': web_url,
+                'max_pages': cli_max_pages or 50,
+                'max_depth': cli_max_depth or 3,
+                'rate_limit': 1.0,
+                'timeout': 15,
+                'path_prefix': None,
+            })
+        elif load_urls_from_json is not None and os.path.exists(config_file):
+            url_configs = load_urls_from_json(config_file)
+            if url_configs:
+                logger.info(f"  Loaded {len(url_configs)} URL configs from {config_file}")
+                # Apply CLI overrides if provided
+                if cli_max_pages is not None:
+                    for cfg in url_configs:
+                        cfg['max_pages'] = cli_max_pages
+                if cli_max_depth is not None:
+                    for cfg in url_configs:
+                        cfg['max_depth'] = cli_max_depth
         else:
-            logger.warning("  ⚠ No --web-url specified and no datasets_source/web/urls.txt found")
+            logger.warning("  ⚠ No --web-url specified and no datasets_source/web/urls_to_process.json found")
             return Dataset.from_list([])
 
-        max_pages = getattr(self.args, 'web_max_pages', 50)
-        max_depth = getattr(self.args, 'web_max_depth', 3)
-
         all_texts = []
-        for seed_url in urls_to_scrape:
+        for url_cfg in url_configs:
+            seed_url = url_cfg['url']
             logger.info(f"  Scraping: {seed_url}")
             try:
                 texts = scrape_web_docs(
                     url=seed_url,
-                    max_pages=max_pages,
-                    max_depth=max_depth,
-                    rate_limit=1.0,
+                    max_pages=url_cfg['max_pages'],
+                    max_depth=url_cfg['max_depth'],
+                    rate_limit=url_cfg['rate_limit'],
                 )
                 all_texts.extend(texts)
             except ImportError as e:
