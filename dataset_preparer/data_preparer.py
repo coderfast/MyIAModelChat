@@ -573,7 +573,6 @@ class DataPreparer:
         self.epub_data = None
         self.web_data = None
         self.csv_data = None
-        self.tagengo_data = None
         self.combined_data = None
         self.statistics = {}
 
@@ -807,11 +806,6 @@ class DataPreparer:
                 logger.info("[5/7] Loading CSV data...")
                 self.csv_data = self._load_csv()
 
-            # Load Tagengo-GPT4 multilingual conversations (EN/ES)
-            if hasattr(self.args, 'tagengo') and self.args.tagengo:
-                logger.info("[5.5/7] Loading Tagengo-GPT4 data...")
-                self.tagengo_data = self._load_tagengo_data()
-
             # Combine datasets
             logger.info("[6/7] Combining datasets...")
             self.combined_data = self._combine_datasets()
@@ -1031,51 +1025,116 @@ class DataPreparer:
     
     def _load_hf_data(self) -> Dataset:
         """
-        Load Hugging Face datasets.
-        
+        Load Hugging Face datasets from datasets_source/hf/urls_to_process.json.
+
+        Reads dataset configurations (URL, format, languages, limits) from JSON
+        and loads each dataset accordingly.
+
         Returns:
             Hugging Face Dataset with HF data
         """
+        import json as json_mod
+
+        config_path = os.path.join('datasets_source', 'hf', 'urls_to_process.json')
+        if not os.path.exists(config_path):
+            logger.warning(f"  ⚠ HF config not found: {config_path}")
+            return Dataset.from_list([])
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json_mod.load(f)
+        except Exception as e:
+            logger.warning(f"  ⚠ Error reading HF config: {e}")
+            return Dataset.from_list([])
+
+        defaults = config.get('defaults', {})
+        datasets_config = config.get('datasets', [])
+
+        if not datasets_config:
+            logger.warning("  ⚠ No datasets defined in HF config")
+            return Dataset.from_list([])
+
         hf_datasets = []
-        
-        # Example HF datasets to load
-        hf_dataset_names = [
-            'wikitext',  # Wikipedia text (multilingual via different configs)
-            # 'opus_100',  # Multi-language translation data (100+ languages)
-            # 'common_voice',  # Speech data (multiple languages)
-        ]
-        
-        for dataset_name in hf_dataset_names:
+
+        for ds_cfg in datasets_config:
             try:
-                logger.info(f"  Loading Hugging Face dataset: {dataset_name}...")
-                
-                if dataset_name == 'wikitext':
-                    ds = load_dataset('wikitext', 'wikitext-2', split='train')
-                    # Take subset for faster preparation
-                    ds = ds.select(range(min(1000, len(ds))))
-                elif dataset_name == 'common_voice':
-                    ds = load_dataset('common_voice', '2024-08', split='train[:1000]', languages=["en", "es", "fr", "de", "pt", "it", "nl", "ru", "zh", "ja"])
-                elif dataset_name == 'opus_100':
-                    ds = load_dataset('opus_100', split='train[:1000]')
+                url = ds_cfg.get('url', '')
+                # Extract dataset name from URL: https://huggingface.co/datasets/{name}
+                dataset_name = url.rstrip('/').split('/datasets/')[-1]
+                cfg = ds_cfg.get('config')
+                split = ds_cfg.get('split', defaults.get('split', 'train'))
+                fmt = ds_cfg.get('format', defaults.get('format', 'plain_text'))
+                languages = ds_cfg.get('languages', defaults.get('languages', ['en']))
+                limit = ds_cfg.get('limit', defaults.get('limit'))
+                language_field = ds_cfg.get('language_field')
+                language_values_map = ds_cfg.get('language_values_map')
+
+                logger.info(f"  Loading HuggingFace dataset: {dataset_name}...")
+
+                # Build load_dataset kwargs
+                load_kwargs = {'split': split}
+                if cfg:
+                    load_kwargs['name'] = cfg
+
+                ds = load_dataset(dataset_name, **load_kwargs)
+
+                # Filter by language if language_field is specified
+                if language_field and languages:
+                    if language_values_map:
+                        # Map dataset language values to ISO codes, then filter
+                        allowed_values = [k for k, v in language_values_map.items() if v in languages]
+                        ds = ds.filter(lambda x, lf=language_field, av=allowed_values: x.get(lf) in av)
+                    else:
+                        ds = ds.filter(lambda x, lf=language_field, langs=languages: x.get(lf) in langs)
+                    logger.info(f"  Filtered to {languages}: {len(ds)} samples")
+
+                # Apply limit
+                if limit:
+                    ds = ds.select(range(min(limit, len(ds))))
+
+                # Convert to input_ids based on format
+                if fmt == 'chat':
+                    # Chat format: extract conversations and apply GPT-2 tokens
+                    def format_chat(example, lvm=language_values_map, lf=language_field):
+                        conversations = example.get('conversations', [])
+                        if len(conversations) < 2:
+                            return None
+                        human = conversations[0].get('value', '')
+                        gpt = conversations[1].get('value', '')
+                        if not human or not gpt:
+                            return None
+                        # Determine language code from language_field
+                        lang = 'unknown'
+                        if lf and lvm:
+                            raw_lang = example.get(lf, '')
+                            lang = lvm.get(raw_lang, raw_lang)
+                        elif lf:
+                            lang = example.get(lf, 'unknown')
+                        result = {
+                            'input_ids': f'<|user|>{human}<|end|><|assistant|>{gpt}<|end|>'
+                        }
+                        if lang and lang != 'unknown':
+                            result['language'] = lang
+                        return result
+
+                    ds = ds.map(format_chat, remove_columns=ds.column_names)
+                    ds = ds.filter(lambda x: x is not None and x.get('input_ids'))
                 else:
-                    ds = load_dataset(dataset_name, split='train[:1000]')
-                
-                # Convert to input_ids format with GPT-2 standard tokens (texto plano: next-token prediction)
-                if 'text' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': x["text"]})
-                elif 'sentence' in ds.column_names:
-                    ds = ds.map(lambda x: {'input_ids': x["sentence"]})
-                
-                # Keep only input_ids column
-                ds = ds.select_columns(['input_ids'])
-                
+                    # Plain text format: extract text column
+                    if 'text' in ds.column_names:
+                        ds = ds.map(lambda x: {'input_ids': x['text']})
+                    elif 'sentence' in ds.column_names:
+                        ds = ds.map(lambda x: {'input_ids': x['sentence']})
+                    ds = ds.select_columns(['input_ids'])
+                    ds = ds.filter(lambda x: x.get('input_ids', '').strip())
+
                 hf_datasets.append(ds)
                 logger.info(f"  ✓ Loaded: {dataset_name} ({len(ds)} samples)")
-                
+
             except Exception as e:
                 logger.warning(f"  ⚠ Error loading {dataset_name}: {e}")
                 continue
-        
+
         if hf_datasets:
             combined = concatenate_datasets(hf_datasets)
             logger.info(f"Total HuggingFace datasets loaded: {len(hf_datasets)}")
@@ -1083,51 +1142,6 @@ class DataPreparer:
             return combined
         else:
             logger.warning("  ⚠ No HuggingFace datasets loaded successfully")
-            return Dataset.from_list([])
-
-    def _load_tagengo_data(self) -> Dataset:
-        """
-        Load Tagengo-GPT4 multilingual conversations (EN/ES only).
-
-        Dataset: lightblue/tagengo-gpt4
-        Format: Human-GPT-4 conversations in 74 languages.
-        We filter to English and Spanish only.
-
-        Returns:
-            Hugging Face Dataset with tagengo data
-        """
-        try:
-            logger.info("  Loading Tagengo-GPT4 dataset...")
-            ds = load_dataset('lightblue/tagengo-gpt4', split='train')
-
-            # Filter to EN and ES only
-            ds = ds.filter(lambda x: x.get('language') in ('English', 'Spanish'))
-            logger.info(f"  Filtered to EN/ES: {len(ds)} samples")
-
-            # Convert to GPT-2 format
-            def format_tagengo(example):
-                conversations = example.get('conversations', [])
-                if len(conversations) < 2:
-                    return None
-                human = conversations[0].get('value', '')
-                gpt = conversations[1].get('value', '')
-                if not human or not gpt:
-                    return None
-                lang = 'en' if example.get('language') == 'English' else 'es'
-                return {
-                    'input_ids': f'<|user|>{human}<|end|><|assistant|>{gpt}<|end|>',
-                    'source': 'tagengo',
-                    'language': lang
-                }
-
-            ds = ds.map(format_tagengo, remove_columns=ds.column_names)
-            ds = ds.filter(lambda x: x is not None and x.get('input_ids'))
-
-            logger.info(f"  ✓ Loaded tagengo: {len(ds)} samples (EN/ES)")
-            return ds
-
-        except Exception as e:
-            logger.warning(f"  ⚠ Error loading tagengo dataset: {e}")
             return Dataset.from_list([])
 
     def _load_csv(self) -> Dataset:
@@ -1783,7 +1797,7 @@ class DataPreparer:
             logger.info(f"  Adding AIML data: {len(self.aiml_data)} samples")
         
         if self.hf_data is not None and len(self.hf_data) > 0:
-            hf_with_source = self._add_source_column(self.hf_data, 'HuggingFace')
+            hf_with_source = self._add_source_column(self.hf_data, 'hf')
             datasets_to_combine.append(hf_with_source)
             total_samples += len(self.hf_data)
             logger.info(f"  Adding HuggingFace data: {len(self.hf_data)} samples")
@@ -1811,12 +1825,6 @@ class DataPreparer:
             datasets_to_combine.append(csv_with_source)
             total_samples += len(self.csv_data)
             logger.info(f"  Adding CSV data: {len(self.csv_data)} samples")
-
-        if self.tagengo_data is not None and len(self.tagengo_data) > 0:
-            tagengo_with_source = self._add_source_column(self.tagengo_data, 'Tagengo')
-            datasets_to_combine.append(tagengo_with_source)
-            total_samples += len(self.tagengo_data)
-            logger.info(f"  Adding Tagengo data: {len(self.tagengo_data)} samples")
 
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")

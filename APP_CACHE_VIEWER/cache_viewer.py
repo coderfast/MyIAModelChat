@@ -21,12 +21,12 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QComboBox,
     QTextEdit, QSplitter, QHeaderView, QMessageBox, QStatusBar,
     QAbstractItemView, QGroupBox, QFormLayout, QApplication,
-    QFileDialog, QPushButton, QProgressBar, QTableView
+    QFileDialog, QPushButton, QProgressBar, QTableView, QSplashScreen
 )
 from PyQt5.QtCore import (
     Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex
 )
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap, QPainter, QColor
 
 
 # ==================== CONSTANTS ====================
@@ -320,6 +320,7 @@ class CacheViewer(QMainWindow):
         self.model = LazyTableModel()
         self.worker: Optional[ContinuousLoaderWorker] = None
         self._loaded_blocks = 0
+        self._splash: Optional[QSplashScreen] = None
         
         # Cache file paths
         self.cache_dataset_file = None
@@ -1055,9 +1056,9 @@ class CacheViewer(QMainWindow):
     # ==================== DATA LOADING ====================
     
     def _load_cache_data(self):
-        """Load all cache data."""
+        """Load all cache data with splash screen progress updates."""
         self.status_bar.showMessage("Loading cache data...")
-        
+
         # Check if cache exists
         if not os.path.exists(self.cache_dir):
             self.status_bar.showMessage("Cache directory not found")
@@ -1066,18 +1067,98 @@ class CacheViewer(QMainWindow):
                 f"Cache directory not found:\n{self.cache_dir}"
             )
             return
-        
-        # Load all data
-        self._load_summary_data()
-        self._load_statistics_data()
-        self._init_samples()
-        self._load_vocabulary()
-        self._load_jsonl_splits()
-        
+
+        # Define loading phases: (name, method, weight)
+        phases = [
+            ("Loading summary...", self._load_summary_data, 1),
+            ("Loading statistics...", self._load_statistics_data, 1),
+            ("Loading dataset...", self._init_samples, 5),
+            ("Loading vocabulary...", self._load_vocabulary, 1),
+            ("Loading JSONL splits...", self._load_jsonl_splits, 1),
+        ]
+        total_weight = sum(w for _, _, w in phases)
+        completed_weight = 0
+
+        for i, (label, method, weight) in enumerate(phases):
+            phase_base = int(completed_weight / total_weight * 100)
+            phase_step = weight / total_weight * 100
+            # Report initial phase start
+            self._update_splash(
+                f"{label}\n\n"
+                f"[{phase_base}%] Phase {i+1}/{len(phases)}"
+            )
+            try:
+                def _cb(p, _base=phase_base, _step=phase_step, _label=label, _i=i, _n=len(phases)):
+                    # Support both formats: float or (float, str)
+                    if isinstance(p, tuple):
+                        pct_val, desc = p
+                        detail = f"\n{desc}" if desc else ""
+                    else:
+                        pct_val = p
+                        detail = ""
+                    pct = int(_base + pct_val * _step)
+                    self._update_splash(
+                        f"{_label}{detail}\n\n"
+                        f"[{pct}%] Phase {_i+1}/{_n}"
+                    )
+                method(progress_callback=_cb)
+            except Exception as e:
+                self.status_bar.showMessage(f"Error during load: {e}")
+            completed_weight += weight
+
+        self._update_splash("Ready\n\n[100%]")
+        if self._splash:
+            self._splash.finish(self)
+            self._splash = None
+
         self.status_bar.showMessage("Cache loaded successfully", 3000)
+
+    def _update_splash(self, message: str):
+        """Update splash screen message, creating splash on first call."""
+        if self._splash is None:
+            pixmap = self._create_splash_pixmap()
+            self._splash = QSplashScreen(pixmap)
+            self._splash.setWindowFlags(
+                Qt.SplashScreen | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+            )
+            self._splash.show()
+        self._splash.showMessage(
+            message,
+            Qt.AlignBottom | Qt.AlignCenter,
+            QColor(220, 220, 220),
+        )
+        QApplication.processEvents()
+
+    @staticmethod
+    def _create_splash_pixmap(width=420, height=160) -> QPixmap:
+        """Create a splash screen pixmap with title and empty progress area."""
+        pixmap = QPixmap(width, height)
+        pixmap.fill(QColor(45, 45, 48))
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Title
+        painter.setPen(QColor(220, 220, 220))
+        font = QFont("Segoe UI", 16, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(pixmap.rect().adjusted(20, 15, -20, -60), Qt.AlignLeft | Qt.AlignTop, "Dataset Cache Viewer")
+
+        # Subtitle
+        painter.setPen(QColor(140, 140, 140))
+        font.setPointSize(10)
+        font.setBold(False)
+        painter.setFont(font)
+        painter.drawText(pixmap.rect().adjusted(20, 55, -20, -30), Qt.AlignLeft | Qt.AlignTop, "Loading data...")
+
+        painter.end()
+        return pixmap
     
-    def _load_jsonl_splits(self):
+    def _load_jsonl_splits(self, progress_callback=None):
         """Load available JSONL splits."""
+        if progress_callback:
+            progress_callback(0.0)
+
         jsonl_dir = os.path.join(self.cache_dir, "jsonl")
         
         if not os.path.exists(jsonl_dir):
@@ -1097,9 +1178,15 @@ class CacheViewer(QMainWindow):
             # Auto-load first split
             if available_splits:
                 self._load_jsonl_data(available_splits[0])
+
+        if progress_callback:
+            progress_callback(1.0)
     
-    def _load_summary_data(self):
+    def _load_summary_data(self, progress_callback=None):
         """Load summary tab data."""
+        if progress_callback:
+            progress_callback(0.0)
+
         # Check existence
         exists = (os.path.exists(self.cache_dataset_file) and
                   os.path.exists(self.cache_stats_file))
@@ -1113,37 +1200,46 @@ class CacheViewer(QMainWindow):
         latest_mod = 0
         files_info = []
         
+        all_files = []
         for root, dirs, files in os.walk(self.cache_dir):
             for file in files:
-                filepath = os.path.join(root, file)
-                rel_path = os.path.relpath(filepath, self.cache_dir)
-                size = os.path.getsize(filepath)
-                mod_time = os.path.getmtime(filepath)
-                
-                total_size += size
-                latest_mod = max(latest_mod, mod_time)
-                
-                # Determine file type
-                file_type = "Other"
-                if file.endswith(".arrow"):
-                    file_type = "Arrow Data"
-                elif file.endswith(".pkl"):
-                    file_type = "Pickle"
-                elif file.endswith(".model"):
-                    file_type = "SentencePiece Model"
-                elif file.endswith(".vocab"):
-                    file_type = "Vocabulary"
-                elif file.endswith(".json"):
-                    file_type = "JSON Metadata"
-                elif file.endswith(".jsonl"):
-                    file_type = "JSONL (GPT-2 Standard)"
-                
-                files_info.append({
-                    "name": rel_path,
-                    "size": size,
-                    "modified": mod_time,
-                    "type": file_type
-                })
+                all_files.append(os.path.join(root, file))
+
+        total_files = len(all_files)
+        for fi, filepath in enumerate(all_files):
+            if progress_callback and fi % 50 == 0:
+                progress_callback(fi / max(total_files, 1))
+            rel_path = os.path.relpath(filepath, self.cache_dir)
+            size = os.path.getsize(filepath)
+            mod_time = os.path.getmtime(filepath)
+            
+            total_size += size
+            latest_mod = max(latest_mod, mod_time)
+            
+            # Determine file type
+            file_type = "Other"
+            if file.endswith(".arrow"):
+                file_type = "Arrow Data"
+            elif file.endswith(".pkl"):
+                file_type = "Pickle"
+            elif file.endswith(".model"):
+                file_type = "SentencePiece Model"
+            elif file.endswith(".vocab"):
+                file_type = "Vocabulary"
+            elif file.endswith(".json"):
+                file_type = "JSON Metadata"
+            elif file.endswith(".jsonl"):
+                file_type = "JSONL (GPT-2 Standard)"
+            
+            files_info.append({
+                "name": rel_path,
+                "size": size,
+                "modified": mod_time,
+                "type": file_type
+            })
+
+        if progress_callback:
+            progress_callback(1.0)
         
         # Set total size
         if total_size < 1024:
@@ -1186,14 +1282,20 @@ class CacheViewer(QMainWindow):
             
             self.files_table.setItem(i, 3, QTableWidgetItem(info["type"]))
     
-    def _load_statistics_data(self):
+    def _load_statistics_data(self, progress_callback=None):
         """Load statistics tab data."""
+        if progress_callback:
+            progress_callback(0.0)
+
         if not os.path.exists(self.cache_stats_file):
             return
         
         try:
             with open(self.cache_stats_file, 'rb') as f:
                 self.statistics = pickle.load(f)
+
+            if progress_callback:
+                progress_callback(0.5)
             
             # Set labels
             self.total_samples_label.setText(
@@ -1252,7 +1354,7 @@ class CacheViewer(QMainWindow):
         except Exception as e:
             self.status_bar.showMessage(f"Error loading statistics: {e}")
     
-    def _init_samples(self):
+    def _init_samples(self, progress_callback=None):
         """Initialize samples tab with source indices and lazy loading."""
         from datasets import Dataset
         
@@ -1260,16 +1362,29 @@ class CacheViewer(QMainWindow):
             return
         
         try:
+            if progress_callback:
+                progress_callback(0.0, "Reading dataset from disk...")
+
             self.dataset = Dataset.load_from_disk(self.cache_dataset_file)
             total = len(self.dataset)
+
+            if progress_callback:
+                progress_callback(0.15, f"Dataset loaded ({total:,} rows)")
             
             # Pre-compute token counts (avoid loading token_ids per row)
             has_tokens = 'token_ids' in self.dataset.column_names
             if has_tokens:
+                if progress_callback:
+                    progress_callback(0.20, "Reading token_ids column...")
                 all_token_ids = self.dataset['token_ids']
+                if progress_callback:
+                    progress_callback(0.30, "Computing token lengths...")
                 self._token_lengths = [len(t) for t in all_token_ids]
             else:
                 self._token_lengths = [0] * total
+
+            if progress_callback:
+                progress_callback(0.35, "Building source indices...")
             
             # Build source indices
             self.source_indices.clear()
@@ -1295,6 +1410,9 @@ class CacheViewer(QMainWindow):
                 for source in sorted(sources_set):
                     self.source_combo.addItem(source)
             
+            if progress_callback:
+                progress_callback(0.55, "Building language indices...")
+
             if has_language_column:
                 all_languages = self.dataset['language']
                 
@@ -1333,16 +1451,25 @@ class CacheViewer(QMainWindow):
             self.samples_progress.setMaximum(total)
             self.samples_progress.setValue(0)
             self.samples_count_label.setText(f"Loaded: 0 / {total:,}")
+
+            if progress_callback:
+                progress_callback(0.9)
             
             # Load first block
             if total > 0:
                 self._load_samples_block(self.all_indices, 0)
+
+            if progress_callback:
+                progress_callback(1.0)
         
         except Exception as e:
             self.status_bar.showMessage(f"Error loading samples: {e}")
     
-    def _load_vocabulary(self):
+    def _load_vocabulary(self, progress_callback=None):
         """Load vocabulary tab data."""
+        if progress_callback:
+            progress_callback(0.0)
+
         if not os.path.exists(self.sentencepiece_vocab):
             return
         
@@ -1350,6 +1477,8 @@ class CacheViewer(QMainWindow):
             self.vocab_data = []
             with open(self.sentencepiece_vocab, 'r', encoding='utf-8') as f:
                 for i, line in enumerate(f):
+                    if progress_callback and i % 500 == 0:
+                        progress_callback(min(i / 8000, 0.9))
                     parts = line.strip().split('\t')
                     if len(parts) == 2:
                         token, score = parts
@@ -1365,6 +1494,9 @@ class CacheViewer(QMainWindow):
                         })
             
             self._update_vocab_table(self.vocab_data)
+
+            if progress_callback:
+                progress_callback(1.0)
         
         except Exception as e:
             self.status_bar.showMessage(f"Error loading vocabulary: {e}")

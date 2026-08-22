@@ -1,0 +1,43 @@
+{
+    "datasets": [
+        {
+            "url": "https://huggingface.co/datasets/Salesforce/wikitext",
+            "config": "wikitext-2-v1",
+            "split": "train",
+            "format": "plain_text",
+            "languages": ["en"],
+            "limit": null,
+            "language_field": null,
+            "language_values_map": null
+        },
+		{
+            "url": "https://huggingface.co/datasets/Salesforce/wikitext",
+            "config": "wikitext-103-v1",
+            "split": "train",
+            "format": "plain_text",
+            "languages": ["en"],
+            "limit": null,
+            "language_field": null,
+            "language_values_map": null
+        },
+        {
+            "url": "https://huggingface.co/datasets/lightblue/tagengo-gpt4",
+            "config": null,
+            "split": "train",
+            "format": "chat",
+            "languages": ["en", "es"],
+            "limit": null,
+            "language_field": "language",
+            "language_values_map": {
+                "English": "en",
+                "Spanish": "es"
+            }
+        }
+    ],
+    "defaults": {
+        "split": "train",
+        "format": "plain_text",
+        "languages": ["en", "es"],
+        "limit": null
+    }
+}
