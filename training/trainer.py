@@ -1677,7 +1677,7 @@ class Trainer:
 
         logger.info("Tokenizing cached dataset for faster training...")
 
-        PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking', 'source', 'has_tool_call')
+        PRESERVED_COLUMNS = ('input_ids', 'token_ids', 'question', 'answer', 'type', 'thinking', 'has_tool_call')
         columns_to_remove = [c for c in self.loaded_dataset.column_names if c not in PRESERVED_COLUMNS]
         num_proc = self._get_num_proc()
         try:

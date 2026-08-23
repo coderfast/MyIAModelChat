@@ -188,6 +188,18 @@ class WebDocScraper:
         if not text:
             return ""
 
+        # Repair mojibake (UTF-8 bytes decoded as a single-byte encoding)
+        if re.search(r'[\x80-\xff]', text):
+            for enc in ('latin-1', 'cp1252', 'cp1250', 'cp1251', 'cp1253',
+                        'cp1254', 'cp1257', 'iso8859-2', 'iso8859-4',
+                        'iso8859-5', 'iso8859-7', 'iso8859-15', 'koi8-r',
+                        'koi8-u', 'macroman', 'maccyrillic'):
+                try:
+                    text = text.encode(enc, errors='strict').decode('utf-8', errors='strict')
+                    break
+                except (UnicodeDecodeError, UnicodeEncodeError):
+                    continue
+
         text = re.sub(r'```\w*\n', '\n', text)
         text = re.sub(r'```', '', text)
         text = re.sub(r'[ \t]+', ' ', text)

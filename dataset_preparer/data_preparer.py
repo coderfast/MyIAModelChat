@@ -82,20 +82,117 @@ def normalize_unicode(text: str) -> str:
     return unicodedata.normalize('NFKC', text)
 
 
+# UTF-8 multi-byte sequences (above ASCII 0x7F) appear as Latin-1 chars
+# when mis-decoded. Detect any char in the 0x80-0xFF range (Latin-1 extended).
+_MOJIBAKE_DETECT = re.compile(r'[\x80-\xff]')
+
+# Encodings to try, ordered by likelihood for European web content.
+# Latin-1/CP1252 first (most common), then ISO-8859, Windows, KOI8, Mac.
+_MOJIBAKE_ENCODINGS = [
+    'latin-1',       # ISO-8859-1 (superset: maps all 0x00-0xFF codepoints)
+    'cp1252',        # Windows-1252 (Western European with smart quotes, euro)
+    # Windows codepages (Central/Eastern/Southern European)
+    'cp1250',        # Central European (Polish, Czech, Slovak, Hungarian, etc.)
+    'cp1251',        # Cyrillic (Russian, Ukrainian, Bulgarian, etc.)
+    'cp1253',        # Greek
+    'cp1254',        # Turkish
+    'cp1255',        # Hebrew
+    'cp1256',        # Arabic
+    'cp1257',        # Baltic (Lithuanian, Latvian, Estonian)
+    'cp1258',        # Vietnamese
+    # ISO-8859 family
+    'iso8859-2',     # Latin-2 (Central European)
+    'iso8859-3',     # Latin-3 (South European: Maltese, Esperanto)
+    'iso8859-4',     # Latin-4 (North European: Estonian, Latvian, Lithuanian)
+    'iso8859-5',     # Cyrillic
+    'iso8859-6',     # Arabic
+    'iso8859-7',     # Greek
+    'iso8859-8',     # Hebrew
+    'iso8859-9',     # Latin-5 (Turkish)
+    'iso8859-10',    # Latin-6 (Nordic)
+    'iso8859-11',    # Thai
+    'iso8859-13',    # Baltic
+    'iso8859-14',    # Celtic (Irish, Welsh)
+    'iso8859-15',    # Latin-9 (superset of ISO-8859-1 with euro, French/Finnish)
+    'iso8859-16',    # Latin-10 (South-Eastern European)
+    # KOI8 family (Cyrillic)
+    'koi8-r',        # Russian
+    'koi8-u',        # Ukrainian
+    # Macintosh legacy
+    'macroman',      # Western European
+    'maccyrillic',   # Cyrillic
+    'macgreek',      # Greek
+    'macturkish',    # Turkish
+    'maciceland',    # Icelandic
+    'maccentraleurope',  # Central European
+]
+
+
+def _repair_mojibake(text: str) -> str:
+    """Repair mojibake caused by UTF-8 bytes decoded as a single-byte encoding.
+
+    Tries re-encoding with each candidate encoding and decoding as UTF-8.
+    Covers all European languages plus Greek, Cyrillic, Arabic, Hebrew, Thai.
+    """
+    if not text or not isinstance(text, str):
+        return text
+
+    # Fast check: no chars above 0x7F means no mojibake possible
+    if not _MOJIBAKE_DETECT.search(text):
+        return text
+
+    # Try each encoding: re-encode to bytes, then decode as UTF-8
+    for encoding in _MOJIBAKE_ENCODINGS:
+        try:
+            repaired = text.encode(encoding, errors='strict').decode('utf-8', errors='strict')
+            return repaired
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            continue
+
+    # Partial mojibake or mixed encoding: try char-by-char recovery
+    result = []
+    buf = []
+    for ch in text:
+        if ord(ch) > 0x7F:
+            buf.append(ch)
+        else:
+            if buf:
+                result.append(_decode_mojibake_buf(buf))
+                buf = []
+            result.append(ch)
+    if buf:
+        result.append(_decode_mojibake_buf(buf))
+    return ''.join(result)
+
+
+def _decode_mojibake_buf(buf):
+    """Try to decode a buffer of high-byte chars as mojibake."""
+    s = ''.join(buf)
+    for encoding in _MOJIBAKE_ENCODINGS:
+        try:
+            return s.encode(encoding, errors='strict').decode('utf-8', errors='strict')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            continue
+    return s  # Not mojibake, return as-is
+
+
 def clean_text(text: str) -> str:
-    """Clean text by removing extra whitespace and normalizing."""
+    """Clean text by removing extra whitespace, repairing encoding, and normalizing."""
     if not text or not isinstance(text, str):
         return ""
-    
-    # Normalize Unicode first
+
+    # Repair mojibake BEFORE normalization (NFKC can't fix double-decoded bytes)
+    text = _repair_mojibake(text)
+
+    # Normalize Unicode
     text = normalize_unicode(text)
-    
+
     # Remove multiple whitespace characters
     text = re.sub(r'\s+', ' ', text)
-    
+
     # Strip leading/trailing whitespace
     text = text.strip()
-    
+
     return text
 
 
@@ -166,11 +263,12 @@ def split_paragraphs(text: str, min_length: int = 20) -> List[str]:
     if not text or not isinstance(text, str):
         return []
 
-    text = clean_text(text)
-    if not text:
+    # Normalize unicode but preserve newlines for paragraph splitting
+    text = normalize_unicode(text)
+    if not text.strip():
         return []
 
-    # Split on blank lines / double newlines
+    # Split on blank lines / double newlines BEFORE cleaning whitespace
     raw_paragraphs = re.split(r'\n\s*\n', text)
     paragraphs = [clean_text(p) for p in raw_paragraphs]
     paragraphs = [p for p in paragraphs if p]
@@ -179,7 +277,7 @@ def split_paragraphs(text: str, min_length: int = 20) -> List[str]:
     if len(paragraphs) <= 1:
         sentences = split_sentences(text)
         if len(sentences) <= 1:
-            paragraphs = sentences
+            paragraphs = sentences if sentences else []
         else:
             paragraphs = []
             for i in range(0, len(sentences), 3):
@@ -654,9 +752,18 @@ class DataPreparer:
         try:
             if self.combined_data is None:
                 return
-            
+
             logger.info("Saving dataset to cache...")
-            
+
+            # Remove metadata columns not needed for training
+            # Keep source/language for cache viewer display; trainer discards them
+            TRAINING_COLUMNS = {'input_ids', 'token_ids', 'thinking', 'has_tool_call', 'source', 'language', 'format_type'}
+            cols_to_drop = [c for c in self.combined_data.column_names
+                           if c not in TRAINING_COLUMNS]
+            if cols_to_drop:
+                logger.info(f"  Dropping metadata columns: {cols_to_drop}")
+                self.combined_data = self.combined_data.remove_columns(cols_to_drop)
+
             # Save dataset
             self.combined_data.save_to_disk(CACHE_DATASET_FILE)
             logger.info(f"  Saved dataset: {CACHE_DATASET_FILE}")
@@ -1311,23 +1418,34 @@ class DataPreparer:
         max_tokens = getattr(self.args, 'chunk_max_tokens', 512)
         overlap_tokens = getattr(self.args, 'chunk_overlap', 50)
 
-        # Process each scraped text into training samples
+        # Process each scraped text into training samples (paragraph-level, like PDF)
         web_items = []
         for text in all_texts:
-            sentences = split_sentences(text)
-            for sentence in sentences:
-                sentence = clean_text(sentence)
-                if len(sentence) > 10:
-                    if enable_chunking and len(sentence.split()) > max_tokens:
-                        chunks = chunk_text_by_tokens(sentence, max_tokens, overlap_tokens)
+            paragraphs = split_paragraphs(text)
+            for paragraph in paragraphs:
+                paragraph = clean_text(paragraph)
+                if len(paragraph) > 10:
+                    if enable_chunking and len(paragraph.split()) > max_tokens:
+                        chunks = chunk_text_by_tokens(paragraph, max_tokens, overlap_tokens)
                         for chunk in chunks:
                             web_items.append({'input_ids': chunk})
                     else:
-                        web_items.append({'input_ids': sentence})
+                        web_items.append({'input_ids': paragraph})
 
         dataset = Dataset.from_list(web_items)
-        logger.info(f"  Total web pages scraped: {len(all_texts)}")
-        logger.info(f"  Total web samples: {len(dataset)}")
+
+        # Stats: word counts per sample
+        if web_items:
+            word_counts = [len(item['input_ids'].split()) for item in web_items]
+            avg_words = sum(word_counts) / len(word_counts)
+            min_words = min(word_counts)
+            max_words = max(word_counts)
+            logger.info(f"  Total web pages scraped: {len(all_texts)}")
+            logger.info(f"  Total web samples (paragraphs): {len(dataset)}")
+            logger.info(f"  Sample word counts: avg={avg_words:.0f}, min={min_words}, max={max_words}")
+        else:
+            logger.info(f"  Total web pages scraped: {len(all_texts)}")
+            logger.info(f"  Total web samples: {len(dataset)}")
 
         # Save scraped text to output directory for inspection
         os.makedirs(WEB_SCRAPER_DIR, exist_ok=True)

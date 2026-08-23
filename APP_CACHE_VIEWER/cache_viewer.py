@@ -657,11 +657,18 @@ class CacheViewer(QMainWindow):
         
         if item:
             text = item['text']
-            source = item.get('source', 'Unknown')
-            language = item.get('language', '-')
-            self.detail_text.setPlainText(
-                f"[Source: {source} | Language: {language}]\n\n{text}"
-            )
+            source = item.get('source', '')
+            language = item.get('language', '')
+            parts = []
+            if source:
+                parts.append(f"Source: {source}")
+            if language:
+                parts.append(f"Language: {language}")
+            if parts:
+                header = ' | '.join(parts)
+                self.detail_text.setPlainText(f"{header}\n\n{text}")
+            else:
+                self.detail_text.setPlainText(text)
         else:
             self.detail_text.setPlainText("Loading...")
     
