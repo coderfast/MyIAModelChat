@@ -38,14 +38,14 @@ class OllamaTeacher:
                 available_models = [m.get('name', '') for m in data.get('models', [])]
                 self._model_valid = self.model in available_models
                 if not self._model_valid:
-                    logger.warning(f"\033[91mMODEL '{self.model}' NOT FOUND IN OLLAMA. AVAILABLE: {available_models}\033[0m")
-                    logger.info(f"\033[92mSWITCHING AUTOMATICALLY TO NLP MODE\033[0m")
+                    logger.warning("MODEL '%s' NOT FOUND IN OLLAMA. AVAILABLE: %s", self.model, available_models)
+                    logger.info("SWITCHING AUTOMATICALLY TO NLP MODE")
                 return self._model_valid
         except Exception:
             self._available = False
             self._model_valid = False
-            logger.warning(f"\033[91mOLLAMA SERVER NOT REACHABLE AT {self.url}\033[0m")
-            logger.info(f"\033[92mSWITCHING AUTOMATICALLY TO NLP MODE\033[0m")
+            logger.warning("OLLAMA SERVER NOT REACHABLE AT %s", self.url)
+            logger.info("SWITCHING AUTOMATICALLY TO NLP MODE")
             return False
 
     def is_available(self) -> bool:

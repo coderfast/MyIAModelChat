@@ -151,11 +151,25 @@ def detect_platform() -> dict:
     # Check VNNI (x86)
     if platform.machine() in ("AMD64", "x86_64", "x86"):
         try:
-            result = subprocess.run(
-                ["wmic", "cpu", "get", "Name"],
-                capture_output=True, text=True, timeout=5
-            )
-            cpu_name = result.stdout.lower()
+            if platform.system() == "Windows":
+                result = subprocess.run(
+                    ["wmic", "cpu", "get", "Name"],
+                    capture_output=True, text=True, timeout=5
+                )
+                cpu_name = result.stdout.lower()
+            elif platform.system() == "Linux":
+                result = subprocess.run(
+                    ["lscpu"], capture_output=True, text=True, timeout=5
+                )
+                cpu_name = result.stdout.lower()
+            elif platform.system() == "Darwin":
+                result = subprocess.run(
+                    ["sysctl", "-n", "machdep.cpu.brand_string"],
+                    capture_output=True, text=True, timeout=5
+                )
+                cpu_name = result.stdout.lower()
+            else:
+                cpu_name = ""
             # Skylake-SP+ and AMD Zen4+ have VNNI
             info["has_vnni"] = any(x in cpu_name for x in [
                 "skylake", "cannonlake", "icelake", "rocketlake",

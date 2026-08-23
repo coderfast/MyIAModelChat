@@ -389,7 +389,7 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         "eos_token_id": tokenizer.get_eos_index(),
         "pad_token_id": tokenizer.get_pad_index(),
     }
-    with open(os.path.join(onnx_dir, "config.json"), 'w') as f:
+    with open(os.path.join(onnx_dir, "config.json"), 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2)
 
     # Copy sentencepiece.model
@@ -411,7 +411,7 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         "n_head": arch.get('n_head', 4),
         "dataset_source": ckpt.get('dataset_source', 'unknown'),
     }
-    with open(os.path.join(onnx_dir, "metadata.json"), 'w') as f:
+    with open(os.path.join(onnx_dir, "metadata.json"), 'w', encoding='utf-8') as f:
         json.dump(model_metadata, f, indent=2)
 
     # Generate standalone inference script
@@ -638,7 +638,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
         "pad_token_id": pad_id,
         "name": stem,
     }
-    with open(os.path.join(hf_dir, "config.json"), 'w') as f:
+    with open(os.path.join(hf_dir, "config.json"), 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2)
 
     # Save tokenizer files
@@ -658,7 +658,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     
     # Add license metadata
     license_metadata = _get_license_metadata()
-    with open(os.path.join(hf_dir, "LICENSE_INFO.json"), 'w') as f:
+    with open(os.path.join(hf_dir, "LICENSE_INFO.json"), 'w', encoding='utf-8') as f:
         json.dump(license_metadata, f, indent=2)
 
     # Generate metadata.json for convert_gguf.py (includes agentic token info)
@@ -675,7 +675,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
         "special_tokens": agentic_metadata.get("special_tokens", {}),
         "mode_tokens": agentic_metadata.get("mode_tokens", {}),
     }
-    with open(os.path.join(hf_dir, "metadata.json"), 'w') as f:
+    with open(os.path.join(hf_dir, "metadata.json"), 'w', encoding='utf-8') as f:
         json.dump(model_metadata, f, indent=2, ensure_ascii=False)
 
     # Generate conversion scripts for the user (with absolute paths)

@@ -89,14 +89,14 @@ STOP_TOKENS = ["<|user|>", "<|end_of_text|>", "</s>"]
 
 def load_config(hf_dir):
     config_path = os.path.join(hf_dir, "config.json")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding='utf-8') as f:
         return json.load(f)
 
 
 def load_metadata(hf_dir):
     meta_path = os.path.join(hf_dir, "metadata.json")
     if os.path.exists(meta_path):
-        with open(meta_path, "r") as f:
+        with open(meta_path, "r", encoding='utf-8') as f:
             return json.load(f)
     return {}
 

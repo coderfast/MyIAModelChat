@@ -810,7 +810,7 @@ class DataPreparer:
             for split_name, indices in splits.items():
                 jsonl_path = os.path.join(jsonl_dir, f'{split_name}.jsonl')
                 count = 0
-                with open(jsonl_path, 'w', encoding='utf-8') as f:
+                with open(jsonl_path, 'w', encoding='utf-8', newline='') as f:
                     for i in indices:
                         sample = self.combined_data[i]
                         # GPT-2 standard: {"text": "<|problem|>...<|thinking|>...<|final|>..."}

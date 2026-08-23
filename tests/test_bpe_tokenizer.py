@@ -95,7 +95,7 @@ class TestSentencePieceTokenizerWrapper:
         sp_tokenizer.save_vocabulary(outfile)
         assert os.path.exists(outfile)
         import json
-        with open(outfile, 'r') as f:
+        with open(outfile, 'r', encoding='utf-8') as f:
             data = json.load(f)
         assert 'sentencepiece_model' in data
         assert 'vocab_size' in data
