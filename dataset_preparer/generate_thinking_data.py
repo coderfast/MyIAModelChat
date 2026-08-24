@@ -275,6 +275,19 @@ def generate_thinking_dataset(pairs: List[Dict[str, str]], lang: str = 'es', gen
     """
     thinking_pairs = []
 
+    # Check Ollama availability once upfront to avoid per-sample 30s timeouts
+    ollama_available = None
+    if generator == 'ollama':
+        try:
+            import requests as _req
+            _resp = _req.get('http://localhost:11434/api/tags', timeout=2)
+            ollama_available = _resp.status_code == 200
+        except Exception:
+            ollama_available = False
+        if not ollama_available:
+            logger.warning("  Ollama not available, falling back to template generation")
+            generator = 'template'
+
     for pair in pairs:
         text = pair['input']
         answer = pair['output']

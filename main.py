@@ -42,6 +42,8 @@ except ImportError:
     KEYBOARD_AVAILABLE = False
 
 # Setup logging with colors
+_USE_COLORS = sys.stdout.isatty()
+
 class ColorFormatter(logging.Formatter):
     """Custom formatter with ANSI colors for console output."""
     COLORS = {
@@ -62,16 +64,17 @@ class ColorFormatter(logging.Formatter):
     RESET = '\033[0m'
 
     def format(self, record):
-        reset = self.RESET
         symbol = self.SYMBOLS.get(record.levelname, '')
 
-        # Green for messages starting with [OK]
-        if record.levelname == 'INFO' and str(record.msg).startswith('[OK]'):
-            color = self.SUCCESS_COLOR
+        if _USE_COLORS:
+            reset = self.RESET
+            if record.levelname == 'INFO' and str(record.msg).startswith('[OK]'):
+                color = self.SUCCESS_COLOR
+            else:
+                color = self.COLORS.get(record.levelname, '')
+            record.msg = f"{color}{symbol}{record.msg}{reset}"
         else:
-            color = self.COLORS.get(record.levelname, '')
-
-        record.msg = f"{color}{symbol}{record.msg}{reset}"
+            record.msg = f"{symbol}{record.msg}"
         return super().format(record)
 
 handler = logging.StreamHandler()

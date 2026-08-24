@@ -17,7 +17,11 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 import torch
 
 from commons.model.chatmodel import ChatModel
@@ -124,7 +128,7 @@ class ChatEngine:
         device = self.get_device()
 
         # Optional memory limit
-        if MAX_RAM_GB is not None:
+        if psutil is not None and MAX_RAM_GB is not None:
             try:
                 p = psutil.Process()
                 mem_bytes = MAX_RAM_GB * 1024**3

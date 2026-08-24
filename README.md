@@ -1,3 +1,12 @@
+---
+title: MyIAModelChat
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # MyIAModelChat
 
 Advanced Conversational AI with Multi-Source Data Support, Chain-of-Thought Reasoning, and Bilingual Capabilities.

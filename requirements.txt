@@ -1,26 +1,36 @@
 # os -> included by default in python
 # json -> included by default in python
-onnx
-onnxruntime
-# onnxruntime-gpu  # Optional: for FP8 support on NVIDIA GPU
-gguf>=0.10.0
+
+# --- Export-only dependencies (not needed for training/inference) ---
+# onnx
+# onnxruntime
+# # onnxruntime-gpu  # Optional: for FP8 support on NVIDIA GPU
+# gguf>=0.10.0
+
+# --- Core ---
 torch
-torchvision
-torchaudio
-torchtext
 # numpy==1.26  -> python 3.12
 numpy
 python-aiml
 transformers
-keyboard
 datasets
-pypdf
-ebooklib
-fastapi
-uvicorn
-pydantic
+psutil
+
+# --- Tokenizer ---
 sentencepiece
 huggingface_hub
+
+# --- Data sources ---
+pypdf
+ebooklib
 trafilatura
 beautifulsoup4
 requests
+
+# --- API server ---
+fastapi
+uvicorn
+pydantic
+
+# --- Optional: ESC-to-stop training (requires display server, not headless) ---
+# keyboard

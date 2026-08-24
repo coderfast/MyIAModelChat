@@ -361,6 +361,14 @@ class Trainer:
         else:
             try:
                 cpus = mp.cpu_count()
+                # Reduce parallelism on low-RAM systems (e.g. HF Spaces 2GB tier)
+                try:
+                    import psutil
+                    mem_gb = psutil.virtual_memory().total / (1024**3)
+                    if mem_gb < 4:
+                        return 1
+                except Exception:
+                    pass
                 if cpus <= 2:
                     return 1
                 return min(4, max(1, cpus // 2))
