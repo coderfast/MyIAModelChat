@@ -1,4 +1,4 @@
-# 🤖 envAIModels - FastAPI LLM Server
+# 🤖 ServerFastAPI - FastAPI LLM Server
 
 Servidor FastAPI modular para ejecutar modelos de lenguaje locales (Llama, Qwen, etc.) con soporte nativo y OpenAI-compatible (v1).
 
@@ -69,7 +69,7 @@ pip install -r ../requirements.txt
 **Windows (PowerShell):**
 ```bash
 # Con reload (desarrollo)
-python -m uvicorn envAIModels.app:app --reload --port 11434
+python -m uvicorn ServerFastAPI.app:app --reload --port 11434
 
 # O usar el batch script
 .\runserver.bat
@@ -77,7 +77,7 @@ python -m uvicorn envAIModels.app:app --reload --port 11434
 
 **Linux/Mac:**
 ```bash
-python -m uvicorn envAIModels.app:app --reload --port 11434
+python -m uvicorn ServerFastAPI.app:app --reload --port 11434
 ```
 
 El servidor estará disponible en `http://127.0.0.1:11434`
@@ -207,7 +207,7 @@ STOP_TOKENS = ["</s>", "Human:", "AI:"]  # Tokens de parada
 Inspeccionar metadatos del modelo:
 
 ```python
-from envAIModels.model_metadata import gather_model_metadata
+from ServerFastAPI.model_metadata import gather_model_metadata
 
 metadata = gather_model_metadata()
 print(f"Capas: {metadata['layer_count']}")

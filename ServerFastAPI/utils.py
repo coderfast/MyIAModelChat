@@ -259,6 +259,7 @@ def llama_create_stream_sync(prompt: str, max_tokens: int, temperature: float, t
 
     if gen is not None:
         buffer = ""
+        sent = 0
         try:
             for item in gen:
                 chunk = safe_get_text_from_item(item)
@@ -266,10 +267,13 @@ def llama_create_stream_sync(prompt: str, max_tokens: int, temperature: float, t
                 if stop:
                     for s in stop:
                         if s and s in buffer:
-                            yield buffer[: buffer.find(s)]
+                            end = buffer.find(s)
+                            if end > sent:
+                                yield buffer[sent:end]
                             return
                 if chunk:
                     yield chunk
+                    sent = len(buffer)
             return
         except Exception:
             logger.exception("error while iterating streaming generator; falling back")

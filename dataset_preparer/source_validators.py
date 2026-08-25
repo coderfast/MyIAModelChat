@@ -124,6 +124,9 @@ class GenericValidator(SourceValidator):
         for key in result:
             if isinstance(result[key], str):
                 result[key] = self._clean_text(result[key])
+                # Truncate to MAX_LENGTH
+                if len(result[key]) > self.MAX_LENGTH:
+                    result[key] = result[key][:self.MAX_LENGTH]
         return result
 
     def report(self) -> QualityReport:

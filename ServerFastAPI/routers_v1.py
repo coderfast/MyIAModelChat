@@ -42,7 +42,7 @@ def models():
             "model_file": MODEL_PATH,
             "file_size_mb": file_size_mb,
             "family": "gguf",
-            "source": "envAIModels",
+            "source": "ServerFastAPI",
         }
     ]
 

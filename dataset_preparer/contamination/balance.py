@@ -89,7 +89,7 @@ class SourceBalancer:
             result.original_counts[source] = len(idxs)
 
         total_samples = len(indices)
-        max_per_source = int(total_samples * self.max_ratio)
+        max_per_source = max(1, int(total_samples * self.max_ratio))
 
         kept_indices = []
         removed_per_source = {}
@@ -99,7 +99,9 @@ class SourceBalancer:
                 kept_indices.extend(idxs)
                 removed_per_source[source] = 0
             else:
-                rng = random.Random(self.seed + hash(source))
+                import hashlib
+                seed_hash = int(hashlib.md5(source.encode()).hexdigest()[:8], 16)
+                rng = random.Random(self.seed + seed_hash)
                 selected = rng.sample(idxs, max_per_source)
                 kept_indices.extend(selected)
                 removed_per_source[source] = len(idxs) - max_per_source

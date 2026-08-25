@@ -189,7 +189,7 @@ HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
 HTML_ENTITY_PATTERN = re.compile(r'&\w+;|&#\d+;')
 
 # AIML thinking pattern (NOT training thinking)
-AIML_THINKING_PATTERN = re.compile(r'<think>.*?</think>', re.DOTALL)
+AIML_THINKING_PATTERN = re.compile(r'<thinking>.*?</thinking>', re.DOTALL)
 
 # Max SRAI chain depth
 MAX_SRAI_DEPTH = 5
@@ -487,6 +487,10 @@ class AIMLParser:
         # If we have random options, return them as list
         if random_options:
             self._stats['random_expanded'] += 1
+            # Prepend/append any surrounding text (text before/after <random>)
+            prefix = ''.join(parts).strip()
+            if prefix:
+                random_options = [f"{prefix} {opt}" for opt in random_options]
             return random_options
 
         # Join all parts

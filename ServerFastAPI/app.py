@@ -1,14 +1,14 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 import logging
 
 from .routers_api import router as api_router
 from .routers_v1 import router as v1_router
 from .model import MODEL_NAME, MODEL_PATH, OLLAMA_VERSION
 
-app = FastAPI(title="envAIModels", version=OLLAMA_VERSION)
+app = FastAPI(title="ServerFastAPI", version=OLLAMA_VERSION)
 logger = logging.getLogger("uvicorn.error")
 
-logger.info(f"Starting envAIModels server")
+logger.info(f"Starting ServerFastAPI server")
 logger.info(f"  Model: {MODEL_NAME}")
 logger.info(f"  Path:  {MODEL_PATH}")
 

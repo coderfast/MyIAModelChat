@@ -140,8 +140,8 @@ Revisión completa del código del proyecto MyIAModelChat. Se encontraron **21 b
   yield 'data: [DONE]\n\n'
   ```
 
-### BUG-28: `torch.set_num_interop_threads` may be called twice (main.py + envAIModels/app.py) — FIXED
-- **File:** `main.py` line 111, `envAIModels/app.py` line 715
+### BUG-28: `torch.set_num_interop_threads` may be called twice (main.py + ServerFastAPI/app.py) — FIXED
+- **File:** `main.py` line 111, `ServerFastAPI/app.py` line 715
 - **Description:** `torch.set_num_interop_threads()` can only be called once per process. If both code paths execute, PyTorch raises `RuntimeError`.
 - **Impact:** Crash when running certain command combinations.
 - **Fix:** Guard with try/except:
@@ -196,11 +196,11 @@ Revisión completa del código del proyecto MyIAModelChat. Se encontraron **21 b
   parser.add_argument('--thinking-depth', choices=['basic', 'adaptive', 'detailed'], default='adaptive')
   ```
 
-### BUG-34: `test_envaimodels_smoke.py` import fails without envAIModels — FIXED
+### BUG-34: `test_envaimodels_smoke.py` import fails without ServerFastAPI — FIXED
 - **File:** `tests/test_envaimodels_smoke.py`
-- **Description:** The test imports `from envAIModels.app import app` which fails if the envAIModels package isn't installed. This causes `pytest tests/` to fail with collection error.
+- **Description:** The test imports `from ServerFastAPI.app import app` which fails if the ServerFastAPI package isn't installed. This causes `pytest tests/` to fail with collection error.
 - **Impact:** Full test suite fails to run.
-- **Fix:** Add `pytest.importorskip("envAIModels")` or mark as `@pytest.mark.skipif`.
+- **Fix:** Add `pytest.importorskip("ServerFastAPI")` or mark as `@pytest.mark.skipif`.
 
 ---
 

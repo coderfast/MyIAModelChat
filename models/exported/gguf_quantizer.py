@@ -230,7 +230,7 @@ class Q6_K_Quantizer:
             block = padded[b * QK_K:(b + 1) * QK_K]
 
             scales = np.zeros(16, dtype=np.uint8)
-            qs = np.zeros(QK_K, dtype=np.uint8)
+            qs_raw = np.zeros(QK_K, dtype=np.uint8)
 
             for sb in range(16):
                 start = sb * 16
@@ -239,12 +239,23 @@ class Q6_K_Quantizer:
                 amax = np.abs(chunk).max()
                 if amax == 0:
                     scales[sb] = 0
-                    qs[start:start + 16] = 0
+                    qs_raw[start:start + 16] = 0
                 else:
                     d = amax / 31.0
                     q = np.clip(np.round(chunk / d) + 31, 0, 63).astype(np.uint8)
-                    qs[start:start + 16] = q
+                    qs_raw[start:start + 16] = q
                     scales[sb] = int(np.clip(np.round(d * 100), 0, 63))
+
+            # Pack 256 6-bit values into 192 bytes (6 bits each)
+            qs_packed = np.zeros(192, dtype=np.uint8)
+            for i in range(QK_K):
+                val = qs_raw[i] & 0x3F  # 6-bit value
+                bit_pos = i * 6
+                byte_idx = bit_pos // 8
+                bit_offset = bit_pos % 8
+                qs_packed[byte_idx] |= (val << bit_offset) & 0xFF
+                if bit_offset > 2 and byte_idx + 1 < 192:
+                    qs_packed[byte_idx + 1] |= (val >> (8 - bit_offset)) & 0xFF
 
             offset = b * Q6_K_Quantizer.type_size
 
@@ -252,12 +263,8 @@ class Q6_K_Quantizer:
             result[offset:offset + 2] = np.frombuffer(np.float16(1.0).tobytes(), dtype=np.uint8)
             # scales (16 bytes)
             result[offset + 2:offset + 18] = scales
-            # qs (192 bytes) - 6-bit values packed (256 elements -> 192 bytes at 6 bits each... actually 128 bytes at 6 bits)
-            # Actually, 256 elements at 6 bits = 192 bytes
-            # But we need to pack them properly
-            # For simplicity, store 6-bit values in 8-bit with only 6 bits used
-            # This wastes 2 bits per byte but is simpler
-            result[offset + 18:offset + 210] = qs[:192]
+            # qs (192 bytes) - 6-bit values packed
+            result[offset + 18:offset + 210] = qs_packed
 
         return result, n, n_blocks
 
@@ -352,6 +359,7 @@ class Q3_K_Quantizer:
                 if amax == 0:
                     for i in range(16):
                         qs[(start + i) // 4] |= (0 << (((start + i) % 4) * 2))
+                    scales[sb // 2] |= (0 << ((sb % 2) * 4))
                 else:
                     d = amax / 3.5
                     q = np.clip(np.round(chunk / d) + 2, 0, 3).astype(np.uint8)
@@ -359,6 +367,9 @@ class Q3_K_Quantizer:
                         idx = (start + i) // 4
                         shift = ((start + i) % 4) * 2
                         qs[idx] |= ((q[i] & 0x03) << shift)
+                    # Store 4-bit scale packed into scales array
+                    scale_val = int(np.clip(np.round(d * 50), 0, 15))
+                    scales[sb // 2] |= (scale_val << ((sb % 2) * 4))
 
             offset = b * Q3_K_Quantizer.type_size
 
@@ -671,7 +682,7 @@ class IQ2_XS_Quantizer:
     """2-bit quantizer using 512-entry grid."""
 
     block_size = QK_K  # 256
-    type_size = 74
+    type_size = 70     # d(2) + qs(64) + scales(4) = 70
 
     GRID_HEX = (
         b"00000200050008000a0011001400160019002000220025002800410044004600"
@@ -774,7 +785,7 @@ class IQ2_S_Quantizer:
     """2-bit quantizer using 1024-entry grid."""
 
     block_size = QK_K
-    type_size = 82
+    type_size = 78     # d(2) + qs(32) + signs(32) + qh(8) + scales(4) = 78
 
     GRID_HEX = (
         b"00000200050008000a0011001400160019002000220025002800410044004600"
@@ -923,7 +934,7 @@ class IQ3_XXS_Quantizer:
     """3-bit quantizer using 256-entry grid with 4 values per entry."""
 
     block_size = QK_K
-    type_size = 98
+    type_size = 74     # d(2) + qs(64) + scales(8) = 74
 
     GRID_HEX = (
         b"0000020004001100130017002000220031004200730075000101030110011201"

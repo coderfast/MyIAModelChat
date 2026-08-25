@@ -25,6 +25,7 @@ except ImportError:
 import torch
 
 from commons.model.chatmodel import ChatModel
+from commons.model.chatmodel_moe import ChatModelMoE
 from commons.dialogue.dialogmanager import DialogueManager
 try:
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
@@ -186,9 +187,17 @@ class ChatEngine:
                 )
 
             arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
-            self.model = ChatModel(self.tokenizer,
-                embed_size=arch.get('embed_size', 256),
-                num_layers=arch.get('num_layers', 4))
+            if arch.get('moe_enabled', False):
+                self.model = ChatModelMoE(self.tokenizer,
+                    embed_size=arch.get('embed_size', 256),
+                    num_layers=arch.get('num_layers', 4),
+                    num_experts=arch.get('moe_num_experts', 4),
+                    top_k=arch.get('moe_top_k', 2),
+                    load_balance_weight=arch.get('moe_load_balance_weight', 0.01))
+            else:
+                self.model = ChatModel(self.tokenizer,
+                    embed_size=arch.get('embed_size', 256),
+                    num_layers=arch.get('num_layers', 4))
 
             if state_dict is None:
                 raise ValueError('Checkpoint does not contain model state dict')
@@ -233,11 +242,13 @@ class ChatEngine:
         # Load auxiliary pipelines
         from commons.registry.model_downloader import ensure_model_local
 
+        # NOTE: Both intent and sentiment use the same BERT sentiment model.
+        # There is no dedicated intent classification model in this project.
+        # The "intent" channel provides user mood/intent from sentiment analysis.
         sentiment_model_path = ensure_model_local(
             'nlptown/bert-base-multilingual-uncased-sentiment',
             'models/sentiment'
         )
-        intent_model_path = sentiment_model_path
 
         pipe_device = 0 if device.type == 'cuda' else -1
         shared_bert = pipeline(
@@ -253,7 +264,7 @@ class ChatEngine:
         from commons.tools.tool_executor import ToolExecutor
         self.tool_registry = ToolRegistry()
         register_default_tools(self.tool_registry)
-        self.tool_executor = ToolExecutor(dry_run=False)
+        self.tool_executor = ToolExecutor(dry_run=False, registry=self.tool_registry)
         logger.info(f"Tool registry initialized: {len(self.tool_registry.list_tools())} tools")
 
         self.dialogue_manager = DialogueManager(

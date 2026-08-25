@@ -119,15 +119,17 @@ class ShellSecurity:
 class ToolExecutor:
     """Executes tool calls from model output with security checks."""
 
-    def __init__(self, permission_callback=None, dry_run: bool = False):
+    def __init__(self, permission_callback=None, dry_run: bool = False, registry=None):
         """
         Args:
             permission_callback: Callable(tool_name, command, platform) -> bool
             dry_run: If True, show what would execute without executing
+            registry: ToolRegistry instance for tool lookup
         """
         self.permission_callback = permission_callback
         self.dry_run = dry_run
         self.platform = get_platform()
+        self.registry = registry
 
     def has_tool_call(self, text: str) -> bool:
         """Detect if text contains <tool_call>."""
@@ -149,33 +151,45 @@ class ToolExecutor:
             logger.warning(f"Failed to parse tool_call: {e}")
             return '', ''
 
-    def execute_tool_call(self, tool_call_text: str, registry) -> str:
-        """Execute a tool_call and return observation."""
+    def execute_tool_call(self, tool_call_text: str, registry=None) -> str:
+        """Execute a tool_call and return observation.
+
+        Args:
+            tool_call_text: Raw tool_call string from model output
+            registry: Optional ToolRegistry; falls back to self.registry
+        """
         tool_name, args_string = self.parse_tool_call(tool_call_text)
         if not tool_name:
             return format_observation("Error: Could not parse tool_call")
 
-        tool = registry.get(tool_name)
+        reg = registry or self.registry
+        if reg is None:
+            return format_observation("Error: No tool registry available")
+
+        tool = reg.get(tool_name)
         if tool is None:
             return format_observation(f"Error: Unknown tool '{tool_name}'")
 
         arguments = self._map_arguments(tool, args_string)
 
-        # Shell commands need security check and permission
+        # All tools go through permission check
+        command = arguments.get('command', '')
+
+        # Shell commands need security check
         if tool.category == 'shell':
-            command = arguments.get('command', '')
             is_safe, reason = ShellSecurity.validate_command(command, self.platform)
             if not is_safe:
                 return format_observation(f"Blocked: {reason}")
 
-            if self.dry_run:
-                return format_observation(f"[DRY RUN] Would execute: {command}")
+        if self.dry_run:
+            return format_observation(f"[DRY RUN] Would execute {tool_name}: {command or str(arguments)[:200]}")
 
-            if self.permission_callback:
-                if not self.permission_callback(tool_name, command, self.platform):
-                    return format_observation("Permission denied by user")
+        if self.permission_callback:
+            if not self.permission_callback(tool_name, command, self.platform):
+                return format_observation("Permission denied by user")
 
-            # Execute on correct platform
+        # Execute tool
+        if tool.category == 'shell':
             if tool_name == 'powershell':
                 result = execute_powershell(command)
             elif tool_name == 'bash':
@@ -184,8 +198,7 @@ class ToolExecutor:
                 result = execute_shell(command)
             return format_observation(result)
 
-        # Non-shell tools execute directly
-        result = registry.call(tool_name, arguments)
+        result = reg.call(tool_name, arguments)
         return format_observation(result)
 
     def _map_arguments(self, tool, args_string: str) -> dict:

@@ -413,7 +413,7 @@ def detect_language(text: str) -> str:
             best_score = score
             best_lang = lang_code
 
-    return best_lang
+    return best_lang if best_score > 0 else 'unknown'
 
 
 def get_language_name(lang_code: str) -> str:

@@ -109,7 +109,7 @@ MyIAModelChat/
 │   ├── __init__.py
 │   └── chat_engine.py                   # ChatEngine class + ChatConfig
 │
-├── envAIModels/                         # FastAPI server
+├── ServerFastAPI/                         # FastAPI server
 │   ├── __init__.py
 │   ├── app.py
 │   ├── routers_api.py
@@ -266,8 +266,8 @@ python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 512
 ### API Server
 
 ```bash
-# Start FastAPI server (from envAIModels/)
-python -m envAIModels.app
+# Start FastAPI server (from ServerFastAPI/)
+python -m ServerFastAPI.app
 
 # API endpoints
 POST /v1/chat/completions  # Chat completion
@@ -329,7 +329,7 @@ python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
 - dataset_preparer/: Data loading, preprocessing, and contamination filtering
 - training/: Training pipeline
 - inference/: Inference and chat
-- envAIModels/: FastAPI server (separate concern)
+- ServerFastAPI/: FastAPI server (separate concern)
 
 ---
 

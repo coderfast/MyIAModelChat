@@ -91,7 +91,7 @@ def validate_agent_sample(sample: Dict[str, Any], known_tools: Optional[List[str
         issues.append('thinking_mismatches_tool')
         score -= 0.1
 
-    valid = score >= 0.5 and 'invalid_tool_call_format' not in issues and 'missing_tool_call_tags' not in issues
+    valid = score >= 0.5 and 'invalid_tool_call_format' not in issues and 'missing_tool_call_tags' not in issues and 'missing_observation' not in issues and 'empty_observation' not in issues
     return AgentQualityResult(valid=valid, score=max(0.0, score), issues=issues)
 
 

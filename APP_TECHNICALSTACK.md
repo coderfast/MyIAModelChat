@@ -184,7 +184,7 @@
 | `/v1/embeddings` | POST | Yes |
 | `/api/generate` | POST | No |
 
-**envAIModels server (GGUF/llama.cpp):**
+**ServerFastAPI server (GGUF/llama.cpp):**
 | Endpoint | Method | OpenAI Compatible |
 |----------|--------|-------------------|
 | `/health` | GET | - |
@@ -215,10 +215,10 @@
 
 ```bash
 # Start PyTorch GPT-2 server
-python -m envAIModels.app --port 11434
+python -m ServerFastAPI.app --port 11434
 
 # Start GGUF server
-cd envAIModels
+cd ServerFastAPI
 # Set MODEL_GGUF_PATH in .env
 uvicorn app:app --host 0.0.0.0 --port 11435
 ```

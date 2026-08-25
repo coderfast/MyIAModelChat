@@ -31,13 +31,14 @@ def merge_models(
     if len(model_paths) < 2:
         raise ValueError("Need at least 2 models to merge")
 
-    # Validate compatibility
-    for i in range(len(model_paths) - 1):
-        compatible, errors = validate_compatibility(model_paths[i], model_paths[i + 1])
-        if not compatible:
-            raise ValueError(
-                f"Models are not compatible:\n" + "\n".join(f"  - {e}" for e in errors)
-            )
+    # Validate compatibility (check all pairs, not just adjacent)
+    for i in range(len(model_paths)):
+        for j in range(i + 1, len(model_paths)):
+            compatible, errors = validate_compatibility(model_paths[i], model_paths[j])
+            if not compatible:
+                raise ValueError(
+                    f"Models are not compatible:\n" + "\n".join(f"  - {e}" for e in errors)
+                )
 
     # Default uniform weights
     if weights is None:
@@ -46,7 +47,10 @@ def merge_models(
         if len(weights) != len(model_paths):
             raise ValueError(f"Number of weights ({len(weights)}) must match number of models ({len(model_paths)})")
         total = sum(weights)
-        weights = [w / total for w in weights]
+        if total == 0:
+            weights = [1.0 / len(model_paths)] * len(model_paths)
+        else:
+            weights = [w / total for w in weights]
 
     logger.info(f"Merging {len(model_paths)} models with weights: {weights}")
 

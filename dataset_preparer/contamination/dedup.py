@@ -157,7 +157,10 @@ class CrossSourceDeduplicator:
         for i, text in enumerate(texts):
             m = MinHash(num_perm=128)
             words = text.split()
-            for idx in range(max(0, len(words) - 2)):
+            if len(words) < 3:
+                minhashes[i] = None
+                continue
+            for idx in range(len(words) - 2):
                 shingle = ' '.join(words[idx:idx + 3])
                 m.update(shingle.encode('utf-8'))
             minhashes[i] = m
@@ -168,7 +171,7 @@ class CrossSourceDeduplicator:
 
         duplicates: Set[int] = set()
         for i, m in minhashes.items():
-            if i in duplicates:
+            if i in duplicates or m is None:
                 continue
             result_set = lsh.query(m)
             for j in result_set:

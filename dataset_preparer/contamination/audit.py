@@ -82,9 +82,10 @@ class AuditReport:
             "Per-source breakdown:",
         ]
         for name, report in self.per_source.items():
+            final_count = report.after_leakage or report.after_language or report.after_dedup or report.after_balance or report.after_quality or report.after_noise or report.original_count
             lines.append(
                 f"  {name}: {report.original_count} -> "
-                f"{report.after_leakage or report.after_language or report.after_dedup or report.original_count} "
+                f"{final_count} "
                 f"({report.total_discarded} discarded)"
             )
         if self.thinking_stats:

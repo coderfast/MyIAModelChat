@@ -77,7 +77,7 @@ class HFThinkingGenerator(ThinkingGenerator):
                 f"Razona sobre como el contexto respuesta la pregunta ({self.depth_config['min_sentences']}-{self.depth_config['max_sentences']} oraciones):\n"
                 f"Razonamiento:"
             )
-            thinking = self.teacher.generate(prompt, max_max=max_tokens)
+            thinking = self.teacher.generate(prompt, max_tokens=max_tokens)
             if thinking:
                 return self._format_thinking_sample(sample, thinking)
 

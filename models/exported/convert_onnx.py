@@ -19,17 +19,49 @@ import numpy as np
 def export_to_onnx(hf_dir: str, output_path: str, opset: int = 17, seq_len: int = 32) -> str:
     """Export HuggingFace model to ONNX."""
     import torch
-    from transformers import GPT2LMHeadModel, GPT2Config
 
     print(f"Loading model from {hf_dir}...")
-    config = GPT2Config.from_pretrained(hf_dir)
-    model = GPT2LMHeadModel.from_pretrained(hf_dir, config=config)
-    model.eval()
 
-    print(f"Config: vocab={config.vocab_size}, embd={config.n_embd}, "
-          f"layers={config.n_layer}, heads={config.n_head}")
+    # Try project model first, fall back to HuggingFace
+    model = None
+    config = None
+    try:
+        from commons.model.chatmodel import ChatModel
+        from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+        import json as json_mod
+        cfg_path = os.path.join(hf_dir, 'config.json')
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'r') as f:
+                cfg_data = json_mod.load(f)
+            tokenizer_path = os.path.join(hf_dir, 'sentencepiece.model')
+            if os.path.exists(tokenizer_path):
+                tokenizer = SentencePieceTokenizerWrapper(tokenizer_path)
+                model = ChatModel(tokenizer,
+                    embed_size=cfg_data.get('n_embd', 256),
+                    num_layers=cfg_data.get('n_layer', 4))
+                # Try loading weights
+                bin_path = os.path.join(hf_dir, 'pytorch_model.bin')
+                if os.path.exists(bin_path):
+                    state_dict = torch.load(bin_path, map_location='cpu', weights_only=False)
+                    model.load_state_dict(state_dict, strict=False)
+                model.eval()
+                config = cfg_data
+                print(f"Loaded project ChatModel: vocab={cfg_data.get('vocab_size')}, "
+                      f"embd={cfg_data.get('n_embd')}, layers={cfg_data.get('n_layer')}")
+    except Exception as e:
+        print(f"  Could not load as project model: {e}")
+        model = None
 
-    dummy_input = torch.randint(0, config.vocab_size, (1, seq_len))
+    if model is None:
+        from transformers import GPT2LMHeadModel, GPT2Config
+        config = GPT2Config.from_pretrained(hf_dir)
+        model = GPT2LMHeadModel.from_pretrained(hf_dir, config=config)
+        model.eval()
+        print(f"Loaded HuggingFace GPT2LMHeadModel: vocab={config.vocab_size}, "
+              f"embd={config.n_embd}, layers={config.n_layer}, heads={config.n_head}")
+
+    vocab_size = config.get('vocab_size', 8000) if isinstance(config, dict) else config.vocab_size
+    dummy_input = torch.randint(0, vocab_size, (1, seq_len))
 
     print(f"Exporting to ONNX (opset={opset})...")
     torch.onnx.export(

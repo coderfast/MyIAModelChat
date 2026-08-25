@@ -546,7 +546,7 @@ def validate_thinking(thinking: str, answer: str = '', question: str = '') -> Qu
         score -= 0.2  # Penalty for re-declaration
     elif is_placeholder:
         score -= 0.1  # Penalty for placeholder
-    else:
+    elif not is_meta and not is_re_declaration and not is_placeholder:
         score += 0.3  # Bonus for non-meta content
 
     if has_answer_derivation:
@@ -599,7 +599,7 @@ def validate_thinking_batch(samples: List[Dict[str, Any]]) -> BatchQualityReport
                 report.placeholder += 1
             if 'no_derivation' in result.issues:
                 report.no_derivation += 1
-            if 'low_reasoning' in result.issues or 'low_quality' in result.issues:
+            if result.score < 0.5:
                 report.low_quality += 1
 
     return report

@@ -171,7 +171,11 @@ class PlatformDetector:
         shell_lower = shell.lower()
         current_platform = PlatformDetector.detect_platform()
         
-        # Find matching config
+        # Find matching config (prefer current platform)
+        for config in PlatformDetector.SHELL_CONFIGS.values():
+            if config.name == shell_lower and config.platform == current_platform:
+                return config
+        # Fall back to any matching name
         for config in PlatformDetector.SHELL_CONFIGS.values():
             if config.name == shell_lower:
                 return config

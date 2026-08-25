@@ -178,6 +178,7 @@ def register_default_tools(registry: ToolRegistry):
         parameters={"path": {"type": "string", "description": "File path to read"}},
         func=_read_file,
         category="file",
+        requires_permission=True,
     ))
     registry.register(ToolDef(
         name="list_directory",
@@ -185,6 +186,7 @@ def register_default_tools(registry: ToolRegistry):
         parameters={"path": {"type": "string", "description": "Directory path (default: current)"}},
         func=_list_directory,
         category="file",
+        requires_permission=True,
     ))
     registry.register(ToolDef(
         name="web_search",

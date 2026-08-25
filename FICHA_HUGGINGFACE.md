@@ -47,7 +47,7 @@
 - Soporta cache de datasets para entrenamiento rápido
 
 ## Inferencia
-- Servidor FastAPI en `envAIModels/app.py`
+- Servidor FastAPI en `ServerFastAPI/app.py`
 - Endpoints disponibles:
   - `POST /v1/chat/completions` — Chat completion (compatible OpenAI)
   - `POST /api/chat/completions` — Chat completion alternativo
@@ -87,7 +87,7 @@
 - `dataset_preparer/thinking_generators.py` — generador de datos con thinking (mode tokens)
 - `training/trainer.py` — pipeline de entrenamiento
 - `inference/chat_engine.py` — lógica de inferencia
-- `envAIModels/app.py` — servidor FastAPI
+- `ServerFastAPI/app.py` — servidor FastAPI
 - `checkpoints/tokenizer_vocab.json` — vocabulario del tokenizador
 - `dataset_cache/sentencepiece.model` — modelo BPE entrenado
 - `checkpoints/` — checkpoints de modelos entrenados

@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 
 LEGACY_TO_CANONICAL = [
     ('<|context|>', '<|problem|>'),
-    ('<|answer|>', '<|final|>'),
     ('<thinking>', '<|thinking|>'),
-    ('</thinking>', '<|final|>'),
+    ('</thinking><|answer|>', '<|final|>'),  # combined: avoids double <|final|>
+    ('</thinking>', '<|final|>'),             # standalone close
+    ('<|answer|>', '<|final|>'),              # standalone answer
 ]
 
 # <observation> is a prefix-only token: <observation>X</observation> -> <|tool_result|>X<|end|>

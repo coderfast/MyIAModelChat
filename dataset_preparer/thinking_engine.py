@@ -1328,8 +1328,25 @@ class ThinkingEngine:
                 best_lang = lang_code
         return best_lang
 
+    # Regional code to base language mapping
+    _REGIONAL_MAP = {
+        'fr-CH': 'fr', 'fr-FR': 'fr', 'de-CH': 'de', 'it-CH': 'it',
+        'rm': 'de',  # Romansh → German family
+        'gl': 'es',  # Galician → close to Spanish
+        'ca': 'es',  # Catalan → close to Spanish
+        'nb': 'da',  # Norwegian Bokmål → close to Danish
+        'nn': 'da',  # Norwegian Nynorsk → close to Danish
+        'sr-Latn': 'sr', 'sr-Cyrl': 'sr',
+        'bs-Latn': 'bs', 'hr-Latn': 'hr',
+    }
+
     def _get_lang_config(self, language: str) -> dict:
         """Get language configuration, fallback to English if unsupported."""
+        # Map regional codes to base language
+        if language in self._REGIONAL_MAP:
+            language = self._REGIONAL_MAP[language]
+        elif '-' in language:
+            language = language.split('-')[0]
         return LANGUAGE_CONFIG.get(language, FALLBACK_CONFIG)
 
     def _build_reasoning(self, text: str, analysis: dict, concepts: list,

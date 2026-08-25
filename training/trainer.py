@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, IterableDataset
 from torch.amp import GradScaler
 from datasets import Dataset
 from commons.model.chatmodel import ChatModel
+from commons.model.chatmodel_moe import ChatModelMoE
 import logging
 import shutil
 
@@ -622,7 +623,56 @@ class Trainer:
         self._gpu_layers_count = layers_on_gpu
         self._gpu_device = gpu_device
 
+        # Install custom forward wrapper to move activations between CPU/GPU
+        self._install_cpu_gpu_forward_wrapper(model)
+
         return model
+
+    def _install_cpu_gpu_forward_wrapper(self, model):
+        """Wrap transformer forward to move activations at CPU/GPU boundary."""
+        split_index = self._gpu_layers_count
+        gpu_device = self._gpu_device
+
+        transformer = model.model.transformer
+        original_transformer_forward = transformer.forward
+
+        def cpu_gpu_forward(*args, **kwargs):
+            # For GPT-2, call the original forward but intercept hidden states
+            # at the split boundary by hooking into the layer list
+            from transformers.modeling_outputs import BaseModelOutputWithPast
+
+            # Replicate the GPT-2 forward logic with device transfers
+            input_ids = kwargs.get('input_ids', args[0] if args else None)
+            attention_mask = kwargs.get('attention_mask', None)
+            position_ids = kwargs.get('position_ids', None)
+
+            if input_ids is not None:
+                batch_size, seq_len = input_ids.shape
+                if position_ids is None:
+                    position_ids = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(batch_size, -1)
+
+                hidden_states = transformer.wte(input_ids) + transformer.wpe(position_ids)
+
+                for i, layer in enumerate(transformer.h):
+                    # Transfer to CPU when crossing from GPU to CPU boundary
+                    if i == split_index and hidden_states.device.type != 'cpu':
+                        hidden_states = hidden_states.to('cpu')
+                    layer_output = layer(hidden_states)
+                    hidden_states = layer_output[0]
+
+                hidden_states = transformer.ln_f(hidden_states)
+
+                # Transfer back to GPU for lm_head
+                if hidden_states.device.type != gpu_device.type:
+                    hidden_states = hidden_states.to(gpu_device)
+
+                return BaseModelOutputWithPast(last_hidden_state=hidden_states)
+
+            # Fallback to original forward
+            return original_transformer_forward(*args, **kwargs)
+
+        transformer.forward = cpu_gpu_forward
+        logger.info(f"CPU/GPU forward wrapper installed (split at layer {split_index})")
 
     def _compute_loss(self, model, inputs, targets, criterion):
         """Unified loss computation with thinking-aware, mode-aware, and agentic loss weighting.
@@ -1354,7 +1404,10 @@ class Trainer:
                 checkpoint_vocab_size = arch.get('vocab_size', self.tokenizer.vocab_size)
                 current_vocab_size = self.tokenizer.vocab_size
                 
-                model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
+                model = ChatModelMoE(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
+                                      num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
+                                      top_k=arch.get('moe_top_k', self.config.moe_top_k),
+                                      load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight)) if arch.get('moe_enabled', self.config.moe_enabled) else ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
                 
                 # Handle vocab_size mismatch
                 if checkpoint_vocab_size != current_vocab_size:
@@ -1385,8 +1438,15 @@ class Trainer:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
             else:
                 if self.rank == 0:
-                    logger.info(f"Initializing ChatModel (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4)...")
-                model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
+                    logger.info(f"Initializing ChatModel{'(MoE)' if self.config.moe_enabled else ''} (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4)...")
+                if self.config.moe_enabled:
+                    model = ChatModelMoE(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4,
+                                          num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
+                                          load_balance_weight=self.config.moe_load_balance_weight)
+                    if self.config.moe_freeze_attention:
+                        model.freeze_attention()
+                else:
+                    model = ChatModel(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4)
 
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:
@@ -1522,6 +1582,10 @@ class Trainer:
                                 'n_head': TRAINING_CONFIG.get('n_head', 4),
                                 'n_positions': TRAINING_CONFIG.get('n_positions', 512),
                                 'vocab_size': self.tokenizer.vocab_size,
+                                'moe_enabled': self.config.moe_enabled,
+                                'moe_num_experts': self.config.moe_num_experts,
+                                'moe_top_k': self.config.moe_top_k,
+                                'moe_load_balance_weight': self.config.moe_load_balance_weight,
                             },
                             'dataset_source': self.dataset_source,
                         }, epoch_path)
@@ -1573,6 +1637,10 @@ class Trainer:
                         'n_head': TRAINING_CONFIG.get('n_head', 4),
                         'n_positions': TRAINING_CONFIG.get('n_positions', 512),
                         'vocab_size': self.tokenizer.vocab_size,
+                        'moe_enabled': self.config.moe_enabled,
+                        'moe_num_experts': self.config.moe_num_experts,
+                        'moe_top_k': self.config.moe_top_k,
+                        'moe_load_balance_weight': self.config.moe_load_balance_weight,
                     },
                     'dataset_source': self.dataset_source,
                 }, self.model_output_path)

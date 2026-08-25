@@ -321,7 +321,8 @@ def chunk_text_by_tokens(text: str, max_tokens: int = 512, overlap_tokens: int =
             chunks.append(chunk)
 
         # Move start forward, accounting for overlap
-        start += max_tokens - overlap_tokens
+        step = max(1, max_tokens - overlap_tokens)
+        start += step
 
         # Safety check to avoid infinite loop
         if start >= len(words):
@@ -1241,6 +1242,11 @@ class DataPreparer:
                         ds = ds.map(lambda x: {'input_ids': x['text']})
                     elif 'sentence' in ds.column_names:
                         ds = ds.map(lambda x: {'input_ids': x['sentence']})
+                    else:
+                        # No standard text column found — skip this dataset
+                        logger.warning(f"  ⚠ Dataset {dataset_name} has no 'text' or 'sentence' column. Columns: {ds.column_names}")
+                        hf_datasets.append(Dataset.from_list([]))
+                        continue
                     ds = ds.select_columns(['input_ids'])
                     ds = ds.filter(lambda x: x.get('input_ids', '').strip())
 
@@ -2250,6 +2256,11 @@ class DataPreparer:
         from datasets import concatenate_datasets
         self.combined_data = concatenate_datasets(cleaned_datasets)
 
+        # Re-apply standardization and language tagging since we rebuilt from raw sources
+        self._standardize_combined_dataset()
+        from dataset_preparer.migrator import migrate_dataset_texts
+        self.combined_data = migrate_dataset_texts(self.combined_data)
+
         logger.info("--- Source Validation Reports ---")
         for source_name, report in reports.items():
             logger.info(f"  {report.summary()}")
@@ -2452,9 +2463,12 @@ class DataPreparer:
             # Apply deduplication
             unique_texts = deduplicate_texts(texts, threshold=dedup_threshold)
 
-            # Recreate dataset with unique texts
-            unique_data = [{'input_ids': text} for text in unique_texts]
-            self.combined_data = Dataset.from_list(unique_data)
+            # Build set of unique texts for fast lookup
+            unique_set = set(unique_texts)
+
+            # Preserve original columns by selecting matching indices
+            kept_indices = [i for i, t in enumerate(texts) if t in unique_set and t.strip()]
+            self.combined_data = self.combined_data.select(kept_indices)
 
             removed_count = original_count - len(self.combined_data)
             logger.info(f"  ✓ Deduplication complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")
@@ -2486,9 +2500,10 @@ class DataPreparer:
             # Apply quality filtering
             filtered_texts = filter_by_quality(texts, min_words=min_words, max_words=max_words)
 
-            # Recreate dataset with filtered texts
-            filtered_data = [{'input_ids': text} for text in filtered_texts]
-            self.combined_data = Dataset.from_list(filtered_data)
+            # Build set for fast lookup and preserve original columns
+            filtered_set = set(filtered_texts)
+            kept_indices = [i for i, t in enumerate(texts) if t in filtered_set and t.strip()]
+            self.combined_data = self.combined_data.select(kept_indices)
 
             removed_count = original_count - len(self.combined_data)
             logger.info(f"  ✓ Quality filtering complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")
@@ -2519,9 +2534,10 @@ class DataPreparer:
             # Apply language filtering
             filtered_texts = filter_by_language(texts, allowed_languages=allowed_languages)
 
-            # Recreate dataset with filtered texts
-            filtered_data = [{'input_ids': text} for text in filtered_texts]
-            self.combined_data = Dataset.from_list(filtered_data)
+            # Preserve original columns by selecting matching indices
+            filtered_set = set(filtered_texts)
+            kept_indices = [i for i, t in enumerate(texts) if t in filtered_set and t.strip()]
+            self.combined_data = self.combined_data.select(kept_indices)
 
             removed_count = original_count - len(self.combined_data)
             logger.info(f"  ✓ Language filtering complete: {original_count} → {len(self.combined_data)} samples ({removed_count} removed)")

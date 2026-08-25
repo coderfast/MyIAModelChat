@@ -185,7 +185,8 @@ class ChatModelMoE(ChatModel):
             return {i: 0.0 for i in range(self.num_experts)}
         
         # Stack all gate scores and average
-        all_scores = torch.stack(self._all_gate_scores)
+        all_scores = torch.stack([s.detach() if s.requires_grad else s for s in self._all_gate_scores])
+        all_scores = all_scores.to(next(self.parameters()).device)
         avg_scores = all_scores.mean(dim=[0, 1, 2])  # Average across batch, seq, layers
         
         utilization = {}
@@ -206,7 +207,8 @@ class ChatModelMoE(ChatModel):
         if gate_scores is None:
             if not self._all_gate_scores:
                 return torch.tensor(0.0)
-            gate_scores = torch.stack(self._all_gate_scores)
+            gate_scores = torch.stack([s.detach() if s.requires_grad else s for s in self._all_gate_scores])
+            gate_scores = gate_scores.to(next(self.parameters()).device)
         
         # Average gate scores across batch and sequence
         # gate_scores shape: (num_layers, batch, seq, num_experts)

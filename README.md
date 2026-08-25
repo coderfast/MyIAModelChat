@@ -174,7 +174,7 @@ MyIAModelChat/
 │   ├── __init__.py
 │   └── chat_engine.py                   # ChatEngine class + ChatConfig
 │
-├── envAIModels/                         # FastAPI server (unchanged)
+├── ServerFastAPI/                         # FastAPI server (unchanged)
 │   ├── __init__.py
 │   ├── app.py
 │   ├── routers_api.py
@@ -249,10 +249,10 @@ ollama run mi-ciencias
 
 MyIAModelChat provides an Ollama-compatible REST API server built with FastAPI.
 
-### PyTorch GPT-2 Server (envAIModels/)
+### PyTorch GPT-2 Server (ServerFastAPI/)
 
 ```bash
-cd envAIModels
+cd ServerFastAPI
 python -m uvicorn app:app --host 127.0.0.1 --port 11434
 ```
 

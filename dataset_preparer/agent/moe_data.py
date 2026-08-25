@@ -50,8 +50,9 @@ class MoEDataProcessor:
         self.thinking_end_id = tokenizer.get_thinking_end_index()
         self.tool_call_id = getattr(tokenizer, 'get_tool_call_index', lambda: -1)()
         self.tool_call_end_id = getattr(tokenizer, 'get_tool_call_end_index', lambda: -1)()
-        self.observation_id = getattr(tokenizer, 'get_observation_index', lambda: -1)()
-        self.observation_end_id = getattr(tokenizer, 'get_observation_end_index', lambda: -1)()
+        # Use <|tool_result|> prefix (no closing tag; runs until <|end|>/<|assistant|>)
+        self.observation_id = getattr(tokenizer, 'get_tool_result_index', lambda: -1)()
+        self.observation_end_id = getattr(tokenizer, 'get_end_index', lambda: -1)()
         
         logger.info(f"MoEDataProcessor initialized with {self.config.num_experts} experts")
     

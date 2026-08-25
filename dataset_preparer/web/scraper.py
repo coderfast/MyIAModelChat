@@ -108,17 +108,20 @@ class WebDocScraper:
         if url.startswith(('#', 'mailto:', 'tel:', 'javascript:')):
             return False
 
-        if parsed.path in self.visited and parsed.fragment:
+        if parsed.path in self.visited and not parsed.query:
             return False
 
         return True
 
     def _normalize_url(self, url: str) -> str:
-        """Normalize URL by removing fragment, trailing slash consistency."""
+        """Normalize URL by removing fragment, keeping query strings for pagination."""
         parsed = urlparse(url)
         normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
         if normalized != self.base_url and normalized.endswith('/'):
             normalized = normalized.rstrip('/')
+        # Preserve query string (needed for pagination like ?page=2)
+        if parsed.query:
+            normalized = f"{normalized}?{parsed.query}"
         return normalized
 
     def _extract_links(self, html: str, current_url: str) -> List[str]:

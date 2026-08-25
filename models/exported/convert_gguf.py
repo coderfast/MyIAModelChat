@@ -33,6 +33,7 @@ except ImportError:
 QUANT_TYPES = {
     "f32": GGMLQuantizationType.F32,
     "f16": GGMLQuantizationType.F16,
+    "bf16": GGMLQuantizationType.BF16,
     "q4_0": GGMLQuantizationType.Q4_0,
     "q4_1": GGMLQuantizationType.Q4_1,
     "q5_0": GGMLQuantizationType.Q5_0,

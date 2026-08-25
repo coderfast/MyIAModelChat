@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-envAIModels = pytest.importorskip("envAIModels")
-from envAIModels.app import app
+ServerFastAPI = pytest.importorskip("ServerFastAPI")
+from ServerFastAPI.app import app
 
 
 client = TestClient(app)

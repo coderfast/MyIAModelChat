@@ -67,7 +67,7 @@ def validate_compatibility(model_a_path: str, model_b_path: str) -> tuple:
             errors.append(f"{Path(model_a_path).stem}: no architecture metadata found")
         if not arch_b:
             errors.append(f"{Path(model_b_path).stem}: no architecture metadata found")
-        return False, errors
+        # Fall through to state_dict comparison instead of returning False
 
     # Compare architecture fields
     fields = ['embed_size', 'hidden_size', 'num_layers', 'n_head', 'n_positions', 'vocab_size']

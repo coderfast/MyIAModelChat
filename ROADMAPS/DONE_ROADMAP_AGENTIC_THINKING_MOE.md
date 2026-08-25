@@ -1024,7 +1024,7 @@ python main.py --chat --model agente_v1 --agent-enabled --agent-show-tool-calls
   ```
 
 ### Task 7.4: API endpoints agentic
-- **Archivo**: `envAIModels/routers_v1.py`
+- **Archivo**: `ServerFastAPI/routers_v1.py`
 - **Nuevo campo en request**: `"agent_enabled": true`
 - **Nuevo campo en response**: `"tool_calls": [...]`, `"observations": [...]`
 
@@ -1404,7 +1404,7 @@ Fase 8 (MoE) — P3 — 20-30h
 | `dataset_preparer/hf/agent_thinking.py` | 2.2 | Nuevo |
 | `commons/dialogue/dialogmanager.py` | 4.1, 4.2 | Modificado |
 | `main.py` | 5.1, 8.8 | Modificado |
-| `envAIModels/routers_v1.py` | 7.4 | Modificado |
+| `ServerFastAPI/routers_v1.py` | 7.4 | Modificado |
 | `commons/model/chatmodel_moe.py` | 8.1, 8.2, 8.3 | Nuevo |
 | `dataset_preparer/agent/moe_data.py` | 8.5 | Nuevo |
 | `tests/test_moe.py` | 8.9 | Nuevo |

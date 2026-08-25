@@ -123,7 +123,10 @@ class ThinkingGenerator:
         result = dict(sample)
 
         question = sample.get('input', sample.get('question', ''))
-        answer = sample.get('output', sample.get('answer', sample.get('input_ids', '')))
+        answer = sample.get('output', sample.get('answer', ''))
+        if not answer:
+            raw_ids = sample.get('input_ids', '')
+            answer = raw_ids if isinstance(raw_ids, str) else ''
 
         result['question'] = question
         result['answer'] = answer

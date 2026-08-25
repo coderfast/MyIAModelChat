@@ -25,28 +25,24 @@ logger = logging.getLogger(__name__)
 # Thinking templates by category
 THINKING_TEMPLATES = {
     'identity': [
-        "El usuario pregunta sobre mi identidad. Debo responder con la información correcta sobre mi creador.",
-        "Esta es una pregunta sobre quién me creó. Voy a dar la respuesta directa.",
-        "Pregunta de identidad. Respondo de forma clara y directa.",
+        "Mi creador es el equipo de MyIAModelChat. Soy un asistente de IA basado en GPT-2.",
+        "Fui desarrollado por MyIAModelChat. Mi arquitectura es un Transformer GPT-2.",
     ],
     'greeting': [
-        "El usuario me saluda. Debo responder de forma amigable y preguntar cómo puedo ayudar.",
-        "Saludo del usuario. Respondo de manera cálida y ofrezco mi ayuda.",
-        "El usuario inicia la conversación con un saludo. Mantengo un tono amigable.",
+        "El usuario me saluda. Respondo de forma amigable y ofrezco mi ayuda para cualquier consulta.",
+        "Saludo recibido. Mantengo un tono cálido y pregunto en qué puedo asistir.",
     ],
     'question': [
-        "El usuario hace una pregunta. Voy a analizar la información disponible y dar una respuesta clara.",
-        "Pregunta del usuario. Debo dar una respuesta completa y precisa.",
-        "Esta es una pregunta directa. Proporciono la información más relevante.",
+        "Para responder esta pregunta, analizo la información disponible y proporciono la respuesta más precisa basada en mi conocimiento.",
+        "Analizo los conceptos clave de la pregunta. La respuesta debe ser clara, directa y completa.",
     ],
     'farewell': [
-        "El usuario se despide. Debo despedirme de forma amigable.",
-        "Despedida del usuario. Respondo con amabilidad y cierro la conversación.",
+        "El usuario se despide. Agradezco la conversación y me despido de forma cordial.",
+        "Despedida del usuario. Cierro la interacción de manera amigable.",
     ],
     'default': [
-        "El usuario me escribe. Analizo el mensaje y preparo una respuesta apropiada.",
-        "Proceso el mensaje del usuario. Genero una respuesta relevante y útil.",
-        "Recibo el mensaje. Evalúo el contenido y formulo mi respuesta.",
+        "Analizo el mensaje del usuario para entender su intención. Preparo una respuesta relevante y útil basada en el contexto proporcionado.",
+        "Proceso la solicitud. Identifico los conceptos principales y genero una respuesta coherente.",
     ],
 }
 
@@ -61,28 +57,24 @@ THINKING_PATTERNS_ES = [
 # English thinking templates
 THINKING_TEMPLATES_EN = {
     'identity': [
-        "The user is asking about my identity. I should respond with information about my creator.",
-        "This is a question about who created me. I'll give a direct answer.",
-        "Identity question. I respond clearly and directly.",
+        "I was created by the MyIAModelChat team. I am a GPT-2 based AI assistant.",
+        "My architecture is a GPT-2 Transformer developed by MyIAModelChat.",
     ],
     'greeting': [
-        "The user is greeting me. I should respond in a friendly manner and ask how I can help.",
-        "User greeting. I respond warmly and offer my assistance.",
-        "The user starts the conversation with a greeting. I maintain a friendly tone.",
+        "The user is greeting me. I respond warmly and offer my assistance with any questions.",
+        "Greeting received. I maintain a friendly tone and ask how I can help.",
     ],
     'question': [
-        "The user is asking a question. I'll analyze the available information and give a clear answer.",
-        "User question. I should give a complete and accurate response.",
-        "This is a direct question. I provide the most relevant information.",
+        "To answer this question, I analyze the available information and provide the most accurate response based on my knowledge.",
+        "I analyze the key concepts of the question. The answer should be clear, direct, and complete.",
     ],
     'farewell': [
-        "The user is saying goodbye. I should respond politely.",
-        "User farewell. I respond with kindness and close the conversation.",
+        "The user is saying goodbye. I thank them for the conversation and close politely.",
+        "User farewell. I end the interaction in a friendly manner.",
     ],
     'default': [
-        "The user is writing to me. I'll analyze the message and prepare an appropriate response.",
-        "Processing the user's message. I'll generate a relevant and helpful response.",
-        "I received the message. I'll evaluate the content and formulate my response.",
+        "I analyze the user's message to understand their intent. I prepare a relevant and helpful response based on the provided context.",
+        "I process the request. I identify the main concepts and generate a coherent response.",
     ],
 }
 

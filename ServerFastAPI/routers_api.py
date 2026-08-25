@@ -89,6 +89,7 @@ async def generate(req: GenerateRequest):
 
     text = out["choices"][0].get("text", "") or ""
     text = truncate_text_by_stop(text, req.stop)
+    text = remove_excessive_repetition(text)
 
     parsed = parse_thinking_response(text)
     result = {"id": None, "object": "text.completion", "model": MODEL_NAME, "choices": [{"text": parsed['response'] if not req.include_thinking else text, "index": 0}], "raw": out}

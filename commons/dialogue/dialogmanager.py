@@ -100,7 +100,7 @@ class DialogueManager:
                 return None
             probs = probs / total
 
-        if torch.isnan(probs).any() or torch.isclose(probs.sum(), torch.tensor(0.0, device=probs.device)):
+        if torch.isnan(probs).any() or torch.isclose(probs.sum(), torch.tensor(0.0, device=probs.device)).item():
             return int(torch.argmax(logits).item())
 
         try:
@@ -393,7 +393,7 @@ class DialogueManager:
 
             # Execute tool
             try:
-                result = self.tool_executor.execute_tool_call(raw_output, self.tool_executor._registry if hasattr(self.tool_executor, '_registry') else None)
+                result = self.tool_executor.execute_tool_call(raw_output)
             except Exception as e:
                 result = format_observation(f"Error: {str(e)}")
 

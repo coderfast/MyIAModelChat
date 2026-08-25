@@ -120,7 +120,7 @@ class NoiseFilter:
         for text in texts:
             if not text or not isinstance(text, str):
                 result.discarded.append({'text': text or '', 'reason': 'empty'})
-                result['empty'] = result.get('empty', 0) + 1 if hasattr(result, 'get') else 0
+                result.stats['empty'] = result.stats.get('empty', 0) + 1
                 continue
 
             reason = self._detect_noise(text)

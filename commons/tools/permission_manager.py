@@ -108,14 +108,22 @@ class PermissionManager:
             return RiskLevel.MEDIUM
         
         # Check for dangerous patterns
+        critical_patterns = [
+            'rm -rf', 'format c:', 'Format-Volume', 'Initialize-Disk',
+            'shutdown', 'reboot', 'poweroff',
+            'Remove-Item -Recurse -Force',
+        ]
         dangerous_patterns = [
-            'rm -rf', 'sudo', 'Format-Volume', 'Remove-Item -Recurse',
-            'del /s', 'format c:', 'shutdown', 'reboot',
-            '> /dev/null', '2>&1', '|',  # Pipe and redirect
-            '&&', '||',  # Command chaining
+            'sudo', 'del /s', 'Remove-Item -Recurse',
+            'chmod 777', 'chmod -R 777', 'chown',
+            '> /dev/null', '2>&1', '|',
+            '&&', '||',
         ]
         
         command_lower = command.lower()
+        for pattern in critical_patterns:
+            if pattern.lower() in command_lower:
+                return RiskLevel.CRITICAL
         for pattern in dangerous_patterns:
             if pattern.lower() in command_lower:
                 return RiskLevel.HIGH
@@ -216,6 +224,17 @@ class PermissionManager:
             'mode': self.mode.value,
         }
         
+        # CRITICAL is always blocked, regardless of mode
+        if risk_level == RiskLevel.CRITICAL:
+            log_entry['approved'] = False
+            log_entry['reason'] = 'blocked: critical risk'
+            self.permission_log.append(log_entry)
+            return PermissionResult(
+                approved=False,
+                mode=self.mode,
+                reason="Blocked: critical risk command"
+            )
+
         # Handle based on mode
         if self.mode == PermissionMode.AUTO_APPROVE:
             log_entry['approved'] = True

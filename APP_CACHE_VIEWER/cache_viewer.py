@@ -85,10 +85,6 @@ class ContinuousLoaderWorker(QThread):
         except Exception as e:
             if not self._is_cancelled:
                 self.error_occurred.emit(str(e))
-        except Exception as e:
-            self._lock = False
-            if not self._is_cancelled:
-                self.error_occurred.emit(str(e))
 
 
 # ==================== LAZY TABLE MODEL ====================
@@ -1396,7 +1392,7 @@ class CacheViewer(QMainWindow):
                     items.append({
                         'index': idx,
                         'text': row.get('input_ids', row.get('bpe_text', '')),
-                        'token_count': self._token_lengths[idx] if idx < len(self._token_lengths) else 0,
+                        'token_count': self._token_lengths[idx] if self._token_lengths and idx < len(self._token_lengths) else 0,
                         'source': row.get('source', 'Unknown'),
                         'language': row.get('language', '-')
                     })

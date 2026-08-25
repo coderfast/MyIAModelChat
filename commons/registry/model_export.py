@@ -551,7 +551,7 @@ def export_to_onnx_quantized(
     elif static and quant_type in ('int4', 'uint4'):
         resolved_type = f"static_{quant_type}_qdq"
 
-    quantize_onnx(base_onnx, output_path, quant_type=resolved_type)
+    quantize_onnx(base_onnx, output_path, quant_type=resolved_type, per_channel=per_channel, block_size=block_size)
 
     # Update inference.py to use the quantized model by default
     inference_path = os.path.join(onnx_dir, "inference.py")
@@ -608,6 +608,12 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
             tokenizer = SentencePieceTokenizerWrapper(tokenizer_path)
         else:
             raise RuntimeError("No tokenizer found in checkpoint. Cannot export to GGUF.")
+    elif isinstance(tokenizer, str):
+        if os.path.exists(tokenizer):
+            from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
+            tokenizer = SentencePieceTokenizerWrapper(tokenizer)
+        else:
+            raise RuntimeError(f"Tokenizer path not found: {tokenizer}")
 
     stem = Path(pth_path).stem
     os.makedirs(EXPORTED_DIR, exist_ok=True)
@@ -705,7 +711,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     modelfile_path = os.path.join(hf_dir, "Modelfile")
     modelfile_content = f"FROM {gguf_rel}\n"
     modelfile_content += "\n"
-    modelfile_content += 'TEMPLATE \"\"\"{{{{ if .System }}}}<|system|>\n{{{{ .System }}}}\n{{{{ end }}}}{{{{ if .Prompt }}}}<|user|>\n{{{{ .Prompt }}}}\n{{{{ end }}}}<|assistant|>\n{{{{ .Response }}}}\n\"\"\"\n'
+    modelfile_content += 'TEMPLATE """{{ if .System }}<|system|>\n{{ .System }}\n{{ end }}{{ if .Prompt }}<|user|>\n{{ .Prompt }}\n{{ end }}<|assistant|>\n{{ .Response }}\n"""\n'
     modelfile_content += "\n"
     modelfile_content += 'PARAMETER stop "<|user|>"\n'
     modelfile_content += 'PARAMETER stop "<|end_of_text|>"\n'
@@ -824,7 +830,7 @@ def export_cli(
     """CLI entry point for model export."""
     # Parse model spec (may contain + for merge)
     if '+' in model_spec:
-        from model_merge import parse_merge_spec, merge_from_names
+        from commons.registry.model_merge import parse_merge_spec, merge_from_names
         names, weights = parse_merge_spec(model_spec)
         logger.info(f"Merging models: {names}")
         merged_path = merge_from_names(names, weights)

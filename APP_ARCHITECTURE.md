@@ -28,7 +28,7 @@ MyIAModelChat is a conversational AI system built on a **custom GPT-2 Transforme
          v                      v                    v
 +------------------+  +------------------+  +------------------+
 | commons/         |  |  Model Library   |  |  GGUF Server     |
-| (shared code)    |  |  (checkpoints/*.pth)  |  | (envAIModels/)   |
+| (shared code)    |  |  (checkpoints/*.pth)  |  | (ServerFastAPI/)   |
 |                  |  |                  |  |                  |
 | model|tokenizer  |  | Merge | Export   |  | llama.cpp        |
 | dialogue|dataset |  | ONNX | GGUF      |  | Ollama-API       |
@@ -390,7 +390,7 @@ def get_chat_engine_instance(device_mode='auto', gpu_indices=None, model=None) -
 | ONNX Int8 | `export_to_onnx_quantized()` | Quantized `.onnx` |
 | GGUF | `export_to_gguf()` | HF format + converter script |
 
-### 2.10 GGUF Inference Server (`envAIModels/`)
+### 2.10 GGUF Inference Server (`ServerFastAPI/`)
 
 Parallel inference server for GGUF models via `llama-cpp-python`.
 
@@ -535,7 +535,7 @@ main.py
   ├── inference/
   │   └── chat_engine.py
   │
-  └── envAIModels/
+  └── ServerFastAPI/
         ├── app.py
         ├── routers_api.py
         ├── routers_v1.py

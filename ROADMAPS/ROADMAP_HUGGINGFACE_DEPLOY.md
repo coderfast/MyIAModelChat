@@ -171,7 +171,7 @@ python-aiml
 git clone https://huggingface.co/spaces/TU_USUARIO/MyIAModelChat
 cd MyIAModelChat
 
-# 2. Copiar archivos del proyecto (NO copiar .git, envAIModels/, tests/, APP_CACHE_VIEWER/)
+# 2. Copiar archivos del proyecto (NO copiar .git, ServerFastAPI/, tests/, APP_CACHE_VIEWER/)
 # Solo copiar lo necesario:
 cp /ruta/proyecto/app.py .
 cp /ruta/proyecto/requirements.txt .

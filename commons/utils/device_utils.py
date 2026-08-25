@@ -248,7 +248,7 @@ def calculate_layers_for_vram(
             overhead_params += sum(p.numel() for p in model.model.transformer.wpe.parameters())
     if hasattr(model, "lm_head"):
         overhead_params += sum(p.numel() for p in model.lm_head.parameters())
-    overhead_gb = (overhead_params * 4) / (1024 ** 3)
+    overhead_gb = (overhead_params * bytes_per_param) / (1024 ** 3)
 
     available_for_layers = vram_budget - overhead_gb
     if available_for_layers <= 0:

@@ -97,9 +97,17 @@ class AgentThinkingGenerator(ThinkingGenerator):
     def _simulate_tool_result(self, tool_name: str, arguments: str, answer: str) -> str:
         """Simulate a realistic tool result based on the answer."""
         if tool_name == 'calculator':
-            # Extract numbers from answer to simulate result
-            import re
-            nums = re.findall(r'[\d,]+\.?\d*', answer.replace(',', ''))
+            import re as _re
+            # Try to evaluate the expression if possible
+            expr = arguments.strip('()')
+            try:
+                import ast
+                result = eval(compile(ast.parse(expr, mode='eval'), '<expr>', 'eval'))
+                return str(result)
+            except Exception:
+                pass
+            # Fallback: extract numbers from answer
+            nums = _re.findall(r'[\d,]+\.?\d*', answer.replace(',', ''))
             if nums:
                 return nums[0].replace(',', '')
             return answer[:50]
@@ -117,31 +125,46 @@ class AgentThinkingGenerator(ThinkingGenerator):
     def _generate_agent_thinking(self, question: str, answer: str, tool_name: str,
                                   arguments: str, result: str) -> str:
         """Generate thinking that includes tool call reasoning."""
+        from commons.language_utils import detect_language
+        lang = detect_language(question)
+        is_es = lang == 'es'
+
         thinking_parts = []
 
         # Analyze the question
         q_type = self._classify_question(question)
-        thinking_parts.append(f"La consulta del usuario es {q_type}.")
-
-        # Explain tool choice
-        thinking_parts.append(f"Para responder correctamente, necesito usar la herramienta '{tool_name}'.")
-
-        # Explain arguments
-        if arguments:
-            thinking_parts.append(f"Los parámetros para la herramienta son: {arguments}.")
-
-        # Explain result processing
-        thinking_parts.append(f"El resultado obtenido es: {result[:100]}.")
-        thinking_parts.append(f"Proceso este resultado para dar una respuesta completa al usuario.")
+        if is_es:
+            thinking_parts.append(f"La consulta del usuario es {q_type}.")
+            thinking_parts.append(f"Para responder correctamente, necesito usar la herramienta '{tool_name}'.")
+            if arguments:
+                thinking_parts.append(f"Los parámetros para la herramienta son: {arguments}.")
+            thinking_parts.append(f"El resultado obtenido es: {result[:100]}.")
+            thinking_parts.append(f"Proceso este resultado para dar una respuesta completa al usuario.")
+        else:
+            thinking_parts.append(f"The user's query is {q_type}.")
+            thinking_parts.append(f"To respond correctly, I need to use the tool '{tool_name}'.")
+            if arguments:
+                thinking_parts.append(f"The parameters for the tool are: {arguments}.")
+            thinking_parts.append(f"The result obtained is: {result[:100]}.")
+            thinking_parts.append(f"I process this result to give a complete response to the user.")
 
         return " ".join(thinking_parts)
 
     def _generate_normal_thinking(self, question: str, answer: str) -> str:
         """Generate normal (non-agentic) thinking."""
+        from commons.language_utils import detect_language
+        lang = detect_language(question)
+        is_es = lang == 'es'
+
         q_type = self._classify_question(question)
-        thinking = f"La consulta del usuario es {q_type}. "
-        thinking += "No necesito usar herramientas externas para responder. "
-        thinking += f"La respuesta apropiada es: {answer[:150]}."
+        if is_es:
+            thinking = f"La consulta del usuario es {q_type}. "
+            thinking += "No necesito usar herramientas externas para responder. "
+            thinking += f"La respuesta apropiada es: {answer[:150]}."
+        else:
+            thinking = f"The user's query is {q_type}. "
+            thinking += "I don't need external tools to respond. "
+            thinking += f"The appropriate answer is: {answer[:150]}."
         return thinking
 
     def _classify_question(self, question: str) -> str:
@@ -178,11 +201,11 @@ class AgentThinkingGenerator(ThinkingGenerator):
             args_str = f"({tool_args})" if tool_args else "()"
             tool_call_str = f"{tool_name}{args_str}"
 
-            # GPT-2 standard agentic format (Formato 2, no thinking block)
+            # GPT-2 standard agentic format (Formato 2) with thinking included
             agent_text = (
                 f"<|user|>{question}<|end|>"
                 f"<|assistant|><tool_call>{tool_call_str}</tool_call><|tool_result|>{observation}<|end|>"
-                f"<|assistant|>{answer}<|end|>"
+                f"<|assistant|><|thinking|>{thinking}<|final|>{answer}<|end|>"
             )
 
             result['thinking'] = thinking
