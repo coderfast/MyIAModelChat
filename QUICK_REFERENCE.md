@@ -253,7 +253,7 @@ export_to_gguf("model.pth")
 | `models/exported/<name>_int8.onnx` | ~10MB | Quantized ONNX |
 | `checkpoints/tokenizer_vocab.json` | ~1KB | Tokenizer metadata |
 | `checkpoints/chat_model_metrics.csv` | ~1KB | Training metrics per epoch |
-| `checkpoints/chat_model_metrics_report.html` | ~10KB | HTML report with Chart.js graphs |
+| `checkpoints/chat_model_metrics_report.html` | ~10KB | HTML report with Chart.js graphs, Google Translate, OK/WARNING/INFORMATION status |
 | `dataset_cache/` | ~5GB | Cached processed datasets |
 
 ## Caching System

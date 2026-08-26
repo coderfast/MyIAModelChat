@@ -259,15 +259,16 @@ Epoch 15/30 | Train Loss: 2.1045 | Val Loss: 2.8934 | Perplexity: 8.20/18.10 | G
 After training, a `_report.html` file is generated alongside the CSV with:
 - **Loss & Perplexity** charts (train vs val)
 - **Gap & Learning Rate** charts
-- **Thinking** section: accuracy, coverage, response accuracy with green/red status
-- **Agent** section: tool_call_acc, observation_acc, ratio with green/red status
-- **MoE** section: gate entropy, expert utilization stacked bars with green/red status
-- **Status banner** at the bottom: green (healthy), red (overfitting), yellow (stable)
+- **Thinking** section: accuracy, coverage, response accuracy with status indicators
+- **Agent** section: tool_call_acc, observation_acc, ratio with status indicators
+- **MoE** section: gate entropy, expert utilization stacked bars with status indicators
+- **Status banner** at the bottom: OK (healthy), WARNING (overfitting), INFORMATION (stable)
+- **Google Translate** banner (top-right) for translating the report to any language
 
 **Status indicators:**
-- Green: loss decreased >10% or accuracy > threshold
-- Red: loss increased >10% or accuracy below threshold
-- Yellow: loss changed <10% (stable/plateau)
+- OK: loss decreased >10% or accuracy > threshold
+- WARNING: loss increased >10% or accuracy below threshold
+- INFORMATION: loss changed <10% (stable/plateau)
 
 ### Chat with Thinking
 
@@ -453,6 +454,11 @@ torch.save(checkpoint, f'models/{checkpoint_name}.pth')
 
 Training automatically continues from the last checkpoint's epoch number. If `chat_model_epoch_5_*.pth` exists, running `--train` will start from epoch 6.
 
+The resume logic handles architecture changes between sessions:
+- **MoE detection**: reads actual state_dict keys (`mlp.experts`, `mlp.gate`) instead of metadata flags
+- **Shape mismatch filtering**: `_filter_state_dict` skips keys with incompatible shapes (e.g., different expert count)
+- **Graceful loading**: uses `strict=False` to load partial weights when architectures differ
+
 ```python
 # Manual resume (if needed)
 checkpoint = torch.load('checkpoints/chat_model.pth')
@@ -556,4 +562,4 @@ print(prof.key_averages().table(sort_by="cpu_time_total"))
 
 ---
 
-*Updated: 2026-07-28 - Reflects new modular project structure*
+*Updated: 2026-08-26 - Reflects new modular project structure*

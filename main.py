@@ -332,6 +332,8 @@ EXAMPLES:
         # Model library arguments
         parser.add_argument("--model", type=str, default=None, help="Model name to load for chat (e.g. ciencias_naturales)")
         parser.add_argument("--checkpoint-name", type=str, default="chat_model", help="Name for saved checkpoint (default: chat_model)")
+        parser.add_argument("--config", type=str, default=None, help="Path to training config JSON file (overrides defaults)")
+        parser.add_argument("--generate-config", type=str, nargs='?', const='training_config.json', default=None, help="Generate default training config JSON (default: training_config.json)")
         parser.add_argument("--dataset", type=str, default="dataset_cache", help="Path to dataset directory (default: dataset_cache)")
         
         # CPU configuration
@@ -626,39 +628,89 @@ EXAMPLES:
                 args.master_port = 29500
 
             logger.info("Initializing training...")
-            config = TrainingConfig(
-                epochs=args.epochs,
-                checkpoint_name=args.checkpoint_name,
-                dataset_source=args.dataset,
-                device_mode=args.device_mode,
-                gpu_indices=args.gpu_indices,
-                use_vulkan=args.use_vulkan,
-                num_cores=args.num_cores,
-                num_threads=args.num_threads,
-                max_ram_fraction=args.max_ram_fraction,
-                max_ram_bytes=getattr(args, 'max_ram_bytes', None),
-                thinking_loss_weight=args.thinking_loss_weight,
-                thinking_enabled=args.thinking_enabled,
-                thinking_max_tokens=args.thinking_max_tokens,
-                statistics=args.statistics,
-                agent_enabled=getattr(args, 'agent_enabled', False),
-                agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0),
-                agent_ratio=getattr(args, 'agent_ratio', 0.3),
-                moe_enabled=getattr(args, 'moe_enabled', False),
-                moe_num_experts=getattr(args, 'moe_num_experts', 4),
-                moe_top_k=getattr(args, 'moe_top_k', 2),
-                moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
-                moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
-                val_split=getattr(args, 'val_split', 0.1),
-                val_batches=getattr(args, 'val_batches', 0),
-                early_stopping_patience=getattr(args, 'early_stopping_patience', 0),
-                log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
-                rank=args.rank,
-                local_rank=args.local_rank,
-                world_size=args.world_size,
-                master_addr=args.master_addr,
-                master_port=args.master_port,
-            )
+
+            # Handle --generate-config: generate default JSON and exit
+            if args.generate_config is not None:
+                from training.trainer import TrainingConfig
+                config_path = args.generate_config
+                TrainingConfig.generate_default(config_path)
+                logger.info(f"Default training config generated: {config_path}")
+                logger.info("Edit the file and run with: python main.py --train --config " + config_path)
+                sys.exit(0)
+
+            # Load JSON config if provided (CLI args override JSON values)
+            if args.config is not None:
+                from training.trainer import TrainingConfig
+                json_config = TrainingConfig.from_json(args.config)
+                # CLI args override JSON values
+                config = TrainingConfig(
+                    epochs=args.epochs if args.epochs != 1 else json_config.epochs,
+                    checkpoint_name=args.checkpoint_name if args.checkpoint_name != "chat_model" else json_config.checkpoint_name,
+                    dataset_source=args.dataset if args.dataset != "dataset_cache" else json_config.dataset_source,
+                    device_mode=args.device_mode if args.device_mode != "auto" else json_config.device_mode,
+                    gpu_indices=args.gpu_indices if args.gpu_indices else json_config.gpu_indices,
+                    use_vulkan=args.use_vulkan if args.use_vulkan else json_config.use_vulkan,
+                    num_cores=args.num_cores if args.num_cores != default_num_cores else json_config.num_cores,
+                    num_threads=args.num_threads if args.num_threads != default_num_threads else json_config.num_threads,
+                    max_ram_fraction=args.max_ram_fraction if args.max_ram_fraction != 0.75 else json_config.max_ram_fraction,
+                    max_ram_bytes=getattr(args, 'max_ram_bytes', None) or json_config.max_ram_bytes,
+                    thinking_loss_weight=args.thinking_loss_weight if args.thinking_loss_weight != 1.0 else json_config.thinking_loss_weight,
+                    thinking_enabled=args.thinking_enabled if args.thinking_enabled else json_config.thinking_enabled,
+                    thinking_max_tokens=args.thinking_max_tokens if args.thinking_max_tokens != 64 else json_config.thinking_max_tokens,
+                    statistics=args.statistics if args.statistics else json_config.statistics,
+                    agent_enabled=getattr(args, 'agent_enabled', False) or json_config.agent_enabled,
+                    agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0) if getattr(args, 'agent_loss_weight', 1.0) != 1.0 else json_config.agent_loss_weight,
+                    agent_ratio=getattr(args, 'agent_ratio', 0.3) if getattr(args, 'agent_ratio', 0.3) != 0.3 else json_config.agent_ratio,
+                    moe_enabled=getattr(args, 'moe_enabled', False) or json_config.moe_enabled,
+                    moe_num_experts=getattr(args, 'moe_num_experts', 4) if getattr(args, 'moe_num_experts', 4) != 4 else json_config.moe_num_experts,
+                    moe_top_k=getattr(args, 'moe_top_k', 2) if getattr(args, 'moe_top_k', 2) != 2 else json_config.moe_top_k,
+                    moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01) if getattr(args, 'moe_load_balance_weight', 0.01) != 0.01 else json_config.moe_load_balance_weight,
+                    moe_freeze_attention=getattr(args, 'moe_freeze_attention', False) or json_config.moe_freeze_attention,
+                    val_split=getattr(args, 'val_split', 0.1) if getattr(args, 'val_split', 0.1) != 0.1 else json_config.val_split,
+                    val_batches=getattr(args, 'val_batches', 0) if getattr(args, 'val_batches', 0) != 0 else json_config.val_batches,
+                    early_stopping_patience=getattr(args, 'early_stopping_patience', 0) if getattr(args, 'early_stopping_patience', 0) != 0 else json_config.early_stopping_patience,
+                    log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
+                    rank=args.rank,
+                    local_rank=args.local_rank,
+                    world_size=args.world_size,
+                    master_addr=args.master_addr,
+                    master_port=args.master_port,
+                )
+                logger.info(f"Loaded training config from: {args.config}")
+            else:
+                config = TrainingConfig(
+                    epochs=args.epochs,
+                    checkpoint_name=args.checkpoint_name,
+                    dataset_source=args.dataset,
+                    device_mode=args.device_mode,
+                    gpu_indices=args.gpu_indices,
+                    use_vulkan=args.use_vulkan,
+                    num_cores=args.num_cores,
+                    num_threads=args.num_threads,
+                    max_ram_fraction=args.max_ram_fraction,
+                    max_ram_bytes=getattr(args, 'max_ram_bytes', None),
+                    thinking_loss_weight=args.thinking_loss_weight,
+                    thinking_enabled=args.thinking_enabled,
+                    thinking_max_tokens=args.thinking_max_tokens,
+                    statistics=args.statistics,
+                    agent_enabled=getattr(args, 'agent_enabled', False),
+                    agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0),
+                    agent_ratio=getattr(args, 'agent_ratio', 0.3),
+                    moe_enabled=getattr(args, 'moe_enabled', False),
+                    moe_num_experts=getattr(args, 'moe_num_experts', 4),
+                    moe_top_k=getattr(args, 'moe_top_k', 2),
+                    moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
+                    moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
+                    val_split=getattr(args, 'val_split', 0.1),
+                    val_batches=getattr(args, 'val_batches', 0),
+                    early_stopping_patience=getattr(args, 'early_stopping_patience', 0),
+                    log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
+                    rank=args.rank,
+                    local_rank=args.local_rank,
+                    world_size=args.world_size,
+                    master_addr=args.master_addr,
+                    master_port=args.master_port,
+                )
             trainer = Trainer(config)
             training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=False)
             training_thread.start()

@@ -1,0 +1,50 @@
+{
+  "training": {
+    "epochs": 1,
+    "checkpoint_name": "chat_model",
+    "dataset_source": "dataset_cache"
+  },
+  "device": {
+    "mode": "auto",
+    "gpu_indices": null,
+    "use_vulkan": false,
+    "num_cores": 4,
+    "num_threads": 4,
+    "max_ram_fraction": 0.75,
+    "max_ram_bytes": null
+  },
+  "thinking": {
+    "enabled": true,
+    "loss_weight": 1.0,
+    "max_tokens": 64
+  },
+  "agent": {
+    "enabled": true,
+    "loss_weight": 1.0,
+    "ratio": 0.3
+  },
+  "moe": {
+    "enabled": true,
+    "num_experts": 4,
+    "top_k": 2,
+    "load_balance_weight": 0.01,
+    "freeze_attention": false
+  },
+  "validation": {
+    "split": 0.1,
+    "batches": 0,
+    "early_stopping_patience": 5
+  },
+  "scheduler": {
+    "type": "cosine",
+    "eta_min": 1e-6,
+    "step_size": 0,
+    "gamma": 0.5,
+    "patience": 5,
+    "factor": 0.5
+  },
+  "logging": {
+    "metrics_csv": true,
+    "statistics": false
+  }
+}

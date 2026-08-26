@@ -9,10 +9,12 @@
 - Early stopping with `--early-stopping-patience`
 - CSV metrics logging with `--no-metrics-csv` to disable
 - HTML report with Chart.js graphs (Loss, Perplexity, Gap, LR, Speed, Thinking, Agent, MoE)
-- Green/red/yellow status indicators for training health
+- OK/WARNING/INFORMATION status indicators for training health
+- Google Translate banner in HTML report for multilingual support
 - Correlated epoch numbering (continues from last training session)
 - Per-epoch `chat_model.pth` overwrite (not just at end)
 - Python `None` → JavaScript `null` serialization in HTML report
+- Robust checkpoint resume: MoE detection from state_dict keys, shape mismatch filtering, architecture change handling
 
 ---
 

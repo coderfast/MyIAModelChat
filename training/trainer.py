@@ -63,6 +63,7 @@ TRAINING_CONFIG = {
     'batch_size': 4,
     'accumulation_steps': 8,
     'learning_rate': 1e-3,
+    'weight_decay': 0.01,
     'embed_size': 256,
     'hidden_size': 512,
     'grad_clip_norm': 1.0,
@@ -135,7 +136,7 @@ class _RangedIterableDataset(IterableDataset):
 @dataclass
 class TrainingConfig:
     """Configuration for model training (no CLI args)."""
-    epochs: int = 1
+    epochs: int = 30
     checkpoint_name: str = 'chat_model'
     dataset_source: str = 'dataset_cache'
     device_mode: str = 'auto'           # 'cpu' | 'gpu' | 'cpu+gpu' | 'auto'
@@ -161,14 +162,125 @@ class TrainingConfig:
     # Validation and metrics
     val_split: float = 0.1              # 10% del dataset para validacion (0 = sin validacion)
     val_batches: int = 0                # 0 = usar todo el split; >0 = limitar batches de val
-    early_stopping_patience: int = 0    # 0 = deshabilitado; N = parar si val_loss no mejora en N epochs
+    early_stopping_patience: int = 5    # 0 = deshabilitado; N = parar si val_loss no mejora en N epochs
     log_metrics_csv: bool = True        # Guardar metricas en metrics.csv
+    # LR Scheduler settings
+    scheduler_type: str = 'cosine'      # 'cosine' | 'step' | 'exponential' | 'plateau' | 'onecycle'
+    scheduler_eta_min: float = 1e-6     # LR minimo para cosine/onecycle
+    scheduler_step_size: int = 0        # Para step: cada cuantos epochs (0 = auto = epochs//3)
+    scheduler_gamma: float = 0.5        # Factor de reduccion para step/exponential
+    scheduler_patience: int = 5         # Para plateau: epochs sin mejora antes de reducir
+    scheduler_factor: float = 0.5       # Para plateau: factor de reduccion
     # DDP fields (single-machine multi-GPU or multi-node)
     rank: int = 0                # global rank
     local_rank: int = 0          # rank within this machine
     world_size: int = 1          # total number of processes
     master_addr: str = 'localhost'
     master_port: int = 29500
+
+    def to_dict(self):
+        """Convert config to dictionary."""
+        return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
+    # Mapping: nested JSON path → flat TrainingConfig field
+    _JSON_TO_FIELD = {
+        # training
+        'training.epochs': 'epochs',
+        'training.checkpoint_name': 'checkpoint_name',
+        'training.dataset_source': 'dataset_source',
+        # device
+        'device.mode': 'device_mode',
+        'device.gpu_indices': 'gpu_indices',
+        'device.use_vulkan': 'use_vulkan',
+        'device.num_cores': 'num_cores',
+        'device.num_threads': 'num_threads',
+        'device.max_ram_fraction': 'max_ram_fraction',
+        'device.max_ram_bytes': 'max_ram_bytes',
+        # thinking
+        'thinking.enabled': 'thinking_enabled',
+        'thinking.loss_weight': 'thinking_loss_weight',
+        'thinking.max_tokens': 'thinking_max_tokens',
+        # agent
+        'agent.enabled': 'agent_enabled',
+        'agent.loss_weight': 'agent_loss_weight',
+        'agent.ratio': 'agent_ratio',
+        # moe
+        'moe.enabled': 'moe_enabled',
+        'moe.num_experts': 'moe_num_experts',
+        'moe.top_k': 'moe_top_k',
+        'moe.load_balance_weight': 'moe_load_balance_weight',
+        'moe.freeze_attention': 'moe_freeze_attention',
+        # validation
+        'validation.split': 'val_split',
+        'validation.batches': 'val_batches',
+        'validation.early_stopping_patience': 'early_stopping_patience',
+        # scheduler
+        'scheduler.type': 'scheduler_type',
+        'scheduler.eta_min': 'scheduler_eta_min',
+        'scheduler.step_size': 'scheduler_step_size',
+        'scheduler.gamma': 'scheduler_gamma',
+        'scheduler.patience': 'scheduler_patience',
+        'scheduler.factor': 'scheduler_factor',
+        # logging
+        'logging.metrics_csv': 'log_metrics_csv',
+        'logging.statistics': 'statistics',
+    }
+
+    # Reverse mapping: flat field → nested JSON path
+    _FIELD_TO_JSON = {v: k for k, v in _JSON_TO_FIELD.items()}
+
+    @classmethod
+    def _flatten_json(cls, data):
+        """Flatten nested JSON dict to flat field dict."""
+        flat = {}
+        for section, values in data.items():
+            if isinstance(values, dict):
+                for key, value in values.items():
+                    path = f"{section}.{key}"
+                    if path in cls._JSON_TO_FIELD:
+                        flat[cls._JSON_TO_FIELD[path]] = value
+            elif section in cls._JSON_TO_FIELD:
+                flat[cls._JSON_TO_FIELD[section]] = values
+        return flat
+
+    def _nest_dict(self):
+        """Convert flat config dict to nested JSON structure."""
+        nested = {}
+        for field_name, value in self.to_dict().items():
+            if field_name in self._FIELD_TO_JSON:
+                path = self._FIELD_TO_JSON[field_name]
+                section, key = path.split('.', 1)
+                if section not in nested:
+                    nested[section] = {}
+                nested[section][key] = value
+            else:
+                # Fields not in mapping go to root (DDP fields)
+                nested[field_name] = value
+        return nested
+
+    @classmethod
+    def from_json(cls, json_path):
+        """Load config from nested JSON file, overriding defaults."""
+        import json
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        flat = cls._flatten_json(data)
+        config = cls(**flat)
+        return config
+
+    def save_json(self, json_path):
+        """Save config to nested JSON file."""
+        import json
+        nested = self._nest_dict()
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(nested, f, indent=2, ensure_ascii=False)
+
+    @classmethod
+    def generate_default(cls, json_path):
+        """Generate default config JSON file."""
+        config = cls()
+        config.save_json(json_path)
+        return config
 
 class Trainer:
 
@@ -1632,6 +1744,21 @@ class Trainer:
     </style>
 </head>
 <body>
+    <div id="google_translate_element" style="position:fixed;top:10px;right:10px;z-index:9999;background:white;padding:5px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:13px;"></div>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script>
+    function googleTranslateElementInit() {{
+        new google.translate.TranslateElement({{pageLanguage: 'en', includedLanguages: 'es,fr,de,it,pt,ru,ja,ko,zh-CN,ar,hi,th,vi,nl,pl,sv,da,no,fi,tr,uk,cs,ro,hu,el,bg,hr,sk,sl,lt,lv,et,mt,ga,cy,eu,ca,gl,af,sq,bs,is,lb,mk,sr,be,kk,ky,tg,uz,tk,ka,hy,az', autoDisplay: false}}, 'google_translate_element');
+    }}
+    </script>
+    <style>
+        .skiptranslate {{ display: inline !important; }}
+        .goog-te-gadget {{ font-family: Roboto, sans-serif !important; font-size: 13px !important; }}
+        .goog-te-gadget-simple {{ border: 1px solid #ddd !important; border-radius: 6px !important; padding: 2px 8px !important; background: #f8f8f8 !important; }}
+        .goog-te-gadget-simple:hover {{ background: #e8e8e8 !important; }}
+        .goog-te-combo {{ font-family: Roboto, sans-serif !important; font-size: 13px !important; border: none !important; background: transparent !important; cursor: pointer !important; }}
+        body {{ top: 0 !important; }}
+    </style>
     <div class="container">
         <div class="header">
             <h1>Training Report: {self.checkpoint_name}</h1>
@@ -1701,7 +1828,7 @@ class Trainer:
             </div>
         </div>
         <div class="status-banner {thinking_status}">
-            <div class="banner-icon">{'PERFECTO' if thinking_status == 'healthy' else 'ALERTA' if thinking_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-icon">{'OK' if thinking_status == 'healthy' else 'WARNING' if thinking_status == 'overfitting' else 'INFORMATION'}</div>
             <div class="banner-content">
                 <div class="banner-title">{thinking_status_text}</div>
                 <div class="banner-detail">{thinking_status_detail}</div>
@@ -1722,7 +1849,7 @@ class Trainer:
             </div>
         </div>
         <div class="status-banner {agent_status}">
-            <div class="banner-icon">{'PERFECTO' if agent_status == 'healthy' else 'ALERTA' if agent_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-icon">{'OK' if agent_status == 'healthy' else 'WARNING' if agent_status == 'overfitting' else 'INFORMATION'}</div>
             <div class="banner-content">
                 <div class="banner-title">{agent_status_text}</div>
                 <div class="banner-detail">{agent_status_detail}</div>
@@ -1743,7 +1870,7 @@ class Trainer:
             </div>
         </div>
         <div class="status-banner {moe_status}">
-            <div class="banner-icon">{'PERFECTO' if moe_status == 'healthy' else 'ALERTA' if moe_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-icon">{'OK' if moe_status == 'healthy' else 'WARNING' if moe_status == 'overfitting' else 'INFORMATION'}</div>
             <div class="banner-content">
                 <div class="banner-title">{moe_status_text}</div>
                 <div class="banner-detail">{moe_status_detail}</div>
@@ -1752,7 +1879,7 @@ class Trainer:
         ''' if has_moe else ''}
 
         <div class="status-banner {status}">
-            <div class="banner-icon">{'PERFECTO' if status == 'healthy' else 'ALERTA' if status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-icon">{'OK' if status == 'healthy' else 'WARNING' if status == 'overfitting' else 'INFORMATION'}</div>
             <div class="banner-content">
                 <div class="banner-title">{status_text}</div>
                 <div class="banner-detail">{status_detail}</div>
@@ -2273,6 +2400,20 @@ class Trainer:
             # Setup device with improved configuration for CPU-GPU combined training
             device = self._setup_device_and_config()
 
+            def _filter_state_dict(sd, model):
+                """Filter state_dict to only include keys with matching shapes."""
+                model_sd = model.state_dict()
+                filtered = {}
+                skipped = 0
+                for k, v in sd.items():
+                    if k in model_sd and v.shape == model_sd[k].shape:
+                        filtered[k] = v
+                    else:
+                        skipped += 1
+                if self.rank == 0 and skipped:
+                    logger.info(f" Filtered {skipped} keys with shape mismatch (will be retrained)")
+                return filtered
+
             # Initialize model — resume from checkpoint if it exists
             resume_checkpoint = None
             if os.path.exists(self.model_output_path):
@@ -2285,36 +2426,39 @@ class Trainer:
                 num_layers = arch.get('num_layers', 4)
                 checkpoint_vocab_size = arch.get('vocab_size', self.tokenizer.vocab_size)
                 current_vocab_size = self.tokenizer.vocab_size
-                
+
+                # Detect MoE from actual state_dict keys, not metadata
+                sd_keys = set(resume_checkpoint['model_state_dict'].keys())
+                checkpoint_has_moe = any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+                use_moe = checkpoint_has_moe or self.config.moe_enabled
+
                 model = ChatModelMoE(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
                                       num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
                                       top_k=arch.get('moe_top_k', self.config.moe_top_k),
-                                      load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight)) if arch.get('moe_enabled', self.config.moe_enabled) else ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
+                                      load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight)) if use_moe else ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
                 
                 # Handle vocab_size mismatch
                 if checkpoint_vocab_size != current_vocab_size:
                     if self.rank == 0:
                         logger.warning(f" vocab_size mismatch: checkpoint={checkpoint_vocab_size}, current={current_vocab_size}")
                         logger.info(" Loading only transformer layers (skipping embedding/head layers)...")
-                    
-                    # Filter out embedding and head layers
-                    state_dict = resume_checkpoint['model_state_dict']
-                    filtered_state_dict = {}
-                    for k, v in state_dict.items():
-                        # Skip embedding and head layers if vocab_size mismatch
-                        if 'wte.weight' in k or 'lm_head.weight' in k:
-                            if v.shape[0] != current_vocab_size:
-                                if self.rank == 0:
-                                    logger.info(f"   Skipping {k}: shape {v.shape} -> will be retrained")
-                                continue
-                        filtered_state_dict[k] = v
-                    
-                    # Load with strict=False to allow missing keys
-                    missing, unexpected = model.load_state_dict(filtered_state_dict, strict=False)
+
+                    filtered = _filter_state_dict(resume_checkpoint['model_state_dict'], model)
+                    missing, unexpected = model.load_state_dict(filtered, strict=False)
                     if self.rank == 0 and missing:
                         logger.info(f" Missing keys (will be retrained): {len(missing)}")
                 else:
-                    model.load_state_dict(resume_checkpoint['model_state_dict'])
+                    # Detect MoE from actual state_dict keys, not metadata
+                    sd_keys = set(resume_checkpoint['model_state_dict'].keys())
+                    checkpoint_has_moe = any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+                    current_moe = self.config.moe_enabled
+                    if checkpoint_has_moe != current_moe:
+                        if self.rank == 0:
+                            logger.warning(f" Architecture mismatch: checkpoint MoE={checkpoint_has_moe}, current MoE={current_moe}")
+                    filtered = _filter_state_dict(resume_checkpoint['model_state_dict'], model)
+                    missing, unexpected = model.load_state_dict(filtered, strict=False)
+                    if self.rank == 0 and missing:
+                        logger.info(f" Missing keys (will be retrained): {len(missing)}")
                 
                 if self.rank == 0:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
@@ -2336,10 +2480,21 @@ class Trainer:
 
             # Define loss and optimizer
             criterion = nn.CrossEntropyLoss(ignore_index=self.tokenizer.get_pad_index(), reduction='none')
-            optimizer = optim.Adam(model.parameters(), lr=TRAINING_CONFIG['learning_rate'])
+            optimizer = optim.Adam(model.parameters(), lr=TRAINING_CONFIG['learning_rate'], weight_decay=TRAINING_CONFIG.get('weight_decay', 0.01))
             
             # Add learning rate scheduler
-            scheduler = lr_scheduler.StepLR(optimizer, step_size=max(1, self.epochs // 3), gamma=0.1)
+            sched_type = self.config.scheduler_type.lower()
+            if sched_type == 'step':
+                step_size = self.config.scheduler_step_size if self.config.scheduler_step_size > 0 else max(1, self.epochs // 3)
+                scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=self.config.scheduler_gamma)
+            elif sched_type == 'exponential':
+                scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=self.config.scheduler_gamma)
+            elif sched_type == 'plateau':
+                scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=self.config.scheduler_patience, factor=self.config.scheduler_factor)
+            elif sched_type == 'onecycle':
+                scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=TRAINING_CONFIG['learning_rate'], total_steps=self.epochs)
+            else:  # cosine (default)
+                scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.epochs, eta_min=self.config.scheduler_eta_min)
 
             # Restore optimizer and scheduler state if resuming
             if resume_checkpoint is not None:
@@ -2371,7 +2526,16 @@ class Trainer:
                         logger.info(f" Best loss restored: {self.best_loss:.4f}")
 
             if self.rank == 0:
-                logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
+                if sched_type == 'step':
+                    logger.info(f" Learning rate scheduler: StepLR (step_size={scheduler.step_size}, gamma={scheduler.gamma})")
+                elif sched_type == 'exponential':
+                    logger.info(f" Learning rate scheduler: ExponentialLR (gamma={scheduler.gamma})")
+                elif sched_type == 'plateau':
+                    logger.info(f" Learning rate scheduler: ReduceLROnPlateau (patience={scheduler.patience}, factor={scheduler.factor})")
+                elif sched_type == 'onecycle':
+                    logger.info(f" Learning rate scheduler: OneCycleLR (max_lr={TRAINING_CONFIG['learning_rate']})")
+                else:
+                    logger.info(f" Learning rate scheduler: CosineAnnealingLR (T_max={self.epochs}, eta_min={self.config.scheduler_eta_min})")
 
             # Initialize gradient scaler for mixed precision training
             scaler = GradScaler() if self.use_mixed_precision else None
@@ -2439,7 +2603,12 @@ class Trainer:
                 train_loss, total_tokens, grad_norm, thinking_metrics, agent_metrics = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
 
                 # Update learning rate
-                scheduler.step()
+                if sched_type == 'plateau':
+                    # Plateau scheduler needs val_loss
+                    val_metric = val_loss if val_dataloader is not None else train_loss
+                    scheduler.step(val_metric)
+                else:
+                    scheduler.step()
                 current_lr = optimizer.param_groups[0]['lr']
 
                 # Validation

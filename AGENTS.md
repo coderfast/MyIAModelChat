@@ -456,10 +456,11 @@ open → in_progress → done
 - Enhanced testing suite with 21 test files covering tools, agents, MoE, and thinking
 - PDF/EPUB Whole-Paragraph Extraction: PDF samples are whole paragraphs; EPUB uses native chapters (whole chapter when it fits, else paragraphs via BeautifulSoup); repeated headers/footers and standalone page numbers removed via cross-page detection (`clean_page_artifacts`)
 - Training Metrics: validation split, perplexity, train/val gap, grad norm, tokens/s, CSV logging, early stopping
-- HTML Training Report: Chart.js graphs for Loss, Perplexity, Gap, LR, Speed, Thinking, Agent, MoE; green/red/yellow status indicators
+- HTML Training Report: Chart.js graphs for Loss, Perplexity, Gap, LR, Speed, Thinking, Agent, MoE; OK/WARNING/INFORMATION status indicators; Google Translate banner
 - Correlated Epoch Numbering: checkpoint filenames continue from last training session (e.g., epoch 5 → epoch 6)
 - Per-Epoch Model Overwrite: `chat_model.pth` updated after every epoch (not just at end)
 - HTML Report Serialization: Python `None` → JavaScript `null` for correct chart rendering
+- Robust Checkpoint Resume: detects MoE from state_dict keys (not metadata), filters shape mismatches via `_filter_state_dict`, handles architecture changes between sessions (e.g., adding/expert count, MoE on/off)
 
 ---
 
