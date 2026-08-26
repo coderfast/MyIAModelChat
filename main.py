@@ -358,6 +358,16 @@ EXAMPLES:
         parser.add_argument("--statistics", action='store_true', help="Show detailed per-step timing statistics during training")
         parser.add_argument("--bpe-vocab-size", type=int, default=8000, help="Vocabulary size for BPE tokenizer (default: 8000)")
 
+        # Validation and metrics options
+        parser.add_argument("--val-split", type=float, default=0.1,
+                            help="Validation split ratio: 0.0-0.5 (default: 0.1 = 10%%, 0 = no validation)")
+        parser.add_argument("--val-batches", type=int, default=0,
+                            help="Max validation batches per epoch: 0=all, 1-N=limit (default: 0)")
+        parser.add_argument("--early-stopping-patience", type=int, default=0,
+                            help="Stop if no improvement in N epochs: 0=disabled, 1-N=patience (default: 0)")
+        parser.add_argument("--no-metrics-csv", action='store_true',
+                            help="Disable CSV metrics logging")
+
         # Device selection
         parser.add_argument("--cpu", action='store_true', help="Force CPU-only execution (disable GPU)")
         parser.add_argument("--gpu", type=str, nargs='?', const='', default=None,
@@ -639,6 +649,10 @@ EXAMPLES:
                 moe_top_k=getattr(args, 'moe_top_k', 2),
                 moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
                 moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
+                val_split=getattr(args, 'val_split', 0.1),
+                val_batches=getattr(args, 'val_batches', 0),
+                early_stopping_patience=getattr(args, 'early_stopping_patience', 0),
+                log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
                 rank=args.rank,
                 local_rank=args.local_rank,
                 world_size=args.world_size,

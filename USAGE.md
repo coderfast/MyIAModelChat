@@ -751,9 +751,11 @@ Workflow with cached data (fast iteration):
 ================================================================================
 
 Training Mode Creates (in checkpoints/ directory):
-    - chat_model.pth              Model weights
+    - chat_model.pth              Latest model weights (overwritten every epoch)
+    - chat_model_epoch_N_*.pth    Best model checkpoints (only when loss improves)
+    - chat_model_metrics.csv      Per-epoch training metrics
+    - chat_model_metrics_report.html  HTML report with Chart.js graphs
     - tokenizer_vocab.json        Bilingual tokenizer with vocabulary and mappings
-    - config.json                 Training configuration and metadata
 
 Data Preparation Creates (in dataset_cache/ directory):
     - dataset_cache/

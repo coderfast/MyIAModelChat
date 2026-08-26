@@ -3,6 +3,8 @@ import pickle
 import sys
 import time
 import math
+import csv
+import json
 import threading
 import contextlib
 import torch
@@ -105,6 +107,30 @@ class TokenPairIterableDataset(IterableDataset):
         raise TypeError("TokenPairIterableDataset length not set")
 
 
+class _RangedIterableDataset(IterableDataset):
+    """Wraps a generator factory to yield only items in [offset, offset+limit)."""
+    def __init__(self, base_factory, offset, limit, length=None):
+        self._base_factory = base_factory
+        self._offset = offset
+        self._limit = limit
+        self._length = length
+
+    def __iter__(self):
+        count = 0
+        for i, item in enumerate(self._base_factory()):
+            if i < self._offset:
+                continue
+            yield item
+            count += 1
+            if self._limit > 0 and count >= self._limit:
+                break
+
+    def __len__(self):
+        if self._length is not None:
+            return self._length
+        raise TypeError("_RangedIterableDataset length not set")
+
+
 
 @dataclass
 class TrainingConfig:
@@ -132,6 +158,11 @@ class TrainingConfig:
     moe_top_k: int = 2
     moe_load_balance_weight: float = 0.01
     moe_freeze_attention: bool = False
+    # Validation and metrics
+    val_split: float = 0.1              # 10% del dataset para validacion (0 = sin validacion)
+    val_batches: int = 0                # 0 = usar todo el split; >0 = limitar batches de val
+    early_stopping_patience: int = 0    # 0 = deshabilitado; N = parar si val_loss no mejora en N epochs
+    log_metrics_csv: bool = True        # Guardar metricas en metrics.csv
     # DDP fields (single-machine multi-GPU or multi-node)
     rank: int = 0                # global rank
     local_rank: int = 0          # rank within this machine
@@ -186,6 +217,9 @@ class Trainer:
         self.model_output_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}.pth')
         os.makedirs(MODEL_CHECKPOINT_DIR, exist_ok=True)
 
+        # Detect next epoch number from existing checkpoints
+        self._next_epoch = self._get_next_epoch_number()
+
         # Load cached dataset and metadata (if present)
         self.cache_metadata = {}
         print(f"Loading dataset from cache...")
@@ -232,6 +266,34 @@ class Trainer:
     def request_stop(self):
         """Request that training stop gracefully."""
         self.stop_event.set()
+
+    def _get_next_epoch_number(self):
+        """Read last epoch number from training_state.json."""
+        state_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}_state.json')
+        if os.path.exists(state_path):
+            try:
+                import json
+                with open(state_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data.get('last_epoch', 0)
+            except Exception:
+                pass
+        return 0
+
+    def _save_training_state(self, epoch):
+        """Save last epoch number to training_state.json."""
+        import json
+        state_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}_state.json')
+        try:
+            data = {}
+            if os.path.exists(state_path):
+                with open(state_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            data['last_epoch'] = epoch
+            with open(state_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
 
     def _load_cached_dataset(self):
         """Load dataset from pre-prepared cache."""
@@ -1045,6 +1107,8 @@ class Trainer:
         thinking_metrics_accum = {}
         agent_metrics_accum = {}
         last_loss = 0.0
+        total_tokens = 0
+        last_grad_norm = 0.0
 
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             if self.stop_event.is_set():
@@ -1095,6 +1159,7 @@ class Trainer:
                 loss, logits = self._compute_loss(model, inputs, targets, criterion)
 
             last_loss = loss.item()
+            total_tokens += inputs.size(0) * inputs.size(1)
 
             # Compute thinking metrics periodically (reuse logits from _compute_loss)
             if self.has_thinking_data and (batch_idx + 1) % 50 == 0:
@@ -1145,7 +1210,8 @@ class Trainer:
                     scaler.unscale_(optimizer)
 
                 # Gradient clipping for stability
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=TRAINING_CONFIG['grad_clip_norm'])
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=TRAINING_CONFIG['grad_clip_norm'])
+                last_grad_norm = grad_norm.item() if isinstance(grad_norm, torch.Tensor) else grad_norm
 
                 if scaler:
                     scaler.step(optimizer)
@@ -1229,7 +1295,788 @@ class Trainer:
             logger.info("=" * 80)
 
             logger.info(f"Training loop completed after {num_batches} batches")
-        return avg_loss
+
+        # Compute average thinking metrics for this epoch
+        thinking_epoch = {}
+        for key, values in thinking_metrics_accum.items():
+            thinking_epoch[key] = sum(values) / len(values) if values else 0.0
+
+        # Compute average agent metrics for this epoch
+        agent_epoch = {}
+        for key, values in agent_metrics_accum.items():
+            agent_epoch[key] = sum(values) / len(values) if values else 0.0
+
+        return avg_loss, total_tokens, last_grad_norm, thinking_epoch, agent_epoch
+
+    def validate(self, model, dataloader, criterion, device, max_batches=0):
+        """Run validation loop. Returns (avg_loss, perplexity, num_batches)."""
+        model.eval()
+        total_loss = 0.0
+        total_batches = 0
+
+        with torch.no_grad():
+            for batch_idx, (inputs, targets) in enumerate(dataloader):
+                if max_batches > 0 and batch_idx >= max_batches:
+                    break
+
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+
+                loss, _ = self._compute_loss(model, inputs, targets, criterion)
+                total_loss += loss.item()
+                total_batches += 1
+
+        model.train()
+        avg_loss = total_loss / max(1, total_batches)
+        perplexity = math.exp(min(avg_loss, 20))  # cap to avoid overflow
+        return avg_loss, perplexity, total_batches
+
+
+    def _log_metrics_csv(self, metrics_row, csv_path):
+        """Append a row of metrics to CSV file. Creates header if file doesn't exist.
+        Correlates epoch numbers when retraining (continues from last session)."""
+        file_exists = os.path.exists(csv_path)
+        fieldnames = [
+            'epoch', 'train_loss', 'val_loss', 'train_perplexity', 'val_perplexity',
+            'gap', 'lr', 'grad_norm', 'tokens_per_sec', 'best_loss', 'early_stop_patience',
+            # Thinking metrics
+            'thinking_accuracy', 'thinking_open_acc', 'thinking_close_acc',
+            'thinking_coverage', 'response_accuracy',
+            # Agent metrics
+            'agent_tool_call_acc', 'agent_observation_acc', 'agent_ratio',
+            # MoE metrics
+            'moe_gate_entropy_norm',
+        ]
+        # Add per-expert utilization columns dynamically
+        for key in sorted(metrics_row.keys()):
+            if key.startswith('moe_expert_') and key not in fieldnames:
+                fieldnames.append(key)
+
+        # If file exists, read last epoch number for correlation
+        epoch_offset = 0
+        if file_exists:
+            try:
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    last_epoch = 0
+                    for row in reader:
+                        try:
+                            last_epoch = int(row.get('epoch', 0))
+                        except (ValueError, TypeError):
+                            pass
+                    epoch_offset = last_epoch
+            except Exception:
+                epoch_offset = 0
+
+        # Epoch number is already correlated (current_epoch_num = _next_epoch + epoch + 1)
+        # No additional offset needed - just write the row as-is
+
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(metrics_row)
+
+    def _generate_training_report(self, csv_path):
+        """Generate an HTML report with training graphs from CSV metrics."""
+        if not os.path.exists(csv_path):
+            return
+
+        # Read CSV data
+        epochs = []
+        train_losses = []
+        val_losses = []
+        train_perplexities = []
+        val_perplexities = []
+        gaps = []
+        lrs = []
+        grad_norms = []
+        tokens_per_secs = []
+        # Thinking metrics
+        thinking_accuracies = []
+        thinking_open_accs = []
+        thinking_close_accs = []
+        thinking_coverages = []
+        response_accuracies = []
+        # Agent metrics
+        agent_tool_call_accs = []
+        agent_observation_accs = []
+        agent_ratios = []
+        # MoE metrics
+        moe_gate_entropy_norms = []
+        moe_expert_utils = {}  # expert_id -> list of utilization values
+
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        epochs.append(int(row.get('epoch', 0)))
+                        train_losses.append(float(row.get('train_loss', 0)))
+                        val_loss = row.get('val_loss', '').strip()
+                        val_losses.append(float(val_loss) if val_loss else None)
+                        train_perplexities.append(float(row.get('train_perplexity', 0)))
+                        val_perp = row.get('val_perplexity', '').strip()
+                        val_perplexities.append(float(val_perp) if val_perp else None)
+                        gap = row.get('gap', '').strip()
+                        gaps.append(float(gap) if gap else None)
+                        lrs.append(float(row.get('lr', 0)))
+                        grad_norms.append(float(row.get('grad_norm', 0)))
+                        tokens_per_secs.append(float(row.get('tokens_per_sec', 0)))
+                        # Thinking metrics
+                        ta = row.get('thinking_accuracy', '').strip()
+                        thinking_accuracies.append(float(ta) if ta else None)
+                        to = row.get('thinking_open_acc', '').strip()
+                        thinking_open_accs.append(float(to) if to else None)
+                        tc = row.get('thinking_close_acc', '').strip()
+                        thinking_close_accs.append(float(tc) if tc else None)
+                        tv = row.get('thinking_coverage', '').strip()
+                        thinking_coverages.append(float(tv) if tv else None)
+                        ra = row.get('response_accuracy', '').strip()
+                        response_accuracies.append(float(ra) if ra else None)
+                        # Agent metrics
+                        at = row.get('agent_tool_call_acc', '').strip()
+                        agent_tool_call_accs.append(float(at) if at else None)
+                        ao = row.get('agent_observation_acc', '').strip()
+                        agent_observation_accs.append(float(ao) if ao else None)
+                        ar = row.get('agent_ratio', '').strip()
+                        agent_ratios.append(float(ar) if ar else None)
+                        # MoE metrics
+                        me = row.get('moe_gate_entropy_norm', '').strip()
+                        moe_gate_entropy_norms.append(float(me) if me else None)
+                        # Per-expert utilization
+                        for key, value in row.items():
+                            if key.startswith('moe_expert_') and key.endswith('_util'):
+                                expert_id = key.replace('moe_expert_', '').replace('_util', '')
+                                if expert_id not in moe_expert_utils:
+                                    moe_expert_utils[expert_id] = []
+                                ev = value.strip()
+                                moe_expert_utils[expert_id].append(float(ev) if ev else None)
+                    except (ValueError, TypeError):
+                        continue
+        except Exception:
+            return
+
+        if not epochs:
+            return
+
+        # Determine training status
+        has_val = any(v is not None for v in val_losses)
+        if has_val and len(val_losses) >= 2:
+            first_val = next(v for v in val_losses if v is not None)
+            last_val = next(v for v in reversed(val_losses) if v is not None)
+            val_change_pct = ((last_val - first_val) / first_val) * 100 if first_val > 0 else 0
+            if last_val < first_val * 0.9:
+                status = "healthy"
+                status_text = f"TRAINING IS GOING WELL - Val loss decreased {abs(val_change_pct):.1f}%"
+                status_detail = "The model is learning and generalizing to new data."
+            elif last_val > first_val * 1.1:
+                status = "overfitting"
+                status_text = f"WARNING: OVERFITTING DETECTED - Val loss increased {val_change_pct:.1f}%"
+                status_detail = "The model is memorizing training data but failing on new data. Reduce --val-split or add more data."
+            else:
+                status = "stable"
+                status_text = f"TRAINING IS STABLE - Val loss changed {val_change_pct:+.1f}%"
+                status_detail = "Loss is plateauing. Try more epochs or adjust learning rate."
+        else:
+            first_loss = train_losses[0] if train_losses else 0
+            last_loss = train_losses[-1] if train_losses else 0
+            loss_change_pct = ((last_loss - first_loss) / first_loss) * 100 if first_loss > 0 else 0
+            if last_loss < first_loss * 0.9:
+                status = "healthy"
+                status_text = f"TRAINING IS GOING WELL - Loss decreased {abs(loss_change_pct):.1f}%"
+                status_detail = "The model is learning. Add --val-split 0.1 to monitor generalization."
+            elif last_loss > first_loss * 1.1:
+                status = "overfitting"
+                status_text = f"WARNING: LOSS INCREASING - Loss increased {loss_change_pct:.1f}%"
+                status_detail = "Training is diverging. Reduce learning rate or check data quality."
+            else:
+                status = "stable"
+                status_text = f"TRAINING IS STABLE - Loss changed {loss_change_pct:+.1f}%"
+                status_detail = "Loss plateau. Try more epochs or adjust learning rate."
+
+        # Thinking status
+        has_thinking = any(v is not None for v in thinking_accuracies)
+        if has_thinking and len(thinking_accuracies) >= 2:
+            first_ta = next(v for v in thinking_accuracies if v is not None)
+            last_ta = next(v for v in reversed(thinking_accuracies) if v is not None)
+            last_tc = next((v for v in reversed(thinking_close_accs) if v is not None), 0)
+            if last_ta > 0.8 and last_tc > 0.7:
+                thinking_status = "healthy"
+                thinking_status_text = f"THINKING IS LEARNING - Accuracy: {last_ta*100:.0f}% (close: {last_tc*100:.0f}%)"
+                thinking_status_detail = "Model is learning to generate thinking blocks correctly."
+            elif last_ta < 0.5 or last_tc < 0.3:
+                thinking_status = "overfitting"
+                thinking_status_text = f"THINKING NEEDS ATTENTION - Accuracy: {last_ta*100:.0f}% (close: {last_tc*100:.0f}%)"
+                thinking_status_detail = "Model struggles with thinking delimiters. Check thinking data quality."
+            else:
+                thinking_status = "stable"
+                thinking_status_text = f"THINKING IS STABLE - Accuracy: {last_ta*100:.0f}%"
+                thinking_status_detail = "Thinking accuracy is moderate. More epochs may help."
+        else:
+            thinking_status = None
+            thinking_status_text = None
+            thinking_status_detail = None
+
+        # Agent status
+        has_agent = any(v is not None for v in agent_tool_call_accs)
+        if has_agent and len(agent_tool_call_accs) >= 2:
+            first_at = next(v for v in agent_tool_call_accs if v is not None)
+            last_at = next(v for v in reversed(agent_tool_call_accs) if v is not None)
+            last_ao = next((v for v in reversed(agent_observation_accs) if v is not None), 0)
+            if last_at > 0.7 and last_ao > 0.6:
+                agent_status = "healthy"
+                agent_status_text = f"AGENT IS LEARNING - Tool Call: {last_at*100:.0f}% | Observation: {last_ao*100:.0f}%"
+                agent_status_detail = "Model is learning tool calls and observations correctly."
+            elif last_at < 0.4 or last_ao < 0.3:
+                agent_status = "overfitting"
+                agent_status_text = f"AGENT NEEDS ATTENTION - Tool Call: {last_at*100:.0f}% | Observation: {last_ao*100:.0f}%"
+                agent_status_detail = "Model struggles with agentic tokens. Check agent data quality."
+            else:
+                agent_status = "stable"
+                agent_status_text = f"AGENT IS STABLE - Tool Call: {last_at*100:.0f}%"
+                agent_status_detail = "Agent accuracy is moderate. More epochs may help."
+        else:
+            agent_status = None
+            agent_status_text = None
+            agent_status_detail = None
+
+        # MoE status
+        has_moe = any(v is not None for v in moe_gate_entropy_norms)
+        if has_moe and len(moe_gate_entropy_norms) >= 2:
+            last_entropy = next(v for v in reversed(moe_gate_entropy_norms) if v is not None)
+            # Check if experts are balanced (entropy > 0.7 means good balance)
+            if last_entropy > 0.7:
+                moe_status = "healthy"
+                moe_status_text = f"MoE IS BALANCED - Gate entropy: {last_entropy*100:.0f}% of max"
+                moe_status_detail = "Experts are being used evenly. Load balancing is working."
+            elif last_entropy < 0.4:
+                moe_status = "overfitting"
+                moe_status_text = f"MoE EXPERT COLLAPSE - Gate entropy: {last_entropy*100:.0f}% of max"
+                moe_status_detail = "One or more experts dominate. Increase load_balance_weight."
+            else:
+                moe_status = "stable"
+                moe_status_text = f"MoE IS MODERATE - Gate entropy: {last_entropy*100:.0f}% of max"
+                moe_status_detail = "Expert distribution is moderate. Monitor for collapse."
+        else:
+            moe_status = None
+            moe_status_text = None
+            moe_status_detail = None
+
+        # Precompute display values for HTML template (avoid f-string ternary issues)
+        final_train_loss_str = f"{train_losses[-1]:.4f}" if train_losses else "N/A"
+        final_val_loss_str = f"{next(v for v in reversed(val_losses) if v is not None):.4f}" if has_val else "N/A"
+        final_perplexity_str = f"{train_perplexities[-1]:.2f}" if train_perplexities else "N/A"
+        final_tokens_str = f"{tokens_per_secs[-1]:.0f}" if tokens_per_secs else "N/A"
+        total_epochs_str = str(epochs[-1]) if epochs else "0"
+
+        # Serialize data for JavaScript (Python None → null, proper JS syntax)
+        epochs_json = json.dumps(epochs)
+        train_losses_json = json.dumps(train_losses)
+        val_losses_json = json.dumps(val_losses)
+        train_perplexities_json = json.dumps(train_perplexities)
+        val_perplexities_json = json.dumps(val_perplexities)
+        gaps_json = json.dumps(gaps)
+        lrs_json = json.dumps(lrs)
+        tokens_per_secs_json = json.dumps(tokens_per_secs)
+        grad_norms_json = json.dumps(grad_norms)
+        thinking_accuracies_json = json.dumps(thinking_accuracies)
+        thinking_open_accs_json = json.dumps(thinking_open_accs)
+        thinking_close_accs_json = json.dumps(thinking_close_accs)
+        thinking_coverages_json = json.dumps(thinking_coverages)
+        response_accuracies_json = json.dumps(response_accuracies)
+        agent_tool_call_accs_json = json.dumps(agent_tool_call_accs)
+        agent_observation_accs_json = json.dumps(agent_observation_accs)
+        agent_ratios_json = json.dumps(agent_ratios)
+        moe_gate_entropy_norms_json = json.dumps(moe_gate_entropy_norms)
+        moe_expert_utils_json = json.dumps(moe_expert_utils)
+
+        # Generate HTML
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Report - {self.checkpoint_name}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 1200px; margin: 0 auto; }}
+        .header {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .status {{ padding: 15px 20px; border-radius: 8px; margin: 15px 0; font-weight: bold; border-left: 5px solid; }}
+        .status.healthy {{ background: #d4edda; color: #155724; border-color: #28a745; }}
+        .status.overfitting {{ background: #f8d7da; color: #721c24; border-color: #dc3545; }}
+        .status.stable {{ background: #fff3cd; color: #856404; border-color: #ffc107; }}
+        .status-main {{ font-size: 18px; margin-bottom: 5px; }}
+        .status-detail {{ font-size: 14px; font-weight: normal; opacity: 0.9; }}
+        .status-banner {{ display: flex; align-items: center; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }}
+        .status-banner.healthy {{ background: linear-gradient(135deg, #28a745, #20c997); color: white; }}
+        .status-banner.overfitting {{ background: linear-gradient(135deg, #dc3545, #e83e8c); color: white; }}
+        .status-banner.stable {{ background: linear-gradient(135deg, #ffc107, #fd7e14); color: white; }}
+        .banner-icon {{ font-size: 36px; margin-right: 20px; opacity: 0.9; }}
+        .banner-content {{ flex: 1; }}
+        .banner-title {{ font-size: 20px; font-weight: bold; margin-bottom: 5px; }}
+        .banner-detail {{ font-size: 14px; opacity: 0.9; }}
+        .section-divider {{ font-size: 20px; font-weight: bold; color: #333; margin: 30px 0 15px 0; padding: 10px 0; border-bottom: 3px solid #3498db; }}
+        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+        canvas {{ max-height: 300px; }}
+        .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
+        .metric {{ background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .metric-value {{ font-size: 24px; font-weight: bold; color: #333; }}
+        .metric-label {{ font-size: 12px; color: #666; margin-top: 5px; }}
+        @media (max-width: 768px) {{
+            .charts-grid {{ grid-template-columns: 1fr; }}
+            .summary {{ grid-template-columns: repeat(2, 1fr); }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Training Report: {self.checkpoint_name}</h1>
+            <div class="status {status}">
+                <div class="status-main">{status_text}</div>
+                <div class="status-detail">{status_detail}</div>
+            </div>
+            <p>Total epochs: {total_epochs_str} | Final train loss: {final_train_loss_str} | Final val loss: {final_val_loss_str}</p>
+        </div>
+
+        <div class="summary">
+            <div class="metric">
+                <div class="metric-value">{final_train_loss_str}</div>
+                <div class="metric-label">Final Train Loss</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{final_val_loss_str}</div>
+                <div class="metric-label">Final Val Loss</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{final_perplexity_str}</div>
+                <div class="metric-label">Final Perplexity</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{final_tokens_str}</div>
+                <div class="metric-label">Tokens/sec</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>Loss Over Time</h2>
+            <canvas id="lossChart"></canvas>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Perplexity</h2>
+                <canvas id="perplexityChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Train/Val Gap</h2>
+                <canvas id="gapChart"></canvas>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Learning Rate</h2>
+                <canvas id="lrChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Training Speed (tokens/s)</h2>
+                <canvas id="speedChart"></canvas>
+            </div>
+        </div>
+
+        {f'''
+        <div class="section-divider">THINKING TRAINING PROGRESS</div>
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Thinking Accuracy</h2>
+                <canvas id="thinkingAccuracyChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Thinking Coverage</h2>
+                <canvas id="thinkingCoverageChart"></canvas>
+            </div>
+        </div>
+        <div class="status-banner {thinking_status}">
+            <div class="banner-icon">{'PERFECTO' if thinking_status == 'healthy' else 'ALERTA' if thinking_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-content">
+                <div class="banner-title">{thinking_status_text}</div>
+                <div class="banner-detail">{thinking_status_detail}</div>
+            </div>
+        </div>
+        ''' if has_thinking else ''}
+
+        {f'''
+        <div class="section-divider">AGENT TRAINING PROGRESS</div>
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Agent Accuracy</h2>
+                <canvas id="agentAccuracyChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Agent Token Ratio</h2>
+                <canvas id="agentRatioChart"></canvas>
+            </div>
+        </div>
+        <div class="status-banner {agent_status}">
+            <div class="banner-icon">{'PERFECTO' if agent_status == 'healthy' else 'ALERTA' if agent_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-content">
+                <div class="banner-title">{agent_status_text}</div>
+                <div class="banner-detail">{agent_status_detail}</div>
+            </div>
+        </div>
+        ''' if has_agent else ''}
+
+        {f'''
+        <div class="section-divider">MoE TRAINING PROGRESS</div>
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>Gate Entropy (normalized)</h2>
+                <canvas id="moeEntropyChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Expert Utilization</h2>
+                <canvas id="moeUtilChart"></canvas>
+            </div>
+        </div>
+        <div class="status-banner {moe_status}">
+            <div class="banner-icon">{'PERFECTO' if moe_status == 'healthy' else 'ALERTA' if moe_status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-content">
+                <div class="banner-title">{moe_status_text}</div>
+                <div class="banner-detail">{moe_status_detail}</div>
+            </div>
+        </div>
+        ''' if has_moe else ''}
+
+        <div class="status-banner {status}">
+            <div class="banner-icon">{'PERFECTO' if status == 'healthy' else 'ALERTA' if status == 'overfitting' else 'INFORMACION'}</div>
+            <div class="banner-content">
+                <div class="banner-title">{status_text}</div>
+                <div class="banner-detail">{status_detail}</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const epochs = {epochs_json};
+        const trainLoss = {train_losses_json};
+        const valLoss = {val_losses_json};
+        const trainPerplexity = {train_perplexities_json};
+        const valPerplexity = {val_perplexities_json};
+        const gaps = {gaps_json};
+        const lrs = {lrs_json};
+        const tokensPerSec = {tokens_per_secs_json};
+        const gradNorms = {grad_norms_json};
+        const thinkingAccuracy = {thinking_accuracies_json};
+        const thinkingOpenAcc = {thinking_open_accs_json};
+        const thinkingCloseAcc = {thinking_close_accs_json};
+        const thinkingCoverage = {thinking_coverages_json};
+        const responseAccuracy = {response_accuracies_json};
+        const agentToolCallAcc = {agent_tool_call_accs_json};
+        const agentObsAcc = {agent_observation_accs_json};
+        const agentRatio = {agent_ratios_json};
+        const moeEntropyNorm = {moe_gate_entropy_norms_json};
+        const moeExpertUtils = {moe_expert_utils_json};
+
+        // Loss Chart
+        new Chart(document.getElementById('lossChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [
+                    {{
+                        label: 'Train Loss',
+                        data: trainLoss,
+                        borderColor: '#3498db',
+                        tension: 0.3,
+                        fill: false
+                    }},
+                    {{
+                        label: 'Val Loss',
+                        data: valLoss,
+                        borderColor: '#e74c3c',
+                        tension: 0.3,
+                        fill: false
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                    y: {{ title: {{ display: true, text: 'Loss' }} }}
+                }}
+            }}
+        }});
+
+        // Perplexity Chart
+        new Chart(document.getElementById('perplexityChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [
+                    {{
+                        label: 'Train Perplexity',
+                        data: trainPerplexity,
+                        borderColor: '#2ecc71',
+                        tension: 0.3,
+                        fill: false
+                    }},
+                    {{
+                        label: 'Val Perplexity',
+                        data: valPerplexity,
+                        borderColor: '#e67e22',
+                        tension: 0.3,
+                        fill: false
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                    y: {{ title: {{ display: true, text: 'Perplexity' }} }}
+                }}
+            }}
+        }});
+
+        // Gap Chart
+        new Chart(document.getElementById('gapChart'), {{
+            type: 'bar',
+            data: {{
+                labels: epochs,
+                datasets: [{{
+                    label: 'Val - Train Loss',
+                    data: gaps,
+                    backgroundColor: gaps.map(v => v === null ? 'transparent' : v > 0 ? 'rgba(231, 76, 60, 0.6)' : 'rgba(46, 204, 113, 0.6)'),
+                    borderColor: gaps.map(v => v === null ? 'transparent' : v > 0 ? '#e74c3c' : '#2ecc71'),
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                    y: {{ title: {{ display: true, text: 'Gap' }} }}
+                }},
+                plugins: {{
+                    annotation: {{
+                        annotations: {{
+                            zeroLine: {{
+                                type: 'line',
+                                yMin: 0,
+                                yMax: 0,
+                                borderColor: '#999',
+                                borderDash: [5, 5]
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+
+        // Learning Rate Chart
+        new Chart(document.getElementById('lrChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [{{
+                    label: 'Learning Rate',
+                    data: lrs,
+                    borderColor: '#9b59b6',
+                    tension: 0.3,
+                    fill: false
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                    y: {{ title: {{ display: true, text: 'Learning Rate' }} }}
+                }}
+            }}
+        }});
+
+        // Speed Chart
+        new Chart(document.getElementById('speedChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [{{
+                    label: 'Tokens/sec',
+                    data: tokensPerSec,
+                    borderColor: '#1abc9c',
+                    tension: 0.3,
+                    fill: true,
+                    backgroundColor: 'rgba(26, 188, 156, 0.2)'
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                    y: {{ title: {{ display: true, text: 'Tokens/sec' }} }}
+                }}
+            }}
+        }});
+
+        // Thinking Accuracy Chart
+        if (thinkingAccuracy.length > 0 && thinkingAccuracy[0] !== null) {{
+            new Chart(document.getElementById('thinkingAccuracyChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [
+                        {{ label: 'Overall', data: thinkingAccuracy, borderColor: '#3498db', tension: 0.3, fill: false }},
+                        {{ label: 'Open <thinking>', data: thinkingOpenAcc, borderColor: '#2ecc71', tension: 0.3, fill: false }},
+                        {{ label: 'Close </thinking>', data: thinkingCloseAcc, borderColor: '#e74c3c', tension: 0.3, fill: false }},
+                        {{ label: 'Response', data: responseAccuracy, borderColor: '#9b59b6', tension: 0.3, fill: false }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
+                    }}
+                }}
+            }});
+        }}
+
+        // Thinking Coverage Chart
+        if (thinkingCoverage.length > 0 && thinkingCoverage[0] !== null) {{
+            new Chart(document.getElementById('thinkingCoverageChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'Thinking Coverage',
+                        data: thinkingCoverage,
+                        borderColor: '#f39c12',
+                        tension: 0.3,
+                        fill: true,
+                        backgroundColor: 'rgba(243, 156, 18, 0.2)'
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'Coverage' }}, min: 0, max: 1 }}
+                    }}
+                }}
+            }});
+        }}
+
+        // Agent Accuracy Chart
+        if (agentToolCallAcc.length > 0 && agentToolCallAcc[0] !== null) {{
+            new Chart(document.getElementById('agentAccuracyChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [
+                        {{ label: 'Tool Call', data: agentToolCallAcc, borderColor: '#e67e22', tension: 0.3, fill: false }},
+                        {{ label: 'Observation', data: agentObsAcc, borderColor: '#1abc9c', tension: 0.3, fill: false }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
+                    }}
+                }}
+            }});
+        }}
+
+        // Agent Ratio Chart
+        if (agentRatio.length > 0 && agentRatio[0] !== null) {{
+            new Chart(document.getElementById('agentRatioChart'), {{
+                type: 'bar',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'Agent Token Ratio',
+                        data: agentRatio,
+                        backgroundColor: 'rgba(230, 126, 34, 0.6)',
+                        borderColor: '#e67e22',
+                        borderWidth: 1
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'Ratio' }}, min: 0 }}
+                    }}
+                }}
+            }});
+        }}
+
+        // MoE Entropy Chart
+        if (moeEntropyNorm.length > 0 && moeEntropyNorm[0] !== null) {{
+            new Chart(document.getElementById('moeEntropyChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'Normalized Entropy',
+                        data: moeEntropyNorm,
+                        borderColor: '#8e44ad',
+                        tension: 0.3,
+                        fill: true,
+                        backgroundColor: 'rgba(142, 68, 173, 0.2)'
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'Entropy (0=collapsed, 1=balanced)' }}, min: 0, max: 1 }}
+                    }}
+                }}
+            }});
+        }}
+
+        // MoE Expert Utilization Chart
+        if (Object.keys(moeExpertUtils).length > 0) {{
+            const expertColors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+            const datasets = Object.keys(moeExpertUtils).map((key, i) => ({{
+                label: 'Expert ' + key,
+                data: moeExpertUtils[key],
+                backgroundColor: expertColors[i % expertColors.length] + '99',
+                borderColor: expertColors[i % expertColors.length],
+                borderWidth: 1
+            }}));
+            new Chart(document.getElementById('moeUtilChart'), {{
+                type: 'bar',
+                data: {{ labels: epochs, datasets: datasets }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ stacked: true, title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ stacked: true, title: {{ display: true, text: 'Utilization' }}, min: 0 }}
+                    }}
+                }}
+            }});
+        }}
+    </script>
+</body>
+</html>"""
+
+        # Write HTML file
+        html_path = csv_path.replace('.csv', '_report.html')
+        try:
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            if self.rank == 0:
+                logger.info(f"  Training report saved to {html_path}")
+        except Exception as e:
+            if self.rank == 0:
+                logger.warning(f"  Could not generate training report: {e}")
 
 
     def collate_fn(self, batch):
@@ -1352,18 +2199,40 @@ class Trainer:
                     yield input_ids, output_ids
 
             dataset_length = len(self.loaded_dataset) if hasattr(self.loaded_dataset, '__len__') else None
-            iterable_dataset = TokenPairIterableDataset(
-                token_pair_generator,
-                length=dataset_length,
-                rank=self.rank,
-                world_size=self.world_size
-            )
 
-            # Create DataLoader with custom collate function
+            # Split into train/validation
+            val_split = getattr(self.config, 'val_split', 0.1)
+            val_batches_config = getattr(self.config, 'val_batches', 0)
+            val_dataloader = None
+
+            if val_split > 0 and dataset_length is not None and dataset_length > 10:
+                val_size = max(1, int(dataset_length * val_split))
+                train_size = dataset_length - val_size
+                if self.rank == 0:
+                    logger.info(f"Dataset split: {train_size} train / {val_size} validation ({val_split*100:.0f}%)")
+                    if val_batches_config == 0:
+                        logger.info(f"  val_batches=0: evaluating ALL {val_size // TRAINING_CONFIG['batch_size']} validation batches per epoch")
+                    else:
+                        logger.info(f"  val_batches={val_batches_config}: limiting validation to {val_batches_config} batches per epoch")
+
+                train_dataset = _RangedIterableDataset(token_pair_generator, offset=0, limit=train_size, length=train_size)
+                val_dataset = _RangedIterableDataset(token_pair_generator, offset=train_size, limit=val_size, length=val_size)
+
+                iterable_dataset = train_dataset
+            else:
+                if val_split > 0 and self.rank == 0:
+                    logger.info(f"Validation split disabled (dataset too small: {dataset_length} samples)")
+                iterable_dataset = TokenPairIterableDataset(
+                    token_pair_generator,
+                    length=dataset_length,
+                    rank=self.rank,
+                    world_size=self.world_size
+                )
+
+            # Create train DataLoader
             if self.rank == 0:
                 logger.info(f"Creating DataLoader (batch_size={TRAINING_CONFIG['batch_size']})...")
-            pin_memory = self.use_gpu  # Only use pin_memory if GPU is available
-            # num_workers = self._limit_num_workers_by_memory(max(1, min(2, mp.cpu_count() // 2)))
+            pin_memory = self.use_gpu
 
             dataloader = DataLoader(
                 iterable_dataset,
@@ -1373,6 +2242,19 @@ class Trainer:
                 pin_memory=pin_memory,
                 num_workers=0
             )
+
+            # Create validation DataLoader if split was applied
+            if val_split > 0 and dataset_length is not None and dataset_length > 10:
+                val_dataloader = DataLoader(
+                    val_dataset,
+                    batch_size=TRAINING_CONFIG['batch_size'],
+                    shuffle=False,
+                    collate_fn=self.collate_fn,
+                    pin_memory=pin_memory,
+                    num_workers=0
+                )
+                if self.rank == 0:
+                    logger.info("Validation DataLoader created")
 
             if self.rank == 0:
                 logger.info(" DataLoader created")
@@ -1535,65 +2417,203 @@ class Trainer:
             if self.rank == 0:
                 logger.info(f"Starting main training phase ({self.epochs} epochs)...")
                 logger.info("=" * 80)
-            
+
+            # Early stopping state
+            early_stopping_patience = getattr(self.config, 'early_stopping_patience', 0)
+            best_val_loss = float('inf')
+            patience_counter = 0
+
+            # CSV metrics path
+            metrics_csv_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}_metrics.csv')
+            log_csv = getattr(self.config, 'log_metrics_csv', True) and self.rank == 0
+
             num_epochs = self.epochs
             for epoch in range(num_epochs):
                 if self.stop_event.is_set():
                     logger.warning("Training stop requested; ending before next epoch")
                     break
 
+                epoch_start_time = time.time()
+
                 # Training
-                loss = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
-                
+                train_loss, total_tokens, grad_norm, thinking_metrics, agent_metrics = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+
                 # Update learning rate
                 scheduler.step()
                 current_lr = optimizer.param_groups[0]['lr']
-                
-                # Memory and performance information (rank-0 only)
-                if self.rank == 0:
-                    if self.use_gpu:
-                        gpu_memory = torch.cuda.memory_allocated(device) / 1e9
-                        gpu_memory_reserved = torch.cuda.memory_reserved(device) / 1e9
-                        logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e} | GPU mem used: {gpu_memory:.2f}GB / reserved: {gpu_memory_reserved:.2f}GB")
-                    else:
-                        logger.info(f"Epoch {epoch+1:2d}/{num_epochs} | Training loss (avg per batch): {loss:.4f} | Learning rate (LR): {current_lr:.2e}")
 
-                # Save best model checkpoint after each epoch (rank-0 only)
-                if loss < self.best_loss:
-                    self.best_loss = loss
-                    if self.rank == 0:
+                # Validation
+                val_loss = 0.0
+                val_perplexity = 0.0
+                if val_dataloader is not None:
+                    val_loss, val_perplexity, val_batches_run = self.validate(
+                        model, val_dataloader, criterion, device,
+                        max_batches=val_batches_config if val_batches_config > 0 else 0
+                    )
+
+                # Compute metrics
+                train_perplexity = math.exp(min(train_loss, 20))
+                gap = val_loss - train_loss if val_dataloader is not None else 0.0
+                epoch_time = time.time() - epoch_start_time
+                tokens_per_sec = total_tokens / epoch_time if epoch_time > 0 else 0
+
+                # MoE metrics (if enabled)
+                moe_metrics = {}
+                if self.config.moe_enabled and hasattr(model, 'get_expert_utilization'):
+                    try:
+                        utilization = model.get_expert_utilization()
+                        for expert_id, util in utilization.items():
+                            moe_metrics[f'moe_expert_{expert_id}_util'] = util
+                        # Compute gate entropy (higher = more balanced)
+                        if hasattr(model, '_all_gate_scores') and model._all_gate_scores:
+                            all_scores = torch.stack([s.detach() if s.requires_grad else s for s in model._all_gate_scores])
+                            probs = all_scores.mean(dim=[0, 1, 2])
+                            entropy = -(probs * torch.log(probs + 1e-10)).sum().item()
+                            moe_metrics['moe_gate_entropy'] = entropy
+                            # Normalized entropy (0 = one expert, log(N) = perfectly balanced)
+                            import math as _math
+                            max_entropy = _math.log(self.config.moe_num_experts)
+                            moe_metrics['moe_gate_entropy_norm'] = entropy / max_entropy if max_entropy > 0 else 0
+                    except Exception:
+                        pass
+
+                # Log enhanced metrics (rank-0 only)
+                if self.rank == 0:
+                    current_epoch_num = self._next_epoch + epoch + 1
+                    total_epochs_display = self._next_epoch + num_epochs
+                    if val_dataloader is not None:
+                        gap_sign = "+" if gap >= 0 else ""
+                        logger.info(
+                            f"Epoch {current_epoch_num:2d}/{total_epochs_display} | "
+                            f"Train Loss: {train_loss:.4f} | "
+                            f"Val Loss: {val_loss:.4f} | "
+                            f"Perplexity: {train_perplexity:.2f}/{val_perplexity:.2f} | "
+                            f"Gap: {gap_sign}{gap:.4f} | "
+                            f"LR: {current_lr:.2e} | "
+                            f"Tokens/s: {tokens_per_sec:.0f} | "
+                            f"Grad: {grad_norm:.2f}"
+                        )
+                    else:
+                        if self.use_gpu:
+                            gpu_memory = torch.cuda.memory_allocated(device) / 1e9
+                            logger.info(
+                                f"Epoch {current_epoch_num:2d}/{total_epochs_display} | "
+                                f"Train Loss: {train_loss:.4f} | "
+                                f"Perplexity: {train_perplexity:.2f} | "
+                                f"LR: {current_lr:.2e} | "
+                                f"Tokens/s: {tokens_per_sec:.0f} | "
+                                f"Grad: {grad_norm:.2f} | "
+                                f"GPU: {gpu_memory:.2f}GB"
+                            )
+                        else:
+                            logger.info(
+                                f"Epoch {current_epoch_num:2d}/{total_epochs_display} | "
+                                f"Train Loss: {train_loss:.4f} | "
+                                f"Perplexity: {train_perplexity:.2f} | "
+                                f"LR: {current_lr:.2e} | "
+                                f"Tokens/s: {tokens_per_sec:.0f} | "
+                                f"Grad: {grad_norm:.2f}"
+                            )
+
+                    # Save best model checkpoint
+                    best_metric = val_loss if val_dataloader is not None else train_loss
+                    state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
+                    checkpoint_data = {
+                        'epoch': current_epoch_num,
+                        'model_state_dict': state_dict,
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'scheduler_state_dict': scheduler.state_dict(),
+                        'loss': best_metric,
+                        'train_loss': train_loss,
+                        'val_loss': val_loss if val_dataloader is not None else None,
+                        'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
+                        'model_name': self.checkpoint_name,
+                        'architecture': {
+                            'embed_size': TRAINING_CONFIG['embed_size'],
+                            'hidden_size': TRAINING_CONFIG['hidden_size'],
+                            'num_layers': TRAINING_CONFIG.get('num_layers', 4),
+                            'n_head': TRAINING_CONFIG.get('n_head', 4),
+                            'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+                            'vocab_size': self.tokenizer.vocab_size,
+                            'moe_enabled': self.config.moe_enabled,
+                            'moe_num_experts': self.config.moe_num_experts,
+                            'moe_top_k': self.config.moe_top_k,
+                            'moe_load_balance_weight': self.config.moe_load_balance_weight,
+                        },
+                        'dataset_source': self.dataset_source,
+                    }
+
+                    # Save epoch-specific checkpoint (only if best)
+                    if best_metric < self.best_loss:
+                        self.best_loss = best_metric
                         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                        epoch_filename = f"{self.checkpoint_name}_epoch_{epoch+1}_{timestamp}.pth"
+                        epoch_filename = f"{self.checkpoint_name}_epoch_{current_epoch_num}_{timestamp}.pth"
                         epoch_path = os.path.join(MODEL_CHECKPOINT_DIR, epoch_filename)
-                        # Use model.module.state_dict() for DDP to remove 'module.' prefix
-                        state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
-                        torch.save({
-                            'epoch': epoch + 1,
-                            'model_state_dict': state_dict,
-                            'optimizer_state_dict': optimizer.state_dict(),
-                            'scheduler_state_dict': scheduler.state_dict(),
-                            'loss': loss,
-                            'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
-                            'model_name': self.checkpoint_name,
-                            'architecture': {
-                                'embed_size': TRAINING_CONFIG['embed_size'],
-                                'hidden_size': TRAINING_CONFIG['hidden_size'],
-                                'num_layers': TRAINING_CONFIG.get('num_layers', 4),
-                                'n_head': TRAINING_CONFIG.get('n_head', 4),
-                                'n_positions': TRAINING_CONFIG.get('n_positions', 512),
-                                'vocab_size': self.tokenizer.vocab_size,
-                                'moe_enabled': self.config.moe_enabled,
-                                'moe_num_experts': self.config.moe_num_experts,
-                                'moe_top_k': self.config.moe_top_k,
-                                'moe_load_balance_weight': self.config.moe_load_balance_weight,
-                            },
-                            'dataset_source': self.dataset_source,
-                        }, epoch_path)
-                        logger.info(f"Epoch {epoch+1} checkpoint saved to {epoch_path}")
-                    # Synchronize all processes after checkpoint save
-                    if self.world_size > 1:
-                        import torch.distributed as dist
-                        dist.barrier()
+                        torch.save(checkpoint_data, epoch_path)
+                        logger.info(f"  Best model saved to {epoch_path}")
+
+                    # Always overwrite chat_model.pth with latest epoch
+                    torch.save(checkpoint_data, self.model_output_path)
+
+                    # Save training state for epoch correlation
+                    self._save_training_state(current_epoch_num)
+
+                    # CSV metrics logging
+                    if log_csv:
+                        metrics_row = {
+                            'epoch': current_epoch_num,
+                            'train_loss': f"{train_loss:.6f}",
+                            'val_loss': f"{val_loss:.6f}" if val_dataloader is not None else "",
+                            'train_perplexity': f"{train_perplexity:.4f}",
+                            'val_perplexity': f"{val_perplexity:.4f}" if val_dataloader is not None else "",
+                            'gap': f"{gap:.6f}" if val_dataloader is not None else "",
+                            'lr': f"{current_lr:.8f}",
+                            'grad_norm': f"{grad_norm:.4f}",
+                            'tokens_per_sec': f"{tokens_per_sec:.0f}",
+                            'best_loss': f"{self.best_loss:.6f}",
+                            'early_stop_patience': f"{patience_counter}",
+                            # Thinking metrics
+                            'thinking_accuracy': f"{thinking_metrics.get('thinking_token_accuracy', 0):.4f}" if thinking_metrics else "",
+                            'thinking_open_acc': f"{thinking_metrics.get('thinking_open_accuracy', 0):.4f}" if thinking_metrics else "",
+                            'thinking_close_acc': f"{thinking_metrics.get('thinking_close_accuracy', 0):.4f}" if thinking_metrics else "",
+                            'thinking_coverage': f"{thinking_metrics.get('thinking_coverage', 0):.4f}" if thinking_metrics else "",
+                            'response_accuracy': f"{thinking_metrics.get('response_token_accuracy', 0):.4f}" if thinking_metrics else "",
+                            # Agent metrics
+                            'agent_tool_call_acc': f"{agent_metrics.get('agent_tool_call_accuracy', 0):.4f}" if agent_metrics else "",
+                            'agent_observation_acc': f"{agent_metrics.get('agent_observation_accuracy', 0):.4f}" if agent_metrics else "",
+                            'agent_ratio': f"{agent_metrics.get('agent_ratio', 0):.6f}" if agent_metrics else "",
+                            # MoE metrics
+                            'moe_gate_entropy_norm': f"{moe_metrics.get('moe_gate_entropy_norm', 0):.4f}" if moe_metrics else "",
+                        }
+                        # Add per-expert utilization
+                        for expert_id in range(self.config.moe_num_experts):
+                            key = f'moe_expert_{expert_id}_util'
+                            metrics_row[key] = f"{moe_metrics.get(key, 0):.4f}" if moe_metrics else ""
+                        self._log_metrics_csv(metrics_row, metrics_csv_path)
+
+                # Early stopping check
+                if early_stopping_patience > 0 and val_dataloader is not None:
+                    current_best = val_loss
+                    if current_best < best_val_loss:
+                        best_val_loss = current_best
+                        patience_counter = 0
+                    else:
+                        patience_counter += 1
+                        if self.rank == 0:
+                            logger.info(f"  Early stopping patience: {patience_counter}/{early_stopping_patience}")
+                        if patience_counter >= early_stopping_patience:
+                            if self.rank == 0:
+                                logger.info(f"Early stopping triggered at epoch {current_epoch_num} (no improvement in {early_stopping_patience} epochs)")
+                            break
+
+                # DDP barrier
+                if self.world_size > 1:
+                    import torch.distributed as dist
+                    dist.barrier()
+
+            # Generate training report after epoch loop
+            if log_csv and self.rank == 0:
+                self._generate_training_report(metrics_csv_path)
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():
@@ -1623,7 +2643,7 @@ class Trainer:
                 # Use model.module.state_dict() for DDP to remove 'module.' prefix
                 state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
                 torch.save({
-                    'epoch': epoch + 1,
+                    'epoch': self._next_epoch + num_epochs,
                     'model_state_dict': state_dict,
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),

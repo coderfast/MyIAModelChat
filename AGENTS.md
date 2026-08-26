@@ -249,6 +249,12 @@ python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
 # Enable Mixture of Experts (MoE) training
 python main.py --train --moe-enabled --moe-num-experts 4 --moe-top-k 2
 
+# Train with validation and early stopping
+python main.py --train --epochs 30 --val-split 0.1 --early-stopping-patience 5
+
+# Train without validation (backward-compatible)
+python main.py --train --epochs 30 --val-split 0
+
 # Apply contamination filtering
 python main.py --prepare-data --aiml --filter-noise --filter-contamination --filter-dedup --filter-balance
 
@@ -318,6 +324,12 @@ python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
 ### Configuration Dataclasses
 - TrainingConfig: All training parameters (no CLI args)
 - ChatConfig: All inference parameters (no CLI args)
+
+### Training Metrics
+- Validation split with `--val-split` (default 10%)
+- Per-epoch metrics: train_loss, val_loss, perplexity, gap, grad_norm, tokens/s
+- CSV logging to `checkpoints/{name}_metrics.csv`
+- Early stopping with `--early-stopping-patience`
 
 ### Class Inheritance
 - ThinkingGenerator base class with source-specific implementations
@@ -443,7 +455,12 @@ open → in_progress → done
 - MoE (Mixture of Experts) architecture support for training
 - Enhanced testing suite with 21 test files covering tools, agents, MoE, and thinking
 - PDF/EPUB Whole-Paragraph Extraction: PDF samples are whole paragraphs; EPUB uses native chapters (whole chapter when it fits, else paragraphs via BeautifulSoup); repeated headers/footers and standalone page numbers removed via cross-page detection (`clean_page_artifacts`)
+- Training Metrics: validation split, perplexity, train/val gap, grad norm, tokens/s, CSV logging, early stopping
+- HTML Training Report: Chart.js graphs for Loss, Perplexity, Gap, LR, Speed, Thinking, Agent, MoE; green/red/yellow status indicators
+- Correlated Epoch Numbering: checkpoint filenames continue from last training session (e.g., epoch 5 → epoch 6)
+- Per-Epoch Model Overwrite: `chat_model.pth` updated after every epoch (not just at end)
+- HTML Report Serialization: Python `None` → JavaScript `null` for correct chart rendering
 
 ---
 
-*Last updated: 2026-08-17*
+*Last updated: 2026-08-26*

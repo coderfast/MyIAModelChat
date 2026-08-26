@@ -44,6 +44,12 @@ python main.py --train --epochs 30
 # Train with custom checkpoint name
 python main.py --train --checkpoint-name ciencias_naturales --epochs 30
 
+# Train with validation and early stopping
+python main.py --train --epochs 30 --val-split 0.1 --early-stopping-patience 5
+
+# Train without validation (backward-compatible)
+python main.py --train --epochs 30 --val-split 0
+
 # Refresh cache after adding new data
 python main.py --prepare-data --aiml --epub --refresh-cache
 
@@ -238,12 +244,16 @@ export_to_gguf("model.pth")
 
 | File | Size | Purpose |
 |------|------|---------|
+| `checkpoints/chat_model.pth` | ~37MB | Latest model (overwritten every epoch) |
+| `checkpoints/chat_model_epoch_N_*.pth` | ~37MB | Best model checkpoints (when loss improves) |
 | `models/<name>.pth` | ~37MB | Trained model checkpoint (with metadata) |
 | `models/<a>+<b>.pth` | ~37MB | Merged model (weight average) |
 | `models/exported/<name>.gguf` | ~20MB | GGUF for Ollama/llama.cpp |
 | `models/exported/<name>.onnx` | ~15MB | ONNX for ONNX Runtime |
 | `models/exported/<name>_int8.onnx` | ~10MB | Quantized ONNX |
 | `checkpoints/tokenizer_vocab.json` | ~1KB | Tokenizer metadata |
+| `checkpoints/chat_model_metrics.csv` | ~1KB | Training metrics per epoch |
+| `checkpoints/chat_model_metrics_report.html` | ~10KB | HTML report with Chart.js graphs |
 | `dataset_cache/` | ~5GB | Cached processed datasets |
 
 ## Caching System

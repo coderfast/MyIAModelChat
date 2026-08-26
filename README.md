@@ -208,6 +208,12 @@ Train multiple independent models and use them individually or combined.
 ```bash
 python main.py --train --dataset datasets_source/ciencias/ --checkpoint-name ciencias_naturales --aiml --hf --epochs 30
 python main.py --train --dataset datasets_source/programacion/ --checkpoint-name programacion --aiml --hf --epochs 30
+
+# Train with validation and early stopping
+python main.py --train --epochs 30 --val-split 0.1 --early-stopping-patience 5
+
+# Train without validation (backward-compatible)
+python main.py --train --epochs 30 --val-split 0
 ```
 
 ### List available models
@@ -424,6 +430,11 @@ class TrainingConfig:
     preserve_metadata: bool = False
     enable_lang_filter: bool = False
     allowed_languages: List[str] = field(default_factory=lambda: ['es', 'en'])
+    # Validation and metrics
+    val_split: float = 0.1              # Validation split ratio (0 = no validation)
+    val_batches: int = 0                # Max validation batches per epoch (0 = all)
+    early_stopping_patience: int = 0    # Stop if no improvement in N epochs (0 = disabled)
+    log_metrics_csv: bool = True        # Save metrics to CSV
 ```
 
 ### ChatConfig (inference/chat_engine.py)
@@ -468,15 +479,19 @@ class ChatConfig:
 
 ### Training Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs NUM` | Number of training epochs | `1` |
-| `--refresh-cache` | Rebuild cache from scratch | (flag) |
-| `--onlytokenize` | Build vocabulary only | (flag) |
-| `--bpe-vocab-size` | BPE vocabulary size | `8000` |
-| `--thinking-mode` | Generate thinking data (nlp, ollama) | none |
-| `--thinking-model` | Ollama model for thinking | `llama3.2` |
-| `--show-thinking` | Show thinking in chat output | (flag) |
+| Flag | Description | Accepted Values | Default |
+|------|-------------|-----------------|---------|
+| `--epochs NUM` | Number of training epochs | `1`-`1000` | `1` |
+| `--refresh-cache` | Rebuild cache from scratch | (flag) | - |
+| `--onlytokenize` | Build vocabulary only | (flag) | - |
+| `--bpe-vocab-size` | BPE vocabulary size | `1000`-`50000` | `8000` |
+| `--val-split FLOAT` | Validation split ratio | `0.0`-`0.5` (0=no val) | `0.1` |
+| `--val-batches NUM` | Max validation batches per epoch | `0` (all), `1`-`N` | `0` |
+| `--early-stopping-patience NUM` | Stop if no improvement in N epochs | `0` (disabled), `1`-`N` | `0` |
+| `--no-metrics-csv` | Disable CSV metrics logging | (flag) | - |
+| `--thinking-mode` | Generate thinking data (nlp, ollama) | `nlp`, `ollama` | none |
+| `--thinking-model` | Ollama model for thinking | model name | `llama3.2` |
+| `--show-thinking` | Show thinking in chat output | (flag) | - |
 
 ### Device Selection
 

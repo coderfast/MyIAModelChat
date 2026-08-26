@@ -129,29 +129,35 @@ else:
 python main.py --train \
     --epochs 30 \
     --checkpoint-name my_model \
+    --val-split 0.1 \
+    --early-stopping-patience 5 \
     --cpu \
     --num_cores 4
 ```
 
-| Argument | Purpose | Default |
-|----------|---------|---------|
-| `--epochs` | Number of training epochs | 1 |
-| `--checkpoint-name` | Name for saved checkpoint | `chat_model` |
-| `--aiml` | Include AIML datasets (prepare-data only) | False |
-| `--pdf` | Include PDF document datasets (prepare-data only) | False |
-| `--epub` | Include EPUB e-book datasets (prepare-data only) | False |
-| `--hf` | Include Hugging Face datasets (prepare-data only) | False |
-| `--csv` | Include CSV datasets | False |
-| `--web` | Include web scraping datasets | False |
-| `--cpu` | Force CPU training | False |
-| `--gpu [N,N,...]` | Use GPU (auto or specific indices) | auto |
-| `--vulkan` | Force Vulkan backend | False |
-| `--cpu+gpu N,N,...` | CPU+GPU hybrid (split by VRAM) | - |
-| `--gpu-enum` | Enumerate available GPUs and exit | - |
-| `--model-info NAME` | Show model layer details | - |
-| `--num_cores` | CPU cores for DataLoader workers | auto |
-| `--num_threads` | Additional threads per worker | auto |
-| `--dataset PATH` | Path to dataset directory | `dataset_cache` |
+| Argument | Purpose | Accepted Values | Default |
+|----------|---------|-----------------|---------|
+| `--epochs` | Number of training epochs | `1` - `1000` | `1` |
+| `--checkpoint-name` | Name for saved checkpoint | string | `chat_model` |
+| `--val-split` | Validation split ratio | `0.0` - `0.5` (0=no validation) | `0.1` |
+| `--val-batches` | Max validation batches per epoch | `0` (all), `1` - `N` | `0` |
+| `--early-stopping-patience` | Stop if no improvement in N epochs | `0` (disabled), `1` - `N` | `0` |
+| `--no-metrics-csv` | Disable CSV metrics logging | flag | `False` |
+| `--aiml` | Include AIML datasets (prepare-data only) | flag | `False` |
+| `--pdf` | Include PDF document datasets (prepare-data only) | flag | `False` |
+| `--epub` | Include EPUB e-book datasets (prepare-data only) | flag | `False` |
+| `--hf` | Include Hugging Face datasets (prepare-data only) | flag | `False` |
+| `--csv` | Include CSV datasets | flag | `False` |
+| `--web` | Include web scraping datasets | flag | `False` |
+| `--cpu` | Force CPU training | flag | `False` |
+| `--gpu [N,N,...]` | Use GPU (auto or specific indices) | `auto`, `0`, `0,1`, etc. | `auto` |
+| `--vulkan` | Force Vulkan backend | flag | `False` |
+| `--cpu+gpu N,N,...` | CPU+GPU hybrid (split by VRAM) | `0`, `0,1`, etc. | - |
+| `--gpu-enum` | Enumerate available GPUs and exit | flag | - |
+| `--model-info NAME` | Show model layer details | model name | - |
+| `--num_cores` | CPU cores for DataLoader workers | `0` (auto), `1` - `N` | `0` |
+| `--num_threads` | Additional threads per worker | `0` (auto), `1` - `N` | `0` |
+| `--dataset PATH` | Path to dataset directory | path string | `dataset_cache` |
 | `--statistics` | Show detailed per-step timing stats | False |
 | `--thinking-mode` | Generate thinking data (nlp, ollama) | none |
 | `--thinking-model` | Ollama model for thinking (with ollama mode) | llama3.2 |
@@ -229,14 +235,39 @@ The trainer automatically:
 ### Expected Training Metrics
 
 ```
-Training batch 50/inf in progress...
-  Thinking Metrics Summary:
-    thinking_token_accuracy: 0.8234
-    thinking_open_accuracy: 0.8189
-    thinking_close_accuracy: 0.8278
-    thinking_coverage: 0.6543
-    response_token_accuracy: 0.7891
+Epoch  1/30 | Train Loss: 4.2315 | Val Loss: 4.1892 | Perplexity: 68.90/65.90 | Gap: -0.0423 | LR: 1.00e-03 | Tokens/s: 12450 | Grad: 0.85
+Epoch  2/30 | Train Loss: 3.8764 | Val Loss: 3.9201 | Perplexity: 48.30/50.40 | Gap: +0.0437 | LR: 9.20e-04 | Tokens/s: 12680 | Grad: 0.72
+...
+Epoch 15/30 | Train Loss: 2.1045 | Val Loss: 2.8934 | Perplexity: 8.20/18.10 | Gap: +0.7889 | LR: 2.10e-04 | Tokens/s: 12590 | Grad: 0.45
 ```
+
+**Metrics explained:**
+- **Train Loss**: Error on training data (lower = better)
+- **Val Loss**: Error on validation data (lower = better, must track train loss)
+- **Perplexity**: `e^loss` — "how many options the model considers" (8 = confident, 68 = uncertain)
+- **Gap**: `val_loss - train_loss` (negative = good generalization, positive/growing = overfitting)
+- **Grad Norm**: Gradient stability (spike >10 = gradient explosion)
+- **Tokens/s**: Effective training speed
+- **Thinking**: `thinking_accuracy`, `thinking_open_acc`, `thinking_close_acc`, `thinking_coverage`, `response_accuracy` — Thinking block metrics
+- **Agent**: `agent_tool_call_acc`, `agent_observation_acc`, `agent_ratio` — Agentic token metrics
+- **MoE**: `moe_gate_entropy_norm` (0=collapsed, 1=balanced), `moe_expert_N_util` — Expert utilization
+
+**CSV logging**: Metrics saved to `checkpoints/{name}_metrics.csv` for visualization.
+
+### HTML Report
+
+After training, a `_report.html` file is generated alongside the CSV with:
+- **Loss & Perplexity** charts (train vs val)
+- **Gap & Learning Rate** charts
+- **Thinking** section: accuracy, coverage, response accuracy with green/red status
+- **Agent** section: tool_call_acc, observation_acc, ratio with green/red status
+- **MoE** section: gate entropy, expert utilization stacked bars with green/red status
+- **Status banner** at the bottom: green (healthy), red (overfitting), yellow (stable)
+
+**Status indicators:**
+- Green: loss decreased >10% or accuracy > threshold
+- Red: loss increased >10% or accuracy below threshold
+- Yellow: loss changed <10% (stable/plateau)
 
 ### Chat with Thinking
 
@@ -420,13 +451,15 @@ torch.save(checkpoint, f'models/{checkpoint_name}.pth')
 
 ### Resuming Training
 
+Training automatically continues from the last checkpoint's epoch number. If `chat_model_epoch_5_*.pth` exists, running `--train` will start from epoch 6.
+
 ```python
-checkpoint = torch.load('checkpoints/checkpoint_epoch_5.pth')
+# Manual resume (if needed)
+checkpoint = torch.load('checkpoints/chat_model.pth')
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-tokenizer = checkpoint['tokenizer']  # Load tokenizer from checkpoint
-start_epoch = checkpoint['epoch'] + 1
+start_epoch = checkpoint['epoch']  # Already includes offset
 ```
 
 ## Model Library
@@ -493,6 +526,12 @@ Each checkpoint now includes metadata for validation and export:
     'dataset_source': 'datasets_source/ciencias/',
 }
 ```
+
+**Epoch numbering**: Checkpoint filenames use correlated epoch numbers. If you trained 2 epochs previously (`chat_model_epoch_1_*.pth`, `chat_model_epoch_2_*.pth`), the next training session continues from epoch 3.
+
+**Per-epoch overwrite**: `chat_model.pth` is overwritten after every epoch, always containing the latest model state. Epoch-specific checkpoints (`chat_model_epoch_N_*.pth`) are only saved when a new best loss is achieved.
+
+**HTML report**: After training, a `_report.html` file is generated with Chart.js graphs for Loss, Perplexity, Gap, LR, Speed, Thinking, Agent, and MoE metrics. Python `None` values are serialized as JavaScript `null` for correct rendering.
 
 ## Performance Profiling
 
