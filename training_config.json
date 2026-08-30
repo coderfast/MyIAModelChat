@@ -30,6 +30,22 @@
     "load_balance_weight": 0.01,
     "freeze_attention": false
   },
+  "mtp": {
+    "enabled": true,
+    "num_heads": 4,
+    "loss_weight": 0.3
+  },
+  "draft": {
+    "enabled": true,
+    "num_layers": 2,
+    "embed_size": 128,
+    "hidden_size": 256,
+    "n_head": 2,
+    "kd_enabled": false,
+    "kd_temperature": 2.0,
+    "kd_loss_weight": 0.5,
+    "kd_epochs": 1
+  },
   "validation": {
     "split": 0.1,
     "batches": 0,

@@ -26,6 +26,8 @@ import torch
 
 from commons.model.chatmodel import ChatModel
 from commons.model.chatmodel_moe import ChatModelMoE
+from commons.model.chatmodel_mtp import ChatModelMTP
+from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
 from commons.dialogue.dialogmanager import DialogueManager
 try:
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
@@ -56,6 +58,7 @@ class ChatConfig:
     agent_enabled: bool = False
     agent_max_iterations: int = 5
     agent_show_tool_calls: bool = True
+    draft_model_name: Optional[str] = None  # Draft model for speculative decoding (llama.cpp -md flag)
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
@@ -187,7 +190,27 @@ class ChatEngine:
                 )
 
             arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
-            if arch.get('moe_enabled', False):
+            # Detect MoE and MTP from both metadata and state_dict keys
+            sd_keys = set(state_dict.keys()) if state_dict else set()
+            checkpoint_has_moe = arch.get('moe_enabled', False) or any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+            checkpoint_has_mtp = arch.get('mtp_enabled', False) or any('mtp_heads' in k for k in sd_keys)
+
+            if checkpoint_has_moe and checkpoint_has_mtp:
+                self.model = ChatModelMoEMTP(self.tokenizer,
+                    embed_size=arch.get('embed_size', 256),
+                    num_layers=arch.get('num_layers', 4),
+                    num_experts=arch.get('moe_num_experts', 4),
+                    top_k=arch.get('moe_top_k', 2),
+                    load_balance_weight=arch.get('moe_load_balance_weight', 0.01),
+                    mtp_num_heads=arch.get('mtp_num_heads', 4),
+                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+            elif checkpoint_has_mtp:
+                self.model = ChatModelMTP(self.tokenizer,
+                    embed_size=arch.get('embed_size', 256),
+                    num_layers=arch.get('num_layers', 4),
+                    mtp_num_heads=arch.get('mtp_num_heads', 4),
+                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+            elif checkpoint_has_moe:
                 self.model = ChatModelMoE(self.tokenizer,
                     embed_size=arch.get('embed_size', 256),
                     num_layers=arch.get('num_layers', 4),

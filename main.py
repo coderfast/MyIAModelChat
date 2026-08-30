@@ -424,6 +424,35 @@ EXAMPLES:
                             help="Weight for load balancing loss (default: 0.01)")
         parser.add_argument("--moe-freeze-attention", action='store_true',
                             help="Freeze attention layers during MoE training")
+
+        # MTP (Multi-Token Prediction) configuration
+        parser.add_argument("--mtp-enabled", action='store_true',
+                            help="Enable Multi-Token Prediction training")
+        parser.add_argument("--mtp-num-heads", type=int, default=4,
+                            help="Number of MTP heads including primary (default: 4)")
+        parser.add_argument("--mtp-loss-weight", type=float, default=0.3,
+                            help="Weight for MTP auxiliary loss (default: 0.3)")
+
+        # Draft model (speculative decoding) configuration
+        parser.add_argument("--draft-enabled", action='store_true',
+                            help="Create draft model for speculative decoding after training")
+        parser.add_argument("--draft-num-layers", type=int, default=2,
+                            help="Number of layers in draft model (default: 2)")
+        parser.add_argument("--draft-embed-size", type=int, default=128,
+                            help="Embed size in draft model (default: 128)")
+        parser.add_argument("--draft-hidden-size", type=int, default=256,
+                            help="Hidden size in draft model (default: 256)")
+        parser.add_argument("--draft-n-head", type=int, default=2,
+                            help="Attention heads in draft model (default: 2)")
+        parser.add_argument("--draft-kd-enabled", action='store_true',
+                            help="Train draft model with Knowledge Distillation from target")
+        parser.add_argument("--draft-kd-temperature", type=float, default=2.0,
+                            help="Temperature for KD soft labels (default: 2.0)")
+        parser.add_argument("--draft-kd-loss-weight", type=float, default=0.5,
+                            help="Weight for KD loss vs next-token loss (default: 0.5)")
+        parser.add_argument("--draft-kd-epochs", type=int, default=10,
+                            help="Epochs for KD training of draft model (default: 10)")
+
         parser.add_argument("--validate-sources", action='store_true',
                             help="Validate and clean each data source before training")
 
@@ -666,6 +695,18 @@ EXAMPLES:
                     moe_top_k=getattr(args, 'moe_top_k', 2) if getattr(args, 'moe_top_k', 2) != 2 else json_config.moe_top_k,
                     moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01) if getattr(args, 'moe_load_balance_weight', 0.01) != 0.01 else json_config.moe_load_balance_weight,
                     moe_freeze_attention=getattr(args, 'moe_freeze_attention', False) or json_config.moe_freeze_attention,
+                    mtp_enabled=getattr(args, 'mtp_enabled', False) or json_config.mtp_enabled,
+                    mtp_num_heads=getattr(args, 'mtp_num_heads', 4) if getattr(args, 'mtp_num_heads', 4) != 4 else json_config.mtp_num_heads,
+                    mtp_loss_weight=getattr(args, 'mtp_loss_weight', 0.3) if getattr(args, 'mtp_loss_weight', 0.3) != 0.3 else json_config.mtp_loss_weight,
+                    draft_enabled=getattr(args, 'draft_enabled', False) or json_config.draft_enabled,
+                    draft_num_layers=getattr(args, 'draft_num_layers', 2) if getattr(args, 'draft_num_layers', 2) != 2 else json_config.draft_num_layers,
+                    draft_embed_size=getattr(args, 'draft_embed_size', 128) if getattr(args, 'draft_embed_size', 128) != 128 else json_config.draft_embed_size,
+                    draft_hidden_size=getattr(args, 'draft_hidden_size', 256) if getattr(args, 'draft_hidden_size', 256) != 256 else json_config.draft_hidden_size,
+                    draft_n_head=getattr(args, 'draft_n_head', 2) if getattr(args, 'draft_n_head', 2) != 2 else json_config.draft_n_head,
+                    draft_kd_enabled=getattr(args, 'draft_kd_enabled', False) or json_config.draft_kd_enabled,
+                    draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0) if getattr(args, 'draft_kd_temperature', 2.0) != 2.0 else json_config.draft_kd_temperature,
+                    draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5) if getattr(args, 'draft_kd_loss_weight', 0.5) != 0.5 else json_config.draft_kd_loss_weight,
+                    draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10) if getattr(args, 'draft_kd_epochs', 10) != 10 else json_config.draft_kd_epochs,
                     val_split=getattr(args, 'val_split', 0.1) if getattr(args, 'val_split', 0.1) != 0.1 else json_config.val_split,
                     val_batches=getattr(args, 'val_batches', 0) if getattr(args, 'val_batches', 0) != 0 else json_config.val_batches,
                     early_stopping_patience=getattr(args, 'early_stopping_patience', 0) if getattr(args, 'early_stopping_patience', 0) != 0 else json_config.early_stopping_patience,
@@ -701,6 +742,18 @@ EXAMPLES:
                     moe_top_k=getattr(args, 'moe_top_k', 2),
                     moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
                     moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
+                    mtp_enabled=getattr(args, 'mtp_enabled', False),
+                    mtp_num_heads=getattr(args, 'mtp_num_heads', 4),
+                    mtp_loss_weight=getattr(args, 'mtp_loss_weight', 0.3),
+                    draft_enabled=getattr(args, 'draft_enabled', False),
+                    draft_num_layers=getattr(args, 'draft_num_layers', 2),
+                    draft_embed_size=getattr(args, 'draft_embed_size', 128),
+                    draft_hidden_size=getattr(args, 'draft_hidden_size', 256),
+                    draft_n_head=getattr(args, 'draft_n_head', 2),
+                    draft_kd_enabled=getattr(args, 'draft_kd_enabled', False),
+                    draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0),
+                    draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5),
+                    draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10),
                     val_split=getattr(args, 'val_split', 0.1),
                     val_batches=getattr(args, 'val_batches', 0),
                     early_stopping_patience=getattr(args, 'early_stopping_patience', 0),

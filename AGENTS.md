@@ -33,7 +33,10 @@ MyIAModelChat/
 │   ├── __init__.py
 │   ├── model/                           # Model architecture
 │   │   ├── __init__.py
-│   │   └── chatmodel.py                 # GPT-2 Transformer
+│   │   ├── chatmodel.py                 # GPT-2 Transformer
+│   │   ├── chatmodel_moe.py             # MoE (Mixture of Experts)
+│   │   ├── chatmodel_mtp.py             # MTP (Multi-Token Prediction)
+│   │   └── chatmodel_moe_mtp.py         # MoE + MTP combined
 │   ├── tokenizer/                       # Tokenization
 │   │   ├── __init__.py
 │   │   └── bpe_tokenizer.py             # SentencePiece BPE
@@ -143,6 +146,9 @@ MyIAModelChat/
 | main.py | CLI entry point - parses args, orchestrates operations |
 | config.py | Centralized config (OLLAMA_MODEL, OLLAMA_URL) |
 | commons/model/chatmodel.py | GPT-2 Transformer architecture |
+| commons/model/chatmodel_moe.py | MoE (Mixture of Experts) |
+| commons/model/chatmodel_mtp.py | MTP (Multi-Token Prediction) |
+| commons/model/chatmodel_moe_mtp.py | MoE + MTP combined |
 | commons/dialogue/dialogmanager.py | Intent/sentiment analysis, temperature adjustment |
 | commons/dataset/chatdataset.py | PyTorch Dataset for tokenized chat data |
 | commons/tokenizer/bpe_tokenizer.py | SentencePiece BPE tokenizer (multilingual) |
@@ -255,6 +261,24 @@ python main.py --train --epochs 30 --val-split 0.1 --early-stopping-patience 5
 # Train without validation (backward-compatible)
 python main.py --train --epochs 30 --val-split 0
 
+# Enable Multi-Token Prediction (MTP) training
+python main.py --train --mtp-enabled --mtp-num-heads 4 --mtp-loss-weight 0.3
+
+# Combine MoE + MTP training
+python main.py --train --moe-enabled --moe-num-experts 4 --moe-top-k 2 --mtp-enabled --mtp-num-heads 4
+
+# Train with Draft Model (speculative decoding) + Knowledge Distillation
+python main.py --train --epochs 30 --draft-enabled --draft-kd-enabled --draft-kd-epochs 10
+
+# Train with Draft Model (no KD, simple training)
+python main.py --train --epochs 30 --draft-enabled --draft-kd-epochs 10
+
+# Train with Draft Model via JSON config
+python main.py --train --config training_config.json
+
+# Export target + draft to GGUF for llama.cpp
+python main.py --export chat_model --formats gguf
+
 # Apply contamination filtering
 python main.py --prepare-data --aiml --filter-noise --filter-contamination --filter-dedup --filter-balance
 
@@ -330,6 +354,21 @@ python main.py --prepare-data --aiml --generate-agent-data --agent-ratio 0.3
 - Per-epoch metrics: train_loss, val_loss, perplexity, gap, grad_norm, tokens/s
 - CSV logging to `checkpoints/{name}_metrics.csv`
 - Early stopping with `--early-stopping-patience`
+
+### MoE (Mixture of Experts) Architecture
+- MoELayer: top-k expert routing with load balancing loss
+- ChatModelMoE: inherits ChatModel, replaces MLP with MoE layers
+- Checkpoint detection: checks `moe` in metadata or `mlp.experts` in state_dict keys
+- Export: GGUF/ONNX export uses only primary lm_head (MoE layers skipped)
+
+### MTP (Multi-Token Prediction) Architecture
+- MTPHead: `Linear→GELU→Linear` per head, predicts t+2, t+3, ...
+- ChatModelMTP: inherits ChatModel, adds N-1 MTP heads
+- Shared backbone: transformer hidden states used by all heads
+- Training-only: MTP heads are not used during inference
+- Combined MoE+MTP: `ChatModelMoEMTP` inherits `ChatModelMoE`
+- Checkpoint detection: checks `mtp` in metadata or `mtp_heads` in state_dict keys
+- Export: GGUF/ONNX uses only primary lm_head (MTP heads skipped)
 
 ### Class Inheritance
 - ThinkingGenerator base class with source-specific implementations
@@ -461,7 +500,8 @@ open → in_progress → done
 - Per-Epoch Model Overwrite: `chat_model.pth` updated after every epoch (not just at end)
 - HTML Report Serialization: Python `None` → JavaScript `null` for correct chart rendering
 - Robust Checkpoint Resume: detects MoE from state_dict keys (not metadata), filters shape mismatches via `_filter_state_dict`, handles architecture changes between sessions (e.g., adding/expert count, MoE on/off)
+- Draft Model (Speculative Decoding): optional small model for 1.5-3x inference speedup via llama.cpp; supports Knowledge Distillation from target model; exported as separate GGUF; configurable via JSON/CLI (`draft.enabled`, `draft.kd_enabled`, `draft.kd_epochs`)
 
 ---
 
-*Last updated: 2026-08-26*
+*Last updated: 2026-08-30*

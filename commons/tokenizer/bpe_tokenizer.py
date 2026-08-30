@@ -11,8 +11,9 @@ GPT-2 standard special tokens:
   <|tool_result|> - tool result prefix
 """
 
-import logging
+import os
 import torch
+import logging
 
 try:
     import sentencepiece as spm
@@ -319,7 +320,7 @@ class SentencePieceTokenizerWrapper:
             'padding': None,
             'added_tokens': [
                 {
-                    'id': tid,
+                    'id': info['id'],
                     'content': tname,
                     'single_word': False,
                     'lstrip': False,

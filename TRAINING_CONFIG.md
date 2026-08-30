@@ -56,6 +56,22 @@ python main.py --train --config training_config.json --epochs 50
     "load_balance_weight": 0.01,
     "freeze_attention": false
   },
+  "mtp": {
+    "enabled": false,
+    "num_heads": 4,
+    "loss_weight": 0.3
+  },
+  "draft": {
+    "enabled": false,
+    "num_layers": 2,
+    "embed_size": 128,
+    "hidden_size": 256,
+    "n_head": 2,
+    "kd_enabled": false,
+    "kd_temperature": 2.0,
+    "kd_loss_weight": 0.5,
+    "kd_epochs": 10
+  },
   "validation": {
     "split": 0.1,
     "batches": 0,
@@ -343,6 +359,105 @@ MoE usa multiples "expertos" especializados. En vez de un solo modelo grande, ti
 
 ---
 
+### Draft Model (Speculative Decoding)
+
+El draft model es un modelo pequeno que propone tokens candidatos para **speculative decoding**. El modelo principal verifica todos en un solo forward pass, logrando **1.5x-3x de throughput** sin perdida de calidad (lossless).
+
+**Concepto simple:**
+- El draft model "adivina" los proximos N tokens rapidamente
+- El modelo target verifica todos de golpe
+- Si K de N se aceptan, obtienes K tokens en 1 paso en vez de K pasos
+- Si algun token falla, se descarta y se usa la correccion del target
+
+| Parametro | Tipo | Valores | Default | Descripcion |
+|-----------|------|---------|---------|-------------|
+| `draft.enabled` | bool | `true` / `false` | `false` | Habilitar creacion de draft model despues del entrenamiento principal. |
+| `draft.num_layers` | int | `1` - `4` | `2` | Capas del draft. Target tiene 4; draft debe ser menor. |
+| `draft.embed_size` | int | `64` - `256` | `128` | Tamanio de embedding. Target tiene 256; draft debe ser menor. |
+| `draft.hidden_size` | int | `128` - `512` | `256` | Tamanio del hidden layer. Target tiene 512. |
+| `draft.n_head` | int | `1` - `4` | `2` | Cabezas de atencion. Target tiene 4. |
+| `draft.kd_enabled` | bool | `true` / `false` | `false` | Entrenar con Knowledge Distillation usando el target como teacher. |
+| `draft.kd_temperature` | float | `1.0` - `5.0` | `2.0` | Temperature para soft labels del teacher. Mayor = mas suave. |
+| `draft.kd_loss_weight` | float | `0.0` - `1.0` | `0.5` | Peso del KD loss vs next-token loss. `0.5` = balance. |
+| `draft.kd_epochs` | int | `1` - `100` | `10` | Epochs de entrenamiento del draft (despues del training principal). |
+
+**Relacion de tamanio tipica:**
+
+| Target | Draft | Ratio | Acceptance rate esperado |
+|--------|-------|-------|--------------------------|
+| 4 capas, embed=256 | 2 capas, embed=128 | ~1/4 | 60-70% |
+| 4 capas, embed=256 | 1 capa, embed=64 | ~1/16 | 50-60% |
+
+**Que es Knowledge Distillation (KD)?**
+```
+Target model:  P("hola" | input) = 0.8,  P("que" | input) = 0.15
+                      ↓ soft labels (temperature=2.0)
+Draft model:   aprende a imitar esas probabilidades suaves
+                      ↓ en vez de solo aprender el token correcto
+Resultado:     draft model predice mejor porque entiende la "duda" del target
+```
+
+| kd_temperature | Efecto |
+|----------------|--------|
+| `1.0` | Distribuciones agudas (casi one-hot) |
+| `2.0` | Balance (recomendado) |
+| `5.0` | Distribuciones muy suaves (draft aprende mas generalidad) |
+
+| kd_loss_weight | Efecto |
+|----------------|--------|
+| `0.0` | Solo next-token prediction (sin KD) |
+| `0.5` | Balance entre KD y hard labels (recomendado) |
+| `1.0` | Solo KD (draft solo imita al target) |
+
+**Archivos generados:**
+```
+checkpoints/
+├── chat_model.pth                      # Modelo target
+└── chat_model_draft.pth                # Modelo draft (speculative decoding)
+```
+
+**Exportar a GGUF:**
+```bash
+# Exportar target (genera directorio HF + scripts de conversion)
+python main.py --export chat_model --formats gguf
+
+# El draft se exporta automaticamente si existe
+# Genera: models/exported/chat_model_hf/ y models/exported/chat_model_draft_hf/
+```
+
+**Uso con llama.cpp:**
+```bash
+# Compilar llama.cpp (requiere build 9200+ para soporte MTP)
+# Luego ejecutar con draft model:
+llama-server \
+  -m target.gguf \
+  -md draft.gguf \
+  --spec-type draft-simple \
+  --spec-draft-n-max 5 \
+  --port 8080
+```
+
+| llama.cpp flag | Descripcion |
+|----------------|-------------|
+| `-m` / `--model` | Modelo target (principal) |
+| `-md` / `--model-draft` | Modelo draft (pequeno) |
+| `--spec-type` | Tipo de speculative: `draft-simple`, `draft-mtp`, `ngram-simple` |
+| `--spec-draft-n-max` | Maximo de tokens a proponer por paso (default: 3) |
+| `--spec-draft-n-min` | Minimo de tokens a proponer (default: 0) |
+
+**Ejemplo con MTP + Draft:**
+```bash
+# Si el modelo tiene MTP habilitado, tambien puedes usar draft-mtp
+llama-server \
+  -m target_with_mtp.gguf \
+  --spec-type draft-mtp \
+  --spec-draft-n-max 3 \
+  --port 8080
+# No necesita -md separado porque MTP esta embebido en el target
+```
+
+---
+
 ### Validacion y Early Stopping
 
 La validacion verifica si el modelo generaliza bien con datos que NO vio durante el entrenamiento.
@@ -486,6 +601,55 @@ El reporte incluye un banner de **Google Translate** en la esquina superior dere
     "enabled": false
   }
 }
+```
+
+### Entrenamiento con Draft Model (Knowledge Distillation)
+```json
+{
+  "training": {
+    "epochs": 30,
+    "checkpoint_name": "mi_modelo"
+  },
+  "validation": {
+    "split": 0.1,
+    "early_stopping_patience": 5
+  },
+  "thinking": {
+    "enabled": true
+  },
+  "moe": {
+    "enabled": false
+  },
+  "mtp": {
+    "enabled": false
+  },
+  "draft": {
+    "enabled": true,
+    "num_layers": 2,
+    "embed_size": 128,
+    "hidden_size": 256,
+    "n_head": 2,
+    "kd_enabled": true,
+    "kd_temperature": 2.0,
+    "kd_loss_weight": 0.5,
+    "kd_epochs": 10
+  }
+}
+```
+
+### Entrenamiento con Draft Model (sin KD)
+```json
+{
+  "training": {
+    "epochs": 30
+  },
+  "draft": {
+    "enabled": true,
+    "num_layers": 2,
+    "embed_size": 128,
+    "kd_enabled": false,
+    "kd_epochs": 15
+  }
 }
 ```
 
@@ -501,3 +665,6 @@ El reporte incluye un banner de **Google Translate** en la esquina superior dere
 | Entrenamiento muy lento | Demasiados expertos MoE | Reducir `moe_num_experts` o deshabilitar MoE |
 | Memory error | Dataset o modelo muy grande | Reducir `max_ram_fraction`, usar `device_mode: cpu+gpu` |
 | Epochs no correlativos | Archivo state corrupto | Verificar `checkpoints/{name}_state.json` |
+| Draft loss no baja | KD temperature muy alta | Reducir `kd_temperature` a 1.5-2.0 |
+| Draft muy lento | Draft model muy grande | Reducir `draft_num_layers` o `draft_embed_size` |
+| Draft no se genera | `draft_enabled=false` | Poner `draft.enabled=true` en JSON o `--draft-enabled` en CLI |

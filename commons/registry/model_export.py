@@ -254,8 +254,10 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     try:
         from commons.model.chatmodel import ChatModel
         from commons.model.chatmodel_moe import ChatModelMoE
+        from commons.model.chatmodel_mtp import ChatModelMTP
+        from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
     except ImportError:
-        raise RuntimeError("Cannot import ChatModel. Ensure chatmodel.py is in the project root.")
+        raise RuntimeError("Cannot import model classes. Ensure model modules are in the project root.")
 
     ckpt = torch.load(pth_path, map_location='cpu', weights_only=False)
     state_dict = ckpt.get('model_state_dict', ckpt) if isinstance(ckpt, dict) else ckpt
@@ -277,16 +279,32 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
 
     arch = ckpt.get('architecture', {}) if isinstance(ckpt, dict) else {}
     
-    # Check if this is a MoE model
-    is_moe = ckpt.get('is_moe', False) or any('moe' in k.lower() for k in new_state.keys())
+    # Detect MoE and MTP from metadata and state_dict keys
+    sd_keys = set(new_state.keys())
+    is_moe = arch.get('moe_enabled', False) or any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+    is_mtp = arch.get('mtp_enabled', False) or any('mtp_heads' in k for k in sd_keys)
     
-    if is_moe:
-        # Use MoE model
+    if is_moe and is_mtp:
+        model = ChatModelMoEMTP(tokenizer,
+            embed_size=arch.get('embed_size', 256),
+            num_layers=arch.get('num_layers', 2),
+            num_experts=arch.get('moe_num_experts', arch.get('num_experts', 4)),
+            top_k=arch.get('moe_top_k', arch.get('top_k', 2)),
+            load_balance_weight=arch.get('moe_load_balance_weight', 0.01),
+            mtp_num_heads=arch.get('mtp_num_heads', 4),
+            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+    elif is_mtp:
+        model = ChatModelMTP(tokenizer,
+            embed_size=arch.get('embed_size', 256),
+            num_layers=arch.get('num_layers', 4),
+            mtp_num_heads=arch.get('mtp_num_heads', 4),
+            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+    elif is_moe:
         model = ChatModelMoE(tokenizer,
             embed_size=arch.get('embed_size', 256),
             num_layers=arch.get('num_layers', 2),
-            num_experts=arch.get('num_experts', 4),
-            top_k=arch.get('top_k', 2))
+            num_experts=arch.get('moe_num_experts', arch.get('num_experts', 4)),
+            top_k=arch.get('moe_top_k', arch.get('top_k', 2)))
     else:
         model = ChatModel(tokenizer,
             embed_size=arch.get('embed_size', 256),
@@ -302,19 +320,21 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
 
     dummy_input = torch.randint(0, tokenizer.vocab_size, (1, seq_len))
 
-    # For MoE models, we need to handle the tuple output
-    if is_moe:
-        # Create a wrapper that only returns logits for ONNX export
-        class MoEWrapper(torch.nn.Module):
-            def __init__(self, moe_model):
+    # For MoE/MTP models, we need to handle the tuple output
+    if is_moe or is_mtp:
+        # Create a wrapper that only returns primary logits for ONNX export
+        class PrimaryLogitsWrapper(torch.nn.Module):
+            def __init__(self, wrapped_model):
                 super().__init__()
-                self.moe_model = moe_model
+                self.wrapped_model = wrapped_model
             
             def forward(self, input_ids):
-                logits, _ = self.moe_model(input_ids)
-                return logits
+                output = self.wrapped_model(input_ids)
+                if isinstance(output, tuple):
+                    return output[0]  # primary_logits only
+                return output
         
-        export_model = MoEWrapper(model)
+        export_model = PrimaryLogitsWrapper(model)
     else:
         export_model = model
 
@@ -347,9 +367,15 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     if is_moe:
         agentic_metadata['is_moe'] = True
         agentic_metadata['moe_config'] = {
-            'num_experts': arch.get('num_experts', 4),
-            'top_k': arch.get('top_k', 2),
-            'load_balance_weight': arch.get('load_balance_weight', 0.01)
+            'num_experts': arch.get('moe_num_experts', arch.get('num_experts', 4)),
+            'top_k': arch.get('moe_top_k', arch.get('top_k', 2)),
+            'load_balance_weight': arch.get('moe_load_balance_weight', 0.01)
+        }
+    if is_mtp:
+        agentic_metadata['is_mtp'] = True
+        agentic_metadata['mtp_config'] = {
+            'num_heads': arch.get('mtp_num_heads', 4),
+            'loss_weight': arch.get('mtp_loss_weight', 0.3)
         }
 
     # Add license metadata
@@ -427,10 +453,34 @@ numpy>=1.24.0
     with open(os.path.join(onnx_dir, "requirements.txt"), 'w', encoding='utf-8') as f:
         f.write(requirements)
 
+    # Generate conversion scripts for the user (with absolute paths)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    main_py = os.path.join(project_root, 'main.py')
+    convert_cmd = f"python \"{main_py}\" --export {stem} --formats onnx"
+    convert_cmd_unix = convert_cmd.replace('\\', '/')
+
+    # .sh for Linux/Mac
+    sh_path = os.path.join(onnx_dir, "convert_to_onnx.sh")
+    with open(sh_path, 'w', newline='\n') as f:
+        f.write(f"#!/bin/bash\n")
+        f.write(f"# Convert {stem} to ONNX (from project root)\n")
+        f.write(f"cd \"{project_root}\"\n")
+        f.write(f"{convert_cmd_unix}\n")
+
+    # .bat for Windows
+    bat_path = os.path.join(onnx_dir, "convert_to_onnx.bat")
+    with open(bat_path, 'w', newline='\r\n') as f:
+        f.write(f"@echo off\n")
+        f.write(f"REM Convert {stem} to ONNX (from project root)\n")
+        f.write(f"cd /d \"{project_root}\"\n")
+        f.write(f"{convert_cmd}\n")
+
     size_mb = round(os.path.getsize(output_path) / (1024 * 1024), 2)
     logger.info(f"ONNX package exported to: {onnx_dir}")
     logger.info(f"  Model: {output_path} ({size_mb} MB)")
     logger.info(f"  To use: cd {onnx_dir} && pip install -r requirements.txt && python inference.py")
+    logger.info(f"  Windows:   {bat_path}")
+    logger.info(f"  Linux/Mac: bash {sh_path}")
     return output_path
 
 
@@ -587,6 +637,9 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     """
     try:
         from commons.model.chatmodel import ChatModel
+        from commons.model.chatmodel_moe import ChatModelMoE
+        from commons.model.chatmodel_mtp import ChatModelMTP
+        from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
     except ImportError:
         raise RuntimeError("Cannot import ChatModel. Ensure chatmodel.py is in the project root.")
 
@@ -669,6 +722,13 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
 
     # Generate metadata.json for convert_gguf.py (includes agentic token info)
     agentic_metadata = _extract_agentic_metadata(tokenizer, ckpt)
+    
+    # Detect MoE, MTP, and draft from state_dict keys
+    sd_keys = set(new_state.keys())
+    is_moe = arch_meta.get('moe_enabled', False) or any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+    is_mtp = arch_meta.get('mtp_enabled', False) or any('mtp_heads' in k for k in sd_keys)
+    is_draft = ckpt.get('is_draft', False) or arch_meta.get('is_draft', False)
+    
     model_metadata = {
         "model_name": stem,
         "vocab_size": vocab_size,
@@ -680,7 +740,28 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
         "agentic_tokens": agentic_metadata.get("agentic_tokens", {}),
         "special_tokens": agentic_metadata.get("special_tokens", {}),
         "mode_tokens": agentic_metadata.get("mode_tokens", {}),
+        "is_moe": is_moe,
+        "is_mtp": is_mtp,
+        "is_draft": is_draft,
     }
+    if is_moe:
+        model_metadata["moe_config"] = {
+            "num_experts": arch_meta.get('moe_num_experts', 4),
+            "top_k": arch_meta.get('moe_top_k', 2),
+            "load_balance_weight": arch_meta.get('moe_load_balance_weight', 0.01),
+        }
+    if is_mtp:
+        model_metadata["mtp_config"] = {
+            "num_heads": arch_meta.get('mtp_num_heads', 4),
+            "loss_weight": arch_meta.get('mtp_loss_weight', 0.3),
+        }
+    if is_draft:
+        model_metadata["draft_config"] = {
+            "target_model": ckpt.get('target_model', ''),
+            "kd_enabled": ckpt.get('draft_config', {}).get('kd_enabled', False),
+            "kd_temperature": ckpt.get('draft_config', {}).get('kd_temperature', 2.0),
+            "kd_loss_weight": ckpt.get('draft_config', {}).get('kd_loss_weight', 0.5),
+        }
     with open(os.path.join(hf_dir, "metadata.json"), 'w', encoding='utf-8') as f:
         json.dump(model_metadata, f, indent=2, ensure_ascii=False)
 

@@ -17,6 +17,8 @@ from torch.amp import GradScaler
 from datasets import Dataset
 from commons.model.chatmodel import ChatModel
 from commons.model.chatmodel_moe import ChatModelMoE
+from commons.model.chatmodel_mtp import ChatModelMTP
+from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
 import logging
 import shutil
 
@@ -159,6 +161,20 @@ class TrainingConfig:
     moe_top_k: int = 2
     moe_load_balance_weight: float = 0.01
     moe_freeze_attention: bool = False
+    # MTP (Multi-Token Prediction) fields
+    mtp_enabled: bool = False
+    mtp_num_heads: int = 4
+    mtp_loss_weight: float = 0.3
+    # Draft model (speculative decoding) fields
+    draft_enabled: bool = False
+    draft_num_layers: int = 2
+    draft_embed_size: int = 128
+    draft_hidden_size: int = 256
+    draft_n_head: int = 2
+    draft_kd_enabled: bool = False
+    draft_kd_temperature: float = 2.0
+    draft_kd_loss_weight: float = 0.5
+    draft_kd_epochs: int = 10
     # Validation and metrics
     val_split: float = 0.1              # 10% del dataset para validacion (0 = sin validacion)
     val_batches: int = 0                # 0 = usar todo el split; >0 = limitar batches de val
@@ -210,6 +226,20 @@ class TrainingConfig:
         'moe.top_k': 'moe_top_k',
         'moe.load_balance_weight': 'moe_load_balance_weight',
         'moe.freeze_attention': 'moe_freeze_attention',
+        # mtp
+        'mtp.enabled': 'mtp_enabled',
+        'mtp.num_heads': 'mtp_num_heads',
+        'mtp.loss_weight': 'mtp_loss_weight',
+        # draft
+        'draft.enabled': 'draft_enabled',
+        'draft.num_layers': 'draft_num_layers',
+        'draft.embed_size': 'draft_embed_size',
+        'draft.hidden_size': 'draft_hidden_size',
+        'draft.n_head': 'draft_n_head',
+        'draft.kd_enabled': 'draft_kd_enabled',
+        'draft.kd_temperature': 'draft_kd_temperature',
+        'draft.kd_loss_weight': 'draft_kd_loss_weight',
+        'draft.kd_epochs': 'draft_kd_epochs',
         # validation
         'validation.split': 'val_split',
         'validation.batches': 'val_batches',
@@ -863,9 +893,22 @@ class Trainer:
         """
         # Handle MoE model output (returns logits + gate_scores)
         gate_scores = None
+        mtp_logits_list = None
         outputs = model(inputs)
         if isinstance(outputs, tuple):
-            outputs, gate_scores = outputs
+            if len(outputs) == 2 and isinstance(outputs[1], list):
+                # Check if this is MoE+MTP (list of MTP logits) or pure MoE (list of gate_scores)
+                # MoE+MTP: model has both get_expert_utilization and mtp_heads
+                if hasattr(model, 'get_expert_utilization') and hasattr(model, 'mtp_heads'):
+                    # MoE+MTP: extract gate_scores from model._all_gate_scores
+                    outputs, mtp_logits_list = outputs
+                    gate_scores = model._all_gate_scores if model._all_gate_scores else None
+                else:
+                    # Pure MTP model: (primary_logits, [mtp_head_logits...])
+                    outputs, mtp_logits_list = outputs
+            elif len(outputs) == 2:
+                # MoE model: (logits, gate_scores)
+                outputs, gate_scores = outputs
         raw_outputs = outputs
 
         weights = torch.ones_like(targets, dtype=torch.float)
@@ -993,6 +1036,9 @@ class Trainer:
                     elif in_observation:
                         weights[b, s] = agent_loss_weight  # observation content
 
+        # Save original 2D targets for MTP loss computation (before flattening)
+        targets_2d = targets.clone() if mtp_logits_list and getattr(self.config, 'mtp_enabled', False) else None
+
         # Flatten outputs and targets
         outputs = outputs.contiguous().view(-1, outputs.size(-1))
         targets = targets.contiguous().view(-1)
@@ -1016,8 +1062,28 @@ class Trainer:
         if gate_scores is not None and hasattr(model, 'get_load_balancing_loss'):
             moe_loss = model.get_load_balancing_loss(torch.stack(gate_scores))
             loss = loss + self.config.moe_load_balance_weight * moe_loss
-        
-        return loss, raw_outputs
+
+        # Add MTP auxiliary loss
+        mtp_loss = torch.tensor(0.0, device=loss.device)
+        if mtp_logits_list and getattr(self.config, 'mtp_enabled', False) and targets_2d is not None:
+            mtp_total = torch.tensor(0.0, device=loss.device)
+            mtp_head_count = 0
+            for k, head_logits in enumerate(mtp_logits_list):
+                shift = k + 2  # head 0 predicts t+2, head 1 predicts t+3, ...
+                if targets_2d.size(1) > shift:
+                    mtp_preds = head_logits[:, :-shift].contiguous().view(-1, head_logits.size(-1))
+                    mtp_targets = targets_2d[:, shift:].contiguous().view(-1)
+                    non_pad = mtp_targets.ne(self.tokenizer.get_pad_index())
+                    if non_pad.any():
+                        mtp_token_losses = criterion(mtp_preds[non_pad], mtp_targets[non_pad])
+                        mtp_loss_k = mtp_token_losses.mean()
+                        mtp_total = mtp_total + mtp_loss_k
+                        mtp_head_count += 1
+            if mtp_head_count > 0:
+                mtp_loss = mtp_total / mtp_head_count
+                loss = loss + self.config.mtp_loss_weight * mtp_loss
+
+        return loss, raw_outputs, mtp_loss.item()
 
     def _compute_thinking_metrics(self, model, inputs, targets, device, logits=None):
         """Compute metrics for thinking token generation if thinking data is present."""
@@ -1218,6 +1284,7 @@ class Trainer:
         # Thinking metrics accumulators
         thinking_metrics_accum = {}
         agent_metrics_accum = {}
+        mtp_metrics_accum = {}
         last_loss = 0.0
         total_tokens = 0
         last_grad_norm = 0.0
@@ -1266,9 +1333,9 @@ class Trainer:
             # Forward pass
             if self.use_mixed_precision and scaler is not None:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
-                    loss, logits = self._compute_loss(model, inputs, targets, criterion)
+                    loss, logits, mtp_loss_val = self._compute_loss(model, inputs, targets, criterion)
             else:
-                loss, logits = self._compute_loss(model, inputs, targets, criterion)
+                loss, logits, mtp_loss_val = self._compute_loss(model, inputs, targets, criterion)
 
             last_loss = loss.item()
             total_tokens += inputs.size(0) * inputs.size(1)
@@ -1289,6 +1356,12 @@ class Trainer:
                     if key not in agent_metrics_accum:
                         agent_metrics_accum[key] = []
                     agent_metrics_accum[key].append(value)
+
+            # Accumulate MTP loss
+            if mtp_loss_val > 0:
+                if 'mtp_loss' not in mtp_metrics_accum:
+                    mtp_metrics_accum['mtp_loss'] = []
+                mtp_metrics_accum['mtp_loss'].append(mtp_loss_val)
 
             # Backward pass — use no_sync() for DDP when not at accumulation boundary
             if self.world_size > 1 and hasattr(model, 'no_sync') and not is_last_micro_step:
@@ -1418,7 +1491,31 @@ class Trainer:
         for key, values in agent_metrics_accum.items():
             agent_epoch[key] = sum(values) / len(values) if values else 0.0
 
-        return avg_loss, total_tokens, last_grad_norm, thinking_epoch, agent_epoch
+        # Compute average MTP metrics for this epoch
+        mtp_epoch = {}
+        for key, values in mtp_metrics_accum.items():
+            mtp_epoch[key] = sum(values) / len(values) if values else 0.0
+
+        # Collect MoE metrics BEFORE validation (which clears _all_gate_scores)
+        moe_epoch = {}
+        if hasattr(self.config, 'moe_enabled') and self.config.moe_enabled:
+            try:
+                if hasattr(model, 'get_expert_utilization'):
+                    utilization = model.get_expert_utilization()
+                    for expert_id, util in utilization.items():
+                        moe_epoch[f'moe_expert_{expert_id}_util'] = util
+                if hasattr(model, '_all_gate_scores') and model._all_gate_scores:
+                    import math as _math
+                    all_scores = torch.stack([s.detach() if s.requires_grad else s for s in model._all_gate_scores])
+                    probs = all_scores.mean(dim=[0, 1, 2])
+                    entropy = -(probs * torch.log(probs + 1e-10)).sum().item()
+                    moe_epoch['moe_gate_entropy'] = entropy
+                    max_entropy = _math.log(getattr(self.config, 'moe_num_experts', 4))
+                    moe_epoch['moe_gate_entropy_norm'] = entropy / max_entropy if max_entropy > 0 else 0
+            except Exception:
+                pass
+
+        return avg_loss, total_tokens, last_grad_norm, thinking_epoch, agent_epoch, mtp_epoch, moe_epoch
 
     def validate(self, model, dataloader, criterion, device, max_batches=0):
         """Run validation loop. Returns (avg_loss, perplexity, num_batches)."""
@@ -1434,7 +1531,7 @@ class Trainer:
                 inputs = inputs.to(device)
                 targets = targets.to(device)
 
-                loss, _ = self._compute_loss(model, inputs, targets, criterion)
+                loss, _, _ = self._compute_loss(model, inputs, targets, criterion)
                 total_loss += loss.item()
                 total_batches += 1
 
@@ -1458,25 +1555,39 @@ class Trainer:
             'agent_tool_call_acc', 'agent_observation_acc', 'agent_ratio',
             # MoE metrics
             'moe_gate_entropy_norm',
+            # MTP metrics
+            'mtp_loss',
         ]
         # Add per-expert utilization columns dynamically
         for key in sorted(metrics_row.keys()):
             if key.startswith('moe_expert_') and key not in fieldnames:
                 fieldnames.append(key)
 
-        # If file exists, read last epoch number for correlation
+        # If file exists, migrate missing columns and read last epoch number
         epoch_offset = 0
         if file_exists:
             try:
                 with open(csv_path, 'r', encoding='utf-8') as f:
                     reader = csv.DictReader(f)
+                    existing_fields = reader.fieldnames or []
+                    rows = list(reader)
                     last_epoch = 0
-                    for row in reader:
+                    for row in rows:
                         try:
                             last_epoch = int(row.get('epoch', 0))
                         except (ValueError, TypeError):
                             pass
                     epoch_offset = last_epoch
+
+                # Migrate: add missing columns to existing CSV
+                missing = [col for col in fieldnames if col not in existing_fields]
+                if missing:
+                    with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        for row in rows:
+                            # DictWriter fills missing keys with None (empty string via restval)
+                            writer.writerow(row)
             except Exception:
                 epoch_offset = 0
 
@@ -1517,6 +1628,8 @@ class Trainer:
         # MoE metrics
         moe_gate_entropy_norms = []
         moe_expert_utils = {}  # expert_id -> list of utilization values
+        # MTP metrics
+        mtp_losses = []
 
         try:
             with open(csv_path, 'r', encoding='utf-8') as f:
@@ -1564,6 +1677,9 @@ class Trainer:
                                     moe_expert_utils[expert_id] = []
                                 ev = value.strip()
                                 moe_expert_utils[expert_id].append(float(ev) if ev else None)
+                        # MTP metrics
+                        mt = row.get('mtp_loss', '').strip()
+                        mtp_losses.append(float(mt) if mt else None)
                     except (ValueError, TypeError):
                         continue
         except Exception:
@@ -1675,6 +1791,29 @@ class Trainer:
             moe_status_text = None
             moe_status_detail = None
 
+        # MTP status
+        has_mtp = any(v is not None for v in mtp_losses)
+        if has_mtp and len(mtp_losses) >= 2:
+            first_mtp = next(v for v in mtp_losses if v is not None)
+            last_mtp = next(v for v in reversed(mtp_losses) if v is not None)
+            mtp_change_pct = ((last_mtp - first_mtp) / first_mtp) * 100 if first_mtp > 0 else 0
+            if last_mtp < first_mtp * 0.9:
+                mtp_status = "healthy"
+                mtp_status_text = f"MTP IS LEARNING - Loss decreased {abs(mtp_change_pct):.1f}%"
+                mtp_status_detail = "Multi-Token Prediction heads are learning future token patterns."
+            elif last_mtp > first_mtp * 1.1:
+                mtp_status = "overfitting"
+                mtp_status_text = f"MTP LOSS INCREASING - Loss increased {mtp_change_pct:.1f}%"
+                mtp_status_detail = "MTP heads may be overfitting. Reduce mtp_loss_weight or add more data."
+            else:
+                mtp_status = "stable"
+                mtp_status_text = f"MTP IS STABLE - Loss changed {mtp_change_pct:+.1f}%"
+                mtp_status_detail = "MTP loss is plateauing. More epochs may help."
+        else:
+            mtp_status = None
+            mtp_status_text = None
+            mtp_status_detail = None
+
         # Precompute display values for HTML template (avoid f-string ternary issues)
         final_train_loss_str = f"{train_losses[-1]:.4f}" if train_losses else "N/A"
         final_val_loss_str = f"{next(v for v in reversed(val_losses) if v is not None):.4f}" if has_val else "N/A"
@@ -1702,6 +1841,7 @@ class Trainer:
         agent_ratios_json = json.dumps(agent_ratios)
         moe_gate_entropy_norms_json = json.dumps(moe_gate_entropy_norms)
         moe_expert_utils_json = json.dumps(moe_expert_utils)
+        mtp_losses_json = json.dumps(mtp_losses)
 
         # Generate HTML
         html_content = f"""<!DOCTYPE html>
@@ -1878,6 +2018,23 @@ class Trainer:
         </div>
         ''' if has_moe else ''}
 
+        {f'''
+        <div class="section-divider">MTP TRAINING PROGRESS</div>
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h2>MTP Loss</h2>
+                <canvas id="mtpLossChart"></canvas>
+            </div>
+        </div>
+        <div class="status-banner {mtp_status}">
+            <div class="banner-icon">{'OK' if mtp_status == 'healthy' else 'WARNING' if mtp_status == 'overfitting' else 'INFORMATION'}</div>
+            <div class="banner-content">
+                <div class="banner-title">{mtp_status_text}</div>
+                <div class="banner-detail">{mtp_status_detail}</div>
+            </div>
+        </div>
+        ''' if has_mtp else ''}
+
         <div class="status-banner {status}">
             <div class="banner-icon">{'OK' if status == 'healthy' else 'WARNING' if status == 'overfitting' else 'INFORMATION'}</div>
             <div class="banner-content">
@@ -1907,6 +2064,7 @@ class Trainer:
         const agentRatio = {agent_ratios_json};
         const moeEntropyNorm = {moe_gate_entropy_norms_json};
         const moeExpertUtils = {moe_expert_utils_json};
+        const mtpLosses = {mtp_losses_json};
 
         // Loss Chart
         new Chart(document.getElementById('lossChart'), {{
@@ -2051,7 +2209,7 @@ class Trainer:
         }});
 
         // Thinking Accuracy Chart
-        if (thinkingAccuracy.length > 0 && thinkingAccuracy[0] !== null) {{
+        if (thinkingAccuracy.some(v => v !== null)) {{
             new Chart(document.getElementById('thinkingAccuracyChart'), {{
                 type: 'line',
                 data: {{
@@ -2074,7 +2232,7 @@ class Trainer:
         }}
 
         // Thinking Coverage Chart
-        if (thinkingCoverage.length > 0 && thinkingCoverage[0] !== null) {{
+        if (thinkingCoverage.some(v => v !== null)) {{
             new Chart(document.getElementById('thinkingCoverageChart'), {{
                 type: 'line',
                 data: {{
@@ -2099,7 +2257,7 @@ class Trainer:
         }}
 
         // Agent Accuracy Chart
-        if (agentToolCallAcc.length > 0 && agentToolCallAcc[0] !== null) {{
+        if (agentToolCallAcc.some(v => v !== null)) {{
             new Chart(document.getElementById('agentAccuracyChart'), {{
                 type: 'line',
                 data: {{
@@ -2120,7 +2278,7 @@ class Trainer:
         }}
 
         // Agent Ratio Chart
-        if (agentRatio.length > 0 && agentRatio[0] !== null) {{
+        if (agentRatio.some(v => v !== null)) {{
             new Chart(document.getElementById('agentRatioChart'), {{
                 type: 'bar',
                 data: {{
@@ -2144,7 +2302,7 @@ class Trainer:
         }}
 
         // MoE Entropy Chart
-        if (moeEntropyNorm.length > 0 && moeEntropyNorm[0] !== null) {{
+        if (moeEntropyNorm.some(v => v !== null)) {{
             new Chart(document.getElementById('moeEntropyChart'), {{
                 type: 'line',
                 data: {{
@@ -2190,6 +2348,31 @@ class Trainer:
                 }}
             }});
         }}
+
+        // MTP Loss Chart
+        if (mtpLosses.some(v => v !== null)) {{
+            new Chart(document.getElementById('mtpLossChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'MTP Loss',
+                        data: mtpLosses,
+                        borderColor: '#e74c3c',
+                        tension: 0.3,
+                        fill: true,
+                        backgroundColor: 'rgba(231, 76, 60, 0.2)'
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    scales: {{
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }},
+                        y: {{ title: {{ display: true, text: 'MTP Loss' }} }}
+                    }}
+                }}
+            }});
+        }}
     </script>
 </body>
 </html>"""
@@ -2204,6 +2387,308 @@ class Trainer:
         except Exception as e:
             if self.rank == 0:
                 logger.warning(f"  Could not generate training report: {e}")
+
+
+    def _log_draft_csv(self, metrics_row, csv_path):
+        """Append a row of draft model metrics to CSV file."""
+        file_exists = os.path.exists(csv_path)
+        fieldnames = [
+            'epoch', 'loss', 'lr', 'kd_loss', 'hard_loss', 'tokens_per_sec',
+        ]
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, restval='')
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(metrics_row)
+
+    def _generate_draft_report(self, csv_path):
+        """Generate an HTML report for draft model training."""
+        if not os.path.exists(csv_path):
+            return
+
+        epochs = []
+        losses = []
+        lrs = []
+        kd_losses = []
+        hard_losses = []
+        tokens_per_secs = []
+
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        epochs.append(int(row.get('epoch', 0)))
+                        losses.append(float(row.get('loss', 0)))
+                        lrs.append(float(row.get('lr', 0)))
+                        kl = row.get('kd_loss', '').strip()
+                        kd_losses.append(float(kl) if kl else None)
+                        hl = row.get('hard_loss', '').strip()
+                        hard_losses.append(float(hl) if hl else None)
+                        ts = row.get('tokens_per_sec', '').strip()
+                        tokens_per_secs.append(float(ts) if ts else 0)
+                    except (ValueError, TypeError):
+                        continue
+        except Exception:
+            return
+
+        if not epochs:
+            return
+
+        # Determine status
+        if len(losses) >= 2:
+            change_pct = ((losses[-1] - losses[0]) / losses[0]) * 100 if losses[0] > 0 else 0
+            if losses[-1] < losses[0] * 0.9:
+                status = "healthy"
+                status_text = f"DRAFT TRAINING GOING WELL - Loss decreased {abs(change_pct):.1f}%"
+                status_detail = "The draft model is learning from the target model."
+            elif losses[-1] > losses[0] * 1.1:
+                status = "overfitting"
+                status_text = f"WARNING - Loss increased {change_pct:.1f}%"
+                status_detail = "Draft model may be overfitting. Try reducing kd_epochs."
+            else:
+                status = "stable"
+                status_text = f"STABLE - Loss changed {change_pct:.1f}%"
+                status_detail = "Draft model training is stable."
+        else:
+            status = "stable"
+            status_text = "DRAFT MODEL TRAINING"
+            status_detail = "Insufficient data for status determination."
+
+        # Summary values
+        final_loss_str = f"{losses[-1]:.4f}" if losses else "N/A"
+        final_lr_str = f"{lrs[-1]:.2e}" if lrs else "N/A"
+        total_epochs_str = str(epochs[-1]) if epochs else "0"
+        min_loss_str = f"{min(losses):.4f}" if losses else "N/A"
+
+        # Serialize data for JavaScript
+        epochs_json = json.dumps(epochs)
+        losses_json = json.dumps(losses)
+        lrs_json = json.dumps(lrs)
+        kd_losses_json = json.dumps(kd_losses)
+        hard_losses_json = json.dumps(hard_losses)
+
+        # Generate HTML
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draft Model Training Report - {self.checkpoint_name}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 1200px; margin: 0 auto; }}
+        .header {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .status {{ padding: 15px 20px; border-radius: 8px; margin: 15px 0; font-weight: bold; border-left: 5px solid; }}
+        .status.healthy {{ background: #d4edda; color: #155724; border-color: #28a745; }}
+        .status.overfitting {{ background: #f8d7da; color: #721c24; border-color: #dc3545; }}
+        .status.stable {{ background: #fff3cd; color: #856404; border-color: #ffc107; }}
+        .status-main {{ font-size: 18px; margin-bottom: 5px; }}
+        .status-detail {{ font-size: 14px; font-weight: normal; opacity: 0.9; }}
+        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+        canvas {{ max-height: 300px; }}
+        .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
+        .metric {{ background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .metric-value {{ font-size: 24px; font-weight: bold; color: #333; }}
+        .metric-label {{ font-size: 12px; color: #666; margin-top: 5px; }}
+        .badge {{ display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 10px; }}
+        .badge-draft {{ background: #17a2b8; color: white; }}
+        @media (max-width: 768px) {{
+            .charts-grid {{ grid-template-columns: 1fr; }}
+            .summary {{ grid-template-columns: repeat(2, 1fr); }}
+        }}
+    </style>
+</head>
+<body>
+    <div id="google_translate_element" style="position:fixed;top:10px;right:10px;z-index:9999;background:white;padding:5px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:13px;"></div>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script>
+    function googleTranslateElementInit() {{
+        new google.translate.TranslateElement({{pageLanguage: 'en', includedLanguages: 'es,fr,de,it,pt,ru,ja,ko,zh-CN,ar,hi,th,vi,nl,pl,sv,da,no,fi,tr,uk,cs,ro,hu,el,bg,hr,sk,sl,lt,lv,et,mt,ga,cy,eu,ca,gl,af,sq,bs,is,lb,mk,sr,be,kk,ky,tg,uz,tk,ka,hy,az', autoDisplay: false}}, 'google_translate_element');
+    }}
+    </script>
+    <style>
+        .skiptranslate {{ display: inline !important; }}
+        .goog-te-gadget {{ font-family: Roboto, sans-serif !important; font-size: 13px !important; }}
+        .goog-te-gadget-simple {{ border: 1px solid #ddd !important; border-radius: 6px !important; padding: 2px 8px !important; background: #f8f8f8 !important; }}
+        .goog-te-gadget-simple:hover {{ background: #e8e8e8 !important; }}
+        .goog-te-combo {{ font-family: Roboto, sans-serif !important; font-size: 13px !important; border: none !important; background: transparent !important; cursor: pointer !important; }}
+        body {{ top: 0 !important; }}
+    </style>
+    <div class="container">
+        <div class="header">
+            <h1>Draft Model Training Report: {self.checkpoint_name} <span class="badge badge-draft">DRAFT</span></h1>
+            <div class="status {status}">
+                <div class="status-main">{status_text}</div>
+                <div class="status-detail">{status_detail}</div>
+            </div>
+            <p>Total epochs: {total_epochs_str} | Final loss: {final_loss_str} | Min loss: {min_loss_str}</p>
+        </div>
+
+        <div class="summary">
+            <div class="metric">
+                <div class="metric-value">{final_loss_str}</div>
+                <div class="metric-label">Final Loss</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{min_loss_str}</div>
+                <div class="metric-label">Min Loss</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{final_lr_str}</div>
+                <div class="metric-label">Final LR</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">{total_epochs_str}</div>
+                <div class="metric-label">Total Epochs</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <canvas id="lossChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lrChart"></canvas>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <canvas id="kdLossChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="hardLossChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const epochs = {epochs_json};
+        const losses = {losses_json};
+        const lrs = {lrs_json};
+        const kdLosses = {kd_losses_json};
+        const hardLosses = {hard_losses_json};
+
+        // Loss Chart
+        new Chart(document.getElementById('lossChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [{{
+                    label: 'Total Loss',
+                    data: losses,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231,76,60,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{ title: {{ display: true, text: 'Draft Model - Total Loss' }} }},
+                scales: {{
+                    y: {{ title: {{ display: true, text: 'Loss' }} }},
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }}
+                }}
+            }}
+        }});
+
+        // Learning Rate Chart
+        new Chart(document.getElementById('lrChart'), {{
+            type: 'line',
+            data: {{
+                labels: epochs,
+                datasets: [{{
+                    label: 'Learning Rate',
+                    data: lrs,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52,152,219,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{ title: {{ display: true, text: 'Draft Model - Learning Rate' }} }},
+                scales: {{
+                    y: {{ title: {{ display: true, text: 'LR' }} }},
+                    x: {{ title: {{ display: true, text: 'Epoch' }} }}
+                }}
+            }}
+        }});
+
+        // KD Loss Chart (only if KD enabled)
+        if (kdLosses.some(v => v !== null)) {{
+            new Chart(document.getElementById('kdLossChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'KD Loss',
+                        data: kdLosses,
+                        borderColor: '#9b59b6',
+                        backgroundColor: 'rgba(155,89,182,0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    plugins: {{ title: {{ display: true, text: 'Draft Model - Knowledge Distillation Loss' }} }},
+                    scales: {{
+                        y: {{ title: {{ display: true, text: 'KD Loss' }} }},
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }}
+                    }}
+                }}
+            }});
+        }} else {{
+            document.getElementById('kdLossChart').parentElement.style.display = 'none';
+        }}
+
+        // Hard Loss Chart (only if KD enabled)
+        if (hardLosses.some(v => v !== null)) {{
+            new Chart(document.getElementById('hardLossChart'), {{
+                type: 'line',
+                data: {{
+                    labels: epochs,
+                    datasets: [{{
+                        label: 'Hard Loss',
+                        data: hardLosses,
+                        borderColor: '#e67e22',
+                        backgroundColor: 'rgba(230,126,34,0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    plugins: {{ title: {{ display: true, text: 'Draft Model - Next-Token Loss' }} }},
+                    scales: {{
+                        y: {{ title: {{ display: true, text: 'Hard Loss' }} }},
+                        x: {{ title: {{ display: true, text: 'Epoch' }} }}
+                    }}
+                }}
+            }});
+        }} else {{
+            document.getElementById('hardLossChart').parentElement.style.display = 'none';
+        }}
+    </script>
+</body>
+</html>"""
+
+        # Write HTML file
+        html_path = csv_path.replace('.csv', '_report.html')
+        try:
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            if self.rank == 0:
+                logger.info(f"  Draft training report saved to {html_path}")
+        except Exception as e:
+            if self.rank == 0:
+                logger.warning(f"  Could not generate draft training report: {e}")
 
 
     def collate_fn(self, batch):
@@ -2430,12 +2915,28 @@ class Trainer:
                 # Detect MoE from actual state_dict keys, not metadata
                 sd_keys = set(resume_checkpoint['model_state_dict'].keys())
                 checkpoint_has_moe = any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
+                checkpoint_has_mtp = any('mtp_heads' in k for k in sd_keys)
                 use_moe = checkpoint_has_moe or self.config.moe_enabled
+                use_mtp = checkpoint_has_mtp or self.config.mtp_enabled
 
-                model = ChatModelMoE(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
-                                      num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
-                                      top_k=arch.get('moe_top_k', self.config.moe_top_k),
-                                      load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight)) if use_moe else ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
+                if use_moe and use_mtp:
+                    model = ChatModelMoEMTP(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
+                                            num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
+                                            top_k=arch.get('moe_top_k', self.config.moe_top_k),
+                                            load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight),
+                                            mtp_num_heads=arch.get('mtp_num_heads', self.config.mtp_num_heads),
+                                            mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight))
+                elif use_mtp:
+                    model = ChatModelMTP(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
+                                         mtp_num_heads=arch.get('mtp_num_heads', self.config.mtp_num_heads),
+                                         mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight))
+                elif use_moe:
+                    model = ChatModelMoE(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
+                                         num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
+                                         top_k=arch.get('moe_top_k', self.config.moe_top_k),
+                                         load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight))
+                else:
+                    model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
                 
                 # Handle vocab_size mismatch
                 if checkpoint_vocab_size != current_vocab_size:
@@ -2463,12 +2964,29 @@ class Trainer:
                 if self.rank == 0:
                     logger.info(f" Model loaded from checkpoint (epoch {resume_checkpoint.get('epoch', '?')}, loss {resume_checkpoint.get('loss', '?'):.4f})")
             else:
+                model_type = 'ChatModel'
+                if self.config.moe_enabled and self.config.mtp_enabled:
+                    model_type = 'ChatModel(MoE+MTP)'
+                elif self.config.moe_enabled:
+                    model_type = 'ChatModelMoE'
+                elif self.config.mtp_enabled:
+                    model_type = 'ChatModelMTP'
                 if self.rank == 0:
-                    logger.info(f"Initializing ChatModel{'(MoE)' if self.config.moe_enabled else ''} (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4)...")
-                if self.config.moe_enabled:
+                    logger.info(f"Initializing {model_type} (embed_size={TRAINING_CONFIG['embed_size']}, num_layers=4)...")
+                if self.config.moe_enabled and self.config.mtp_enabled:
+                    model = ChatModelMoEMTP(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4,
+                                            num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
+                                            load_balance_weight=self.config.moe_load_balance_weight,
+                                            mtp_num_heads=self.config.mtp_num_heads,
+                                            mtp_loss_weight=self.config.mtp_loss_weight)
+                elif self.config.mtp_enabled:
+                    model = ChatModelMTP(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4,
+                                         mtp_num_heads=self.config.mtp_num_heads,
+                                         mtp_loss_weight=self.config.mtp_loss_weight)
+                elif self.config.moe_enabled:
                     model = ChatModelMoE(self.tokenizer, embed_size=TRAINING_CONFIG['embed_size'], num_layers=4,
-                                          num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
-                                          load_balance_weight=self.config.moe_load_balance_weight)
+                                         num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
+                                         load_balance_weight=self.config.moe_load_balance_weight)
                     if self.config.moe_freeze_attention:
                         model.freeze_attention()
                 else:
@@ -2600,7 +3118,7 @@ class Trainer:
                 epoch_start_time = time.time()
 
                 # Training
-                train_loss, total_tokens, grad_norm, thinking_metrics, agent_metrics = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
+                train_loss, total_tokens, grad_norm, thinking_metrics, agent_metrics, mtp_metrics, moe_metrics = self.train(model, dataloader, criterion, optimizer, device, scaler, TRAINING_CONFIG['accumulation_steps'])
 
                 # Update learning rate
                 if sched_type == 'plateau':
@@ -2626,25 +3144,16 @@ class Trainer:
                 epoch_time = time.time() - epoch_start_time
                 tokens_per_sec = total_tokens / epoch_time if epoch_time > 0 else 0
 
-                # MoE metrics (if enabled)
-                moe_metrics = {}
-                if self.config.moe_enabled and hasattr(model, 'get_expert_utilization'):
-                    try:
-                        utilization = model.get_expert_utilization()
-                        for expert_id, util in utilization.items():
-                            moe_metrics[f'moe_expert_{expert_id}_util'] = util
-                        # Compute gate entropy (higher = more balanced)
-                        if hasattr(model, '_all_gate_scores') and model._all_gate_scores:
-                            all_scores = torch.stack([s.detach() if s.requires_grad else s for s in model._all_gate_scores])
-                            probs = all_scores.mean(dim=[0, 1, 2])
-                            entropy = -(probs * torch.log(probs + 1e-10)).sum().item()
-                            moe_metrics['moe_gate_entropy'] = entropy
-                            # Normalized entropy (0 = one expert, log(N) = perfectly balanced)
-                            import math as _math
-                            max_entropy = _math.log(self.config.moe_num_experts)
-                            moe_metrics['moe_gate_entropy_norm'] = entropy / max_entropy if max_entropy > 0 else 0
-                    except Exception:
-                        pass
+                # MoE metrics (already collected inside train() before validation)
+                # Log MoE summary (rank-0 only)
+                if moe_metrics and self.rank == 0:
+                    moe_entropy_norm = moe_metrics.get('moe_gate_entropy_norm', 0)
+                    logger.info(f"  MoE Gate Entropy (norm): {moe_entropy_norm:.4f}")
+
+                # MTP metrics (if enabled)
+                if self.config.mtp_enabled and mtp_metrics and self.rank == 0:
+                    mtp_loss_val = mtp_metrics.get('mtp_loss', 0)
+                    logger.info(f"  MTP Loss: {mtp_loss_val:.6f}")
 
                 # Log enhanced metrics (rank-0 only)
                 if self.rank == 0:
@@ -2708,6 +3217,9 @@ class Trainer:
                             'moe_num_experts': self.config.moe_num_experts,
                             'moe_top_k': self.config.moe_top_k,
                             'moe_load_balance_weight': self.config.moe_load_balance_weight,
+                            'mtp_enabled': self.config.mtp_enabled,
+                            'mtp_num_heads': self.config.mtp_num_heads,
+                            'mtp_loss_weight': self.config.mtp_loss_weight,
                         },
                         'dataset_source': self.dataset_source,
                     }
@@ -2753,6 +3265,8 @@ class Trainer:
                             'agent_ratio': f"{agent_metrics.get('agent_ratio', 0):.6f}" if agent_metrics else "",
                             # MoE metrics
                             'moe_gate_entropy_norm': f"{moe_metrics.get('moe_gate_entropy_norm', 0):.4f}" if moe_metrics else "",
+                            # MTP metrics
+                            'mtp_loss': f"{mtp_metrics.get('mtp_loss', 0):.6f}" if mtp_metrics else "",
                         }
                         # Add per-expert utilization
                         for expert_id in range(self.config.moe_num_experts):
@@ -2804,6 +3318,13 @@ class Trainer:
                 finally:
                     self.raw_dataset = None  # Free memory after CSV fine-tuning
 
+            # Train draft model for speculative decoding (after main training)
+            if self.config.draft_enabled and not self.stop_event.is_set():
+                if dataloader is not None:
+                    self._train_draft_model(model, dataloader, device)
+                elif self.rank == 0:
+                    logger.warning("Cannot train draft model: no training data available")
+
             # Save final model + tokenizer state for consistent inference (rank-0 only)
             if self.rank == 0:
                 logger.info("=" * 80)
@@ -2830,6 +3351,9 @@ class Trainer:
                         'moe_num_experts': self.config.moe_num_experts,
                         'moe_top_k': self.config.moe_top_k,
                         'moe_load_balance_weight': self.config.moe_load_balance_weight,
+                        'mtp_enabled': self.config.mtp_enabled,
+                        'mtp_num_heads': self.config.mtp_num_heads,
+                        'mtp_loss_weight': self.config.mtp_loss_weight,
                     },
                     'dataset_source': self.dataset_source,
                 }, self.model_output_path)
@@ -2859,6 +3383,201 @@ class Trainer:
                             logger.info("DDP process group destroyed")
                 except Exception as e:
                     logger.warning(f"Error destroying DDP process group: {e}")
+
+    def _train_draft_model(self, target_model, train_dataloader, device, num_epochs=None):
+        """Train a draft model for speculative decoding.
+
+        The draft model is a small ChatModel (same architecture, fewer layers/smaller embed).
+        When KD is enabled, it is trained with soft labels from the target model.
+        """
+        if not self.config.draft_enabled:
+            return
+
+        draft_num_layers = self.config.draft_num_layers
+        draft_embed_size = self.config.draft_embed_size
+        draft_hidden_size = self.config.draft_hidden_size
+        draft_n_head = self.config.draft_n_head
+        kd_enabled = self.config.draft_kd_enabled
+        kd_temperature = self.config.draft_kd_temperature
+        kd_loss_weight = self.config.draft_kd_loss_weight
+        kd_epochs = num_epochs if num_epochs is not None else self.config.draft_kd_epochs
+
+        if self.rank == 0:
+            logger.info("=" * 80)
+            logger.info(f"Training DRAFT MODEL for speculative decoding")
+            logger.info(f"  Draft config: layers={draft_num_layers}, embed={draft_embed_size}, "
+                        f"hidden={draft_hidden_size}, heads={draft_n_head}")
+            if kd_enabled:
+                logger.info(f"  KD enabled: temperature={kd_temperature}, loss_weight={kd_loss_weight}, epochs={kd_epochs}")
+            else:
+                logger.info(f"  Simple training (no KD): epochs={kd_epochs}")
+
+        # Create draft model (small ChatModel)
+        draft_model = ChatModel(self.tokenizer, embed_size=draft_embed_size, num_layers=draft_num_layers)
+        draft_model = draft_model.to(device)
+
+        draft_param_count = sum(p.numel() for p in draft_model.parameters())
+        if self.rank == 0:
+            logger.info(f"  Draft model parameters: {draft_param_count:,}")
+
+        # Setup optimizer for draft
+        draft_optimizer = torch.optim.AdamW(
+            draft_model.parameters(),
+            lr=TRAINING_CONFIG['learning_rate'],
+            weight_decay=TRAINING_CONFIG['weight_decay']
+        )
+        draft_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            draft_optimizer, T_max=kd_epochs, eta_min=1e-6
+        )
+        draft_criterion = torch.nn.CrossEntropyLoss()
+
+        # Prepare target model for KD (frozen, eval mode)
+        if kd_enabled and target_model is not None:
+            target_model.eval()
+            for param in target_model.parameters():
+                param.requires_grad = False
+
+        # Prepare CSV path for draft metrics
+        draft_csv_path = os.path.join(
+            MODEL_CHECKPOINT_DIR,
+            f"{self.checkpoint_name}_draft_metrics.csv"
+        )
+
+        draft_model.train()
+        for epoch in range(kd_epochs):
+            if self.stop_event.is_set():
+                break
+
+            epoch_loss = 0.0
+            epoch_kd_loss = 0.0
+            epoch_hard_loss = 0.0
+            epoch_batches = 0
+            epoch_start = time.time()
+            try:
+                known_total = len(train_dataloader)
+            except (TypeError, AttributeError):
+                known_total = None
+
+            for batch_idx, (inputs, targets) in enumerate(train_dataloader):
+                if self.stop_event.is_set():
+                    break
+
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+
+                # Forward pass on draft
+                draft_logits = draft_model(inputs)
+
+                if kd_enabled and target_model is not None:
+                    # Knowledge Distillation: soft labels from target
+                    with torch.no_grad():
+                        target_logits = target_model(inputs)
+                        if isinstance(target_logits, tuple):
+                            target_logits = target_logits[0]  # Extract primary logits
+
+                    # Soft target distribution (temperature scaled)
+                    soft_targets = torch.nn.functional.softmax(target_logits / kd_temperature, dim=-1)
+                    draft_log_probs = torch.nn.functional.log_softmax(draft_logits, dim=-1)
+                    kd_loss = torch.nn.functional.kl_div(draft_log_probs, soft_targets, reduction='batchmean')
+
+                    # Hard target loss (next-token prediction)
+                    hard_loss = draft_criterion(draft_logits.view(-1, draft_logits.size(-1)), targets.view(-1))
+
+                    # Combined loss
+                    loss = kd_loss_weight * kd_loss + (1.0 - kd_loss_weight) * hard_loss
+                    epoch_kd_loss += kd_loss.item()
+                    epoch_hard_loss += hard_loss.item()
+                else:
+                    # Simple next-token prediction
+                    loss = draft_criterion(draft_logits.view(-1, draft_logits.size(-1)), targets.view(-1))
+                    epoch_kd_loss = 0.0
+                    epoch_hard_loss = loss.item()
+
+                # Backward pass
+                draft_optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(draft_model.parameters(), TRAINING_CONFIG['grad_clip_norm'])
+                draft_optimizer.step()
+
+                epoch_loss += loss.item()
+                epoch_batches += 1
+
+                if self.rank == 0 and (batch_idx + 1) % 50 == 0:
+                    avg_loss = epoch_loss / epoch_batches
+                    elapsed = time.time() - epoch_start
+                    rate = (batch_idx + 1) / elapsed
+                    current_batch = batch_idx + 1
+                    if known_total is not None and known_total > 1:
+                        remaining = max(0, known_total - current_batch)
+                        eta_seconds = remaining / rate if rate > 0 else 0
+                        eta_m, eta_s = divmod(int(eta_seconds), 60)
+                        eta_str = f"{eta_m}m {eta_s}s" if eta_m > 0 else f"{eta_s}s"
+                        total_str = f"/{known_total}"
+                    else:
+                        eta_str = "..."
+                        total_str = ""
+                    logger.info(f"  Draft epoch {epoch+1}/{kd_epochs} batch {current_batch}{total_str} | ETA: {eta_str} | loss: {avg_loss:.4f}")
+
+            draft_scheduler.step()
+            elapsed = time.time() - epoch_start
+            avg_loss = epoch_loss / max(epoch_batches, 1)
+            avg_kd_loss = epoch_kd_loss / max(epoch_batches, 1) if kd_enabled else 0.0
+            avg_hard_loss = epoch_hard_loss / max(epoch_batches, 1)
+            tokens_per_sec = (epoch_batches * inputs.size(0) * inputs.size(1)) / elapsed if elapsed > 0 else 0
+            current_lr = draft_optimizer.param_groups[0]['lr']
+
+            if self.rank == 0:
+                logger.info(f"  Draft epoch {epoch+1}/{kd_epochs} completed | avg_loss: {avg_loss:.4f} | time: {elapsed:.1f}s")
+
+                # Log to CSV
+                draft_metrics = {
+                    'epoch': epoch + 1,
+                    'loss': f"{avg_loss:.6f}",
+                    'lr': f"{current_lr:.2e}",
+                    'kd_loss': f"{avg_kd_loss:.6f}" if kd_enabled else '',
+                    'hard_loss': f"{avg_hard_loss:.6f}",
+                    'tokens_per_sec': f"{tokens_per_sec:.0f}",
+                }
+                self._log_draft_csv(draft_metrics, draft_csv_path)
+
+        # Generate HTML report
+        if self.rank == 0:
+            self._generate_draft_report(draft_csv_path)
+
+        # Save draft checkpoint
+        if self.rank == 0:
+            draft_output_path = os.path.join(
+                MODEL_CHECKPOINT_DIR,
+                f"{self.checkpoint_name}_draft.pth"
+            )
+            state_dict = draft_model.module.state_dict() if hasattr(draft_model, 'module') else draft_model.state_dict()
+            torch.save({
+                'model_state_dict': state_dict,
+                'architecture': {
+                    'embed_size': draft_embed_size,
+                    'hidden_size': draft_hidden_size,
+                    'num_layers': draft_num_layers,
+                    'n_head': draft_n_head,
+                    'n_positions': TRAINING_CONFIG.get('n_positions', 512),
+                    'vocab_size': self.tokenizer.vocab_size,
+                },
+                'is_draft': True,
+                'target_model': self.checkpoint_name,
+                'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
+                'model_name': f"{self.checkpoint_name}_draft",
+                'draft_config': {
+                    'kd_enabled': kd_enabled,
+                    'kd_temperature': kd_temperature,
+                    'kd_loss_weight': kd_loss_weight,
+                    'kd_epochs': kd_epochs,
+                },
+            }, draft_output_path)
+            logger.info(f"  Draft model saved to: {draft_output_path}")
+
+        # Cleanup
+        del draft_model, draft_optimizer, draft_scheduler
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
 
     def _tokenize_dataset_item(self, value):
         if value is None:

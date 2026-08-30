@@ -165,6 +165,15 @@ python main.py --train \
 | `--web-url URL` | Seed URL to scrape | reads from urls.txt |
 | `--web-max-pages N` | Max pages to scrape | 50 |
 | `--web-max-depth N` | Max link-following depth | 3 |
+| `--draft-enabled` | Create draft model after training | False |
+| `--draft-num-layers N` | Draft model layers (default: 2) | `1` - `4` |
+| `--draft-embed-size N` | Draft embed size (default: 128) | `64` - `256` |
+| `--draft-hidden-size N` | Draft hidden size (default: 256) | `128` - `512` |
+| `--draft-n-head N` | Draft attention heads (default: 2) | `1` - `4` |
+| `--draft-kd-enabled` | Train draft with Knowledge Distillation | False |
+| `--draft-kd-temp T` | KD temperature (default: 2.0) | `1.0` - `5.0` |
+| `--draft-kd-loss-weight W` | KD loss weight (default: 0.5) | `0.0` - `1.0` |
+| `--draft-kd-epochs N` | Draft training epochs (default: 10) | `1` - `100` |
 
 ### Hyperparameter Tuning
 
@@ -279,6 +288,182 @@ python main.py --chat --show-thinking
 # Clean response only
 python main.py --chat
 ```
+
+## Draft Model (Speculative Decoding)
+
+### Que es Speculative Decoding?
+
+Speculative decoding es una tecnica que acelera la inferencia **1.5x-3x** sin cambiar la calidad del modelo. Funciona asi:
+
+1. Un **draft model** (pequeno y rapido) propone N tokens candidatos
+2. El **target model** (grande y preciso) verifica todos en un solo forward pass
+3. Los tokens aceptados se quedan; los rechazados se descartan
+4. El resultado es **identico** a usar solo el target (lossless)
+
+### Entrenar un Draft Model
+
+```bash
+# Draft con Knowledge Distillation (mejor calidad)
+python main.py --train --epochs 30 --draft-enabled --draft-kd-enabled --draft-kd-epochs 10
+
+# Draft sin KD (entrenamiento simple, mas rapido)
+python main.py --train --epochs 30 --draft-enabled --draft-kd-epochs 10
+
+# Draft con configuracion JSON
+python main.py --train --config training_config.json
+
+# Draft personalizado via CLI
+python main.py --train --epochs 30 \
+    --draft-enabled \
+    --draft-num-layers 2 \
+    --draft-embed-size 128 \
+    --draft-hidden-size 256 \
+    --draft-n-head 2 \
+    --draft-kd-enabled \
+    --draft-kd-temperature 2.0 \
+    --draft-kd-loss-weight 0.5 \
+    --draft-kd-epochs 10
+```
+
+**Archivos generados:**
+```
+checkpoints/
+├── chat_model.pth                      # Modelo target
+└── chat_model_draft.pth                # Modelo draft
+```
+
+### Exportar a GGUF
+
+```bash
+# Exportar target + draft
+python main.py --export chat_model --formats gguf
+
+# Genera:
+# models/exported/chat_model_hf/          -> target GGUF
+# models/exported/chat_model_draft_hf/    -> draft GGUF
+```
+
+### Inference con llama.cpp
+
+**Requisitos:** llama.cpp build 9200+ (soporte speculative decoding)
+
+```bash
+# Compilar llama.cpp (macOS/Linux)
+git clone https://github.com/ggml-org/llama.cpp
+cd llama.cpp
+cmake -B build
+cmake --build build --config Release
+
+# Ejecutar con draft model
+./build/bin/llama-server \
+  -m models/chat_model-q4_k_m.gguf \
+  -md models/chat_model_draft-q4_k_m.gguf \
+  --spec-type draft-simple \
+  --spec-draft-n-max 5 \
+  --port 8080
+```
+
+**Windows:**
+```batch
+llama-server.exe ^
+  -m models\chat_model-q4_k_m.gguf ^
+  -md models\chat_model_draft-q4_k_m.gguf ^
+  --spec-type draft-simple ^
+  --spec-draft-n-max 5 ^
+  --port 8080
+```
+
+**Flags de llama.cpp:**
+
+| Flag | Descripcion | Default |
+|------|-------------|---------|
+| `-m` | Modelo target (principal) | obligatorio |
+| `-md` | Modelo draft (pequeno) | sin draft |
+| `--spec-type` | Tipo: `draft-simple`, `draft-mtp`, `ngram-simple` | `none` |
+| `--spec-draft-n-max` | Max tokens a proponer por paso | `3` |
+| `--spec-draft-n-min` | Min tokens a proponer | `0` |
+| `--spec-draft-p-min` | Probabilidad minima para seguir draftando | `0.00` |
+
+**Uso con API (OpenAI-compatible):**
+```bash
+# El servidor expone la misma API que OpenAI
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "chat_model",
+    "messages": [{"role": "user", "content": "Hola"}],
+    "temperature": 0.7
+  }'
+```
+
+### Inference con Ollama
+
+Ollama no soporta draft models directamente, pero puedes:
+1. Usar el modelo target sin draft (funciona normal)
+2. Exportar a GGUF y usar con llama.cpp (ver arriba)
+
+```bash
+# Crear Modelfile (se genera automaticamente en la exportacion)
+ollama create mi_modelo -f Modelfile
+
+# Ejecutar
+ollama run mi_modelo
+```
+
+### Inference con vLLM
+
+vLLM no soporta draft models de terceros, pero soporta **MTP** (Multi-Token Prediction) si el modelo lo tiene habilitado:
+
+```bash
+# Instalar vLLM
+pip install vllm
+
+# Ejecutar (MTP se detecta automaticamente del GGUF)
+vllm serve models/chat_model-q4_k_m.gguf \
+  --tensor-parallel-size 1 \
+  --port 8000
+```
+
+### Inference con HuggingFace Transformers
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Cargar modelo target
+model = AutoModelForCausalLM.from_pretrained("models/exported/chat_model_hf")
+tokenizer = AutoTokenizer.from_pretrained("models/exported/chat_model_hf")
+
+# Generar texto
+inputs = tokenizer("Hola", return_tensors="pt")
+outputs = model.generate(**inputs, max_new_tokens=50)
+print(tokenizer.decode(outputs[0]))
+```
+
+**Nota:** Transformers no soporta draft models. Solo usa el target.
+
+### Cuándo usar Draft Model?
+
+| Escenario | Usar draft? | Razon |
+|-----------|-------------|-------|
+| Chat interactivo | Si | Latencia reducida, mejor UX |
+| Batch processing | Si | Throughput mayor |
+| API server | Si | Mas requests por segundo |
+| Fine-tuning | No | Solo sirve para inferencia |
+| Evaluacion | No | Quieres resultados exactos del target |
+| CPU only | No | Draft no acelera en CPU |
+
+### Draft vs MTP
+
+| Aspecto | Draft Model | MTP |
+|---------|-------------|-----|
+| **Archivo** | Separado (`_draft.pth`) | Embebido en el target |
+| **Exportar** | Dos GGUFs separados | Un solo GGUF |
+| **Uso llama.cpp** | `-md draft.gguf` | `--spec-type draft-mtp` |
+| **Velocidad** | ~1.5-2x | ~1.8-2.5x |
+| **Calidad** | Depende del KD | Depende del entrenamiento |
+| **Complejidad** | Mas archivos | Menos archivos |
+
+**Recomendacion:** Usar **MTP** si el modelo ya lo tiene (mejor integracion). Usar **Draft Model** si necesitas flexibilidad o el modelo no tiene MTP.
 
 ## Tokenization
 
