@@ -1,0 +1,193 @@
+{
+  "tools": {
+    "calculator": {
+      "description": "Evaluate math expressions safely",
+      "parameters": {
+        "expression": {
+          "type": "string",
+          "description": "Math expression to evaluate"
+        }
+      },
+      "category": "computation",
+      "platform": null,
+      "requires_permission": false,
+      "enabled": true
+    },
+    "current_date": {
+      "description": "Get current date and time",
+      "parameters": {},
+      "category": "computation",
+      "platform": null,
+      "requires_permission": false,
+      "enabled": true
+    },
+    "word_count": {
+      "description": "Count words in text",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "description": "Text to count words in"
+        }
+      },
+      "category": "computation",
+      "platform": null,
+      "requires_permission": false,
+      "enabled": true
+    },
+    "get_platform": {
+      "description": "Detect current operating system",
+      "parameters": {},
+      "category": "computation",
+      "platform": null,
+      "requires_permission": false,
+      "enabled": true
+    },
+    "read_file": {
+      "description": "Read content of a file",
+      "parameters": {
+        "path": {
+          "type": "string",
+          "description": "File path to read"
+        }
+      },
+      "category": "file",
+      "platform": null,
+      "requires_permission": true,
+      "enabled": true
+    },
+    "list_directory": {
+      "description": "List files in a directory",
+      "parameters": {
+        "path": {
+          "type": "string",
+          "description": "Directory path (default: current)"
+        }
+      },
+      "category": "file",
+      "platform": null,
+      "requires_permission": true,
+      "enabled": true
+    },
+    "web_search": {
+      "description": "Search the web for information",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "Search query"
+        }
+      },
+      "category": "search",
+      "platform": null,
+      "requires_permission": false,
+      "enabled": true
+    },
+    "shell": {
+      "description": "Execute a shell command",
+      "parameters": {
+        "command": {
+          "type": "string",
+          "description": "Shell command to execute"
+        }
+      },
+      "category": "shell",
+      "platform": null,
+      "requires_permission": true,
+      "enabled": true
+    }
+  },
+  "agent_patterns": {
+    "math": {
+      "tools": ["calculator"],
+      "patterns": [
+        {"regex": "(\\d+)\\s*\\*\\s*(\\d+)", "args_group": [1, " * ", 2]},
+        {"regex": "(\\d+)\\s*[\\+]\\s*(\\d+)", "args_group": [1, " + ", 2]},
+        {"regex": "(\\d+)\\s*[\\-]\\s*(\\d+)", "args_group": [1, " - ", 2]},
+        {"regex": "cuanto es (\\d+)", "args_group": [1]},
+        {"regex": "how much is (\\d+)", "args_group": [1]},
+        {"regex": "calcula?\\s+(.+)", "args_group": [1]}
+      ],
+      "keywords_es": ["cuanto es", "calcula", "suma", "resta", "multiplica"],
+      "keywords_en": ["how much is", "calculate", "sum", "subtract", "multiply"]
+    },
+    "date": {
+      "tools": ["current_date"],
+      "patterns": [],
+      "keywords_es": ["qué día es", "que dia es", "hoy", "fecha actual", "qué fecha es"],
+      "keywords_en": ["what day is it", "today", "current date", "what date is it"]
+    },
+    "files": {
+      "tools": ["list_directory", "read_file"],
+      "patterns": [],
+      "keywords_es": ["qué hay en", "que hay en", "lista archivos", "carpeta", "leer archivo", "contenido de"],
+      "keywords_en": ["what's in", "list files", "directory", "read file", "contents of"]
+    },
+    "search": {
+      "tools": ["web_search"],
+      "patterns": [],
+      "keywords_es": ["busca", "buscar", "investiga", "qué es", "que es"],
+      "keywords_en": ["search", "look up", "research", "what is"]
+    },
+    "shell": {
+      "tools": ["shell"],
+      "patterns": [],
+      "keywords_es": ["ejecuta", "corre comando", "abre", "lista carpetas con"],
+      "keywords_en": ["run command", "execute", "open", "list folders with"]
+    }
+  },
+  "shell_commands": {
+    "windows": {
+      "list_files": "dir /b",
+      "current_dir": "cd",
+      "read_file": "type",
+      "create_file": "echo",
+      "delete_file": "del",
+      "copy_file": "copy",
+      "move_file": "move",
+      "env_var": "echo %",
+      "processes": "tasklist",
+      "kill_process": "taskkill /PID",
+      "network": "ipconfig",
+      "disk_space": "wmic logicaldisk get size,freespace,caption"
+    },
+    "linux": {
+      "list_files": "ls -la",
+      "current_dir": "pwd",
+      "read_file": "cat",
+      "create_file": "touch",
+      "delete_file": "rm",
+      "copy_file": "cp",
+      "move_file": "mv",
+      "env_var": "echo $",
+      "processes": "ps aux",
+      "kill_process": "kill",
+      "kill_by_name": "pkill",
+      "network": "ifconfig",
+      "disk_space": "df -h"
+    },
+    "darwin": {
+      "list_files": "ls -la",
+      "current_dir": "pwd",
+      "read_file": "cat",
+      "create_file": "touch",
+      "delete_file": "rm",
+      "copy_file": "cp",
+      "move_file": "mv",
+      "env_var": "echo $",
+      "processes": "ps aux",
+      "kill_process": "kill",
+      "kill_by_name": "pkill",
+      "network": "ifconfig",
+      "disk_space": "df -h"
+    }
+  },
+  "simulated_results": {
+    "calculator": "evaluator",
+    "current_date": "datetime_now",
+    "word_count": "split_len",
+    "get_platform": "platform_detect",
+    "read_file": "first_200_chars",
+    "list_directory": "file1.txt  file2.py  directory1/",
+    "web_search": "search_stub",
+    "shell": "command_output"
+  }
+}

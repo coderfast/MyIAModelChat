@@ -174,6 +174,10 @@ python main.py --train \
 | `--draft-kd-temp T` | KD temperature (default: 2.0) | `1.0` - `5.0` |
 | `--draft-kd-loss-weight W` | KD loss weight (default: 0.5) | `0.0` - `1.0` |
 | `--draft-kd-epochs N` | Draft training epochs (default: 10) | `1` - `100` |
+| `--tensorboard-enabled` | Enable TensorBoard logging | False |
+| `--tensorboard-log-dir DIR` | TensorBoard log directory | `runs` |
+| `--tensorboard-comment TEXT` | Comment suffix for run name | `""` |
+| `--tensorboard-freq N` | Log every N epochs | `1` |
 
 ### Hyperparameter Tuning
 
@@ -342,6 +346,48 @@ python main.py --export chat_model --formats gguf
 # models/exported/chat_model_hf/          -> target GGUF
 # models/exported/chat_model_draft_hf/    -> draft GGUF
 ```
+
+## TensorBoard
+
+TensorBoard permite visualizar el progreso del entrenamiento en tiempo real con graficas interactivas en el navegador.
+
+### Instalacion
+
+```bash
+pip install tensorboard
+```
+
+### Uso
+
+```bash
+# Entrenar con TensorBoard habilitado
+python main.py --train --tensorboard-enabled
+
+# Con comment personalizado
+python main.py --train --tensorboard-enabled --tensorboard-comment "mi_experimento"
+
+# Loguear cada 5 epochs
+python main.py --train --tensorboard-enabled --tensorboard-freq 5
+
+# Con configuracion JSON
+# tensorboard.enabled = true en training_config.json
+python main.py --train --config training_config.json
+
+# Ver TensorBoard en el navegador (en otra terminal)
+tensorboard --logdir=runs
+```
+
+### Metricas Registradas
+
+| Categoria | Metricas | Descripcion |
+|-----------|----------|-------------|
+| **Loss** | `loss/train`, `loss/val` | Error del modelo |
+| **Perplexity** | `perplexity/train`, `perplexity/val` | `e^loss` |
+| **General** | `gap`, `learning_rate`, `grad_norm`, `tokens_per_sec`, `best_loss` | Metricas generales |
+| **Thinking** | `thinking/thinking_token_accuracy`, `thinking/thinking_coverage`, etc. | Si thinking enabled |
+| **Agent** | `agent/agent_tool_call_accuracy`, `agent/agent_ratio`, etc. | Si agent enabled |
+| **MoE** | `moe/moe_gate_entropy_norm`, `moe/moe_expert_*_util`, etc. | Si MoE enabled |
+| **MTP** | `mtp/mtp_loss` | Si MTP enabled |
 
 ### Inference con llama.cpp
 

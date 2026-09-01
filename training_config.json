@@ -21,7 +21,8 @@
   "agent": {
     "enabled": true,
     "loss_weight": 1.0,
-    "ratio": 0.3
+    "ratio": 0.3,
+    "tools_config": "tools_config.json"
   },
   "moe": {
     "enabled": true,
@@ -58,6 +59,12 @@
     "gamma": 0.5,
     "patience": 5,
     "factor": 0.5
+  },
+  "tensorboard": {
+    "enabled": true,
+    "log_dir": "\\checkpoints\\chat_model_tensorboard",
+    "comment": "",
+    "freq": 1
   },
   "logging": {
     "metrics_csv": true,

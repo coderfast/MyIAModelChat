@@ -119,7 +119,7 @@ class TestToolExecutor:
         executor = ToolExecutor(dry_run=False)
         text = '<tool_call>shell(rm -rf /)</tool_call>'
         result = executor.execute_tool_call(text, registry)
-        assert "Error" in result
+        assert "Error" in result or "Blocked" in result
 
 
 class TestPlatformFunctions:

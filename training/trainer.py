@@ -35,6 +35,14 @@ except Exception:
     spm = None
     SP_AVAILABLE = False
 
+# Optional TensorBoard support
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    SummaryWriter = None
+    TENSORBOARD_AVAILABLE = False
+
 try:
     from commons.tokenizer.bpe_tokenizer import SentencePieceTokenizerWrapper
 except ImportError:
@@ -187,6 +195,11 @@ class TrainingConfig:
     scheduler_gamma: float = 0.5        # Factor de reduccion para step/exponential
     scheduler_patience: int = 5         # Para plateau: epochs sin mejora antes de reducir
     scheduler_factor: float = 0.5       # Para plateau: factor de reduccion
+    # TensorBoard fields
+    tensorboard_enabled: bool = False
+    tensorboard_log_dir: str = 'runs'           # root log directory
+    tensorboard_comment: str = ''               # optional comment suffix (e.g. 'run1')
+    tensorboard_freq: int = 1                   # log every N epochs (1 = every epoch)
     # DDP fields (single-machine multi-GPU or multi-node)
     rank: int = 0                # global rank
     local_rank: int = 0          # rank within this machine
@@ -251,6 +264,11 @@ class TrainingConfig:
         'scheduler.gamma': 'scheduler_gamma',
         'scheduler.patience': 'scheduler_patience',
         'scheduler.factor': 'scheduler_factor',
+        # tensorboard
+        'tensorboard.enabled': 'tensorboard_enabled',
+        'tensorboard.log_dir': 'tensorboard_log_dir',
+        'tensorboard.comment': 'tensorboard_comment',
+        'tensorboard.freq': 'tensorboard_freq',
         # logging
         'logging.metrics_csv': 'log_metrics_csv',
         'logging.statistics': 'statistics',
@@ -3109,6 +3127,23 @@ class Trainer:
             metrics_csv_path = os.path.join(MODEL_CHECKPOINT_DIR, f'{self.checkpoint_name}_metrics.csv')
             log_csv = getattr(self.config, 'log_metrics_csv', True) and self.rank == 0
 
+            # TensorBoard initialization
+            tb_writer = None
+            if getattr(self.config, 'tensorboard_enabled', False) and self.rank == 0:
+                if TENSORBOARD_AVAILABLE:
+                    tb_comment = getattr(self.config, 'tensorboard_comment', '')
+                    tb_log_dir = getattr(self.config, 'tensorboard_log_dir', 'runs')
+                    tb_run_name = f"{self.checkpoint_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    if tb_comment:
+                        tb_run_name += f"_{tb_comment}"
+                    tb_writer = SummaryWriter(log_dir=os.path.join(tb_log_dir, tb_run_name))
+                    tb_freq = getattr(self.config, 'tensorboard_freq', 1)
+                    logger.info(f"  TensorBoard enabled: log_dir={os.path.join(tb_log_dir, tb_run_name)} (every {tb_freq} epochs)")
+                    # Log config as text
+                    tb_writer.add_text("config", str(self.config.to_dict()), 0)
+                else:
+                    logger.warning("  TensorBoard requested but tensorboard package not installed. Install: pip install tensorboard")
+
             num_epochs = self.epochs
             for epoch in range(num_epochs):
                 if self.stop_event.is_set():
@@ -3274,6 +3309,41 @@ class Trainer:
                             metrics_row[key] = f"{moe_metrics.get(key, 0):.4f}" if moe_metrics else ""
                         self._log_metrics_csv(metrics_row, metrics_csv_path)
 
+                    # TensorBoard logging
+                    if tb_writer is not None:
+                        tb_freq = getattr(self.config, 'tensorboard_freq', 1)
+                        if (epoch + 1) % tb_freq == 0:
+                            step = current_epoch_num
+                            tb_writer.add_scalars('loss', {'train': train_loss, 'val': val_loss if val_dataloader is not None else train_loss}, step)
+                            tb_writer.add_scalar('perplexity/train', train_perplexity, step)
+                            if val_dataloader is not None:
+                                tb_writer.add_scalar('perplexity/val', val_perplexity, step)
+                            tb_writer.add_scalar('gap', gap, step)
+                            tb_writer.add_scalar('learning_rate', current_lr, step)
+                            tb_writer.add_scalar('grad_norm', grad_norm, step)
+                            tb_writer.add_scalar('tokens_per_sec', tokens_per_sec, step)
+                            tb_writer.add_scalar('best_loss', self.best_loss, step)
+                            # Thinking metrics
+                            if thinking_metrics:
+                                for k, v in thinking_metrics.items():
+                                    if v != 0:
+                                        tb_writer.add_scalar(f'thinking/{k}', v, step)
+                            # Agent metrics
+                            if agent_metrics:
+                                for k, v in agent_metrics.items():
+                                    if v != 0:
+                                        tb_writer.add_scalar(f'agent/{k}', v, step)
+                            # MoE metrics
+                            if moe_metrics:
+                                for k, v in moe_metrics.items():
+                                    if v != 0:
+                                        tb_writer.add_scalar(f'moe/{k}', v, step)
+                            # MTP metrics
+                            if mtp_metrics:
+                                for k, v in mtp_metrics.items():
+                                    if v != 0:
+                                        tb_writer.add_scalar(f'mtp/{k}', v, step)
+
                 # Early stopping check
                 if early_stopping_patience > 0 and val_dataloader is not None:
                     current_best = val_loss
@@ -3297,6 +3367,12 @@ class Trainer:
             # Generate training report after epoch loop
             if log_csv and self.rank == 0:
                 self._generate_training_report(metrics_csv_path)
+
+            # Close TensorBoard writer
+            if tb_writer is not None:
+                tb_writer.close()
+                if self.rank == 0:
+                    logger.info("  TensorBoard log closed")
 
             # Stop requested? Do not write a partial final checkpoint.
             if self.stop_event.is_set():

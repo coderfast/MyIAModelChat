@@ -276,6 +276,9 @@ python main.py --train --epochs 30 --draft-enabled --draft-kd-epochs 10
 # Train with Draft Model via JSON config
 python main.py --train --config training_config.json
 
+# Train with TensorBoard logging enabled
+python main.py --train --tensorboard-enabled --tensorboard-comment "experiment1"
+
 # Export target + draft to GGUF for llama.cpp
 python main.py --export chat_model --formats gguf
 
@@ -501,6 +504,7 @@ open → in_progress → done
 - HTML Report Serialization: Python `None` → JavaScript `null` for correct chart rendering
 - Robust Checkpoint Resume: detects MoE from state_dict keys (not metadata), filters shape mismatches via `_filter_state_dict`, handles architecture changes between sessions (e.g., adding/expert count, MoE on/off)
 - Draft Model (Speculative Decoding): optional small model for 1.5-3x inference speedup via llama.cpp; supports Knowledge Distillation from target model; exported as separate GGUF; configurable via JSON/CLI (`draft.enabled`, `draft.kd_enabled`, `draft.kd_epochs`)
+- TensorBoard Integration: optional real-time training visualization via TensorBoard; logs loss, perplexity, LR, grad norm, thinking/agent/MoE/MTP metrics; configurable via JSON (`tensorboard.enabled`, `tensorboard.log_dir`, `tensorboard.comment`, `tensorboard.freq`) or CLI (`--tensorboard-enabled`, `--tensorboard-log-dir`, `--tensorboard-comment`, `--tensorboard-freq`); graceful fallback if tensorboard not installed
 
 ---
 

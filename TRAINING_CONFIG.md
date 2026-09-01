@@ -88,6 +88,12 @@ python main.py --train --config training_config.json --epochs 50
   "logging": {
     "metrics_csv": true,
     "statistics": false
+  },
+  "tensorboard": {
+    "enabled": false,
+    "log_dir": "runs",
+    "comment": "",
+    "freq": 1
   }
 }
 ```
@@ -485,6 +491,65 @@ Epoch 7: val_loss = 3.69 (peor)  -> patience = 5 -> STOP!
 | `0.05` - `0.1` | Poco datos para val (datasets grandes) |
 | `0.2` - `0.3` | Bastante datos para val (datasets pequenos) |
 | `0.5` | Mitad y mitad (solo si tienes MUCHOS datos) |
+
+---
+
+### TensorBoard
+
+TensorBoard permite visualizar el progreso del entrenamiento en tiempo real con graficas interactivas.
+
+**Instalar TensorBoard (opcional):**
+```bash
+pip install tensorboard
+```
+
+| Parametro | Tipo | Valores | Default | Descripcion |
+|-----------|------|---------|---------|-------------|
+| `tensorboard.enabled` | bool | `true` / `false` | `false` | Activar logging a TensorBoard |
+| `tensorboard.log_dir` | string | ruta valida | `"runs"` | Directorio raiz donde se guardan los logs |
+| `tensorboard.comment` | string | cualquier texto | `""` | Sufijo opcional para el nombre del run |
+| `tensorboard.freq` | int | `1` - `N` | `1` | Loguear cada N epochs (1 = cada epoch) |
+
+**Metricas registradas:**
+- `loss/train`, `loss/val` - Loss de entrenamiento y validacion
+- `perplexity/train`, `perplexity/val` - Perplejidad
+- `gap` - Diferencia val_loss - train_loss
+- `learning_rate` - Learning rate actual
+- `grad_norm` - Norma del gradiente
+- `tokens_per_sec` - Velocidad de entrenamiento
+- `best_loss` - Mejor loss alcanzado
+- `thinking/*` - Metricas de thinking (si enabled)
+- `agent/*` - Metricas de agente (si enabled)
+- `moe/*` - Metricas de MoE (si enabled)
+- `mtp/*` - Metricas de MTP (si enabled)
+
+**Ejemplo JSON:**
+```json
+{
+  "tensorboard": {
+    "enabled": true,
+    "log_dir": "runs",
+    "comment": "mi_experimento",
+    "freq": 1
+  }
+}
+```
+
+**Ejemplo CLI:**
+```bash
+python main.py --train --tensorboard-enabled --tensorboard-comment "test_run"
+
+# Ver TensorBoard en el navegador:
+tensorboard --logdir=runs
+```
+
+**Estructura de archivos generada:**
+```
+runs/
+└── chat_model_20260830_120000_test_run/
+    ├── events.out.tfevents.*    # Metricas de TensorBoard
+    └── ...
+```
 
 ---
 

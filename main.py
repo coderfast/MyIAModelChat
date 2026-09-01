@@ -453,6 +453,16 @@ EXAMPLES:
         parser.add_argument("--draft-kd-epochs", type=int, default=10,
                             help="Epochs for KD training of draft model (default: 10)")
 
+        # TensorBoard options
+        parser.add_argument("--tensorboard-enabled", action='store_true',
+                            help="Enable TensorBoard logging during training")
+        parser.add_argument("--tensorboard-log-dir", type=str, default='runs',
+                            help="TensorBoard log directory (default: runs)")
+        parser.add_argument("--tensorboard-comment", type=str, default='',
+                            help="Optional comment suffix for TensorBoard run name")
+        parser.add_argument("--tensorboard-freq", type=int, default=1,
+                            help="Log to TensorBoard every N epochs (default: 1)")
+
         parser.add_argument("--validate-sources", action='store_true',
                             help="Validate and clean each data source before training")
 
@@ -707,6 +717,10 @@ EXAMPLES:
                     draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0) if getattr(args, 'draft_kd_temperature', 2.0) != 2.0 else json_config.draft_kd_temperature,
                     draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5) if getattr(args, 'draft_kd_loss_weight', 0.5) != 0.5 else json_config.draft_kd_loss_weight,
                     draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10) if getattr(args, 'draft_kd_epochs', 10) != 10 else json_config.draft_kd_epochs,
+                    tensorboard_enabled=getattr(args, 'tensorboard_enabled', False) or json_config.tensorboard_enabled,
+                    tensorboard_log_dir=getattr(args, 'tensorboard_log_dir', 'runs') if getattr(args, 'tensorboard_log_dir', 'runs') != 'runs' else json_config.tensorboard_log_dir,
+                    tensorboard_comment=getattr(args, 'tensorboard_comment', '') if getattr(args, 'tensorboard_comment', '') != '' else json_config.tensorboard_comment,
+                    tensorboard_freq=getattr(args, 'tensorboard_freq', 1) if getattr(args, 'tensorboard_freq', 1) != 1 else json_config.tensorboard_freq,
                     val_split=getattr(args, 'val_split', 0.1) if getattr(args, 'val_split', 0.1) != 0.1 else json_config.val_split,
                     val_batches=getattr(args, 'val_batches', 0) if getattr(args, 'val_batches', 0) != 0 else json_config.val_batches,
                     early_stopping_patience=getattr(args, 'early_stopping_patience', 0) if getattr(args, 'early_stopping_patience', 0) != 0 else json_config.early_stopping_patience,
@@ -754,6 +768,10 @@ EXAMPLES:
                     draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0),
                     draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5),
                     draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10),
+                    tensorboard_enabled=getattr(args, 'tensorboard_enabled', False),
+                    tensorboard_log_dir=getattr(args, 'tensorboard_log_dir', 'runs'),
+                    tensorboard_comment=getattr(args, 'tensorboard_comment', ''),
+                    tensorboard_freq=getattr(args, 'tensorboard_freq', 1),
                     val_split=getattr(args, 'val_split', 0.1),
                     val_batches=getattr(args, 'val_batches', 0),
                     early_stopping_patience=getattr(args, 'early_stopping_patience', 0),

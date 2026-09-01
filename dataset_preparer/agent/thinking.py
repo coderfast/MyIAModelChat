@@ -2,12 +2,72 @@
 
 import re
 import random
+import json
+import os
 import logging
 from typing import Dict, Any, Optional, List
 
 from dataset_preparer.thinking_generators import ThinkingGenerator, OllamaTeacher
 
 logger = logging.getLogger(__name__)
+
+TOOLS_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'tools_config.json')
+
+
+def _load_agent_patterns() -> dict:
+    """Load agent patterns from tools_config.json."""
+    if not os.path.exists(TOOLS_CONFIG_PATH):
+        logger.warning(f"Tools config not found: {TOOLS_CONFIG_PATH}, using hardcoded patterns")
+        return {}
+    try:
+        with open(TOOLS_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        return config.get('agent_patterns', {})
+    except Exception as e:
+        logger.error(f"Failed to load agent patterns: {e}")
+        return {}
+
+
+def _compile_patterns(patterns_data: dict) -> dict:
+    """Compile JSON patterns into the format expected by _analyze_tool_need."""
+    compiled = {}
+    for category, config in patterns_data.items():
+        compiled_patterns = []
+        default_tool = config['tools'][0] if config.get('tools') else None
+        
+        # Compile regex patterns from JSON
+        for p in config.get('patterns', []):
+            regex = p['regex']
+            args_groups = p.get('args_group', [])
+            tool_for_pattern = p.get('tool', default_tool)
+            
+            def make_args_fn(groups):
+                def args_fn(match):
+                    parts = []
+                    for g in groups:
+                        if isinstance(g, int):
+                            parts.append(match.group(g) if match.lastindex and g <= match.lastindex else '')
+                        else:
+                            parts.append(g)
+                    return ''.join(parts).strip()
+                return args_fn
+            
+            compiled_patterns.append((re.compile(regex, re.IGNORECASE), tool_for_pattern, make_args_fn(args_groups)))
+        
+        # Add keyword-based patterns
+        all_keywords = config.get('keywords_es', []) + config.get('keywords_en', [])
+        if all_keywords:
+            keyword_pattern = '|'.join(re.escape(kw) for kw in all_keywords)
+            tool_name = config['tools'][0] if config.get('tools') else None
+            if tool_name:
+                compiled_patterns.append((re.compile(keyword_pattern, re.IGNORECASE), tool_name, lambda m: ''))
+        
+        compiled[category] = {
+            'tools': config.get('tools', []),
+            'patterns': compiled_patterns
+        }
+    
+    return compiled
 
 
 class AgentThinkingGenerator(ThinkingGenerator):
@@ -22,35 +82,42 @@ class AgentThinkingGenerator(ThinkingGenerator):
         <|problem|>{question}<|thinking|>{reasoning}<|final|>{response}
     """
 
-    TOOL_CATEGORIES = {
+    # Default hardcoded patterns (fallback if JSON not available)
+    DEFAULT_TOOL_CATEGORIES = {
         'math': {
             'tools': ['calculator'],
             'patterns': [
-                (r'(\d+)\s*\*\s*(\d+)', 'calculator', lambda m: f"{m.group(1)} * {m.group(2)}"),
-                (r'(\d+)\s*[\+]\s*(\d+)', 'calculator', lambda m: f"{m.group(1)} + {m.group(2)}"),
-                (r'(\d+)\s*[\-]\s*(\d+)', 'calculator', lambda m: f"{m.group(1)} - {m.group(2)}"),
-                (r'cuanto es (\d+)', 'calculator', lambda m: f"{m.group(1)}"),
-                (r'how much is (\d+)', 'calculator', lambda m: f"{m.group(1)}"),
+                (re.compile(r'(\d+)\s*\*\s*(\d+)', re.IGNORECASE), 'calculator', lambda m: f"{m.group(1)} * {m.group(2)}"),
+                (re.compile(r'(\d+)\s*[\+]\s*(\d+)', re.IGNORECASE), 'calculator', lambda m: f"{m.group(1)} + {m.group(2)}"),
+                (re.compile(r'(\d+)\s*[\-]\s*(\d+)', re.IGNORECASE), 'calculator', lambda m: f"{m.group(1)} - {m.group(2)}"),
+                (re.compile(r'cuanto es (\d+)', re.IGNORECASE), 'calculator', lambda m: f"{m.group(1)}"),
+                (re.compile(r'how much is (\d+)', re.IGNORECASE), 'calculator', lambda m: f"{m.group(1)}"),
             ],
         },
         'date': {
             'tools': ['current_date'],
             'patterns': [
-                (r'qu[eé] d[ií]a es|hoy|today|current date', 'current_date', lambda m: ''),
-                (r'fecha actual|current time', 'current_date', lambda m: ''),
+                (re.compile(r'qu[eé] d[ií]a es|hoy|today|current date', re.IGNORECASE), 'current_date', lambda m: ''),
+                (re.compile(r'fecha actual|current time', re.IGNORECASE), 'current_date', lambda m: ''),
             ],
         },
         'files': {
             'tools': ['list_directory', 'read_file'],
             'patterns': [
-                (r'qu[eé] hay en|list files|carpeta', 'list_directory', lambda m: '.'),
-                (r'leer archivo|read file|contenido de', 'read_file', lambda m: ''),
+                (re.compile(r'qu[eé] hay en|list files|carpeta', re.IGNORECASE), 'list_directory', lambda m: '.'),
+                (re.compile(r'leer archivo|read file|contenido de', re.IGNORECASE), 'read_file', lambda m: ''),
             ],
         },
         'search': {
             'tools': ['web_search'],
             'patterns': [
-                (r'busca|search|buscar|investiga', 'web_search', lambda m: ''),
+                (re.compile(r'busca|search|buscar|investiga', re.IGNORECASE), 'web_search', lambda m: ''),
+            ],
+        },
+        'shell': {
+            'tools': ['shell'],
+            'patterns': [
+                (re.compile(r'ejecuta|run command|execute|corre comando', re.IGNORECASE), 'shell', lambda m: ''),
             ],
         },
     }
@@ -59,6 +126,15 @@ class AgentThinkingGenerator(ThinkingGenerator):
         super().__init__(teacher, depth)
         self._tool_call_count = 0
         self._no_tool_count = 0
+        
+        # Load patterns from JSON or use defaults
+        patterns_data = _load_agent_patterns()
+        if patterns_data:
+            self.TOOL_CATEGORIES = _compile_patterns(patterns_data)
+            logger.info(f"Loaded agent patterns from JSON ({len(self.TOOL_CATEGORIES)} categories)")
+        else:
+            self.TOOL_CATEGORIES = self.DEFAULT_TOOL_CATEGORIES
+            logger.info("Using default hardcoded agent patterns")
 
     def generate(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         """Generate agentic thinking for a sample."""
@@ -87,8 +163,9 @@ class AgentThinkingGenerator(ThinkingGenerator):
 
         for category, config in self.TOOL_CATEGORIES.items():
             for pattern, tool_name, args_fn in config['patterns']:
-                if re.search(pattern, q_lower):
-                    arguments = args_fn(re.search(pattern, q_lower))
+                if pattern.search(q_lower):
+                    match = pattern.search(q_lower)
+                    arguments = args_fn(match)
                     simulated = self._simulate_tool_result(tool_name, arguments, answer)
                     return True, tool_name, arguments, simulated
 
