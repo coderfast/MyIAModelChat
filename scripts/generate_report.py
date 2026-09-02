@@ -427,7 +427,7 @@ def generate_html(data, checkpoint_name, is_draft=False):
         const mtpLoss = {mtp_loss_json};
 
         const zoomOptions = {{
-            zoom: {{ wheel: {{ enabled: true }}, pinch: {{ enabled: true }}, drag: {{ enabled: false }}, mode: 'xy', scaleMode: 'xy' }},
+            zoom: {{ wheel: {{ enabled: true, speed: 0.1 }}, pinch: {{ enabled: true }}, drag: {{ enabled: false }}, mode: 'xy' }},
             pan: {{ enabled: true, mode: 'xy' }}
         }};
 

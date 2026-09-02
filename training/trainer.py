@@ -2105,11 +2105,10 @@ class Trainer:
         // Reusable zoom/pan configuration
         const zoomOptions = {{
             zoom: {{
-                wheel: {{ enabled: true }},
+                wheel: {{ enabled: true, speed: 0.1 }},
                 pinch: {{ enabled: true }},
                 drag: {{ enabled: false }},
-                mode: 'xy',
-                scaleMode: 'xy'
+                mode: 'xy'
             }},
             pan: {{
                 enabled: true,
@@ -2658,11 +2657,10 @@ class Trainer:
         // Reusable zoom/pan configuration
         const zoomOptions = {{
             zoom: {{
-                wheel: {{ enabled: true }},
+                wheel: {{ enabled: true, speed: 0.1 }},
                 pinch: {{ enabled: true }},
                 drag: {{ enabled: false }},
-                mode: 'xy',
-                scaleMode: 'xy'
+                mode: 'xy'
             }},
             pan: {{
                 enabled: true,
