@@ -2102,19 +2102,55 @@ class Trainer:
         const moeExpertUtils = {moe_expert_utils_json};
         const mtpLosses = {mtp_losses_json};
 
-        // Reusable zoom/pan configuration
+        // Reusable zoom config (custom pan via drag handlers below)
         const zoomOptions = {{
             zoom: {{
-                wheel: {{ enabled: true, speed: 0.1 }},
+                wheel: {{ enabled: true }},
                 pinch: {{ enabled: true }},
-                drag: {{ enabled: false }},
                 mode: 'xy'
             }},
-            pan: {{
-                enabled: true,
-                mode: 'xy'
-            }}
+            pan: {{ enabled: false }}
         }};
+
+        // Custom drag-to-pan: per-chart state
+        const _panState = {{}};
+
+        function _initPan(chartId) {{
+            const canvas = document.getElementById(chartId);
+            if (!canvas) return;
+            canvas.style.cursor = 'grab';
+            canvas.addEventListener('mousedown', function(e) {{
+                if (e.button !== 0) return;
+                const chart = Chart.getChart(chartId);
+                if (!chart) return;
+                const xs = chart.scales.x, ys = chart.scales.y;
+                _panState[chartId] = {{
+                    active: true, sx: e.clientX, sy: e.clientY,
+                    xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max
+                }};
+                canvas.style.cursor = 'grabbing';
+                e.preventDefault();
+            }});
+            canvas.addEventListener('mousemove', function(e) {{
+                const s = _panState[chartId];
+                if (!s || !s.active) return;
+                const chart = Chart.getChart(chartId);
+                if (!chart) return;
+                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
+                const cw = canvas.width, ch = canvas.height;
+                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
+                chart.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
+                chart.zoomScale('y', {{ min: s.yMin + dy / ch * yR, max: s.yMax + dy / ch * yR }}, 'default');
+                e.preventDefault();
+            }});
+            window.addEventListener('mouseup', function() {{
+                const s = _panState[chartId];
+                if (s && s.active) {{
+                    s.active = false;
+                    canvas.style.cursor = 'grab';
+                }}
+            }});
+        }}
 
         function resetZoom(chartId) {{
             const chart = Chart.getChart(chartId);
@@ -2159,6 +2195,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('lossChart');
 
         // Perplexity Chart
         new Chart(document.getElementById('perplexityChart'), {{
@@ -2190,6 +2227,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('perplexityChart');
 
         // Gap Chart
         new Chart(document.getElementById('gapChart'), {{
@@ -2225,6 +2263,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('gapChart');
 
         // Learning Rate Chart
         new Chart(document.getElementById('lrChart'), {{
@@ -2256,6 +2295,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('lrChart');
 
         // Speed Chart
         new Chart(document.getElementById('speedChart'), {{
@@ -2279,6 +2319,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('speedChart');
 
         // Thinking Accuracy Chart
         if (thinkingAccuracy.some(v => v !== null)) {{
@@ -2301,6 +2342,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('thinkingAccuracyChart');
         }}
 
         // Thinking Coverage Chart
@@ -2326,6 +2368,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('thinkingCoverageChart');
         }}
 
         // Agent Accuracy Chart
@@ -2347,6 +2390,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('agentAccuracyChart');
         }}
 
         // Agent Ratio Chart
@@ -2371,6 +2415,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('agentRatioChart');
         }}
 
         // MoE Entropy Chart
@@ -2396,6 +2441,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('moeEntropyChart');
         }}
 
         // MoE Expert Utilization Chart
@@ -2419,6 +2465,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('moeUtilChart');
         }}
 
         // MTP Loss Chart
@@ -2444,6 +2491,7 @@ class Trainer:
                     }}
                 }}
             }});
+            _initPan('mtpLossChart');
         }}
     </script>
 </body>
@@ -2654,19 +2702,55 @@ class Trainer:
         const kdLosses = {kd_losses_json};
         const hardLosses = {hard_losses_json};
 
-        // Reusable zoom/pan configuration
+        // Reusable zoom config (custom pan via drag handlers below)
         const zoomOptions = {{
             zoom: {{
-                wheel: {{ enabled: true, speed: 0.1 }},
+                wheel: {{ enabled: true }},
                 pinch: {{ enabled: true }},
-                drag: {{ enabled: false }},
                 mode: 'xy'
             }},
-            pan: {{
-                enabled: true,
-                mode: 'xy'
-            }}
+            pan: {{ enabled: false }}
         }};
+
+        // Custom drag-to-pan: per-chart state
+        const _panState = {{}};
+
+        function _initPan(chartId) {{
+            const canvas = document.getElementById(chartId);
+            if (!canvas) return;
+            canvas.style.cursor = 'grab';
+            canvas.addEventListener('mousedown', function(e) {{
+                if (e.button !== 0) return;
+                const chart = Chart.getChart(chartId);
+                if (!chart) return;
+                const xs = chart.scales.x, ys = chart.scales.y;
+                _panState[chartId] = {{
+                    active: true, sx: e.clientX, sy: e.clientY,
+                    xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max
+                }};
+                canvas.style.cursor = 'grabbing';
+                e.preventDefault();
+            }});
+            canvas.addEventListener('mousemove', function(e) {{
+                const s = _panState[chartId];
+                if (!s || !s.active) return;
+                const chart = Chart.getChart(chartId);
+                if (!chart) return;
+                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
+                const cw = canvas.width, ch = canvas.height;
+                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
+                chart.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
+                chart.zoomScale('y', {{ min: s.yMin + dy / ch * yR, max: s.yMax + dy / ch * yR }}, 'default');
+                e.preventDefault();
+            }});
+            window.addEventListener('mouseup', function() {{
+                const s = _panState[chartId];
+                if (s && s.active) {{
+                    s.active = false;
+                    canvas.style.cursor = 'grab';
+                }}
+            }});
+        }}
 
         function resetZoom(chartId) {{
             const chart = Chart.getChart(chartId);
@@ -2697,13 +2781,14 @@ class Trainer:
             }},
             options: {{
                 responsive: true,
-                plugins: {{ title: {{ display: true, text: 'Draft Model - Total Loss' }} }},
+                plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Total Loss' }} }},
                 scales: {{
                     y: {{ title: {{ display: true, text: 'Loss' }} }},
                     x: {{ title: {{ display: true, text: 'Epoch' }} }}
                 }}
             }}
         }});
+        _initPan('lossChart');
 
         // Learning Rate Chart
         new Chart(document.getElementById('lrChart'), {{
@@ -2722,6 +2807,7 @@ class Trainer:
             options: {{
                 responsive: true,
                 plugins: {{
+                    zoom: zoomOptions,
                     title: {{ display: true, text: 'Draft Model - Learning Rate' }},
                     tooltip: {{
                         callbacks: {{
@@ -2737,6 +2823,7 @@ class Trainer:
                 }}
             }}
         }});
+        _initPan('lrChart');
 
         // KD Loss Chart (only if KD enabled)
         if (kdLosses.some(v => v !== null)) {{
@@ -2755,13 +2842,14 @@ class Trainer:
                 }},
                 options: {{
                     responsive: true,
-                    plugins: {{ title: {{ display: true, text: 'Draft Model - Knowledge Distillation Loss' }} }},
+                    plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Knowledge Distillation Loss' }} }},
                     scales: {{
                         y: {{ title: {{ display: true, text: 'KD Loss' }} }},
                         x: {{ title: {{ display: true, text: 'Epoch' }} }}
                     }}
                 }}
             }});
+            _initPan('kdLossChart');
         }} else {{
             document.getElementById('kdLossChart').parentElement.style.display = 'none';
         }}
@@ -2783,13 +2871,14 @@ class Trainer:
                 }},
                 options: {{
                     responsive: true,
-                    plugins: {{ title: {{ display: true, text: 'Draft Model - Next-Token Loss' }} }},
+                    plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Next-Token Loss' }} }},
                     scales: {{
                         y: {{ title: {{ display: true, text: 'Hard Loss' }} }},
                         x: {{ title: {{ display: true, text: 'Epoch' }} }}
                     }}
                 }}
             }});
+            _initPan('hardLossChart');
         }} else {{
             document.getElementById('hardLossChart').parentElement.style.display = 'none';
         }}

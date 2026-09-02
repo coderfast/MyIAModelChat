@@ -427,9 +427,41 @@ def generate_html(data, checkpoint_name, is_draft=False):
         const mtpLoss = {mtp_loss_json};
 
         const zoomOptions = {{
-            zoom: {{ wheel: {{ enabled: true, speed: 0.1 }}, pinch: {{ enabled: true }}, drag: {{ enabled: false }}, mode: 'xy' }},
-            pan: {{ enabled: true, mode: 'xy' }}
+            zoom: {{ wheel: {{ enabled: true }}, pinch: {{ enabled: true }}, mode: 'xy' }},
+            pan: {{ enabled: false }}
         }};
+
+        const _panState = {{}};
+        function _initPan(id) {{
+            const cv = document.getElementById(id);
+            if (!cv) return;
+            cv.style.cursor = 'grab';
+            cv.addEventListener('mousedown', function(e) {{
+                if (e.button !== 0) return;
+                const ch = Chart.getChart(id);
+                if (!ch) return;
+                const xs = ch.scales.x, ys = ch.scales.y;
+                _panState[id] = {{ active: true, sx: e.clientX, sy: e.clientY, xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max }};
+                cv.style.cursor = 'grabbing';
+                e.preventDefault();
+            }});
+            cv.addEventListener('mousemove', function(e) {{
+                const s = _panState[id];
+                if (!s || !s.active) return;
+                const ch = Chart.getChart(id);
+                if (!ch) return;
+                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
+                const cw = cv.width, chh = cv.height;
+                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
+                ch.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
+                ch.zoomScale('y', {{ min: s.yMin + dy / chh * yR, max: s.yMax + dy / chh * yR }}, 'default');
+                e.preventDefault();
+            }});
+            window.addEventListener('mouseup', function() {{
+                const s = _panState[id];
+                if (s && s.active) {{ s.active = false; cv.style.cursor = 'grab'; }}
+            }});
+        }}
 
         function resetZoom(id) {{ const c = Chart.getChart(id); if (c) c.resetZoom(); }}
         function zoomIn(id) {{ const c = Chart.getChart(id); if (c) c.zoom(1.2); }}
@@ -441,6 +473,7 @@ def generate_html(data, checkpoint_name, is_draft=False):
                 {{ label: 'Val Loss', data: valLoss, borderColor: '#e74c3c', tension: 0.3, fill: false }}
             ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }}
         }});
+        _initPan('lossChart');
 
         new Chart(document.getElementById('perplexityChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
@@ -448,38 +481,49 @@ def generate_html(data, checkpoint_name, is_draft=False):
                 {{ label: 'Val Perplexity', data: valPpl, borderColor: '#e74c3c', tension: 0.3, fill: false }}
             ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Perplexity' }} }} }} }}
         }});
+        _initPan('perplexityChart');
 
         new Chart(document.getElementById('gapChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Train/Val Gap', data: gapData, borderColor: '#f39c12', tension: 0.3, fill: false }}
             ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Gap' }} }} }} }}
         }});
+        _initPan('gapChart');
 
         new Chart(document.getElementById('lrChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Learning Rate', data: lrData, borderColor: '#9b59b6', tension: 0.3, fill: false }}
             ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Learning Rate' }} }} }} }}
         }});
+        _initPan('lrChart');
 
         new Chart(document.getElementById('speedChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Tokens/sec', data: tokensPerSec, borderColor: '#1abc9c', tension: 0.3, fill: false }}
             ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Tokens/sec' }} }} }} }}
         }});
+        _initPan('speedChart');
 
         {f"new Chart(document.getElementById('thinkingAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Thinking Acc', data: thinkingAcc, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Open Acc', data: thinkingOpen, borderColor: '#2ecc71', tension: 0.3, fill: false }}, {{ label: 'Close Acc', data: thinkingClose, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
+        {f"_initPan('thinkingAccuracyChart');" if has_thinking else ''}
 
         {f"new Chart(document.getElementById('thinkingCoverageChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Coverage', data: thinkingCov, borderColor: '#f39c12', tension: 0.3, fill: false }}, {{ label: 'Response Acc', data: responseAcc, borderColor: '#9b59b6', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Value' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
+        {f"_initPan('thinkingCoverageChart');" if has_thinking else ''}
 
         {f"new Chart(document.getElementById('agentAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Tool Call Acc', data: agentTool, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Observation Acc', data: agentObs, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_agent else ''}
+        {f"_initPan('agentAccuracyChart');" if has_agent else ''}
 
         {f"new Chart(document.getElementById('agentRatioChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Agent Ratio', data: agentRatio, borderColor: '#1abc9c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Ratio' }} }} }} }} }});" if has_agent else ''}
+        {f"_initPan('agentRatioChart');" if has_agent else ''}
 
         {f"new Chart(document.getElementById('moeEntropyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Gate Entropy (norm)', data: moeEntropy, borderColor: '#3498db', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Entropy' }} }} }} }} }});" if has_moe else ''}
+        {f"_initPan('moeEntropyChart');" if has_moe else ''}
 
         {f"new Chart(document.getElementById('moeUtilChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: f'Expert {{k}}', data: v, borderColor: colors[i % colors.length], tension: 0.3, fill: false }} for i, (k, v) in enumerate(moeExperts.items())]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Utilization %' }} }} }} }} }});" if has_moe else ''}
+        {f"_initPan('moeUtilChart');" if has_moe else ''}
 
         {f"new Chart(document.getElementById('mtpLossChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'MTP Loss', data: mtpLoss, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }} }});" if has_mtp else ''}
+        {f"_initPan('mtpLossChart');" if has_mtp else ''}
     </script>
 </body>
 </html>"""
