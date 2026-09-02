@@ -1869,6 +1869,8 @@ class Trainer:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Training Report - {self.checkpoint_name}</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background: #f5f5f5; }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
@@ -1888,7 +1890,9 @@ class Trainer:
         .banner-title {{ font-size: 20px; font-weight: bold; margin-bottom: 5px; }}
         .banner-detail {{ font-size: 14px; opacity: 0.9; }}
         .section-divider {{ font-size: 20px; font-weight: bold; color: #333; margin: 30px 0 15px 0; padding: 10px 0; border-bottom: 3px solid #3498db; }}
-        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }}
+        .reset-zoom {{ position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; z-index: 10; }}
+        .reset-zoom:hover {{ opacity: 1; background: #2980b9; }}
         .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
         canvas {{ max-height: 300px; }}
         .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
@@ -1949,16 +1953,19 @@ class Trainer:
         <div class="chart-container">
             <h2>Loss Over Time</h2>
             <canvas id="lossChart"></canvas>
+            <button class="reset-zoom" onclick="resetZoom('lossChart')">Reset Zoom</button>
         </div>
 
         <div class="charts-grid">
             <div class="chart-container">
                 <h2>Perplexity</h2>
                 <canvas id="perplexityChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('perplexityChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <h2>Train/Val Gap</h2>
                 <canvas id="gapChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('gapChart')">Reset Zoom</button>
             </div>
         </div>
 
@@ -1966,10 +1973,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Learning Rate</h2>
                 <canvas id="lrChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('lrChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <h2>Training Speed (tokens/s)</h2>
                 <canvas id="speedChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('speedChart')">Reset Zoom</button>
             </div>
         </div>
 
@@ -1979,10 +1988,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Thinking Accuracy</h2>
                 <canvas id="thinkingAccuracyChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('thinkingAccuracyChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <h2>Thinking Coverage</h2>
                 <canvas id="thinkingCoverageChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('thinkingCoverageChart')">Reset Zoom</button>
             </div>
         </div>
         <div class="status-banner {thinking_status}">
@@ -2000,10 +2011,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Agent Accuracy</h2>
                 <canvas id="agentAccuracyChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('agentAccuracyChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <h2>Agent Token Ratio</h2>
                 <canvas id="agentRatioChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('agentRatioChart')">Reset Zoom</button>
             </div>
         </div>
         <div class="status-banner {agent_status}">
@@ -2021,10 +2034,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Gate Entropy (normalized)</h2>
                 <canvas id="moeEntropyChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('moeEntropyChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <h2>Expert Utilization</h2>
                 <canvas id="moeUtilChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('moeUtilChart')">Reset Zoom</button>
             </div>
         </div>
         <div class="status-banner {moe_status}">
@@ -2042,6 +2057,7 @@ class Trainer:
             <div class="chart-container">
                 <h2>MTP Loss</h2>
                 <canvas id="mtpLossChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('mtpLossChart')">Reset Zoom</button>
             </div>
         </div>
         <div class="status-banner {mtp_status}">
@@ -2084,6 +2100,25 @@ class Trainer:
         const moeExpertUtils = {moe_expert_utils_json};
         const mtpLosses = {mtp_losses_json};
 
+        // Reusable zoom/pan configuration
+        const zoomOptions = {{
+            zoom: {{
+                wheel: {{ enabled: true }},
+                pinch: {{ enabled: true }},
+                drag: {{ enabled: true, backgroundColor: 'rgba(52,152,219,0.1)', borderColor: '#3498db', borderWidth: 1 }},
+                mode: 'xy'
+            }},
+            pan: {{
+                enabled: true,
+                mode: 'xy'
+            }}
+        }};
+
+        function resetZoom(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.resetZoom();
+        }}
+
         // Loss Chart
         new Chart(document.getElementById('lossChart'), {{
             type: 'line',
@@ -2107,7 +2142,7 @@ class Trainer:
                 ]
             }},
             options: {{
-                responsive: true,
+                responsive: true, plugins: {{ zoom: zoomOptions }},
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Loss' }} }}
@@ -2138,7 +2173,7 @@ class Trainer:
                 ]
             }},
             options: {{
-                responsive: true,
+                responsive: true, plugins: {{ zoom: zoomOptions }},
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Perplexity' }} }}
@@ -2160,7 +2195,7 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true,
+                responsive: true, plugins: {{ zoom: zoomOptions }},
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Gap' }} }}
@@ -2195,7 +2230,7 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true,
+                responsive: true, plugins: {{ zoom: zoomOptions }},
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Learning Rate' }} }}
@@ -2227,7 +2262,7 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true,
+                responsive: true, plugins: {{ zoom: zoomOptions }},
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Tokens/sec' }} }}
@@ -2249,7 +2284,7 @@ class Trainer:
                     ]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
@@ -2274,7 +2309,7 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Coverage' }}, min: 0, max: 1 }}
@@ -2295,7 +2330,7 @@ class Trainer:
                     ]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
@@ -2319,7 +2354,7 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Ratio' }}, min: 0 }}
@@ -2344,7 +2379,7 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Entropy (0=collapsed, 1=balanced)' }}, min: 0, max: 1 }}
@@ -2367,7 +2402,7 @@ class Trainer:
                 type: 'bar',
                 data: {{ labels: epochs, datasets: datasets }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ stacked: true, title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ stacked: true, title: {{ display: true, text: 'Utilization' }}, min: 0 }}
@@ -2392,7 +2427,7 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true,
+                    responsive: true, plugins: {{ zoom: zoomOptions }},
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'MTP Loss' }} }}
@@ -2503,6 +2538,8 @@ class Trainer:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Draft Model Training Report - {self.checkpoint_name}</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background: #f5f5f5; }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
@@ -2513,7 +2550,9 @@ class Trainer:
         .status.stable {{ background: #fff3cd; color: #856404; border-color: #ffc107; }}
         .status-main {{ font-size: 18px; margin-bottom: 5px; }}
         .status-detail {{ font-size: 14px; font-weight: normal; opacity: 0.9; }}
-        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }}
+        .reset-zoom {{ position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; z-index: 10; }}
+        .reset-zoom:hover {{ opacity: 1; background: #2980b9; }}
         .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
         canvas {{ max-height: 300px; }}
         .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
@@ -2576,18 +2615,22 @@ class Trainer:
         <div class="charts-grid">
             <div class="chart-container">
                 <canvas id="lossChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('lossChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <canvas id="lrChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('lrChart')">Reset Zoom</button>
             </div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-container">
                 <canvas id="kdLossChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('kdLossChart')">Reset Zoom</button>
             </div>
             <div class="chart-container">
                 <canvas id="hardLossChart"></canvas>
+                <button class="reset-zoom" onclick="resetZoom('hardLossChart')">Reset Zoom</button>
             </div>
         </div>
     </div>
@@ -2598,6 +2641,25 @@ class Trainer:
         const lrs = {lrs_json};
         const kdLosses = {kd_losses_json};
         const hardLosses = {hard_losses_json};
+
+        // Reusable zoom/pan configuration
+        const zoomOptions = {{
+            zoom: {{
+                wheel: {{ enabled: true }},
+                pinch: {{ enabled: true }},
+                drag: {{ enabled: true, backgroundColor: 'rgba(52,152,219,0.1)', borderColor: '#3498db', borderWidth: 1 }},
+                mode: 'xy'
+            }},
+            pan: {{
+                enabled: true,
+                mode: 'xy'
+            }}
+        }};
+
+        function resetZoom(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.resetZoom();
+        }}
 
         // Loss Chart
         new Chart(document.getElementById('lossChart'), {{
