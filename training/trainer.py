@@ -1891,8 +1891,10 @@ class Trainer:
         .banner-detail {{ font-size: 14px; opacity: 0.9; }}
         .section-divider {{ font-size: 20px; font-weight: bold; color: #333; margin: 30px 0 15px 0; padding: 10px 0; border-bottom: 3px solid #3498db; }}
         .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }}
-        .reset-zoom {{ position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; z-index: 10; }}
-        .reset-zoom:hover {{ opacity: 1; background: #2980b9; }}
+        .zoom-controls {{ position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 10; }}
+        .zoom-btn {{ padding: 4px 10px; font-size: 14px; font-weight: bold; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; min-width: 28px; text-align: center; }}
+        .zoom-btn:hover {{ opacity: 1; background: #2980b9; }}
+        .zoom-btn.reset {{ background: #95a5a6; }}
         .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
         canvas {{ max-height: 300px; }}
         .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
@@ -1953,19 +1955,19 @@ class Trainer:
         <div class="chart-container">
             <h2>Loss Over Time</h2>
             <canvas id="lossChart"></canvas>
-            <button class="reset-zoom" onclick="resetZoom('lossChart')">Reset Zoom</button>
+            <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('lossChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('lossChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('lossChart')" title="Reset">&#8634;</button></div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-container">
                 <h2>Perplexity</h2>
                 <canvas id="perplexityChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('perplexityChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('perplexityChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('perplexityChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('perplexityChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <h2>Train/Val Gap</h2>
                 <canvas id="gapChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('gapChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('gapChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('gapChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('gapChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
 
@@ -1973,12 +1975,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Learning Rate</h2>
                 <canvas id="lrChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('lrChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('lrChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('lrChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('lrChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <h2>Training Speed (tokens/s)</h2>
                 <canvas id="speedChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('speedChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('speedChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('speedChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('speedChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
 
@@ -1988,12 +1990,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Thinking Accuracy</h2>
                 <canvas id="thinkingAccuracyChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('thinkingAccuracyChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('thinkingAccuracyChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('thinkingAccuracyChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('thinkingAccuracyChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <h2>Thinking Coverage</h2>
                 <canvas id="thinkingCoverageChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('thinkingCoverageChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('thinkingCoverageChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('thinkingCoverageChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('thinkingCoverageChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
         <div class="status-banner {thinking_status}">
@@ -2011,12 +2013,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Agent Accuracy</h2>
                 <canvas id="agentAccuracyChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('agentAccuracyChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('agentAccuracyChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('agentAccuracyChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('agentAccuracyChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <h2>Agent Token Ratio</h2>
                 <canvas id="agentRatioChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('agentRatioChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('agentRatioChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('agentRatioChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('agentRatioChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
         <div class="status-banner {agent_status}">
@@ -2034,12 +2036,12 @@ class Trainer:
             <div class="chart-container">
                 <h2>Gate Entropy (normalized)</h2>
                 <canvas id="moeEntropyChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('moeEntropyChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('moeEntropyChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('moeEntropyChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('moeEntropyChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <h2>Expert Utilization</h2>
                 <canvas id="moeUtilChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('moeUtilChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('moeUtilChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('moeUtilChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('moeUtilChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
         <div class="status-banner {moe_status}">
@@ -2057,7 +2059,7 @@ class Trainer:
             <div class="chart-container">
                 <h2>MTP Loss</h2>
                 <canvas id="mtpLossChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('mtpLossChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('mtpLossChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('mtpLossChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('mtpLossChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
         <div class="status-banner {mtp_status}">
@@ -2119,6 +2121,14 @@ class Trainer:
         function resetZoom(chartId) {{
             const chart = Chart.getChart(chartId);
             if (chart) chart.resetZoom();
+        }}
+        function zoomIn(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.zoom(1.2);
+        }}
+        function zoomOut(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.zoom(0.8);
         }}
 
         // Loss Chart
@@ -2553,8 +2563,10 @@ class Trainer:
         .status-main {{ font-size: 18px; margin-bottom: 5px; }}
         .status-detail {{ font-size: 14px; font-weight: normal; opacity: 0.9; }}
         .chart-container {{ background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }}
-        .reset-zoom {{ position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; z-index: 10; }}
-        .reset-zoom:hover {{ opacity: 1; background: #2980b9; }}
+        .zoom-controls {{ position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 10; }}
+        .zoom-btn {{ padding: 4px 10px; font-size: 14px; font-weight: bold; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; opacity: 0.8; min-width: 28px; text-align: center; }}
+        .zoom-btn:hover {{ opacity: 1; background: #2980b9; }}
+        .zoom-btn.reset {{ background: #95a5a6; }}
         .charts-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
         canvas {{ max-height: 300px; }}
         .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }}
@@ -2617,22 +2629,22 @@ class Trainer:
         <div class="charts-grid">
             <div class="chart-container">
                 <canvas id="lossChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('lossChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('lossChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('lossChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('lossChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <canvas id="lrChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('lrChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('lrChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('lrChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('lrChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-container">
                 <canvas id="kdLossChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('kdLossChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('kdLossChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('kdLossChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('kdLossChart')" title="Reset">&#8634;</button></div>
             </div>
             <div class="chart-container">
                 <canvas id="hardLossChart"></canvas>
-                <button class="reset-zoom" onclick="resetZoom('hardLossChart')">Reset Zoom</button>
+                <div class="zoom-controls"><button class="zoom-btn" onclick="zoomIn('hardLossChart')" title="Zoom In">+</button><button class="zoom-btn" onclick="zoomOut('hardLossChart')" title="Zoom Out">-</button><button class="zoom-btn reset" onclick="resetZoom('hardLossChart')" title="Reset">&#8634;</button></div>
             </div>
         </div>
     </div>
@@ -2663,6 +2675,14 @@ class Trainer:
         function resetZoom(chartId) {{
             const chart = Chart.getChart(chartId);
             if (chart) chart.resetZoom();
+        }}
+        function zoomIn(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.zoom(1.2);
+        }}
+        function zoomOut(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (chart) chart.zoom(0.8);
         }}
 
         // Loss Chart
