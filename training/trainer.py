@@ -2113,8 +2113,7 @@ class Trainer:
             }},
             pan: {{
                 enabled: true,
-                mode: 'xy',
-                modifierKey: 'shift'
+                mode: 'xy'
             }}
         }};
 
@@ -2667,8 +2666,7 @@ class Trainer:
             }},
             pan: {{
                 enabled: true,
-                mode: 'xy',
-                modifierKey: 'shift'
+                mode: 'xy'
             }}
         }};
 

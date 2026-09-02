@@ -428,7 +428,7 @@ def generate_html(data, checkpoint_name, is_draft=False):
 
         const zoomOptions = {{
             zoom: {{ wheel: {{ enabled: true }}, pinch: {{ enabled: true }}, drag: {{ enabled: false }}, mode: 'xy', scaleMode: 'xy' }},
-            pan: {{ enabled: true, mode: 'xy', modifierKey: 'shift' }}
+            pan: {{ enabled: true, mode: 'xy' }}
         }};
 
         function resetZoom(id) {{ const c = Chart.getChart(id); if (c) c.resetZoom(); }}
