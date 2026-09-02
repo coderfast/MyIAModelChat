@@ -36,14 +36,6 @@ EXPORTED_DIR = os.environ.get("EXPORTED_DIR", str(BASE_DIR.parent / "models" / "
 
 logger = logging.getLogger("uvicorn.error")
 
-if not os.path.exists(MODEL_PATH):
-    logger.warning(
-        "Model file not found: %s. "
-        "Set MODEL_GGUF_PATH or MODEL_PATH env var to a valid .gguf file. "
-        "Chat endpoints will return errors until a model is configured.",
-        MODEL_PATH,
-    )
-
 
 def _resolve_model_name(path: str) -> str:
     """Derive a human-readable model name from the GGUF filename."""

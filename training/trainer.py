@@ -1072,7 +1072,7 @@ class Trainer:
         token_losses = criterion(outputs, targets)
         weight_sum = weights.sum()
         if weight_sum <= 0:
-            return torch.tensor(0.0, device=outputs.device, requires_grad=True), raw_outputs
+            return torch.tensor(0.0, device=outputs.device, requires_grad=True), raw_outputs, torch.tensor(0.0, device=outputs.device)
         loss = (token_losses * weights).sum() / weight_sum
         
         # Add load balancing loss for MoE models
@@ -2199,6 +2199,15 @@ class Trainer:
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Learning Rate' }} }}
+                }},
+                plugins: {{
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(ctx) {{
+                                return 'LR: ' + ctx.parsed.y.toFixed(10);
+                            }}
+                        }}
+                    }}
                 }}
             }}
         }});
@@ -2630,7 +2639,16 @@ class Trainer:
             }},
             options: {{
                 responsive: true,
-                plugins: {{ title: {{ display: true, text: 'Draft Model - Learning Rate' }} }},
+                plugins: {{
+                    title: {{ display: true, text: 'Draft Model - Learning Rate' }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(ctx) {{
+                                return 'LR: ' + ctx.parsed.y.toFixed(10);
+                            }}
+                        }}
+                    }}
+                }},
                 scales: {{
                     y: {{ title: {{ display: true, text: 'LR' }} }},
                     x: {{ title: {{ display: true, text: 'Epoch' }} }}
@@ -3042,16 +3060,63 @@ class Trainer:
                     if 'optimizer_state_dict' in resume_checkpoint:
                         try:
                             optimizer.load_state_dict(resume_checkpoint['optimizer_state_dict'])
+                            # PyTorch 2.x CosineAnnealingLR uses group["lr"] (not base_lrs),
+                            # so restored lr=eta_min would make cosine stuck at eta_min forever.
+                            # We reset lr here and recompute the correct value below.
+                            for group in optimizer.param_groups:
+                                group['lr'] = TRAINING_CONFIG['learning_rate']
                             if self.rank == 0:
-                                logger.info(" Optimizer state restored")
+                                logger.info(f" Optimizer state restored")
                         except Exception as e:
                             if self.rank == 0:
                                 logger.warning(f" Could not restore optimizer state: {e}")
-                    if 'scheduler_state_dict' in resume_checkpoint:
+                    if 'scheduler_state_dict' in resume_checkpoint and sched_type == 'cosine':
                         try:
-                            scheduler.load_state_dict(resume_checkpoint['scheduler_state_dict'])
+                            restored_last_epoch = resume_checkpoint['scheduler_state_dict'].get('last_epoch', 0)
+                            if restored_last_epoch > 0:
+                                has_T_max = 'scheduler_T_max' in resume_checkpoint
+                                old_T_max = resume_checkpoint.get('scheduler_T_max', 0)
+                                lr_max = TRAINING_CONFIG['learning_rate']
+                                eta_min = self.config.scheduler_eta_min
+
+                                if has_T_max and restored_last_epoch >= old_T_max:
+                                    # Cycle completed: start fresh new cycle
+                                    new_T_max = self.epochs
+                                    scheduler = lr_scheduler.CosineAnnealingLR(
+                                        optimizer, T_max=new_T_max, eta_min=eta_min
+                                    )
+                                    for group in optimizer.param_groups:
+                                        group['lr'] = lr_max
+                                    if self.rank == 0:
+                                        logger.info(
+                                            f" Scheduler restarted: T_max={new_T_max}, "
+                                            f"lr={lr_max:.2e} (old cycle completed at epoch {restored_last_epoch})"
+                                        )
+                                else:
+                                    # Mid-cycle: decay from old lr to eta_min over new epochs
+                                    # Get the actual lr from the restored optimizer state
+                                    old_lr = resume_checkpoint['optimizer_state_dict']['param_groups'][0].get('lr', lr_max)
+                                    new_T_max = self.epochs
+                                    scheduler = lr_scheduler.CosineAnnealingLR(
+                                        optimizer, T_max=new_T_max, eta_min=eta_min
+                                    )
+                                    scheduler.base_lrs = [old_lr]
+                                    for group in optimizer.param_groups:
+                                        group['lr'] = old_lr
+                                    if self.rank == 0:
+                                        reason = "legacy checkpoint" if not has_T_max else "mid-cycle"
+                                        logger.info(
+                                            f" Scheduler continued: T_max={new_T_max}, "
+                                            f"lr={old_lr:.2e} -> {eta_min:.2e} over {new_T_max} epochs ({reason})"
+                                        )
+                        except Exception as e:
                             if self.rank == 0:
-                                logger.info(" Scheduler state restored")
+                                logger.warning(f" Could not restore scheduler state: {e}")
+                    elif 'scheduler_state_dict' in resume_checkpoint:
+                        try:
+                            if self.rank == 0:
+                                restored_epoch = resume_checkpoint['scheduler_state_dict'].get('last_epoch', 0)
+                                logger.info(f" Scheduler not restored (non-cosine type); was at epoch {restored_epoch}")
                         except Exception as e:
                             if self.rank == 0:
                                 logger.warning(f" Could not restore scheduler state: {e}")
@@ -3133,13 +3198,14 @@ class Trainer:
                 if TENSORBOARD_AVAILABLE:
                     tb_comment = getattr(self.config, 'tensorboard_comment', '')
                     tb_log_dir = getattr(self.config, 'tensorboard_log_dir', 'runs')
+                    if not os.path.isabs(tb_log_dir):
+                        tb_log_dir = os.path.join(MODEL_CHECKPOINT_DIR, tb_log_dir)
                     tb_run_name = f"{self.checkpoint_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                     if tb_comment:
                         tb_run_name += f"_{tb_comment}"
                     tb_writer = SummaryWriter(log_dir=os.path.join(tb_log_dir, tb_run_name))
                     tb_freq = getattr(self.config, 'tensorboard_freq', 1)
                     logger.info(f"  TensorBoard enabled: log_dir={os.path.join(tb_log_dir, tb_run_name)} (every {tb_freq} epochs)")
-                    # Log config as text
                     tb_writer.add_text("config", str(self.config.to_dict()), 0)
                 else:
                     logger.warning("  TensorBoard requested but tensorboard package not installed. Install: pip install tensorboard")
@@ -3236,6 +3302,7 @@ class Trainer:
                         'model_state_dict': state_dict,
                         'optimizer_state_dict': optimizer.state_dict(),
                         'scheduler_state_dict': scheduler.state_dict(),
+                        'scheduler_T_max': scheduler.T_max if sched_type == 'cosine' else None,
                         'loss': best_metric,
                         'train_loss': train_loss,
                         'val_loss': val_loss if val_dataloader is not None else None,
@@ -3413,6 +3480,7 @@ class Trainer:
                     'model_state_dict': state_dict,
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': scheduler.state_dict(),
+                    'scheduler_T_max': scheduler.T_max if sched_type == 'cosine' else None,
                     'loss': self.best_loss,
                     'tokenizer_path': os.path.join(CACHE_DIR, 'sentencepiece.model'),
                     'model_name': self.checkpoint_name,
@@ -3513,11 +3581,27 @@ class Trainer:
             for param in target_model.parameters():
                 param.requires_grad = False
 
-        # Prepare CSV path for draft metrics
+        # Clear old draft CSV to avoid duplicate epochs across training runs
         draft_csv_path = os.path.join(
             MODEL_CHECKPOINT_DIR,
             f"{self.checkpoint_name}_draft_metrics.csv"
         )
+        if os.path.exists(draft_csv_path):
+            os.remove(draft_csv_path)
+
+        # TensorBoard for draft model
+        draft_tb_writer = None
+        if getattr(self.config, 'tensorboard_enabled', False) and self.rank == 0 and TENSORBOARD_AVAILABLE:
+            draft_tb_log_dir = getattr(self.config, 'tensorboard_log_dir', 'runs')
+            if not os.path.isabs(draft_tb_log_dir):
+                draft_tb_log_dir = os.path.join(MODEL_CHECKPOINT_DIR, draft_tb_log_dir)
+            draft_tb_dir = os.path.join(
+                draft_tb_log_dir,
+                f"{self.checkpoint_name}_draft_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+            draft_tb_writer = SummaryWriter(log_dir=draft_tb_dir)
+            if self.rank == 0:
+                logger.info(f"  Draft TensorBoard: {draft_tb_dir}")
 
         draft_model.train()
         for epoch in range(kd_epochs):
@@ -3616,9 +3700,23 @@ class Trainer:
                 }
                 self._log_draft_csv(draft_metrics, draft_csv_path)
 
+                # TensorBoard logging for draft
+                if draft_tb_writer is not None:
+                    draft_step = epoch + 1
+                    draft_tb_writer.add_scalar('draft/loss', avg_loss, draft_step)
+                    draft_tb_writer.add_scalar('draft/lr', current_lr, draft_step)
+                    draft_tb_writer.add_scalar('draft/hard_loss', avg_hard_loss, draft_step)
+                    if kd_enabled:
+                        draft_tb_writer.add_scalar('draft/kd_loss', avg_kd_loss, draft_step)
+                    draft_tb_writer.add_scalar('draft/tokens_per_sec', tokens_per_sec, draft_step)
+
         # Generate HTML report
         if self.rank == 0:
             self._generate_draft_report(draft_csv_path)
+
+        # Close TensorBoard writer
+        if draft_tb_writer is not None:
+            draft_tb_writer.close()
 
         # Save draft checkpoint
         if self.rank == 0:

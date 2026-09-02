@@ -765,8 +765,8 @@ class DataPreparer:
             logger.info("Saving dataset to cache...")
 
             # Remove metadata columns not needed for training
-            # Keep source/language for cache viewer display; trainer discards them
-            TRAINING_COLUMNS = {'input_ids', 'token_ids', 'thinking', 'has_tool_call', 'source', 'language', 'format_type'}
+            # Keep source/language/bpe_text for cache viewer display; trainer discards them
+            TRAINING_COLUMNS = {'input_ids', 'token_ids', 'thinking', 'has_tool_call', 'source', 'language', 'format_type', 'bpe_text'}
             cols_to_drop = [c for c in self.combined_data.column_names
                            if c not in TRAINING_COLUMNS]
             if cols_to_drop:
@@ -1533,6 +1533,16 @@ class DataPreparer:
                         # Join pages preserving paragraph boundaries
                         text = "\n\n".join(text_parts)
 
+                        # Detect language from the whole document (or first part)
+                        file_lang = 'unknown'
+                        if text.strip():
+                            try:
+                                from commons.language_utils import detect_language as _detect_lang
+                                # Use first 2000 chars for detection
+                                file_lang = _detect_lang(text[:2000])
+                            except Exception:
+                                pass
+
                         # Split text into paragraphs into samples
                         if text.strip():
                             paragraphs = split_paragraphs(text)
@@ -1544,7 +1554,8 @@ class DataPreparer:
                                 if len(paragraph) > 10:  # Skip very short paragraphs
                                     sample = {
                                         'input_ids': paragraph,
-                                        'file_path': file_path
+                                        'file_path': file_path,
+                                        'language': file_lang
                                     }
 
                                     # Add metadata if enabled
@@ -1678,6 +1689,16 @@ class DataPreparer:
                     # Remove headers, footers and page numbers (cross-chapter repetition)
                     chapters = clean_page_artifacts(chapters)
 
+                    # Detect language from the whole EPUB (combine all chapters)
+                    file_lang = 'unknown'
+                    all_text = '\n\n'.join(chapters)[:3000]
+                    if all_text.strip():
+                        try:
+                            from commons.language_utils import detect_language as _detect_lang
+                            file_lang = _detect_lang(all_text)
+                        except Exception:
+                            pass
+
                     # Split chapters into samples: whole chapter if it fits, else paragraphs
                     if chapters:
                         sample_count = 0
@@ -1690,7 +1711,8 @@ class DataPreparer:
                             if not enable_chunking or len(chapter.split()) <= max_tokens:
                                 sample = {
                                     'input_ids': chapter,
-                                    'file_path': file_path
+                                    'file_path': file_path,
+                                    'language': file_lang
                                 }
                                 if preserve_metadata and metadata:
                                     sample['metadata'] = metadata
@@ -1704,7 +1726,8 @@ class DataPreparer:
                                 if len(paragraph) > 10:
                                     sample = {
                                         'input_ids': paragraph,
-                                        'file_path': file_path
+                                        'file_path': file_path,
+                                        'language': file_lang
                                     }
                                     if preserve_metadata and metadata:
                                         sample['metadata'] = metadata
@@ -1791,8 +1814,18 @@ class DataPreparer:
 
         # Create a 'bpe_text' column copying the chosen text column to avoid overwriting
         if 'bpe_text' not in self.combined_data.column_names:
+            import re as _re_lang
+            _LANG_TOKEN_RE = _re_lang.compile(r'^<\|[a-z]{2,3}\|>')
+
             def extract_text(example):
-                return {'bpe_text': example.get(text_column, '') if example.get(text_column) is not None else ''}
+                text = example.get(text_column, '') if example.get(text_column) is not None else ''
+                # Only add <|lang|> if not already present (avoids duplication
+                # when thinking generators or agentic formatters already add it)
+                if text and _LANG_TOKEN_RE.match(text):
+                    return {'bpe_text': text}
+                lang = example.get('language', 'unknown')
+                lang_token = f'<|{lang}|>' if lang and lang not in ('unknown', 'Unknown', '') else ''
+                return {'bpe_text': f'{lang_token}{text}' if lang_token else text}
 
             num_proc = self._get_num_proc()
             try:
@@ -1825,7 +1858,17 @@ class DataPreparer:
 
         model_prefix = os.path.join(CACHE_DIR, 'sentencepiece')
         # GPT-2 standard special tokens (canonical consolidated set)
-        user_symbols = '--user_defined_symbols=<|system|>,<|user|>,<|assistant|>,<|end|>,<|sep|>,<|problem|>,<|thinking|>,<|final|>,<tool_call>,</tool_call>,<|tool_result|>'
+        _base_symbols = '<|system|>,<|user|>,<|assistant|>,<|end|>,<|sep|>,<|problem|>,<|thinking|>,<|final|>,<tool_call>,</tool_call>,<|tool_result|>'
+        # Language tokens (all EU + European languages)
+        _lang_codes = [
+            'es', 'fr', 'it', 'pt', 'ro', 'ca', 'gl', 'rm',
+            'en', 'de', 'nl', 'sv', 'da', 'nb', 'nn', 'is', 'lb', 'fo',
+            'pl', 'cs', 'sk', 'bg', 'hr', 'sr', 'sl', 'bs', 'mk', 'uk', 'be',
+            'lt', 'lv', 'fi', 'et', 'hu',
+            'ga', 'el', 'sq',
+        ]
+        _lang_symbols = ','.join(f'<|{lc}|>' for lc in _lang_codes)
+        user_symbols = f'--user_defined_symbols={_base_symbols},{_lang_symbols}'
         
         # Retry with decreasing vocab_size if training fails (e.g., corpus too small)
         current_vocab = vocab_size

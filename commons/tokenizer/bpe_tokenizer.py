@@ -69,6 +69,18 @@ class SentencePieceTokenizerWrapper:
         tool_call_end_id = _resolve_id('</tool_call>')
         tool_result_id = _resolve_id('<|tool_result|>')
 
+        # Language tokens
+        _lang_codes = [
+            'es', 'fr', 'it', 'pt', 'ro', 'ca', 'gl', 'rm',
+            'en', 'de', 'nl', 'sv', 'da', 'nb', 'nn', 'is', 'lb', 'fo',
+            'pl', 'cs', 'sk', 'bg', 'hr', 'sr', 'sl', 'bs', 'mk', 'uk', 'be',
+            'lt', 'lv', 'fi', 'et', 'hu',
+            'ga', 'el', 'sq',
+        ]
+        self._lang_ids = {}
+        for _lc in _lang_codes:
+            self._lang_ids[_lc] = _resolve_id(f'<|{_lc}|>')
+
         # Legacy tokens (backward compatibility, deprecated)
         legacy_thinking_id = _resolve_id('<thinking>')
         legacy_thinking_end_id = _resolve_id('</thinking>')
@@ -161,6 +173,15 @@ class SentencePieceTokenizerWrapper:
     def get_eos_index(self):
         self._ensure_special_token_ids()
         return self._eos_id
+
+    def get_lang_index(self, lang_code: str) -> int:
+        """Get token ID for a language code (e.g. 'es', 'en', 'fr')."""
+        self._ensure_special_token_ids()
+        return self._lang_ids.get(lang_code, -1)
+
+    def get_lang_token(self, lang_code: str) -> str:
+        """Get the token string for a language code."""
+        return f'<|{lang_code}|>'
 
     def decode(self, indices, skip_special_tokens=True):
         if indices is None:

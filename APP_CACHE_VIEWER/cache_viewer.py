@@ -66,7 +66,7 @@ class ContinuousLoaderWorker(QThread):
                 
                 idx = self.indices[i]
                 row = self.dataset[idx]
-                text = row.get('input_ids', row.get('bpe_text', ''))
+                text = row.get('bpe_text', row.get('input_ids', ''))
                 source = row.get('source', 'Unknown')
                 
                 token_count = self._token_lengths[idx] if idx < len(self._token_lengths) else 0
@@ -1391,7 +1391,7 @@ class CacheViewer(QMainWindow):
                     row = self.dataset[idx]
                     items.append({
                         'index': idx,
-                        'text': row.get('input_ids', row.get('bpe_text', '')),
+                        'text': row.get('bpe_text', row.get('input_ids', '')),
                         'token_count': self._token_lengths[idx] if self._token_lengths and idx < len(self._token_lengths) else 0,
                         'source': row.get('source', 'Unknown'),
                         'language': row.get('language', '-')

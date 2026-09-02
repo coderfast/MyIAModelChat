@@ -71,10 +71,27 @@ SentencePiece (BPE) is trained on extracted text and the prepared cache will inc
 When using `--thinking-mode`, the BPE model automatically registers 5 special tokens as `user_defined_symbols`:
 
 ```
-<thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|>
+<|problem|>, <|thinking|>, <|final|>, <|user|>, <|assistant|>, <|end|>, <|sep|>, <|system|>, <tool_call>, </tool_call>, <|tool_result|>
 ```
 
 These tokens are never fragmented into sub-tokens (always whole tokens). This ensures the model can learn to generate them correctly.
+
+### Language Tokens (36 European Languages)
+
+The BPE model also registers 36 language tokens as `user_defined_symbols`:
+
+```
+<|es|>, <|fr|>, <|it|>, <|pt|>, <|ro|>, <|ca|>, <|gl|>, <|rm|>,    # Romance
+<|en|>, <|de|>, <|nl|>, <|sv|>, <|da|>, <|nb|>, <|nn|>, <|is|>, <|lb|>, <|fo|>,  # Germanic
+<|pl|>, <|cs|>, <|sk|>, <|bg|>, <|hr|>, <|sr|>, <|sl|>, <|bs|>, <|mk|>, <|uk|>, <|be|>,  # Slavic
+<|lt|>, <|lv|>,    # Baltic
+<|fi|>, <|et|>, <|hu|>,    # Finno-Ugric
+<|ga|>, <|el|>, <|sq|>     # Celtic/Hellenic/Albanian
+```
+
+**Format:** `<|lang|><|problem|>question<|thinking|>reasoning<|final|>answer`
+
+Language tokens are automatically prepended to training samples based on language detection.
 
 ```bash
 # Recommended: BPE with thinking

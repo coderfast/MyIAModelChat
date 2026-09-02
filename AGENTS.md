@@ -17,6 +17,18 @@ MyIAModelChat is an advanced conversational AI system built with PyTorch, featur
 - `</tool_call>` - Tool call end
 - `<|tool_result|>` - Tool result prefix (no closing tag; runs until `<|end|>`)
 
+**Language tokens (36 European languages):**
+- `<|es|>` `<|fr|>` `<|it|>` `<|pt|>` `<|ro|>` `<|ca|>` `<|gl|>` `<|rm|>` (Romance)
+- `<|en|>` `<|de|>` `<|nl|>` `<|sv|>` `<|da|>` `<|nb|>` `<|nn|>` `<|is|>` `<|lb|>` `<|fo|>` (Germanic)
+- `<|pl|>` `<|cs|>` `<|sk|>` `<|bg|>` `<|hr|>` `<|sr|>` `<|sl|>` `<|bs|>` `<|mk|>` `<|uk|>` `<|be|>` (Slavic)
+- `<|lt|>` `<|lv|>` (Baltic)
+- `<|fi|>` `<|et|>` `<|hu|>` (Finno-Ugric)
+- `<|ga|>` `<|el|>` `<|sq|>` (Celtic/Hellenic/Albanian)
+
+**Format:** `<|lang|><|problem|>question<|thinking|>reasoning<|final|>answer`
+
+Language tokens are automatically prepended to training samples by `_create_bpe_text_column()` in `data_preparer.py`. This function uses a regex (`^<\|[a-z]{2,3}\|>`) to detect if a sample already has a language token (e.g., from agentic formatters) and skips adding it to avoid duplication.
+
 **Legacy tokens (deprecated, consolidated):** `<|context|>`→`<|problem|>`,
 `<|answer|>`→`<|final|>`, `<thinking>`→`<|thinking|>`, `</thinking>`→`<|final|>`,
 `<observation>`/`</observation>`→`<|tool_result|>`. See `PLAN_SPECIAL_TOKENS.md`.

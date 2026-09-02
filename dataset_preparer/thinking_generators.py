@@ -119,6 +119,9 @@ class ThinkingGenerator:
         GPT-2 standard format (Formato 3, no <|user|>/<|assistant|>):
         - THINKING: <|problem|>question<|thinking|>reasoning<|final|>answer
         - TEXT: <|problem|>question<|final|>answer
+
+        NOTE: Language token <|lang|> is NOT added here. It is added later
+        by _create_bpe_text_column() to avoid duplication.
         """
         result = dict(sample)
 

@@ -1,6 +1,6 @@
 {
   "training": {
-    "epochs": 1,
+    "epochs": 50,
     "checkpoint_name": "chat_model",
     "dataset_source": "dataset_cache"
   },
@@ -45,7 +45,7 @@
     "kd_enabled": false,
     "kd_temperature": 2.0,
     "kd_loss_weight": 0.5,
-    "kd_epochs": 1
+    "kd_epochs": 50
   },
   "validation": {
     "split": 0.1,
@@ -62,7 +62,7 @@
   },
   "tensorboard": {
     "enabled": true,
-    "log_dir": "\\checkpoints\\chat_model_tensorboard",
+    "log_dir": "chat_model_tensorboard",
     "comment": "",
     "freq": 1
   },

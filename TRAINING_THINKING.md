@@ -15,19 +15,35 @@ Thinking (razonamiento) le ensena al modelo a **pensar antes de responder**. En 
 | `<\|problem\|>` | Indica que empieza una pregunta/problema |
 | `<\|thinking\|>` | Indica que empieza el razonamiento |
 | `<\|final\|>` | Indica que termina el razonamiento y empieza la respuesta |
+| `<\|lang\|>` | Token de idioma (prefijo: `<\|es\|>`, `<\|en\|>`, etc.) |
+
+### Tokens de idioma (36 idiomas europeos)
+
+| Familia | Codigos |
+|---------|---------|
+| Romances | `es`, `fr`, `it`, `pt`, `ro`, `ca`, `gl`, `rm` |
+| Germanicas | `en`, `de`, `nl`, `sv`, `da`, `nb`, `nn`, `is`, `lb`, `fo` |
+| Eslavas | `pl`, `cs`, `sk`, `bg`, `hr`, `sr`, `sl`, `bs`, `mk`, `uk`, `be` |
+| Balticas | `lt`, `lv` |
+| Fino-ugricas | `fi`, `et`, `hu` |
+| Celticas/Hellenicas | `ga`, `el`, `sq` |
+
+**Formato:** `<|lang|><|problem|>pregunta<|thinking|>razonamiento<|final|>respuesta`
+
+El token de idioma se añade automáticamente al prepocesar datos. La función `_create_bpe_text_column()` en `data_preparer.py` usa un regex para detectar si una muestra ya tiene token de idioma (por ejemplo, de formatos agentic) y no lo añade para evitar duplicación.
 
 ## Formato basico
 
 ### Con thinking (el modelo razona)
 
 ```
-<|problem|>¿Cual es la capital de Francia?<|thinking|>Francia es un pais de Europa. Su capital es Paris.<|final|>La capital de Francia es Paris.
+<|es|><|problem|>¿Cual es la capital de Francia?<|thinking|>Francia es un pais de Europa. Su capital es Paris.<|final|>La capital de Francia es Paris.
 ```
 
 ### Sin thinking (respuesta directa)
 
 ```
-<|problem|>¿Cual es la capital de Francia?<|final|>La capital de Francia es Paris.
+<|en|><|problem|>What is the capital of France?<|final|>The capital of France is Paris.
 ```
 
 ## Formato con usuario/asistente

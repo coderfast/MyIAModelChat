@@ -139,9 +139,10 @@ async def api_chat(request: Request):
                     del payload["delta"]["role"]
                 yield json.dumps(payload, ensure_ascii=False) + "\n"
                 first_sent = False
-            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+            yield json.dumps({'id': None, 'object': 'chat.completion.chunk', 'delta': {}, 'finish_reason': 'stop'}) + '\n'
+            yield 'data: [DONE]\n\n'
 
-        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     loop = asyncio.get_running_loop()
     try:
@@ -186,9 +187,10 @@ async def chat_completions(req: ChatRequest):
                     del payload["delta"]["role"]
                 yield json.dumps(payload, ensure_ascii=False) + "\n"
                 first_sent = False
-            yield json.dumps({"id": None, "object": "chat.completion.complete"}, ensure_ascii=False) + "\n"
+            yield json.dumps({'id': None, 'object': 'chat.completion.chunk', 'delta': {}, 'finish_reason': 'stop'}) + '\n'
+            yield 'data: [DONE]\n\n'
 
-        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     loop = asyncio.get_running_loop()
     try:

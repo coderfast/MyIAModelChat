@@ -270,6 +270,9 @@ class AgentThinkingGenerator(ThinkingGenerator):
         question = sample.get('input', sample.get('question', ''))
         answer = sample.get('output', sample.get('answer', sample.get('input_ids', '')))
 
+        lang = sample.get('language', 'unknown')
+        lang_token = f'<|{lang}|>' if lang and lang not in ('unknown', 'Unknown', '') else ''
+
         result['question'] = question
         result['answer'] = answer
 
@@ -280,7 +283,7 @@ class AgentThinkingGenerator(ThinkingGenerator):
 
             # GPT-2 standard agentic format (Formato 2) with thinking included
             agent_text = (
-                f"<|user|>{question}<|end|>"
+                f"{lang_token}<|user|>{question}<|end|>"
                 f"<|assistant|><tool_call>{tool_call_str}</tool_call><|tool_result|>{observation}<|end|>"
                 f"<|assistant|><|thinking|>{thinking}<|final|>{answer}<|end|>"
             )
@@ -295,6 +298,7 @@ class AgentThinkingGenerator(ThinkingGenerator):
             self._tool_call_count += 1
         else:
             # GPT-2 standard thinking format (Formato 3, no tool)
+            # NOTE: <|lang|> is NOT added here — _create_bpe_text_column adds it
             normal_text = f"<|problem|>{question}<|thinking|>{thinking}<|final|>{answer}"
             result['thinking'] = thinking
             result['has_tool_call'] = False
