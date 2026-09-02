@@ -2105,12 +2105,14 @@ class Trainer:
             zoom: {{
                 wheel: {{ enabled: true }},
                 pinch: {{ enabled: true }},
-                drag: {{ enabled: true, backgroundColor: 'rgba(52,152,219,0.1)', borderColor: '#3498db', borderWidth: 1 }},
-                mode: 'xy'
+                drag: {{ enabled: false }},
+                mode: 'xy',
+                scaleMode: 'xy'
             }},
             pan: {{
                 enabled: true,
-                mode: 'xy'
+                mode: 'xy',
+                modifierKey: 'shift'
             }}
         }};
 
@@ -2647,12 +2649,14 @@ class Trainer:
             zoom: {{
                 wheel: {{ enabled: true }},
                 pinch: {{ enabled: true }},
-                drag: {{ enabled: true, backgroundColor: 'rgba(52,152,219,0.1)', borderColor: '#3498db', borderWidth: 1 }},
-                mode: 'xy'
+                drag: {{ enabled: false }},
+                mode: 'xy',
+                scaleMode: 'xy'
             }},
             pan: {{
                 enabled: true,
-                mode: 'xy'
+                mode: 'xy',
+                modifierKey: 'shift'
             }}
         }};
 
