@@ -426,104 +426,184 @@ def generate_html(data, checkpoint_name, is_draft=False):
         const moeExperts = {moe_expert_json};
         const mtpLoss = {mtp_loss_json};
 
-        const zoomOptions = {{
-            zoom: {{ wheel: {{ enabled: true }}, pinch: {{ enabled: true }}, mode: 'xy' }},
-            pan: {{ enabled: false }}
-        }};
+        const _orig = {{}};
+        const _view = {{}};
+        const _hbars = {{}};
+        const _vbars = {{}};
 
-        const _panState = {{}};
-        function _initPan(id) {{
-            const cv = document.getElementById(id);
-            if (!cv) return;
-            cv.style.cursor = 'grab';
-            cv.addEventListener('mousedown', function(e) {{
-                if (e.button !== 0) return;
-                const ch = Chart.getChart(id);
-                if (!ch) return;
-                const xs = ch.scales.x, ys = ch.scales.y;
-                _panState[id] = {{ active: true, sx: e.clientX, sy: e.clientY, xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max }};
-                cv.style.cursor = 'grabbing';
-                e.preventDefault();
-            }});
-            cv.addEventListener('mousemove', function(e) {{
-                const s = _panState[id];
-                if (!s || !s.active) return;
-                const ch = Chart.getChart(id);
-                if (!ch) return;
-                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
-                const cw = cv.width, chh = cv.height;
-                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
-                ch.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
-                ch.zoomScale('y', {{ min: s.yMin + dy / chh * yR, max: s.yMax + dy / chh * yR }}, 'default');
-                e.preventDefault();
-            }});
-            window.addEventListener('mouseup', function() {{
-                const s = _panState[id];
-                if (s && s.active) {{ s.active = false; cv.style.cursor = 'grab'; }}
-            }});
+        function _sync(id) {{
+            const c = Chart.getChart(id);
+            if (!c) return;
+            const v = _view[id];
+            c.options.scales.x.min = v.xMin; c.options.scales.x.max = v.xMax;
+            c.options.scales.y.min = v.yMin; c.options.scales.y.max = v.yMax;
+            c.update('none');
+            _layout(id);
         }}
 
-        function resetZoom(id) {{ const c = Chart.getChart(id); if (c) c.resetZoom(); }}
-        function zoomIn(id) {{ const c = Chart.getChart(id); if (c) c.zoom(1.2); }}
-        function zoomOut(id) {{ const c = Chart.getChart(id); if (c) c.zoom(0.8); }}
+        function _layout(id) {{
+            const s = _orig[id], v = _view[id];
+            if (!s || !v) return;
+            const xPct = (v.xMax - v.xMin) / s.xR * 100;
+            const yPct = (v.yMax - v.yMin) / s.yR * 100;
+            const xRoom = s.xR - (v.xMax - v.xMin);
+            const yRoom = s.yR - (v.yMax - v.yMin);
+            const xLeft = xRoom > 0 ? (v.xMin - s.xMin) / xRoom * (100 - xPct) : 0;
+            const yTop = yRoom > 0 ? (v.yMin - s.yMin) / yRoom * (100 - yPct) : 0;
+            if (_hbars[id]) {{ _hbars[id].style.width = xPct + '%'; _hbars[id].style.left = xLeft + '%'; }}
+            if (_vbars[id]) {{ _vbars[id].style.height = yPct + '%'; _vbars[id].style.top = yTop + '%'; }}
+        }}
+
+        function _clamp(v, o) {{
+            const xW = v.xMax - v.xMin, yW = v.yMax - v.yMin;
+            if (xW > o.xR) {{ v.xMin = o.xMin; v.xMax = o.xMax; }}
+            else {{ if (v.xMin < o.xMin) {{ v.xMin = o.xMin; v.xMax = v.xMin + xW; }} if (v.xMax > o.xMax) {{ v.xMax = o.xMax; v.xMin = v.xMax - xW; }} }}
+            if (yW > o.yR) {{ v.yMin = o.yMin; v.yMax = o.yMax; }}
+            else {{ if (v.yMin < o.yMin) {{ v.yMin = o.yMin; v.yMax = v.yMin + yW; }} if (v.yMax > o.yMax) {{ v.yMax = o.yMax; v.yMin = v.yMax - yW; }} }}
+        }}
+
+        function _addScrollbars(id) {{
+            const ch = Chart.getChart(id);
+            if (!ch) return;
+            const xs = ch.scales.x, ys = ch.scales.y;
+            const o = {{ xMin: xs.min, xMax: xs.max, xR: xs.max - xs.min, yMin: ys.min, yMax: ys.max, yR: ys.max - ys.min }};
+            const v = {{ xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max }};
+            _orig[id] = o; _view[id] = v;
+            const box = ch.canvas.parentElement;
+            if (box.querySelector('[data-sb]')) return;
+            box.style.position = 'relative';
+
+            const hTrack = document.createElement('div');
+            hTrack.style.cssText = 'position:relative;width:100%;height:6px;background:#ddd;border-radius:3px;margin-top:4px;overflow:visible;';
+            const hThumb = document.createElement('div');
+            hThumb.style.cssText = 'position:absolute;top:-1px;height:8px;background:#3498db;border-radius:4px;min-width:20px;cursor:grab;transition:none;';
+            hTrack.appendChild(hThumb);
+            _hbars[id] = hThumb;
+
+            const vTrack = document.createElement('div');
+            vTrack.style.cssText = 'position:absolute;right:-6px;top:0;width:6px;height:100%;background:#ddd;border-radius:3px;overflow:visible;z-index:5;';
+            const vThumb = document.createElement('div');
+            vThumb.style.cssText = 'position:absolute;left:-1px;width:8px;background:#3498db;border-radius:4px;min-height:20px;cursor:grab;transition:none;';
+            vTrack.appendChild(vThumb);
+            _vbars[id] = vThumb;
+
+            box.appendChild(hTrack);
+            box.appendChild(vTrack);
+
+            let drag = null;
+            const onMove = e => {{
+                if (!drag) return;
+                e.preventDefault();
+                const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+                if (drag.axis === 'x') {{
+                    const viewW = v.xMax - v.xMin, room = o.xR - viewW;
+                    if (room <= 0) return;
+                    v.xMin = drag.startMin + dx / drag.trackSize * room;
+                    v.xMax = v.xMin + viewW;
+                }} else {{
+                    const viewH = v.yMax - v.yMin, room = o.yR - viewH;
+                    if (room <= 0) return;
+                    v.yMin = drag.startMin + dy / drag.trackSize * room;
+                    v.yMax = v.yMin + viewH;
+                }}
+                _clamp(v, o); _sync(id);
+            }};
+            const onUp = () => {{ if (drag) {{ drag = null; document.body.style.cursor = ''; }} }};
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+
+            hThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'x', sx: e.clientX, sy: e.clientY, startMin: v.xMin, trackSize: hTrack.offsetWidth }}; document.body.style.cursor = 'grabbing'; }});
+            vThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'y', sx: e.clientX, sy: e.clientY, startMin: v.yMin, trackSize: vTrack.offsetHeight }}; document.body.style.cursor = 'grabbing'; }});
+
+            hTrack.addEventListener('click', e => {{ if (e.target === hThumb) return; const rect = hTrack.getBoundingClientRect(); const viewW = v.xMax - v.xMin, room = o.xR - viewW; if (room <= 0) return; const pct = (e.clientX - rect.left) / rect.width; v.xMin = o.xMin + pct * room - viewW / 2; v.xMax = v.xMin + viewW; _clamp(v, o); _sync(id); }});
+            vTrack.addEventListener('click', e => {{ if (e.target === vThumb) return; const rect = vTrack.getBoundingClientRect(); const viewH = v.yMax - v.yMin, room = o.yR - viewH; if (room <= 0) return; const pct = (e.clientY - rect.top) / rect.height; v.yMin = o.yMin + pct * room - viewH / 2; v.yMax = v.yMin + viewH; _clamp(v, o); _sync(id); }});
+
+            _layout(id);
+        }}
+
+        function resetZoom(id) {{
+            const o = _orig[id], v = _view[id];
+            if (!o || !v) return;
+            v.xMin = o.xMin; v.xMax = o.xMax; v.yMin = o.yMin; v.yMax = o.yMax;
+            _sync(id);
+        }}
+
+        function zoomIn(id) {{
+            const o = _orig[id], v = _view[id];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = (v.xMax - v.xMin) / 2 * 0.7, hy = (v.yMax - v.yMin) / 2 * 0.7;
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(id);
+        }}
+
+        function zoomOut(id) {{
+            const o = _orig[id], v = _view[id];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = Math.min((v.xMax - v.xMin) / 2 * 1.4, o.xR / 2);
+            const hy = Math.min((v.yMax - v.yMin) / 2 * 1.4, o.yR / 2);
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(id);
+        }}
 
         new Chart(document.getElementById('lossChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Train Loss', data: trainLoss, borderColor: '#3498db', tension: 0.3, fill: false }},
                 {{ label: 'Val Loss', data: valLoss, borderColor: '#e74c3c', tension: 0.3, fill: false }}
-            ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }}
+            ]}}, options: {{ responsive: true, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }}
         }});
-        _initPan('lossChart');
+        _addScrollbars('lossChart');
 
         new Chart(document.getElementById('perplexityChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Train Perplexity', data: trainPpl, borderColor: '#3498db', tension: 0.3, fill: false }},
                 {{ label: 'Val Perplexity', data: valPpl, borderColor: '#e74c3c', tension: 0.3, fill: false }}
-            ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Perplexity' }} }} }} }}
+            ]}}, options: {{ responsive: true, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Perplexity' }} }} }} }}
         }});
-        _initPan('perplexityChart');
+        _addScrollbars('perplexityChart');
 
         new Chart(document.getElementById('gapChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Train/Val Gap', data: gapData, borderColor: '#f39c12', tension: 0.3, fill: false }}
-            ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Gap' }} }} }} }}
+            ]}}, options: {{ responsive: true, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Gap' }} }} }} }}
         }});
-        _initPan('gapChart');
+        _addScrollbars('gapChart');
 
         new Chart(document.getElementById('lrChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Learning Rate', data: lrData, borderColor: '#9b59b6', tension: 0.3, fill: false }}
-            ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Learning Rate' }} }} }} }}
+            ]}}, options: {{ responsive: true, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Learning Rate' }} }} }} }}
         }});
-        _initPan('lrChart');
+        _addScrollbars('lrChart');
 
         new Chart(document.getElementById('speedChart'), {{
             type: 'line', data: {{ labels: epochs, datasets: [
                 {{ label: 'Tokens/sec', data: tokensPerSec, borderColor: '#1abc9c', tension: 0.3, fill: false }}
-            ]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Tokens/sec' }} }} }} }}
+            ]}}, options: {{ responsive: true, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Tokens/sec' }} }} }} }}
         }});
-        _initPan('speedChart');
+        _addScrollbars('speedChart');
 
-        {f"new Chart(document.getElementById('thinkingAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Thinking Acc', data: thinkingAcc, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Open Acc', data: thinkingOpen, borderColor: '#2ecc71', tension: 0.3, fill: false }}, {{ label: 'Close Acc', data: thinkingClose, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
-        {f"_initPan('thinkingAccuracyChart');" if has_thinking else ''}
+        {f"new Chart(document.getElementById('thinkingAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Thinking Acc', data: thinkingAcc, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Open Acc', data: thinkingOpen, borderColor: '#2ecc71', tension: 0.3, fill: false }}, {{ label: 'Close Acc', data: thinkingClose, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
+        {f"_addScrollbars('thinkingAccuracyChart');" if has_thinking else ''}
 
-        {f"new Chart(document.getElementById('thinkingCoverageChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Coverage', data: thinkingCov, borderColor: '#f39c12', tension: 0.3, fill: false }}, {{ label: 'Response Acc', data: responseAcc, borderColor: '#9b59b6', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Value' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
-        {f"_initPan('thinkingCoverageChart');" if has_thinking else ''}
+        {f"new Chart(document.getElementById('thinkingCoverageChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Coverage', data: thinkingCov, borderColor: '#f39c12', tension: 0.3, fill: false }}, {{ label: 'Response Acc', data: responseAcc, borderColor: '#9b59b6', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Value' }}, min: 0, max: 1 }} }} }} }});" if has_thinking else ''}
+        {f"_addScrollbars('thinkingCoverageChart');" if has_thinking else ''}
 
-        {f"new Chart(document.getElementById('agentAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Tool Call Acc', data: agentTool, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Observation Acc', data: agentObs, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_agent else ''}
-        {f"_initPan('agentAccuracyChart');" if has_agent else ''}
+        {f"new Chart(document.getElementById('agentAccuracyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Tool Call Acc', data: agentTool, borderColor: '#3498db', tension: 0.3, fill: false }}, {{ label: 'Observation Acc', data: agentObs, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }} }} }} }});" if has_agent else ''}
+        {f"_addScrollbars('agentAccuracyChart');" if has_agent else ''}
 
-        {f"new Chart(document.getElementById('agentRatioChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Agent Ratio', data: agentRatio, borderColor: '#1abc9c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Ratio' }} }} }} }} }});" if has_agent else ''}
-        {f"_initPan('agentRatioChart');" if has_agent else ''}
+        {f"new Chart(document.getElementById('agentRatioChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Agent Ratio', data: agentRatio, borderColor: '#1abc9c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Ratio' }} }} }} }} }});" if has_agent else ''}
+        {f"_addScrollbars('agentRatioChart');" if has_agent else ''}
 
-        {f"new Chart(document.getElementById('moeEntropyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Gate Entropy (norm)', data: moeEntropy, borderColor: '#3498db', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Entropy' }} }} }} }} }});" if has_moe else ''}
-        {f"_initPan('moeEntropyChart');" if has_moe else ''}
+        {f"new Chart(document.getElementById('moeEntropyChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'Gate Entropy (norm)', data: moeEntropy, borderColor: '#3498db', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Entropy' }} }} }} }} }});" if has_moe else ''}
+        {f"_addScrollbars('moeEntropyChart');" if has_moe else ''}
 
-        {f"new Chart(document.getElementById('moeUtilChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: f'Expert {{k}}', data: v, borderColor: colors[i % colors.length], tension: 0.3, fill: false }} for i, (k, v) in enumerate(moeExperts.items())]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Utilization %' }} }} }} }} }});" if has_moe else ''}
-        {f"_initPan('moeUtilChart');" if has_moe else ''}
+        {f"new Chart(document.getElementById('moeUtilChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: f'Expert {{k}}', data: v, borderColor: colors[i % colors.length], tension: 0.3, fill: false }} for i, (k, v) in enumerate(moeExperts.items())]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Utilization %' }} }} }} }} }});" if has_moe else ''}
+        {f"_addScrollbars('moeUtilChart');" if has_moe else ''}
 
-        {f"new Chart(document.getElementById('mtpLossChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'MTP Loss', data: mtpLoss, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ zoom: zoomOptions }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }} }});" if has_mtp else ''}
-        {f"_initPan('mtpLossChart');" if has_mtp else ''}
+        {f"new Chart(document.getElementById('mtpLossChart'), {{ type: 'line', data: {{ labels: epochs, datasets: [{{ label: 'MTP Loss', data: mtpLoss, borderColor: '#e74c3c', tension: 0.3, fill: false }}]}}, options: {{ responsive: true, plugins: {{ }}, scales: {{ x: {{ title: {{ display: true, text: 'Epoch' }} }}, y: {{ title: {{ display: true, text: 'Loss' }} }} }} }} }});" if has_mtp else ''}
+        {f"_addScrollbars('mtpLossChart');" if has_mtp else ''}
     </script>
 </body>
 </html>"""

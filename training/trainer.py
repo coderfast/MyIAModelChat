@@ -2102,67 +2102,125 @@ class Trainer:
         const moeExpertUtils = {moe_expert_utils_json};
         const mtpLosses = {mtp_losses_json};
 
-        // Reusable zoom config (custom pan via drag handlers below)
-        const zoomOptions = {{
-            zoom: {{
-                wheel: {{ enabled: true }},
-                pinch: {{ enabled: true }},
-                mode: 'xy'
-            }},
-            pan: {{ enabled: false }}
-        }};
+        const _orig = {{}};
+        const _view = {{}};
+        const _hbars = {{}};
+        const _vbars = {{}};
 
-        // Custom drag-to-pan: per-chart state
-        const _panState = {{}};
+        function _sync(chartId) {{
+            const c = Chart.getChart(chartId);
+            if (!c) return;
+            const v = _view[chartId];
+            c.options.scales.x.min = v.xMin; c.options.scales.x.max = v.xMax;
+            c.options.scales.y.min = v.yMin; c.options.scales.y.max = v.yMax;
+            c.update('none');
+            _layout(chartId);
+        }}
 
-        function _initPan(chartId) {{
-            const canvas = document.getElementById(chartId);
-            if (!canvas) return;
-            canvas.style.cursor = 'grab';
-            canvas.addEventListener('mousedown', function(e) {{
-                if (e.button !== 0) return;
-                const chart = Chart.getChart(chartId);
-                if (!chart) return;
-                const xs = chart.scales.x, ys = chart.scales.y;
-                _panState[chartId] = {{
-                    active: true, sx: e.clientX, sy: e.clientY,
-                    xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max
-                }};
-                canvas.style.cursor = 'grabbing';
+        function _layout(chartId) {{
+            const s = _orig[chartId], v = _view[chartId];
+            if (!s || !v) return;
+            const xPct = (v.xMax - v.xMin) / s.xR * 100;
+            const yPct = (v.yMax - v.yMin) / s.yR * 100;
+            const xRoom = s.xR - (v.xMax - v.xMin);
+            const yRoom = s.yR - (v.yMax - v.yMin);
+            const xLeft = xRoom > 0 ? (v.xMin - s.xMin) / xRoom * (100 - xPct) : 0;
+            const yTop = yRoom > 0 ? (v.yMin - s.yMin) / yRoom * (100 - yPct) : 0;
+            if (_hbars[chartId]) {{ _hbars[chartId].style.width = xPct + '%'; _hbars[chartId].style.left = xLeft + '%'; }}
+            if (_vbars[chartId]) {{ _vbars[chartId].style.height = yPct + '%'; _vbars[chartId].style.top = yTop + '%'; }}
+        }}
+
+        function _clamp(v, o) {{
+            const xW = v.xMax - v.xMin, yW = v.yMax - v.yMin;
+            if (xW > o.xR) {{ v.xMin = o.xMin; v.xMax = o.xMax; }}
+            else {{ if (v.xMin < o.xMin) {{ v.xMin = o.xMin; v.xMax = v.xMin + xW; }} if (v.xMax > o.xMax) {{ v.xMax = o.xMax; v.xMin = v.xMax - xW; }} }}
+            if (yW > o.yR) {{ v.yMin = o.yMin; v.yMax = o.yMax; }}
+            else {{ if (v.yMin < o.yMin) {{ v.yMin = o.yMin; v.yMax = v.yMin + yW; }} if (v.yMax > o.yMax) {{ v.yMax = o.yMax; v.yMin = v.yMax - yW; }} }}
+        }}
+
+        function _addScrollbars(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (!chart) return;
+            const xs = chart.scales.x, ys = chart.scales.y;
+            const o = {{ xMin: xs.min, xMax: xs.max, xR: xs.max - xs.min, yMin: ys.min, yMax: ys.max, yR: ys.max - ys.min }};
+            const v = {{ xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max }};
+            _orig[chartId] = o; _view[chartId] = v;
+            const box = chart.canvas.parentElement;
+            if (box.querySelector('[data-sb]')) return;
+            box.style.position = 'relative';
+
+            const hTrack = document.createElement('div');
+            hTrack.style.cssText = 'position:relative;width:100%;height:6px;background:#ddd;border-radius:3px;margin-top:4px;overflow:visible;';
+            const hThumb = document.createElement('div');
+            hThumb.style.cssText = 'position:absolute;top:-1px;height:8px;background:#3498db;border-radius:4px;min-width:20px;cursor:grab;transition:none;';
+            hTrack.appendChild(hThumb);
+            _hbars[chartId] = hThumb;
+
+            const vTrack = document.createElement('div');
+            vTrack.style.cssText = 'position:absolute;right:-6px;top:0;width:6px;height:100%;background:#ddd;border-radius:3px;overflow:visible;z-index:5;';
+            const vThumb = document.createElement('div');
+            vThumb.style.cssText = 'position:absolute;left:-1px;width:8px;background:#3498db;border-radius:4px;min-height:20px;cursor:grab;transition:none;';
+            vTrack.appendChild(vThumb);
+            _vbars[chartId] = vThumb;
+
+            box.appendChild(hTrack);
+            box.appendChild(vTrack);
+
+            let drag = null;
+            const onMove = e => {{
+                if (!drag) return;
                 e.preventDefault();
-            }});
-            canvas.addEventListener('mousemove', function(e) {{
-                const s = _panState[chartId];
-                if (!s || !s.active) return;
-                const chart = Chart.getChart(chartId);
-                if (!chart) return;
-                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
-                const cw = canvas.width, ch = canvas.height;
-                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
-                chart.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
-                chart.zoomScale('y', {{ min: s.yMin + dy / ch * yR, max: s.yMax + dy / ch * yR }}, 'default');
-                e.preventDefault();
-            }});
-            window.addEventListener('mouseup', function() {{
-                const s = _panState[chartId];
-                if (s && s.active) {{
-                    s.active = false;
-                    canvas.style.cursor = 'grab';
+                const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+                if (drag.axis === 'x') {{
+                    const viewW = v.xMax - v.xMin, room = o.xR - viewW;
+                    if (room <= 0) return;
+                    v.xMin = drag.startMin + dx / drag.trackSize * room;
+                    v.xMax = v.xMin + viewW;
+                }} else {{
+                    const viewH = v.yMax - v.yMin, room = o.yR - viewH;
+                    if (room <= 0) return;
+                    v.yMin = drag.startMin + dy / drag.trackSize * room;
+                    v.yMax = v.yMin + viewH;
                 }}
-            }});
+                _clamp(v, o); _sync(chartId);
+            }};
+            const onUp = () => {{ if (drag) {{ drag = null; document.body.style.cursor = ''; }} }};
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+
+            hThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'x', sx: e.clientX, sy: e.clientY, startMin: v.xMin, trackSize: hTrack.offsetWidth }}; document.body.style.cursor = 'grabbing'; }});
+            vThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'y', sx: e.clientX, sy: e.clientY, startMin: v.yMin, trackSize: vTrack.offsetHeight }}; document.body.style.cursor = 'grabbing'; }});
+
+            hTrack.addEventListener('click', e => {{ if (e.target === hThumb) return; const rect = hTrack.getBoundingClientRect(); const viewW = v.xMax - v.xMin, room = o.xR - viewW; if (room <= 0) return; const pct = (e.clientX - rect.left) / rect.width; v.xMin = o.xMin + pct * room - viewW / 2; v.xMax = v.xMin + viewW; _clamp(v, o); _sync(chartId); }});
+            vTrack.addEventListener('click', e => {{ if (e.target === vThumb) return; const rect = vTrack.getBoundingClientRect(); const viewH = v.yMax - v.yMin, room = o.yR - viewH; if (room <= 0) return; const pct = (e.clientY - rect.top) / rect.height; v.yMin = o.yMin + pct * room - viewH / 2; v.yMax = v.yMin + viewH; _clamp(v, o); _sync(chartId); }});
+
+            _layout(chartId);
         }}
 
         function resetZoom(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.resetZoom();
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            v.xMin = o.xMin; v.xMax = o.xMax; v.yMin = o.yMin; v.yMax = o.yMax;
+            _sync(chartId);
         }}
+
         function zoomIn(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.zoom(1.2);
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = (v.xMax - v.xMin) / 2 * 0.7, hy = (v.yMax - v.yMin) / 2 * 0.7;
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(chartId);
         }}
+
         function zoomOut(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.zoom(0.8);
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = Math.min((v.xMax - v.xMin) / 2 * 1.4, o.xR / 2);
+            const hy = Math.min((v.yMax - v.yMin) / 2 * 1.4, o.yR / 2);
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(chartId);
         }}
 
         // Loss Chart
@@ -2188,14 +2246,14 @@ class Trainer:
                 ]
             }},
             options: {{
-                responsive: true, plugins: {{ zoom: zoomOptions }},
+                responsive: true,
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Loss' }} }}
                 }}
             }}
         }});
-        _initPan('lossChart');
+        _addScrollbars('lossChart');
 
         // Perplexity Chart
         new Chart(document.getElementById('perplexityChart'), {{
@@ -2220,14 +2278,14 @@ class Trainer:
                 ]
             }},
             options: {{
-                responsive: true, plugins: {{ zoom: zoomOptions }},
+                responsive: true,
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Perplexity' }} }}
                 }}
             }}
         }});
-        _initPan('perplexityChart');
+        _addScrollbars('perplexityChart');
 
         // Gap Chart
         new Chart(document.getElementById('gapChart'), {{
@@ -2243,7 +2301,7 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true, plugins: {{ zoom: zoomOptions }},
+                responsive: true,
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Gap' }} }}
@@ -2263,7 +2321,7 @@ class Trainer:
                 }}
             }}
         }});
-        _initPan('gapChart');
+        _addScrollbars('gapChart');
 
         // Learning Rate Chart
         new Chart(document.getElementById('lrChart'), {{
@@ -2279,7 +2337,7 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true, plugins: {{ zoom: zoomOptions }},
+                responsive: true,
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Learning Rate' }} }}
@@ -2295,7 +2353,7 @@ class Trainer:
                 }}
             }}
         }});
-        _initPan('lrChart');
+        _addScrollbars('lrChart');
 
         // Speed Chart
         new Chart(document.getElementById('speedChart'), {{
@@ -2312,14 +2370,14 @@ class Trainer:
                 }}]
             }},
             options: {{
-                responsive: true, plugins: {{ zoom: zoomOptions }},
+                responsive: true,
                 scales: {{
                     x: {{ title: {{ display: true, text: 'Epoch' }} }},
                     y: {{ title: {{ display: true, text: 'Tokens/sec' }} }}
                 }}
             }}
         }});
-        _initPan('speedChart');
+        _addScrollbars('speedChart');
 
         // Thinking Accuracy Chart
         if (thinkingAccuracy.some(v => v !== null)) {{
@@ -2335,14 +2393,14 @@ class Trainer:
                     ]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
                     }}
                 }}
             }});
-            _initPan('thinkingAccuracyChart');
+            _addScrollbars('thinkingAccuracyChart');
         }}
 
         // Thinking Coverage Chart
@@ -2361,14 +2419,14 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Coverage' }}, min: 0, max: 1 }}
                     }}
                 }}
             }});
-            _initPan('thinkingCoverageChart');
+            _addScrollbars('thinkingCoverageChart');
         }}
 
         // Agent Accuracy Chart
@@ -2383,14 +2441,14 @@ class Trainer:
                     ]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Accuracy' }}, min: 0, max: 1 }}
                     }}
                 }}
             }});
-            _initPan('agentAccuracyChart');
+            _addScrollbars('agentAccuracyChart');
         }}
 
         // Agent Ratio Chart
@@ -2408,14 +2466,14 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Ratio' }}, min: 0 }}
                     }}
                 }}
             }});
-            _initPan('agentRatioChart');
+            _addScrollbars('agentRatioChart');
         }}
 
         // MoE Entropy Chart
@@ -2434,14 +2492,14 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'Entropy (0=collapsed, 1=balanced)' }}, min: 0, max: 1 }}
                     }}
                 }}
             }});
-            _initPan('moeEntropyChart');
+            _addScrollbars('moeEntropyChart');
         }}
 
         // MoE Expert Utilization Chart
@@ -2458,14 +2516,14 @@ class Trainer:
                 type: 'bar',
                 data: {{ labels: epochs, datasets: datasets }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ stacked: true, title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ stacked: true, title: {{ display: true, text: 'Utilization' }}, min: 0 }}
                     }}
                 }}
             }});
-            _initPan('moeUtilChart');
+            _addScrollbars('moeUtilChart');
         }}
 
         // MTP Loss Chart
@@ -2484,14 +2542,14 @@ class Trainer:
                     }}]
                 }},
                 options: {{
-                    responsive: true, plugins: {{ zoom: zoomOptions }},
+                    responsive: true,
                     scales: {{
                         x: {{ title: {{ display: true, text: 'Epoch' }} }},
                         y: {{ title: {{ display: true, text: 'MTP Loss' }} }}
                     }}
                 }}
             }});
-            _initPan('mtpLossChart');
+            _addScrollbars('mtpLossChart');
         }}
     </script>
 </body>
@@ -2702,67 +2760,125 @@ class Trainer:
         const kdLosses = {kd_losses_json};
         const hardLosses = {hard_losses_json};
 
-        // Reusable zoom config (custom pan via drag handlers below)
-        const zoomOptions = {{
-            zoom: {{
-                wheel: {{ enabled: true }},
-                pinch: {{ enabled: true }},
-                mode: 'xy'
-            }},
-            pan: {{ enabled: false }}
-        }};
+        const _orig = {{}};
+        const _view = {{}};
+        const _hbars = {{}};
+        const _vbars = {{}};
 
-        // Custom drag-to-pan: per-chart state
-        const _panState = {{}};
+        function _sync(chartId) {{
+            const c = Chart.getChart(chartId);
+            if (!c) return;
+            const v = _view[chartId];
+            c.options.scales.x.min = v.xMin; c.options.scales.x.max = v.xMax;
+            c.options.scales.y.min = v.yMin; c.options.scales.y.max = v.yMax;
+            c.update('none');
+            _layout(chartId);
+        }}
 
-        function _initPan(chartId) {{
-            const canvas = document.getElementById(chartId);
-            if (!canvas) return;
-            canvas.style.cursor = 'grab';
-            canvas.addEventListener('mousedown', function(e) {{
-                if (e.button !== 0) return;
-                const chart = Chart.getChart(chartId);
-                if (!chart) return;
-                const xs = chart.scales.x, ys = chart.scales.y;
-                _panState[chartId] = {{
-                    active: true, sx: e.clientX, sy: e.clientY,
-                    xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max
-                }};
-                canvas.style.cursor = 'grabbing';
+        function _layout(chartId) {{
+            const s = _orig[chartId], v = _view[chartId];
+            if (!s || !v) return;
+            const xPct = (v.xMax - v.xMin) / s.xR * 100;
+            const yPct = (v.yMax - v.yMin) / s.yR * 100;
+            const xRoom = s.xR - (v.xMax - v.xMin);
+            const yRoom = s.yR - (v.yMax - v.yMin);
+            const xLeft = xRoom > 0 ? (v.xMin - s.xMin) / xRoom * (100 - xPct) : 0;
+            const yTop = yRoom > 0 ? (v.yMin - s.yMin) / yRoom * (100 - yPct) : 0;
+            if (_hbars[chartId]) {{ _hbars[chartId].style.width = xPct + '%'; _hbars[chartId].style.left = xLeft + '%'; }}
+            if (_vbars[chartId]) {{ _vbars[chartId].style.height = yPct + '%'; _vbars[chartId].style.top = yTop + '%'; }}
+        }}
+
+        function _clamp(v, o) {{
+            const xW = v.xMax - v.xMin, yW = v.yMax - v.yMin;
+            if (xW > o.xR) {{ v.xMin = o.xMin; v.xMax = o.xMax; }}
+            else {{ if (v.xMin < o.xMin) {{ v.xMin = o.xMin; v.xMax = v.xMin + xW; }} if (v.xMax > o.xMax) {{ v.xMax = o.xMax; v.xMin = v.xMax - xW; }} }}
+            if (yW > o.yR) {{ v.yMin = o.yMin; v.yMax = o.yMax; }}
+            else {{ if (v.yMin < o.yMin) {{ v.yMin = o.yMin; v.yMax = v.yMin + yW; }} if (v.yMax > o.yMax) {{ v.yMax = o.yMax; v.yMin = v.yMax - yW; }} }}
+        }}
+
+        function _addScrollbars(chartId) {{
+            const chart = Chart.getChart(chartId);
+            if (!chart) return;
+            const xs = chart.scales.x, ys = chart.scales.y;
+            const o = {{ xMin: xs.min, xMax: xs.max, xR: xs.max - xs.min, yMin: ys.min, yMax: ys.max, yR: ys.max - ys.min }};
+            const v = {{ xMin: xs.min, xMax: xs.max, yMin: ys.min, yMax: ys.max }};
+            _orig[chartId] = o; _view[chartId] = v;
+            const box = chart.canvas.parentElement;
+            if (box.querySelector('[data-sb]')) return;
+            box.style.position = 'relative';
+
+            const hTrack = document.createElement('div');
+            hTrack.style.cssText = 'position:relative;width:100%;height:6px;background:#ddd;border-radius:3px;margin-top:4px;overflow:visible;';
+            const hThumb = document.createElement('div');
+            hThumb.style.cssText = 'position:absolute;top:-1px;height:8px;background:#3498db;border-radius:4px;min-width:20px;cursor:grab;transition:none;';
+            hTrack.appendChild(hThumb);
+            _hbars[chartId] = hThumb;
+
+            const vTrack = document.createElement('div');
+            vTrack.style.cssText = 'position:absolute;right:-6px;top:0;width:6px;height:100%;background:#ddd;border-radius:3px;overflow:visible;z-index:5;';
+            const vThumb = document.createElement('div');
+            vThumb.style.cssText = 'position:absolute;left:-1px;width:8px;background:#3498db;border-radius:4px;min-height:20px;cursor:grab;transition:none;';
+            vTrack.appendChild(vThumb);
+            _vbars[chartId] = vThumb;
+
+            box.appendChild(hTrack);
+            box.appendChild(vTrack);
+
+            let drag = null;
+            const onMove = e => {{
+                if (!drag) return;
                 e.preventDefault();
-            }});
-            canvas.addEventListener('mousemove', function(e) {{
-                const s = _panState[chartId];
-                if (!s || !s.active) return;
-                const chart = Chart.getChart(chartId);
-                if (!chart) return;
-                const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
-                const cw = canvas.width, ch = canvas.height;
-                const xR = s.xMax - s.xMin, yR = s.yMax - s.yMin;
-                chart.zoomScale('x', {{ min: s.xMin - dx / cw * xR, max: s.xMax - dx / cw * xR }}, 'default');
-                chart.zoomScale('y', {{ min: s.yMin + dy / ch * yR, max: s.yMax + dy / ch * yR }}, 'default');
-                e.preventDefault();
-            }});
-            window.addEventListener('mouseup', function() {{
-                const s = _panState[chartId];
-                if (s && s.active) {{
-                    s.active = false;
-                    canvas.style.cursor = 'grab';
+                const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+                if (drag.axis === 'x') {{
+                    const viewW = v.xMax - v.xMin, room = o.xR - viewW;
+                    if (room <= 0) return;
+                    v.xMin = drag.startMin + dx / drag.trackSize * room;
+                    v.xMax = v.xMin + viewW;
+                }} else {{
+                    const viewH = v.yMax - v.yMin, room = o.yR - viewH;
+                    if (room <= 0) return;
+                    v.yMin = drag.startMin + dy / drag.trackSize * room;
+                    v.yMax = v.yMin + viewH;
                 }}
-            }});
+                _clamp(v, o); _sync(chartId);
+            }};
+            const onUp = () => {{ if (drag) {{ drag = null; document.body.style.cursor = ''; }} }};
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+
+            hThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'x', sx: e.clientX, sy: e.clientY, startMin: v.xMin, trackSize: hTrack.offsetWidth }}; document.body.style.cursor = 'grabbing'; }});
+            vThumb.addEventListener('mousedown', e => {{ e.preventDefault(); drag = {{ axis: 'y', sx: e.clientX, sy: e.clientY, startMin: v.yMin, trackSize: vTrack.offsetHeight }}; document.body.style.cursor = 'grabbing'; }});
+
+            hTrack.addEventListener('click', e => {{ if (e.target === hThumb) return; const rect = hTrack.getBoundingClientRect(); const viewW = v.xMax - v.xMin, room = o.xR - viewW; if (room <= 0) return; const pct = (e.clientX - rect.left) / rect.width; v.xMin = o.xMin + pct * room - viewW / 2; v.xMax = v.xMin + viewW; _clamp(v, o); _sync(chartId); }});
+            vTrack.addEventListener('click', e => {{ if (e.target === vThumb) return; const rect = vTrack.getBoundingClientRect(); const viewH = v.yMax - v.yMin, room = o.yR - viewH; if (room <= 0) return; const pct = (e.clientY - rect.top) / rect.height; v.yMin = o.yMin + pct * room - viewH / 2; v.yMax = v.yMin + viewH; _clamp(v, o); _sync(chartId); }});
+
+            _layout(chartId);
         }}
 
         function resetZoom(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.resetZoom();
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            v.xMin = o.xMin; v.xMax = o.xMax; v.yMin = o.yMin; v.yMax = o.yMax;
+            _sync(chartId);
         }}
+
         function zoomIn(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.zoom(1.2);
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = (v.xMax - v.xMin) / 2 * 0.7, hy = (v.yMax - v.yMin) / 2 * 0.7;
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(chartId);
         }}
+
         function zoomOut(chartId) {{
-            const chart = Chart.getChart(chartId);
-            if (chart) chart.zoom(0.8);
+            const o = _orig[chartId], v = _view[chartId];
+            if (!o || !v) return;
+            const cx = (v.xMin + v.xMax) / 2, cy = (v.yMin + v.yMax) / 2;
+            const hx = Math.min((v.xMax - v.xMin) / 2 * 1.4, o.xR / 2);
+            const hy = Math.min((v.yMax - v.yMin) / 2 * 1.4, o.yR / 2);
+            v.xMin = cx - hx; v.xMax = cx + hx; v.yMin = cy - hy; v.yMax = cy + hy;
+            _clamp(v, o); _sync(chartId);
         }}
 
         // Loss Chart
@@ -2781,14 +2897,14 @@ class Trainer:
             }},
             options: {{
                 responsive: true,
-                plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Total Loss' }} }},
+                plugins: {{ title: {{ display: true, text: 'Draft Model - Total Loss' }} }},
                 scales: {{
                     y: {{ title: {{ display: true, text: 'Loss' }} }},
                     x: {{ title: {{ display: true, text: 'Epoch' }} }}
                 }}
             }}
         }});
-        _initPan('lossChart');
+        _addScrollbars('lossChart');
 
         // Learning Rate Chart
         new Chart(document.getElementById('lrChart'), {{
@@ -2807,7 +2923,6 @@ class Trainer:
             options: {{
                 responsive: true,
                 plugins: {{
-                    zoom: zoomOptions,
                     title: {{ display: true, text: 'Draft Model - Learning Rate' }},
                     tooltip: {{
                         callbacks: {{
@@ -2823,7 +2938,7 @@ class Trainer:
                 }}
             }}
         }});
-        _initPan('lrChart');
+        _addScrollbars('lrChart');
 
         // KD Loss Chart (only if KD enabled)
         if (kdLosses.some(v => v !== null)) {{
@@ -2842,14 +2957,14 @@ class Trainer:
                 }},
                 options: {{
                     responsive: true,
-                    plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Knowledge Distillation Loss' }} }},
+                    plugins: {{ title: {{ display: true, text: 'Draft Model - Knowledge Distillation Loss' }} }},
                     scales: {{
                         y: {{ title: {{ display: true, text: 'KD Loss' }} }},
                         x: {{ title: {{ display: true, text: 'Epoch' }} }}
                     }}
                 }}
             }});
-            _initPan('kdLossChart');
+            _addScrollbars('kdLossChart');
         }} else {{
             document.getElementById('kdLossChart').parentElement.style.display = 'none';
         }}
@@ -2871,14 +2986,14 @@ class Trainer:
                 }},
                 options: {{
                     responsive: true,
-                    plugins: {{ zoom: zoomOptions, title: {{ display: true, text: 'Draft Model - Next-Token Loss' }} }},
+                    plugins: {{ title: {{ display: true, text: 'Draft Model - Next-Token Loss' }} }},
                     scales: {{
                         y: {{ title: {{ display: true, text: 'Hard Loss' }} }},
                         x: {{ title: {{ display: true, text: 'Epoch' }} }}
                     }}
                 }}
             }});
-            _initPan('hardLossChart');
+            _addScrollbars('hardLossChart');
         }} else {{
             document.getElementById('hardLossChart').parentElement.style.display = 'none';
         }}
