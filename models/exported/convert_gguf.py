@@ -140,9 +140,6 @@ def extract_tokenizer_for_gguf(sp, config, metadata):
         '<|user|>', '<|assistant|>',
         '<|system|>', '<|end|>', '<|sep|>',
         '<tool_call>', '</tool_call>', '<|tool_result|>',
-        '<thinking>', '</thinking>',
-        '<|context|>', '<|answer|>',
-        '<observation>', '</observation>',
     }
 
     tokens = []

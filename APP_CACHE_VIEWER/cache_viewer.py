@@ -1456,7 +1456,6 @@ class CacheViewer(QMainWindow):
             '<|user|>', '<|assistant|>',
             '<|system|>', '<|end|>', '<|sep|>',
             '<tool_call>', '</tool_call>', '<|tool_result|>',
-            '<thinking>', '</thinking>',
         }
         for item in self.vocab_data:
             # Apply filter

@@ -34,10 +34,10 @@ class MockTokenizer:
     def get_thinking_end_index(self):
         return -1
 
-    def get_context_index(self):
+    def get_problem_index(self):
         return -1
 
-    def get_answer_index(self):
+    def get_final_index(self):
         return -1
 
     def get_thinking_mode_index(self):
@@ -52,10 +52,7 @@ class MockTokenizer:
     def get_tool_call_end_index(self):
         return -1
 
-    def get_observation_index(self):
-        return -1
-
-    def get_observation_end_index(self):
+    def get_tool_result_index(self):
         return -1
 
     def get_end_index(self):

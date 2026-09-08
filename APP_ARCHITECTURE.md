@@ -168,17 +168,17 @@ Wraps a SentencePiece BPE model with special token support.
 | `<unk>` | 1 | Unknown |
 | `<s>` | 2 | Start of sequence |
 | `</s>` | 3 | End of sequence |
-| `<thinking>` | varies | Content tag: opens reasoning block |
-| `</thinking>` | varies | Content tag: closes reasoning block |
-| `<\|context\|>` | varies | Mode token: marks CONTEXT sample |
-| `<\|answer\|>` | varies | Mode token: answer delimiter |
-| `<\|thinking\|>` | varies | Mode token: marks THINKING sample |
+| `<\|problem\|>` | varies | Question/problem prefix |
+| `<\|thinking\|>` | varies | Reasoning prefix |
+| `<\|final\|>` | varies | Answer prefix |
+| `<\|user\|>` | varies | User prefix (agentic) |
+| `<\|assistant\|>` | varies | Assistant prefix (agentic) |
 
 **Key Methods:**
 - `encode(text)` / `decode(indices)` - Basic tokenization
 - `batch_encode(texts)` - Batch encoding
-- `get_thinking_index()` / `get_thinking_end_index()` - Content tag IDs
-- `get_context_index()` / `get_answer_index()` / `get_thinking_mode_index()` - Mode token IDs
+- `get_problem_index()` / `get_final_index()` / `get_thinking_mode_index()` - Mode token IDs
+- `get_user_index()` / `get_assistant_index()` / `get_end_index()` - Agentic token IDs
 - `has_thinking(text)` / `split_thinking(text)` / `extract_response(text)` - Content tag utilities
 - `has_mode_tokens(text)` / `split_mode(text)` - Mode token utilities
 - `save_vocabulary(filepath)` - Persist vocabulary metadata

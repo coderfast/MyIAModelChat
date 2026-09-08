@@ -62,22 +62,12 @@ class ChatConfig:
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
-    """Parse thinking tags from response text.
-
-    Supports new format (<|thinking|>...<|final|>) and legacy (<thinking>...</thinking>).
-    """
-    if '<|thinking|>' in text and '<|final|>' in text:
-        try:
-            thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
-            response = text.split('<|final|>')[1].strip()
-            return {'thinking': thinking, 'response': response}
-        except (IndexError, ValueError):
-            return {'thinking': None, 'response': text}
-    if '<thinking>' not in text or '</thinking>' not in text:
+    """Parse thinking tags from response text (GPT-2 standard tokens)."""
+    if '<|thinking|>' not in text or '<|final|>' not in text:
         return {'thinking': None, 'response': text}
     try:
-        thinking = text.split('<thinking>')[1].split('</thinking>')[0]
-        response = text.split('</thinking>')[1].strip()
+        thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
+        response = text.split('<|final|>')[1].strip()
         return {'thinking': thinking, 'response': response}
     except (IndexError, ValueError):
         return {'thinking': None, 'response': text}
@@ -308,7 +298,7 @@ class ChatEngine:
             max_len=128,
             min_length=3,
             no_repeat_ngram_size=3,
-            default_response="Lo siento, no puedo responder ahora.",
+            default_response="Lo siento, no puedo responder ahora.\nI'm sorry, I can't respond right now.",
             tool_executor=self.tool_executor,
             agent_enabled=self.config.agent_enabled,
             agent_max_iterations=self.config.agent_max_iterations,

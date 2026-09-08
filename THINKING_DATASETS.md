@@ -6,29 +6,27 @@ This document defines the format and examples for chain-of-thought thinking data
 
 ## 1. Training Format
 
-Each training sample uses a dual-token system with mode tokens and content tokens:
+Each training sample uses the GPT-2 standard token format:
 
 ### THINKING Sample
 
 ```
-<|thinking|>question<thinking>reasoning</thinking><|answer|>answer
+<|problem|>question<|thinking|>reasoning<|final|>answer
 ```
 
-### CONTEXT Sample (no reasoning)
+### PROBLEM Sample (no reasoning)
 
 ```
-<|context|>question<|answer|>answer
+<|problem|>question<|final|>answer
 ```
 
 **Token Roles:**
 
 | Token | Type | Purpose |
 |-------|------|---------|
-| `<\|thinking\|>` | Mode token | Marks sample as THINKING |
-| `<\|context\|>` | Mode token | Marks sample as CONTEXT |
-| `<\|answer\|>` | Mode token | Delimiter before final answer |
-| `<thinking>` | Content tag | Opens reasoning block |
-| `</thinking>` | Content tag | Closes reasoning block |
+| `<\|problem\|>` | Mode token | Marks sample as PROBLEM |
+| `<\|thinking\|>` | Mode token | Opens reasoning block |
+| `<\|final\|>` | Mode token | Closes reasoning block, precedes answer |
 
 ---
 
@@ -140,7 +138,7 @@ what do you think about technology,Technology has transformed how we live, work,
 ### Multi-step Reasoning
 
 ```
-<|thinking|>El usuario pregunta sobre machine learning.
+<|problem|>El usuario pregunta sobre machine learning.<|thinking|>
 
 Paso 1: Definir qué es ML
 - ML es un subconjunto de la IA
@@ -157,13 +155,13 @@ Paso 3: Dar ejemplos prácticos
 - Diagnóstico médico
 
 Paso 4: Resumir en una respuesta clara
-</thinking><|answer|>El aprendizaje automático es una rama de la inteligencia artificial que permite a los sistemas aprender de los datos y mejorar su rendimiento sin ser programados explícitamente. Se utiliza en reconocimiento de voz, sistemas de recomendación y diagnóstico médico.
+<|final|>El aprendizaje automático es una rama de la inteligencia artificial que permite a los sistemas aprender de los datos y mejorar su rendimiento sin ser programados explícitamente. Se utiliza en reconocimiento de voz, sistemas de recomendación y diagnóstico médico.
 ```
 
 ### Mathematical Reasoning
 
 ```
-<|thinking|>El usuario pregunta cuánto es 17 * 23.
+<|problem|>El usuario pregunta cuánto es 17 * 23.<|thinking|>
 
 Paso 1: Descomponer el problema
 - 17 * 23 = 17 * (20 + 3)
@@ -175,13 +173,13 @@ Paso 2: Sumar los resultados
 
 Paso 3: Verificar
 - 17 * 23 = 391 ✓
-</thinking><|answer|>391
+<|final|>391
 ```
 
 ### Code Explanation
 
 ```
-<|thinking|>El usuario pregunta qué hace esta función Python: def factorial(n): return 1 if n <= 1 else n * factorial(n-1)
+<|problem|>El usuario pregunta qué hace esta función Python: def factorial(n): return 1 if n <= 1 else n * factorial(n-1)<|thinking|>
 
 Paso 1: Identificar el patrón
 - Es una función recursiva
@@ -199,7 +197,7 @@ Paso 2: Ejecutar mentalmente con n=5
 Paso 3: Explicar el propósito
 - Calcula el factorial de un número
 - factorial(n) = n * (n-1) * (n-2) * ... * 1
-</thinking><|answer|>Esta función calcula el factorial de un número de forma recursiva. El factorial de n (escrito como n!) es el producto de todos los números enteros desde 1 hasta n. Por ejemplo, factorial(5) = 5 * 4 * 3 * 2 * 1 = 120.
+<|final|>Esta función calcula el factorial de un número de forma recursiva. El factorial de n (escrito como n!) es el producto de todos los números enteros desde 1 hasta n. Por ejemplo, factorial(5) = 5 * 4 * 3 * 2 * 1 = 120.
 ```
 
 ---
@@ -212,21 +210,20 @@ The trainer applies differentiated loss based on token position:
 
 | Segment | Weight | Rationale |
 |---------|--------|-----------|
-| `<\|thinking\|>` mode token | 0.0 | Prefix learning |
-| Question tokens | 0.0 | Don't penalize |
-| `<thinking>` delimiter | 1.0 | Must learn |
+| `<\|problem\|>` mode token | 0.0 | Prefix learning |
+| `<\|thinking\|>` delimiter | 1.0 | Must learn |
 | Reasoning content | 0.5 | Learn structure |
-| `</thinking>` delimiter | 1.0 | Must learn |
-| `<\|answer\|>` delimiter | 1.0 | Must learn |
+| `<\|final\|>` delimiter | 1.0 | Must learn |
 | Answer tokens | 1.0 | Full weight |
 
-### CONTEXT samples
+### PROBLEM samples
 
 | Segment | Weight | Rationale |
 |---------|--------|-----------|
-| `<\|context\|>` mode token | 0.0 | Prefix learning |
+| `<\|problem\|>` mode token | 0.0 | Prefix learning |
 | Question tokens | 0.0 | Don't penalize |
-| `<\|answer\|>` delimiter | 1.0 | Must learn |
+| `<\|final\|>` delimiter | 1.0 | Must learn |
+| Answer tokens | 1.0 | Full weight |
 | Answer tokens | 1.0 | Full weight |
 
 ---
@@ -268,9 +265,9 @@ The thinking engine supports: English, Spanish, French, German, Italian, Portugu
 - Is too short (less than one sentence)
 
 ### Validation Checklist
-- [ ] `<|thinking|>` prefix is present at start
-- [ ] `<thinking>` and `</thinking>` delimiters are present
-- [ ] `<|answer|>` delimiter separates reasoning from answer
+- [ ] `<|problem|>` prefix is present at start
+- [ ] `<|thinking|>` delimiter opens reasoning block
+- [ ] `<|final|>` delimiter separates reasoning from answer
 - [ ] Reasoning logically leads to the response
 - [ ] No thinking/response contradictions
 - [ ] Appropriate length ratio (1:1 to 3:1 thinking:response)

@@ -359,7 +359,7 @@ Serbian, Bosnian, Macedonian, Albanian
 
 ## Troubleshooting
 
-### Model doesn't generate `<thinking>`
+### Model doesn't generate `<|thinking|>`
 
 - Verify dataset contains thinking data: check `type` column for THINKING samples
 - Verify BPE was trained with all special tokens
@@ -375,13 +375,13 @@ Serbian, Bosnian, Macedonian, Albanian
 
 - Use `--show-thinking` flag
 - Verify model was trained with thinking data
-- Check that response actually contains `<|answer|>` delimiter
+- Check that response actually contains `<|final|>` delimiter
 
 ### Validation checklist
 
-- [ ] `<|thinking|>` prefix is present at start of THINKING samples
-- [ ] `<thinking>` and `</thinking>` delimiters are present in reasoning
-- [ ] `<|answer|>` delimiter separates reasoning from answer
+- [ ] `<|problem|>` prefix is present at start of THINKING samples
+- [ ] `<|thinking|>` delimiter opens reasoning block
+- [ ] `<|final|>` delimiter separates reasoning from answer
 - [ ] Reasoning logically leads to the answer
 - [ ] Language matches between question, thinking, and answer
 - [ ] Appropriate length ratio (1:1 to 3:1 thinking:answer)

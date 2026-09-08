@@ -2,9 +2,9 @@
 
 This module assigns expert labels to tokens based on their content type:
 - Expert 0: General conversation (no special tokens)
-- Expert 1: Thinking/reasoning (<thinking>...</thinking>)
+- Expert 1: Thinking/reasoning (<|thinking|>...<|final|>)
 - Expert 2: Tool calls (<tool_call>...</tool_call>)
-- Expert 3: Observations (<observation>...</observation>)
+- Expert 3: Tool results (<|tool_result|>...<|end|>)
 """
 
 import logging
@@ -30,9 +30,9 @@ class MoEDataProcessor:
     
     Each token in the dataset gets an expert label based on its context:
     - Tokens outside special blocks → Expert 0 (conversation)
-    - Tokens inside <thinking>...</thinking> → Expert 1 (thinking)
+    - Tokens inside <|thinking|>...<|final|> → Expert 1 (thinking)
     - Tokens inside <tool_call>...</tool_call> → Expert 2 (tool call)
-    - Tokens inside <observation>...</observation> → Expert 3 (observation)
+    - Tokens inside <|tool_result|>...<|end|> → Expert 3 (tool result)
     """
     
     def __init__(self, tokenizer, config: Optional[MoELabelConfig] = None):

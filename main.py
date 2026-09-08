@@ -97,11 +97,11 @@ SYSTEM_CONFIG = {
 
 def validate_arguments(args):
     """Validate command-line arguments for consistency."""
-    if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.model_info or args.export):
-        return False, "Please specify: --train, --chat, --prepare-data, --clear-cache, --list-models, --model-info, or --export"
+    if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.model_info or args.export or args.generate_md):
+        return False, "Please specify: --train, --chat, --prepare-data, --generate-md, --clear-cache, --list-models, --model-info, or --export"
 
-    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web):
-        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, or --web"
+    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web or args.csv):
+        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, --web, or --csv"
 
     if args.train:
         cache_path = os.path.join('dataset_cache', 'prepared_dataset')
@@ -298,6 +298,8 @@ EXAMPLES:
         parser.add_argument("--train", action='store_true', help="Train the model")
         parser.add_argument("--chat", action='store_true', help="Run chat interface")
         parser.add_argument("--prepare-data", action='store_true', help="Prepare datasets only")
+        parser.add_argument("--generate-md", action='store_true',
+                            help="Generate .md files from data sources into datasets_processed/markdowns/")
         parser.add_argument("--clear-cache", action='store_true', help="Clear cached datasets")
         parser.add_argument("--list-models", action='store_true', help="List available trained models")
         parser.add_argument("--model-info", type=str, default=None, metavar='NAME',
@@ -381,7 +383,7 @@ EXAMPLES:
 
         parser.add_argument("--max-ram-fraction", type=float, default=SYSTEM_CONFIG['max_ram_fraction'],
                             help="Maximum fraction of total RAM to use (0-1, default 0.75)")
-        parser.add_argument("--show-thinking", action='store_true', help="Show <thinking> reasoning in chat")
+        parser.add_argument("--show-thinking", action='store_true', help="Show <|thinking|> reasoning in chat")
 
         # Thinking configuration
         parser.add_argument("--thinking-loss-weight", type=float, default=0.5,
@@ -634,6 +636,61 @@ EXAMPLES:
             logger.info("Cache cleared successfully")
             sys.exit(0)
         
+        # Generate markdown files from data sources
+        if args.generate_md:
+            sources = []
+            if args.aiml: sources.append('aiml')
+            if args.hf: sources.append('hf')
+            if args.pdf: sources.append('pdf')
+            if args.epub: sources.append('epub')
+            if args.web: sources.append('web')
+            if args.csv: sources.append('csv')
+            if not sources:
+                sources = ['aiml', 'hf', 'pdf', 'epub', 'web', 'csv']
+
+            total_generated = 0
+            for source in sources:
+                config_path = os.path.join('dataset_preparer', source, f'{source}_config.json')
+                if not os.path.exists(config_path):
+                    logger.warning(f"Config not found for {source}: {config_path}")
+                    continue
+                try:
+                    if source == 'aiml':
+                        from dataset_preparer.aiml.aiml_to_md import load_config, aiml_to_md
+                        cfg = load_config(config_path)
+                        count = aiml_to_md(cfg)
+                    elif source == 'pdf':
+                        from dataset_preparer.pdf.pdf_to_md import load_config, pdf_to_md
+                        cfg = load_config(config_path)
+                        count = pdf_to_md(cfg)
+                    elif source == 'epub':
+                        from dataset_preparer.epub.epub_to_md import load_config, epub_to_md
+                        cfg = load_config(config_path)
+                        count = epub_to_md(cfg)
+                    elif source == 'web':
+                        from dataset_preparer.web.web_to_md import load_config, web_to_md
+                        cfg = load_config(config_path)
+                        count = web_to_md(cfg, cli_url=getattr(args, 'web_url', None),
+                                          cli_max_pages=getattr(args, 'web_max_pages', None),
+                                          cli_max_depth=getattr(args, 'web_max_depth', None))
+                    elif source == 'hf':
+                        from dataset_preparer.hf.hf_to_md import load_config, hf_to_md
+                        cfg = load_config(config_path)
+                        count = hf_to_md(cfg)
+                    elif source == 'csv':
+                        from dataset_preparer.csv.csv_to_md import load_config, csv_to_md
+                        cfg = load_config(config_path)
+                        count = csv_to_md(cfg)
+                    else:
+                        count = 0
+                    total_generated += count
+                    logger.info(f"  {source}: {count} files generated")
+                except Exception as e:
+                    logger.error(f"  {source}: failed - {e}")
+
+            logger.info(f"[OK] Markdown generation completed: {total_generated} files total")
+            sys.exit(0)
+
         # Prepare data only when explicitly requested
         if args.prepare_data:
             logger.info("Preparing datasets...")

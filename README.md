@@ -572,22 +572,21 @@ AI: El aprendizaje automático es un campo fascinante de la inteligencia artific
 
 ### Chain-of-Thought Reasoning
 
-The model supports chain-of-thought reasoning using a dual-token system:
+The model supports chain-of-thought reasoning using the GPT-2 standard token format:
 
 ```
 THINKING sample:
-<|thinking|>What is 2+2?<thinking>
+<|problem|>What is 2+2?<|thinking|>
 The user is asking a simple arithmetic question.
 I need to add the numbers 2 and 2.
 2 + 2 = 4
-</thinking><|answer|>4
+<|final|>4
 
-CONTEXT sample (no reasoning):
-<|context|>What is 2+2?<|answer|>4
+PROBLEM sample (no reasoning):
+<|problem|>What is 2+2?<|final|>4
 ```
 
-- **Mode tokens** (`<|thinking|>`, `<|context|>`, `<|answer|>`): Define sample structure
-- **Content tags** (`<thinking>`, `</thinking>`): Wrap reasoning content
+- **Mode tokens** (`<|problem|>`, `<|thinking|>`, `<|final|>`): Define sample structure
 - **Loss weighting**: Reasoning tokens get 0.5 weight, answer tokens get 1.0
 
 ---

@@ -1,0 +1,11 @@
+{
+    "source_dir": "datasets_source/aiml",
+    "output_dir": "datasets_processed/markdowns/aiml",
+    "format": "problem_final",
+    "language": "auto",
+    "quality": {
+        "min_words": 3,
+        "max_words": 500,
+        "min_alpha_ratio": 0.5
+    }
+}

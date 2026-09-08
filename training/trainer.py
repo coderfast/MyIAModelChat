@@ -520,27 +520,27 @@ class Trainer:
         thinking_count = 0
         thinking_id = getattr(self.tokenizer, 'get_thinking_index', lambda: -1)()
         thinking_end_id = getattr(self.tokenizer, 'get_thinking_end_index', lambda: -1)()
-        context_id = getattr(self.tokenizer, 'get_context_index', lambda: -1)()
+        problem_id = getattr(self.tokenizer, 'get_problem_index', lambda: -1)()
         thinking_mode_id = getattr(self.tokenizer, 'get_thinking_mode_index', lambda: -1)()
-        answer_id = getattr(self.tokenizer, 'get_answer_index', lambda: -1)()
+        final_id = getattr(self.tokenizer, 'get_final_index', lambda: -1)()
 
         for i in range(sample_size):
             item = self.loaded_dataset[i]
             value = item.get('input_ids', item.get('token_ids', ''))
-            if isinstance(value, str) and ('<thinking>' in value or '<|thinking|>' in value or '<|context|>' in value):
+            if isinstance(value, str) and ('<|thinking|>' in value or '<|problem|>' in value):
                 thinking_count += 1
             elif isinstance(value, list):
                 if thinking_id >= 0 and thinking_end_id >= 0:
                     if thinking_id in value:
                         thinking_count += 1
-                elif context_id >= 0 or thinking_mode_id >= 0:
-                    if context_id in value or thinking_mode_id in value:
+                elif problem_id >= 0 or thinking_mode_id >= 0:
+                    if problem_id in value or thinking_mode_id in value:
                         thinking_count += 1
 
         if thinking_count > 0:
             self.has_thinking_data = True
             self.thinking_sample_count = thinking_count
-            logger.info(f"Thinking data detected ({thinking_count}/{sample_size} samples contain <thinking>)")
+            logger.info(f"Thinking data detected ({thinking_count}/{sample_size} samples contain <|thinking|>)")
         else:
             logger.info("No thinking data detected in dataset")
 
@@ -933,13 +933,12 @@ class Trainer:
 
         thinking_id = self.tokenizer.get_thinking_index()
         thinking_end_id = self.tokenizer.get_thinking_end_index()
-        context_id = getattr(self.tokenizer, 'get_context_index', lambda: -1)()
-        answer_id = getattr(self.tokenizer, 'get_answer_index', lambda: -1)()
+        problem_id = getattr(self.tokenizer, 'get_problem_index', lambda: -1)()
+        final_id = getattr(self.tokenizer, 'get_final_index', lambda: -1)()
         thinking_mode_id = getattr(self.tokenizer, 'get_thinking_mode_index', lambda: -1)()
         tool_call_id = getattr(self.tokenizer, 'get_tool_call_index', lambda: -1)()
         tool_call_end_id = getattr(self.tokenizer, 'get_tool_call_end_index', lambda: -1)()
-        observation_id = getattr(self.tokenizer, 'get_observation_index', lambda: -1)()
-        observation_end_id = getattr(self.tokenizer, 'get_observation_end_index', lambda: -1)()
+        tool_result_id = getattr(self.tokenizer, 'get_tool_result_index', lambda: -1)()
         end_id = getattr(self.tokenizer, 'get_end_index', lambda: -1)()
         assistant_id = getattr(self.tokenizer, 'get_assistant_index', lambda: -1)()
 
@@ -949,14 +948,13 @@ class Trainer:
         batch_size, seq_len = targets.shape
 
         for b in range(batch_size):
-            has_context_prefix = False
+            has_problem_prefix = False
             has_thinking_prefix = False
 
             # Detect thinking by presence of <|thinking|> token anywhere in the row
-            # (Formato 3 thinking samples start with <|problem|>, not <|thinking|>)
             if thinking_id >= 0 and thinking_id in targets[b]:
                 has_thinking_prefix = True
-            elif context_id >= 0:
+            elif problem_id >= 0:
                 # Detect mode from prefix token (only when no thinking present)
                 first_non_pad = -1
                 for s in range(seq_len):
@@ -967,23 +965,23 @@ class Trainer:
 
                 if first_non_pad >= 0:
                     first_token = targets[b, first_non_pad].item()
-                    if first_token == context_id:
-                        has_context_prefix = True
+                    if first_token == problem_id:
+                        has_problem_prefix = True
 
-            if has_context_prefix:
-                # CONTEXT mode: zero loss for everything before <|answer|>
+            if has_problem_prefix:
+                # PROBLEM mode: zero loss for everything before <|final|>
                 in_preamble = True
                 for s in range(seq_len):
                     token = targets[b, s].item()
-                    if token == answer_id:
+                    if token == final_id:
                         in_preamble = False
-                        weights[b, s] = 1.0  # <|answer|> delimiter gets full weight
+                        weights[b, s] = 1.0  # <|final|> delimiter gets full weight
                     elif in_preamble:
                         weights[b, s] = 0.0
 
             elif has_thinking_prefix:
-                # THINKING mode: zero loss for preamble (before <thinking>),
-                # reduced weight for thinking content, full weight after <|answer|>
+                # THINKING mode: zero loss for preamble (before <|thinking|>),
+                # reduced weight for thinking content, full weight after <|final|>
                 in_preamble = True
                 in_thinking = False
                 past_answer = False
@@ -994,14 +992,14 @@ class Trainer:
                     if token == thinking_id:
                         in_preamble = False
                         in_thinking = True
-                        weights[b, s] = 1.0  # <thinking> delimiter gets full weight
+                        weights[b, s] = 1.0  # <|thinking|> delimiter gets full weight
                     elif token == thinking_end_id:
                         in_thinking = False
-                        weights[b, s] = 1.0  # </thinking> delimiter gets full weight
-                    elif token == answer_id:
+                        weights[b, s] = 1.0  # <|final|> delimiter gets full weight
+                    elif token == final_id:
                         past_answer = True
                         in_thinking = False
-                        weights[b, s] = 1.0  # <|answer|> delimiter gets full weight
+                        weights[b, s] = 1.0  # <|final|> delimiter gets full weight
                     elif in_preamble:
                         weights[b, s] = 0.0
                     elif in_thinking:
@@ -1010,7 +1008,7 @@ class Trainer:
                         weights[b, s] = 1.0
 
             elif self.has_thinking_data:
-                # Legacy mode: detect <thinking>...</thinking> without mode prefix
+                # Detect <|thinking|>...</|final|> without mode prefix
                 in_thinking = False
                 for s in range(seq_len):
                     token = targets[b, s].item()
@@ -1021,33 +1019,33 @@ class Trainer:
                     if in_thinking and token != thinking_id and token != thinking_end_id:
                         weights[b, s] = self.thinking_loss_weight
 
-            # Agentic masking: override weights for tool_call and observation tokens.
-            # Observation is a prefix-only marker (<|tool_result|>) that runs until
+            # Agentic masking: override weights for tool_call and tool_result tokens.
+            # Tool_result is a prefix-only marker (<|tool_result|>) that runs until
             # the next turn marker (<|end|> or <|assistant|>).
             if agent_enabled and tool_call_id >= 0:
                 in_tool_call = False
-                in_observation = False
+                in_tool_result = False
                 for s in range(seq_len):
                     token = targets[b, s].item()
                     if token == tool_call_id:
                         in_tool_call = True
-                        in_observation = False
+                        in_tool_result = False
                         weights[b, s] = agent_loss_weight  # tool_call gets full weight
                     elif token == tool_call_end_id:
                         in_tool_call = False
-                        in_observation = False
+                        in_tool_result = False
                         weights[b, s] = agent_loss_weight
-                    elif token == observation_id:
+                    elif token == tool_result_id:
                         in_tool_call = False
-                        in_observation = True
+                        in_tool_result = True
                         weights[b, s] = agent_loss_weight
                     elif end_id >= 0 and token == end_id:
                         in_tool_call = False
-                        in_observation = False
+                        in_tool_result = False
                         weights[b, s] = agent_loss_weight  # <|end|> turn delimiter
                     elif assistant_id >= 0 and token == assistant_id:
                         in_tool_call = False
-                        in_observation = False
+                        in_tool_result = False
                         weights[b, s] = agent_loss_weight  # <|assistant|> new turn
                     elif in_tool_call:
                         weights[b, s] = agent_loss_weight  # JSON inside tool_call
@@ -1183,7 +1181,7 @@ class Trainer:
 
         tool_call_id = getattr(self.tokenizer, 'get_tool_call_index', lambda: -1)()
         tool_call_end_id = getattr(self.tokenizer, 'get_tool_call_end_index', lambda: -1)()
-        observation_id = getattr(self.tokenizer, 'get_observation_index', lambda: -1)()
+        tool_result_id = getattr(self.tokenizer, 'get_tool_result_index', lambda: -1)()
 
         if tool_call_id < 0:
             return {}
@@ -1199,13 +1197,13 @@ class Trainer:
             tool_call_correct = 0
             tool_name_count = 0
             tool_name_correct = 0
-            observation_count = 0
-            observation_correct = 0
+            tool_result_count = 0
+            tool_result_correct = 0
             total_agent_tokens = 0
 
             for i in range(targets.size(0)):
                 in_tool_call = False
-                in_observation = False
+                in_tool_result = False
                 is_tool_name = False
 
                 for j in range(targets.size(1)):
@@ -1226,28 +1224,28 @@ class Trainer:
                         total_agent_tokens += 1
                         if pred_token == tool_call_end_id:
                             tool_call_correct += 1
-                    elif target_token == observation_id:
-                        in_observation = True
+                    elif target_token == tool_result_id:
+                        in_tool_result = True
                         in_tool_call = False
-                        observation_count += 1
+                        tool_result_count += 1
                         total_agent_tokens += 1
-                        if pred_token == observation_id:
-                            observation_correct += 1
+                        if pred_token == tool_result_id:
+                            tool_result_correct += 1
                     elif in_tool_call:
                         total_agent_tokens += 1
                         if pred_token == target_token:
                             tool_call_correct += 1
-                    elif in_observation:
+                    elif in_tool_result:
                         total_agent_tokens += 1
                         if pred_token == target_token:
-                            observation_correct += 1
+                            tool_result_correct += 1
 
             metrics = {}
             if tool_call_count > 0:
                 metrics['agent_tool_call_accuracy'] = tool_call_correct / tool_call_count
                 metrics['agent_tool_call_count'] = tool_call_count
-            if observation_count > 0:
-                metrics['agent_observation_accuracy'] = observation_correct / observation_count
+            if tool_result_count > 0:
+                metrics['agent_tool_result_accuracy'] = tool_result_correct / tool_result_count
             if total_agent_tokens > 0:
                 metrics['agent_total_tokens'] = total_agent_tokens
                 metrics['agent_ratio'] = total_agent_tokens / max(1, targets.size(0) * targets.size(1))
@@ -2387,8 +2385,8 @@ class Trainer:
                     labels: epochs,
                     datasets: [
                         {{ label: 'Overall', data: thinkingAccuracy, borderColor: '#3498db', tension: 0.3, fill: false }},
-                        {{ label: 'Open <thinking>', data: thinkingOpenAcc, borderColor: '#2ecc71', tension: 0.3, fill: false }},
-                        {{ label: 'Close </thinking>', data: thinkingCloseAcc, borderColor: '#e74c3c', tension: 0.3, fill: false }},
+                        {{ label: 'Open <|thinking|>', data: thinkingOpenAcc, borderColor: '#2ecc71', tension: 0.3, fill: false }},
+                        {{ label: 'Close <|final|>', data: thinkingCloseAcc, borderColor: '#e74c3c', tension: 0.3, fill: false }},
                         {{ label: 'Response', data: responseAccuracy, borderColor: '#9b59b6', tension: 0.3, fill: false }}
                     ]
                 }},
@@ -3076,7 +3074,7 @@ class Trainer:
 
             # Log thinking data status
             if self.has_thinking_data:
-                logger.info(f" Thinking data: ENABLED (model will learn <thinking>...</thinking> structure)")
+                logger.info(f" Thinking data: ENABLED (model will learn <|thinking|>/<|final|> structure)")
             else:
                 logger.info(f"Thinking data: NOT detected (standard training mode)")
 

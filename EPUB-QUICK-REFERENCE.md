@@ -70,7 +70,7 @@ python main.py --chat
 
 1. **Detect EPUBs** - Finds all `.epub` files in `datasets_source/epub/` directory
 2. **Extract Chapters** - Reads each e-book and extracts each native chapter (`ITEM_DOCUMENT`) separately
-3. **Remove HTML** - Strips markup and extracts structured paragraphs (BeautifulSoup, keeps `<thinking>` tags)
+3. **Remove HTML** - Strips markup and extracts structured paragraphs (BeautifulSoup)
 4. **Remove Page Artifacts** - Drops repeated headers/footers (cross-chapter detection) and standalone page numbers
 5. **Whole Chapters / Paragraphs** - A chapter becomes one sample if it fits the context window; otherwise it is split into whole paragraphs
 6. **Filter Short** - Removes samples < 10 characters
@@ -320,7 +320,7 @@ python main.py --chat
 **EPUB Support Added:**
 - ✅ Automatic EPUB detection in `datasets_source/epub/` directory
 - ✅ Native chapter extraction (whole chapter as sample when it fits the context window)
-- ✅ Structured paragraph extraction via BeautifulSoup (keeps `<thinking>` tags)
+- ✅ Structured paragraph extraction via BeautifulSoup
 - ✅ Page artifact removal (repeated headers/footers, page numbers)
 - ✅ Integration with existing data sources
 - ✅ Automatic caching for fast iterations

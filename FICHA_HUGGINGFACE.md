@@ -56,9 +56,8 @@
   - `GET /v1/models` — Lista modelos disponibles
   - `GET /v1/health` — Health check
   - `GET /v1/version` — Versión del servidor
-- Soporte para **chain-of-thought reasoning** mediante sistema dual de tokens:
-  - Mode tokens: `<|thinking|>`, `<|context|>`, `<|answer|>`
-  - Content tags: `<thinking>`, `</thinking>`
+- Soporte para **chain-of-thought reasoning** mediante tokens GPT-2 estándar:
+  - Mode tokens: `<|problem|>`, `<|thinking|>`, `<|final|>`
   - Parámetro `include_thinking` en endpoints API
 - Streaming de respuestas soportado
 
@@ -99,9 +98,8 @@
 - El modelo funciona localmente y es compatible con Docker/entornos aislados si se adapta el entorno.
 - Se puede mejorar con fine-tuning adicional y mayores fuentes de datos en español.
 - La tokenización BPE permite soporte multilingüe sin cambiar la arquitectura del modelo.
-- El modelo soporta chain-of-thought reasoning mediante sistema dual de tokens:
-  - `<|thinking|>` / `<|context|>` / `<|answer|>` (mode tokens)
-  - `<thinking>` / `</thinking>` (content tags para razonamiento)
+- El modelo soporta chain-of-thought reasoning mediante tokens GPT-2 estándar:
+  - `<|problem|>` / `<|thinking|>` / `<|final|>` (mode tokens)
 - El servidor es compatible con clientes Ollama y OpenAI API (formato de mensajes idéntico).
 - Opciones de streaming y campo `reasoning` disponibles en todos los endpoints.
 

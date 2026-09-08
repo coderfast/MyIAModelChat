@@ -1,13 +1,13 @@
 """SentencePiece BPE tokenizer wrapper — multilingual, language-agnostic.
 
 GPT-2 standard special tokens:
-  <|problem|>  - question/problem prefix
-  <|thinking|> - reasoning prefix
-  <|final|>    - answer prefix
-  <|user|>     - user prefix (agentic)
+  <|problem|>   - question/problem prefix
+  <|thinking|>  - reasoning prefix
+  <|final|>     - answer prefix
+  <|user|>      - user prefix (agentic)
   <|assistant|> - assistant prefix (agentic)
-  <tool_call> - tool call start
-  </tool_call> - tool call end
+  <tool_call>  - tool call start
+  </tool_call>  - tool call end
   <|tool_result|> - tool result prefix
 """
 
@@ -81,14 +81,6 @@ class SentencePieceTokenizerWrapper:
         for _lc in _lang_codes:
             self._lang_ids[_lc] = _resolve_id(f'<|{_lc}|>')
 
-        # Legacy tokens (backward compatibility, deprecated)
-        legacy_thinking_id = _resolve_id('<thinking>')
-        legacy_thinking_end_id = _resolve_id('</thinking>')
-        legacy_context_id = _resolve_id('<|context|>')
-        legacy_answer_id = _resolve_id('<|answer|>')
-        legacy_observation_id = _resolve_id('<observation>')
-        legacy_observation_end_id = _resolve_id('</observation>')
-
         if pad_id < 0:
             pad_id = 0
         if unk_id < 0:
@@ -105,8 +97,8 @@ class SentencePieceTokenizerWrapper:
 
         # GPT-2 standard
         self._problem_id = problem_id
-        self._thinking_id = thinking_mode_id if thinking_mode_id >= 0 else legacy_thinking_id
-        self._thinking_end_id = final_id if final_id >= 0 else legacy_thinking_end_id
+        self._thinking_id = thinking_mode_id
+        self._thinking_end_id = final_id
         self._thinking_mode_id = thinking_mode_id
         self._final_id = final_id
         self._user_id = user_id
@@ -118,25 +110,10 @@ class SentencePieceTokenizerWrapper:
         self._tool_call_end_id = tool_call_end_id
         self._tool_result_id = tool_result_id
 
-        # Legacy raw IDs kept for decode/skip_special_tokens and backwards compat
-        self._legacy_thinking_id = legacy_thinking_id
-        self._legacy_thinking_end_id = legacy_thinking_end_id
-        self._legacy_context_id = legacy_context_id
-        self._legacy_answer_id = legacy_answer_id
-        self._legacy_observation_id = legacy_observation_id
-        self._legacy_observation_end_id = legacy_observation_end_id
-
-        # Legacy (mapped to GPT-2 standard IDs)
-        self._context_id = problem_id if problem_id >= 0 else legacy_context_id
-        self._answer_id = final_id if final_id >= 0 else legacy_answer_id
-        self._observation_id = tool_result_id if tool_result_id >= 0 else legacy_observation_id
-        self._observation_end_id = tool_result_id if tool_result_id >= 0 else legacy_observation_end_id
-
         # Log real token IDs for debugging
         for name, tid in [
             ('pad', pad_id), ('unk', unk_id), ('bos', bos_id), ('eos', eos_id),
             ('<|problem|>', problem_id), ('<|thinking|>', thinking_mode_id),
-            ('<thinking>', legacy_thinking_id), ('</thinking>', legacy_thinking_end_id),
             ('<|final|>', final_id),
             ('<|user|>', user_id), ('<|assistant|>', assistant_id),
             ('<|system|>', system_id), ('<|end|>', end_id), ('<|sep|>', sep_id),
@@ -206,11 +183,6 @@ class SentencePieceTokenizerWrapper:
                 self._user_id, self._assistant_id, self._system_id,
                 self._end_id, self._sep_id,
                 self._tool_call_id, self._tool_call_end_id, self._tool_result_id,
-                self._context_id, self._answer_id,
-                self._observation_id, self._observation_end_id,
-                self._legacy_thinking_id, self._legacy_thinking_end_id,
-                self._legacy_context_id, self._legacy_answer_id,
-                self._legacy_observation_id, self._legacy_observation_end_id,
             ) if id_ >= 0}
             token_ids = [tid for tid in token_ids if tid not in special_ids]
 
@@ -304,8 +276,6 @@ class SentencePieceTokenizerWrapper:
             '<tool_call>': self.get_tool_call_index(),
             '</tool_call>': self.get_tool_call_end_index(),
             '<|tool_result|>': self.get_tool_result_index(),
-            '<thinking>': self.get_thinking_index(),
-            '</thinking>': self.get_thinking_end_index(),
         }
         for token_str, token_id in agentic_map.items():
             if token_id >= 0:
@@ -411,12 +381,12 @@ class SentencePieceTokenizerWrapper:
     # ── Thinking helpers ──────────────────────────────────────────────
 
     def get_thinking_index(self) -> int:
-        """Return the token ID for <thinking>."""
+        """Return the token ID for <|thinking|>."""
         self._ensure_special_token_ids()
         return self._thinking_id
 
     def get_thinking_end_index(self) -> int:
-        """Return the token ID for </thinking>."""
+        """Return the token ID for <|final|>."""
         self._ensure_special_token_ids()
         return self._thinking_end_id
 
@@ -426,13 +396,13 @@ class SentencePieceTokenizerWrapper:
         return self._thinking_mode_id
 
     def has_thinking(self, text: str) -> bool:
-        """Check if text contains thinking tags (new <|thinking|> or legacy <thinking>)."""
-        return ('<|thinking|>' in text and '<|final|>' in text) or ('<thinking>' in text and '</thinking>' in text)
+        """Check if text contains thinking tags."""
+        return '<|thinking|>' in text and '<|final|>' in text
 
     def split_thinking(self, text: str):
         """Split text into (thinking, response) parts.
 
-        Supports new format (<|thinking|>...</|final|>) and legacy (<thinking>...</thinking>).
+        Supports format: <|thinking|>reasoning<|final|>answer
 
         Returns:
             Tuple[str, str]: (thinking_content, response_text)
@@ -441,12 +411,8 @@ class SentencePieceTokenizerWrapper:
         if not self.has_thinking(text):
             return ('', text)
         try:
-            if '<|thinking|>' in text:
-                thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
-                response = text.split('<|final|>')[1].strip()
-            else:
-                thinking = text.split('<thinking>')[1].split('</thinking>')[0]
-                response = text.split('</thinking>')[1].strip()
+            thinking = text.split('<|thinking|>')[1].split('<|final|>')[0]
+            response = text.split('<|final|>')[1].strip()
             return (thinking, response)
         except (IndexError, ValueError):
             return ('', text)
@@ -456,21 +422,9 @@ class SentencePieceTokenizerWrapper:
         _, response = self.split_thinking(text)
         return response
 
-    # ── Legacy mode token helpers (backward compat) ───────────────
-
-    def get_context_index(self) -> int:
-        """Return the token ID for <|context|> (legacy, maps to <|problem|>)."""
-        self._ensure_special_token_ids()
-        return self._context_id
-
-    def get_answer_index(self) -> int:
-        """Return the token ID for <|answer|> (legacy, maps to <|final|>)."""
-        self._ensure_special_token_ids()
-        return self._answer_id
-
     def has_mode_tokens(self, text: str) -> bool:
         """Check if text contains mode tokens."""
-        return '<|problem|>' in text or '<|thinking|>' in text or '<|context|>' in text or '<|answer|>' in text
+        return '<|problem|>' in text or '<|thinking|>' in text
 
     def split_mode(self, text: str):
         """Split text into (mode, content) where mode is 'problem' or 'thinking'."""
@@ -478,8 +432,6 @@ class SentencePieceTokenizerWrapper:
             return ('thinking', text[len('<|thinking|>'):].strip())
         elif text.startswith('<|problem|>'):
             return ('problem', text[len('<|problem|>'):].strip())
-        elif text.startswith('<|context|>'):
-            return ('problem', text[len('<|context|>'):].strip())
         return ('problem', text)
 
     # ── Agentic token helpers ──────────────────────────────────────
@@ -493,16 +445,6 @@ class SentencePieceTokenizerWrapper:
         """Return the token ID for </tool_call>."""
         self._ensure_special_token_ids()
         return self._tool_call_end_id
-
-    def get_observation_index(self) -> int:
-        """Return the token ID for <observation> (legacy, maps to <|tool_result|>)."""
-        self._ensure_special_token_ids()
-        return self._observation_id
-
-    def get_observation_end_index(self) -> int:
-        """Return the token ID for </observation> (legacy, maps to <|tool_result|>)."""
-        self._ensure_special_token_ids()
-        return self._observation_end_id
 
     def has_tool_call(self, text: str) -> bool:
         """Check if text contains <tool_call> tags."""

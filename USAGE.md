@@ -9,14 +9,20 @@ with the MyIAModelChat model. Supports AIML, PDF, EPUB, and Hugging Face dataset
                             QUICK START
 ================================================================================
 
+GENERATE MARKDOWN (convert raw sources to .md files):
+    python main.py --generate-md --aiml --hf --pdf --epub --web --csv
+
+PREPARE DATASETS (create cache from markdowns):
+    python main.py --prepare-data --aiml --pdf --epub
+
+COMBINED: generate markdowns + prepare data:
+    python main.py --generate-md --prepare-data --aiml --hf --pdf
+
 TRAIN MODE (build/train the model):
     python main.py --train --epochs 30
 
 CHAT MODE (run interactive chat):
     python main.py --chat --cpu --num_cores 4 --num_threads 4
-
-PREPARE DATASETS (validate data and create cache):
-    python main.py --prepare-data --aiml --pdf --epub
 
 REFRESH CACHE (rebuild cached dataset):
     python main.py --prepare-data --aiml --pdf --epub --refresh-cache
@@ -55,13 +61,27 @@ Primary Mode Arguments (choose one):
         - Requires trained model and tokenizer
         - Supports min-length enforcement and repetition prevention
 
+--generate-md
+    Description: Generate markdown files from raw data sources
+    Type: Boolean flag (no value needed)
+    Default: False
+    Example: python main.py --generate-md --aiml --hf --pdf
+    Notes:
+        - Converts raw data sources (AIML, PDF, EPUB, Web, HF, CSV) to .md files
+        - Output files are saved to dataset_preparer/markdowns/{source}/
+        - Each source has its own *_to_md.py script
+        - Generates GPT-2 standard tokens (<|problem|>, <|user|>, <|assistant|>, etc.)
+        - If no source flags specified, generates from all available sources
+        - Can be combined with --prepare-data: python main.py --generate-md --prepare-data --aiml
+
 --prepare-data
     Description: Prepare and validate datasets only (no training)
     Type: Boolean flag (no value needed)
     Default: False
     Example: python main.py --prepare-data --aiml --pdf --epub
     Notes:
-        - Loads AIML, PDF, EPUB, and/or Hugging Face datasets
+        - Loads markdown files from dataset_preparer/markdowns/ (if available)
+        - Falls back to loading from raw sources if no markdowns found
         - Validates data structure and content
         - Shows dataset statistics (samples, text length, sources)
         - Automatically saves prepared dataset to cache (dataset_cache/)
@@ -79,8 +99,8 @@ Primary Mode Arguments (choose one):
         - Requires `sentencepiece` package to be installed (`pip install sentencepiece`)
         - When used, prepared cache will include `token_ids` per sample and a `sentencepiece.model` in `dataset_cache/`
         - Omit this flag to skip BPE and use raw text
-        - BPE automatically registers 5 special tokens as user_defined_symbols:
-          <thinking>, </thinking>, <|context|>, <|answer|>, <|thinking|>
+        - BPE automatically registers special tokens as user_defined_symbols:
+          <|problem|>, <|thinking|>, <|final|>, <|user|>, <|assistant|>, <|end|>, <|system|>, <|sep|>, <tool_call>, </tool_call>, <|tool_result|>
         - These tokens are never fragmented (always whole tokens)
         - Recommended vocab size: 8000 (default), increase for larger datasets
 
@@ -511,13 +531,12 @@ Training Arguments:
                         THINKING GENERATION
 ================================================================================
 
-The model supports chain-of-thought reasoning using special tokens:
-- Mode tokens: <|thinking|>, <|context|>, <|answer|>
-- Content tags: <thinking>, </thinking>
+The model supports chain-of-thought reasoning using GPT-2 standard tokens:
+- Mode tokens: <|problem|>, <|thinking|>, <|final|>
 
 Sample formats:
-  THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
-  CONTEXT:  <|context|>question<|answer|>answer
+  THINKING: <|problem|>question<|thinking|>reasoning<|final|>answer
+  PROBLEM:  <|problem|>question<|final|>answer
 
 ================================================================================
 
@@ -562,8 +581,8 @@ Training with Thinking:
 ================================================================================
 
 When training with thinking data, the model learns:
-1. When to generate <thinking>...</thinking> (reasoning)
-2. When to generate <|answer|> (direct response)
+1. When to generate <|thinking|> (reasoning)
+2. When to generate <|final|> (direct response)
 3. Loss weighting: reasoning tokens get 0.5 weight, answer tokens get 1.0
 
 Expected metrics during training:
@@ -665,13 +684,19 @@ Dataset caching enables fast repeated runs without reloading source data.
     python main.py --prepare-data --aiml --pdf --epub --bpe-vocab-size 8000
 
 
-9. Complete workflow (prepare -> train -> chat):
+9. Complete workflow (generate markdowns -> prepare -> train -> chat):
+    python main.py --generate-md --aiml --hf --pdf
+    python main.py --prepare-data --aiml --hf --pdf
+    python main.py --train --epochs 30
+    python main.py --chat
+
+10. Quick workflow (prepare directly from raw sources):
     python main.py --prepare-data --aiml --pdf --epub
     python main.py --train --epochs 30
     python main.py --chat
 
-10. Workflow for repeated experiments (cache is automatic):
-    python main.py --prepare-data --aiml --pdf --epub          (first time: ~30 seconds)
+11. Workflow for repeated experiments (cache is automatic):
+    python main.py --generate-md --prepare-data --aiml --pdf --epub  (first time: ~30 seconds)
     python main.py --train --epochs 10
     python main.py --train --epochs 20
     python main.py --train --epochs 30
@@ -681,19 +706,23 @@ Dataset caching enables fast repeated runs without reloading source data.
 ADVANCED DATA PROCESSING EXAMPLES:
 ================================================================================
 
-10. Prepare PDF with chunking (for long documents):
+12. Generate markdowns from all sources:
+    python main.py --generate-md --aiml --hf --pdf --epub --web --csv
+
+13. Prepare PDF with chunking (for long documents):
     python main.py --prepare-data --pdf --enable-chunking --chunk-max-tokens 256
 
-11. Prepare data with deduplication (remove duplicates):
+14. Prepare data with deduplication (remove duplicates):
     python main.py --prepare-data --aiml --pdf --enable-dedup --dedup-threshold 0.9
 
-12. Prepare data with quality filtering:
+15. Prepare data with quality filtering:
     python main.py --prepare-data --pdf --epub --enable-quality-filter --min-words 10
 
-13. Prepare data with language filtering (Spanish only):
+16. Prepare data with language filtering (Spanish only):
     python main.py --prepare-data --pdf --enable-lang-filter --allowed-languages es
 
-14. Prepare data with thinking + BPE (recommended workflow):
+17. Prepare data with thinking + BPE (recommended workflow):
+    python main.py --generate-md --aiml --hf
     python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
     python main.py --train --epochs 30
     python main.py --chat --show-thinking

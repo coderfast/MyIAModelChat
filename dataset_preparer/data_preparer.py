@@ -766,7 +766,7 @@ class DataPreparer:
 
             # Remove metadata columns not needed for training
             # Keep source/language/bpe_text for cache viewer display; trainer discards them
-            TRAINING_COLUMNS = {'input_ids', 'token_ids', 'thinking', 'has_tool_call', 'source', 'language', 'format_type', 'bpe_text'}
+            TRAINING_COLUMNS = {'input_ids', 'token_ids', 'thinking', 'has_tool_call', 'source', 'language', 'format_type', 'bpe_text', 'text'}
             cols_to_drop = [c for c in self.combined_data.column_names
                            if c not in TRAINING_COLUMNS]
             if cols_to_drop:
@@ -892,44 +892,54 @@ class DataPreparer:
                     }
             
             # Prepare fresh dataset
-            logger.info("[1/7] Loading AIML data..." if (self.args.aiml or self.args.hf) else "[1/7] No data sources selected...")
-            
-            # Load AIML data
-            if self.args.aiml:
-                self.aiml_data = self._load_aiml_data()
-            
-            # Load Hugging Face data
-            if self.args.hf:
-                logger.info("[2/7] Loading Hugging Face datasets...")
-                self.hf_data = self._load_hf_data()
-            
-            # Load PDF data
-            if hasattr(self.args, 'pdf') and self.args.pdf:
-                logger.info("[3/7] Loading PDF files...")
-                self.pdf_data = self._load_pdf_data()
-            
-            # Load EPUB data
-            if hasattr(self.args, 'epub') and self.args.epub:
-                logger.info("[4/7] Loading EPUB files...")
-                self.epub_data = self._load_epub_data()
+            md_root = os.path.join('datasets_processed', 'markdowns')
+            md_available = os.path.exists(md_root) and any(
+                os.path.isdir(os.path.join(md_root, d))
+                for d in ['aiml', 'pdf', 'epub', 'web', 'hf', 'csv']
+                if os.path.exists(os.path.join(md_root, d))
+            )
 
-            # Load Web documentation data
-            if hasattr(self.args, 'web') and self.args.web:
-                logger.info("[4.5/7] Scraping web documentation...")
-                self.web_data = self._load_web_data()
+            if md_available:
+                logger.info("[1/7] Loading from pre-generated markdowns...")
+                self.combined_data = self._load_markdowns()
+            else:
+                logger.info("[1/7] Loading AIML data..." if (self.args.aiml or self.args.hf) else "[1/7] No data sources selected...")
 
-            # Load CSV data (curated supplementary dataset)
-            if hasattr(self.args, 'csv') and self.args.csv:
-                logger.info("[5/7] Loading CSV data...")
-                self.csv_data = self._load_csv()
+                # Load AIML data
+                if self.args.aiml:
+                    self.aiml_data = self._load_aiml_data()
 
-            # Combine datasets
-            logger.info("[6/7] Combining datasets...")
-            self.combined_data = self._combine_datasets()
+                # Load Hugging Face data
+                if self.args.hf:
+                    logger.info("[2/7] Loading Hugging Face datasets...")
+                    self.hf_data = self._load_hf_data()
+
+                # Load PDF data
+                if hasattr(self.args, 'pdf') and self.args.pdf:
+                    logger.info("[3/7] Loading PDF files...")
+                    self.pdf_data = self._load_pdf_data()
+
+                # Load EPUB data
+                if hasattr(self.args, 'epub') and self.args.epub:
+                    logger.info("[4/7] Loading EPUB files...")
+                    self.epub_data = self._load_epub_data()
+
+                # Load Web documentation data
+                if hasattr(self.args, 'web') and self.args.web:
+                    logger.info("[4.5/7] Scraping web documentation...")
+                    self.web_data = self._load_web_data()
+
+                # Load CSV data (curated supplementary dataset)
+                if hasattr(self.args, 'csv') and self.args.csv:
+                    logger.info("[5/7] Loading CSV data...")
+                    self.csv_data = self._load_csv()
+
+                # Combine datasets
+                logger.info("[6/7] Combining datasets...")
+                self.combined_data = self._combine_datasets()
+
+            # Standardize dataset format
             self._standardize_combined_dataset()
-            # Migrate any legacy special tokens to the consolidated GPT-2 format
-            from dataset_preparer.migrator import migrate_dataset_texts
-            self.combined_data = migrate_dataset_texts(self.combined_data)
             self._tag_format_types()
 
             # Tag languages from datasets_source/language_manifest.json
@@ -1646,9 +1656,8 @@ class DataPreparer:
                                 # Get chapter content
                                 content = item.get_content().decode('utf-8', errors='ignore')
 
-                                # Preserve <thinking> tags before removing HTML
-                                content = re.sub(r'<thinking>', '§THINKING_START§', content)
-                                content = re.sub(r'</thinking>', '§THINKING_END§', content)
+                                # Remove AIML <thinking> tags completely (legacy)
+                                content = re.sub(r'<thinking>.*?</thinking>', '', content, flags=re.DOTALL)
 
                                 # Extract structured paragraphs with BeautifulSoup if available
                                 chapter_paragraphs = []
@@ -1670,16 +1679,9 @@ class DataPreparer:
                                     if content.strip():
                                         chapter_paragraphs = [content]
 
-                                # Restore <thinking> tags
-                                restored = []
-                                for para in chapter_paragraphs:
-                                    para = para.replace('§THINKING_START§', '<thinking>')
-                                    para = para.replace('§THINKING_END§', '</thinking>')
-                                    restored.append(para)
-
                                 # Clean up whitespace
                                 chapter_text = '\n\n'.join(
-                                    re.sub(r'\s+', ' ', p).strip() for p in restored if p.strip()
+                                    re.sub(r'\s+', ' ', p).strip() for p in chapter_paragraphs if p.strip()
                                 )
                                 if chapter_text.strip():
                                     chapters.append(chapter_text)
@@ -1779,7 +1781,7 @@ class DataPreparer:
         try:
             sample = self.combined_data[0]
             input_text = sample.get('input_ids', '')
-            if isinstance(input_text, str) and ('<thinking>' in input_text or '<|thinking|>' in input_text):
+            if isinstance(input_text, str) and '<|thinking|>' in input_text:
                 logger.info("  ✓ Dataset contains thinking tokens in input_ids - will use for BPE training")
             else:
                 logger.info("  ℹ No thinking tokens detected in input_ids - using for BPE training")
@@ -1973,6 +1975,65 @@ class DataPreparer:
         # Add source column
         return dataset.add_column('source', [source_name] * len(dataset))
     
+    def _load_markdowns(self) -> Dataset:
+        """
+        Load all .md files from datasets_processed/markdowns/ subdirectories.
+        Each .md file should already contain GPT-2 standard tokens applied
+        by the *_to_md.py generation scripts.
+
+        Returns:
+            Hugging Face Dataset with all markdown content
+        """
+        from dataset_preparer.language_utils import extract_language_from_text
+
+        md_root = os.path.join('datasets_processed', 'markdowns')
+        if not os.path.exists(md_root):
+            logger.warning(f"  Markdown directory not found: {md_root}")
+            return Dataset.from_list([])
+
+        samples = []
+        source_map = {
+            'aiml': 'AIML', 'pdf': 'PDF', 'epub': 'EPUB',
+            'web': 'Web', 'hf': 'HuggingFace', 'csv': 'CSV',
+        }
+
+        for source_key, source_label in source_map.items():
+            source_dir = os.path.join(md_root, source_key)
+            if not os.path.exists(source_dir):
+                continue
+
+            md_files = []
+            for root, dirs, files in os.walk(source_dir):
+                for f in files:
+                    if f.endswith('.md'):
+                        md_files.append(os.path.join(root, f))
+            if not md_files:
+                continue
+
+            for file_path in sorted(md_files):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                    if content:
+                        lang, text = extract_language_from_text(content)
+                        samples.append({
+                            'text': text,
+                            'source': source_label,
+                            'language': lang or 'unknown',
+                        })
+                except Exception as e:
+                    logger.warning(f"  Error reading {file_path}: {e}")
+
+            logger.info(f"  Loaded {len(md_files)} {source_label} markdowns")
+
+        if not samples:
+            logger.warning("  No markdown samples found")
+            return Dataset.from_list([])
+
+        dataset = Dataset.from_list(samples)
+        logger.info(f"  Total markdown samples: {len(dataset)}")
+        return dataset
+
     def _combine_datasets(self) -> Dataset:
         """
         Combine AIML, HF, PDF, EPUB, Web, and CSV datasets.
@@ -2057,7 +2118,9 @@ class DataPreparer:
             merged = ' '.join(str(v).strip() for v in example.values() if isinstance(v, str) and v.strip())
             return {'input_ids': merged.strip()}
 
-        columns_to_remove = [c for c in self.combined_data.column_names if c != 'input_ids']
+        # Keep source/language for cache viewer display; trainer discards them
+        keep_columns = {'input_ids', 'source', 'language', 'text'}
+        columns_to_remove = [c for c in self.combined_data.column_names if c not in keep_columns]
         num_proc = self._get_num_proc()
         
         try:
@@ -2301,9 +2364,6 @@ class DataPreparer:
 
         # Re-apply standardization and language tagging since we rebuilt from raw sources
         self._standardize_combined_dataset()
-        from dataset_preparer.migrator import migrate_dataset_texts
-        self.combined_data = migrate_dataset_texts(self.combined_data)
-
         logger.info("--- Source Validation Reports ---")
         for source_name, report in reports.items():
             logger.info(f"  {report.summary()}")

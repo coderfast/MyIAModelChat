@@ -223,22 +223,22 @@ python main.py --train \
 
 ### Overview
 
-The model supports chain-of-thought reasoning using a dual-token system:
+The model supports chain-of-thought reasoning using GPT-2 standard tokens:
 
-- **Mode tokens** (`<|thinking|>`, `<|context|>`, `<|answer|>`): Define sample structure
-- **Content tags** (`<thinking>`, `</thinking>`): Wrap reasoning content
+- **Mode tokens** (`<|problem|>`, `<|thinking|>`, `<|final|>`): Define sample structure
 
 ### Sample Formats
 
 ```
-THINKING: <|thinking|>question<thinking>reasoning</thinking><|answer|>answer
-CONTEXT:  <|context|>question<|answer|>answer
+THINKING: <|problem|>question<|thinking|>reasoning<|final|>answer
+PROBLEM:  <|problem|>question<|final|>answer
 ```
 
 ### Generating Thinking Data
 
 ```bash
 # NLP-based thinking (no external dependencies)
+python main.py --generate-md --aiml --hf
 python main.py --prepare-data --aiml --hf --thinking-mode nlp --bpe-vocab-size 8000 --refresh-cache
 
 # Ollama teacher (higher quality, requires Ollama)
@@ -563,8 +563,9 @@ text = tokenizer.decode(token_ids)
 - Common sizes: 2k, 8k, 16k, 32k tokens
 - Special tokens (automatically registered in BPE):
   - `<pad>`, `<unk>`, `<s>`, `</s>` (structural)
-  - `<thinking>`, `</thinking>` (content tags for reasoning)
-  - `<|context|>`, `<|answer|>`, `<|thinking|>` (mode tokens)
+  - `<|problem|>`, `<|thinking|>`, `<|final|>` (mode tokens)
+  - `<|user|>`, `<|assistant|>`, `<|end|>`, `<|system|>`, `<|sep|>` (agentic)
+  - `<tool_call>`, `</tool_call>`, `<|tool_result|>` (tool call)
 
 ### Issues & Solutions
 

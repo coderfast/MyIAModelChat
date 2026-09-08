@@ -11,7 +11,7 @@ class DialogueManager:
                  top_k=12, top_p=0.8, temperature=0.65, max_len=128,
                  min_length=5, no_repeat_ngram_size=3,
                  pad_token_id=None, eos_token_id=None, unk_token_id=None,
-                 default_response="Lo siento, no puedo responder ahora.",
+                 default_response="Lo siento, no puedo responder ahora.\nI'm sorry, I can't respond right now.",
                  tool_executor=None, agent_enabled=False, agent_max_iterations=5,
                  moe_enabled=False):
         self.model = model
@@ -44,17 +44,13 @@ class DialogueManager:
         self.end_id = getattr(tokenizer, "get_end_index", lambda: -1)()
         self.sep_id = getattr(tokenizer, "get_sep_index", lambda: -1)()
         self.thinking_id = getattr(tokenizer, "get_thinking_index", lambda: -1)()
-
-        # Legacy token IDs (backward compat)
-        self.context_id = getattr(tokenizer, "get_context_index", lambda: -1)()
-        self.answer_id = getattr(tokenizer, "get_answer_index", lambda: -1)()
+        self.problem_id = getattr(tokenizer, "get_problem_index", lambda: -1)()
+        self.final_id = getattr(tokenizer, "get_final_index", lambda: -1)()
         self.thinking_mode_id = getattr(tokenizer, "get_thinking_mode_index", lambda: -1)()
 
         # Agentic token IDs
         self.tool_call_id = getattr(tokenizer, "get_tool_call_index", lambda: -1)()
         self.tool_call_end_id = getattr(tokenizer, "get_tool_call_end_index", lambda: -1)()
-        self.observation_id = getattr(tokenizer, "get_observation_index", lambda: -1)()
-        self.observation_end_id = getattr(tokenizer, "get_observation_end_index", lambda: -1)()
 
         # Agent support
         self.tool_executor = tool_executor
@@ -232,10 +228,12 @@ class DialogueManager:
                     if next_token is None:
                         break
 
-                    # Stop on agentic end tokens (model finished tool call or observation)
+                    # Stop on agentic end tokens (model finished tool call)
                     if (self.tool_call_end_id >= 0 and next_token == self.tool_call_end_id):
                         break
-                    if (self.observation_end_id >= 0 and next_token == self.observation_end_id):
+
+                    # Stop on <|end|> token (model finished response)
+                    if (self.end_id >= 0 and next_token == self.end_id):
                         break
 
                     # Enforce min_length: don't stop on EOS until minimum length reached

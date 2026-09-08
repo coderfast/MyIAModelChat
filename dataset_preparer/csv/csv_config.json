@@ -1,0 +1,6 @@
+{
+    "source_dir": "datasets_source/csv",
+    "output_dir": "datasets_processed/markdowns/csv",
+    "format": "chat",
+    "oversample_factor": 5
+}

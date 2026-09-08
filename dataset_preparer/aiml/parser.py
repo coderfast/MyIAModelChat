@@ -11,6 +11,7 @@ import random
 import html
 import unicodedata
 import logging
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Union
 from xml.etree import ElementTree
 
@@ -929,6 +930,8 @@ def parse_aiml_directory(
         if filename.lower().endswith('.aiml'):
             file_path = os.path.join(aiml_dir, filename)
             samples, stats = parse_aiml_file(file_path, bot_properties)
+            for s in samples:
+                s['source_file'] = Path(filename).stem
             all_samples.extend(samples)
 
             # Merge stats

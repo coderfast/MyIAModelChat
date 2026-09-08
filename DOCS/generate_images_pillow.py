@@ -333,7 +333,7 @@ def gen_15_operaciones():
     draw = ImageDraw.Draw(img)
     draw_header(draw, "Operaciones del Sistema", "System Operations")
     ops = [
-        ("thinking", "Cerebro", TEAL, "<thinking>"),
+        ("thinking", "Cerebro", TEAL, "<|thinking|>"),
         ("date", "Reloj", BLUE, "<date>"),
         ("eval", "Terminal", ORANGE, "<eval>"),
         ("system", "Servidor", RED, "<system>"),

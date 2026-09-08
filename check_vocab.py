@@ -6,10 +6,9 @@ w = SentencePieceTokenizerWrapper(os.path.join('dataset_cache', 'sentencepiece.m
 
 # Check which special tokens are in vocab
 tokens = [
-    '<thinking>', '</thinking>',
-    '<|problem|>', '<|context|>', '<|answer|>', '<|final|>',
+    '<|problem|>', '<|final|>',
     '<|thinking|>', '<tool_call>', '</tool_call>',
-    '<|tool_result|>', '<observation>', '</observation>',
+    '<|tool_result|>',
     '<|user|>', '<|assistant|>',
     '<|system|>', '<|end|>', '<|sep|>',
 ]
@@ -28,11 +27,8 @@ print(f"  get_thinking_end_index()  = {w.get_thinking_end_index()}")
 print(f"  get_thinking_mode_index() = {w.get_thinking_mode_index()}")
 print(f"  get_problem_index()       = {w.get_problem_index()}")
 print(f"  get_final_index()         = {w.get_final_index()}")
-print(f"  get_context_index()       = {w.get_context_index()}")
-print(f"  get_answer_index()        = {w.get_answer_index()}")
 print(f"  get_tool_call_index()     = {w.get_tool_call_index()}")
 print(f"  get_tool_call_end_index() = {w.get_tool_call_end_index()}")
-print(f"  get_observation_index()   = {w.get_observation_index()}")
 print(f"  get_tool_result_index()   = {w.get_tool_result_index()}")
 print(f"  get_user_index()          = {w.get_user_index()}")
 print(f"  get_assistant_index()     = {w.get_assistant_index()}")
@@ -46,7 +42,7 @@ print("=== Vocab scan for think/problem/final/tool tokens ===")
 for i in range(w.vocab_size):
     word = w.idx2word.get(i, '')
     wl = word.lower()
-    if any(kw in wl for kw in ['think', 'prob', 'final', 'tool', 'answer', 'context', 'observ']):
+    if any(kw in wl for kw in ['think', 'prob', 'final', 'tool']):
         print(f"  vocab[{i}] = {word}")
 
 print()

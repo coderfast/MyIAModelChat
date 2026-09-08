@@ -1,0 +1,10 @@
+{
+    "output_dir": "datasets_processed/markdowns/hf",
+    "datasets": [],
+    "defaults": {
+        "split": "train",
+        "format": "plain_text",
+        "languages": ["en"],
+        "limit": null
+    }
+}

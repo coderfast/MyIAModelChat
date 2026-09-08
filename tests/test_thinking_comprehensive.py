@@ -56,7 +56,7 @@ def test_bpe_encode_preserves_thinking_tags():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    text_with_thinking = "<|problem|>Pregunta<thinking>El usuario pregunta sobre Python. Python es un lenguaje.</thinking><|final|>La respuesta es 42."
+    text_with_thinking = "<|problem|>Pregunta<|thinking|>El usuario pregunta sobre Python. Python es un lenguaje.<|final|>La respuesta es 42."
     encoded = wrapper.encode(text_with_thinking)
 
     assert len(encoded) > 0, "Encoded should not be empty"
@@ -85,7 +85,7 @@ def test_bpe_has_thinking_method():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    text_with = "<thinking>Razoning aquí</thinking>La respuesta"
+    text_with = "<|thinking|>Razoning aquí<|final|>La respuesta"
     text_without = "Hola mundo"
 
     assert wrapper.has_thinking(text_with) is True
@@ -325,7 +325,7 @@ def test_thinking_detection_in_dataset():
 
     wrapper = SentencePieceTokenizerWrapper(model_path)
 
-    sample_with = "<thinking>El usuario pregunta.</thinking>La respuesta es 42."
+    sample_with = "<|thinking|>El usuario pregunta.<|final|>La respuesta es 42."
     sample_without = "Hola! ¿Cómo estás?"
 
     assert wrapper.has_thinking(sample_with) is True, "Should detect thinking tags"

@@ -60,7 +60,7 @@ The AIML Parser (`dataset_preparer/aiml/parser.py`) resolves:
 - `<srai>` chains (max depth 5)
 - `<random><li>` → generates N samples (one per `<li>`)
 - Wildcards `*`, `_`, `**`, `^` → expanded with contextual examples
-- `<thinking>` → eliminated (AIML's `<thinking>` element is stripped to avoid collision with training format which uses `<thinking>`, `</thinking>`, `<|context|>`, `<|answer|>`, `<|thinking|>`)
+- `<thinking>` → eliminated (AIML's `<thinking>` element is stripped to avoid collision with training format)
 - `<set>`, `<get>`, `<bot>` → resolved with defaults
 - HTML tags → stripped
 

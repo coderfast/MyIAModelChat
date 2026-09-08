@@ -29,10 +29,6 @@ MyIAModelChat is an advanced conversational AI system built with PyTorch, featur
 
 Language tokens are automatically prepended to training samples by `_create_bpe_text_column()` in `data_preparer.py`. This function uses a regex (`^<\|[a-z]{2,3}\|>`) to detect if a sample already has a language token (e.g., from agentic formatters) and skips adding it to avoid duplication.
 
-**Legacy tokens (deprecated, consolidated):** `<|context|>`→`<|problem|>`,
-`<|answer|>`→`<|final|>`, `<thinking>`→`<|thinking|>`, `</thinking>`→`<|final|>`,
-`<observation>`/`</observation>`→`<|tool_result|>`. See `PLAN_SPECIAL_TOKENS.md`.
-
 ---
 
 ## Project Structure
@@ -186,17 +182,21 @@ MyIAModelChat/
 
 ### Data Flow
 
-`
-User Input → Tokenizer → Model → Logits → Decoding → Response
-                ↓
-        Intent Classifier (BERT)
-                ↓
-        Sentiment Analyzer (BERT)
-                ↓
-        Temperature Adjustment + Prompt Enrichment
-                ↓
-        GPT-2 Transformer Generation
-`
+```
+[Step 1: Generate Markdowns]
+  aiml_to_md.py  → dataset_preparer/markdowns/aiml/*.md
+  pdf_to_md.py   → dataset_preparer/markdowns/pdf/*.md
+  epub_to_md.py  → dataset_preparer/markdowns/epub/*.md
+  web_to_md.py   → dataset_preparer/markdowns/web/*.md
+  hf_to_md.py    → dataset_preparer/markdowns/hf/*.md
+  csv_to_md.py   → dataset_preparer/markdowns/csv/*.md
+
+[Step 2: Prepare Data]
+  DataPreparer._load_markdowns() → Combine → Tags → Contamination → Thinking → Agent → BPE → Cache
+
+[Step 3: Training]
+  User Input → Tokenizer → Model → Logits → Decoding → Response
+```
 
 ---
 
@@ -237,8 +237,14 @@ pytest tests/test_aiml_parser.py -v
 ### Training Commands
 
 ```bash
-# Prepare data with BPE tokenizer
+# Generate markdown files from raw data sources
+python main.py --generate-md --aiml --hf --pdf --epub --web --csv
+
+# Prepare data with BPE tokenizer (reads from markdowns/ if available)
 python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
+
+# Combined: generate markdowns + prepare data
+python main.py --generate-md --prepare-data --aiml --hf --pdf
 
 # Train model (default checkpoint name)
 python main.py --train --epochs 30
@@ -502,7 +508,7 @@ open → in_progress → done
 - Removed CLI dependency from training/inference modules
 - Improved code organization for better maintainability
 - AIML 2.0 Smart Parser: resolves `<srai>`, `<random>`, wildcards, HTML tags
-- Special Tokens Consolidation: unified legacy tokens to GPT-2 standard set, added `<|system|>`/`<|end|>`/`<|sep|>`, `<|tool_result|>` prefix-only format, dataset migrator (`dataset_preparer/migrator.py`)
+- Special Tokens Consolidation: unified legacy tokens to GPT-2 standard set, added `<|system|>`/`<|end|>`/`<|sep|>`, `<|tool_result|>` prefix-only format
 - Contamination Filtering Pipeline: 6 phases (noise, quality, dedup, balance, leakage, language)
 - Source Validators: improved detection of URLs, emails, phone numbers, code, boilerplate
 - Agentic Tool System: platform-aware tool registry, permission management, tool call parsing

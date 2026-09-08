@@ -1,0 +1,15 @@
+{
+    "output_dir": "datasets_processed/markdowns/web",
+    "urls_file": "datasets_source/web/urls_to_process.json",
+    "format": "problem_final",
+    "chunking": {
+        "enabled": false,
+        "max_tokens": 512,
+        "overlap_tokens": 50
+    },
+    "defaults": {
+        "max_pages": 50,
+        "max_depth": 3,
+        "rate_limit": 1.0
+    }
+}
