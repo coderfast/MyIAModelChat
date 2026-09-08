@@ -257,7 +257,7 @@ python main.py --train --epochs 30
 The trainer automatically:
 1. Detects thinking data via mode tokens or content tags
 2. Applies differentiated loss weighting:
-   - Preamble (before `<thinking>`): weight 0.0
+   - Preamble (before `<|thinking|>`): weight 0.0
    - Reasoning content: weight 0.5
    - Answer tokens: weight 1.0
 3. Tracks thinking metrics (delimiter accuracy, reasoning coverage)

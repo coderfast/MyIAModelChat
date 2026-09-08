@@ -91,7 +91,7 @@ The trainer applies **differentiated loss** based on token position and sample t
 ### THINKING samples
 
 ```
-<|problem|>question<thinking|>reasoning<|final|>answer
+<|problem|>question<|thinking|>reasoning<|final|>answer
 ────────────────────────── ────────────────────  ──────────────
   weight = 0.0                weight = 0.5            weight = 1.0
   (preamble)                  (reasoning)             (answer)
@@ -220,7 +220,7 @@ dataset_cache/
 
 ### What Training Does
 
-- Detects thinking data via mode tokens (`<|thinking|>`, `<|context|>`) or content tags
+- Detects thinking data via mode tokens (`<|thinking|>`, `<|problem|>`) or content tags
 - Applies differentiated loss weighting based on token position
 - Tracks thinking metrics (delimiter accuracy, reasoning coverage)
 - Registers metrics per epoch

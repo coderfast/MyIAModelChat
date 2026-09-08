@@ -68,7 +68,7 @@ Primary Mode Arguments (choose one):
     Example: python main.py --generate-md --aiml --hf --pdf
     Notes:
         - Converts raw data sources (AIML, PDF, EPUB, Web, HF, CSV) to .md files
-        - Output files are saved to dataset_preparer/markdowns/{source}/
+        - Output files are saved to datasets_processed/markdowns/{source}/
         - Each source has its own *_to_md.py script
         - Generates GPT-2 standard tokens (<|problem|>, <|user|>, <|assistant|>, etc.)
         - If no source flags specified, generates from all available sources
@@ -80,7 +80,7 @@ Primary Mode Arguments (choose one):
     Default: False
     Example: python main.py --prepare-data --aiml --pdf --epub
     Notes:
-        - Loads markdown files from dataset_preparer/markdowns/ (if available)
+        - Loads markdown files from datasets_processed/markdowns/ (if available)
         - Falls back to loading from raw sources if no markdowns found
         - Validates data structure and content
         - Shows dataset statistics (samples, text length, sources)

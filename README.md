@@ -605,7 +605,7 @@ User Input → Tokenizer → Model → Logits → Decoding → Response
                 ↓
         GPT-2 Transformer Generation
                 ↓
-        Mode Token Detection (<|thinking|> or <|context|>)
+        Mode Token Detection (<|thinking|> or <|final|>)
                 ↓
         Thinking Extraction (if present)
 ```
