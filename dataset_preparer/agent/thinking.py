@@ -175,11 +175,19 @@ class AgentThinkingGenerator(ThinkingGenerator):
         """Simulate a realistic tool result based on the answer."""
         if tool_name == 'calculator':
             import re as _re
-            # Try to evaluate the expression if possible
+            import ast as _ast
+            # Try to evaluate the expression safely (only arithmetic, no function calls)
             expr = arguments.strip('()')
             try:
-                import ast
-                result = eval(compile(ast.parse(expr, mode='eval'), '<expr>', 'eval'))
+                tree = _ast.parse(expr, mode='eval')
+                # Reject any node that isn't a number, binary op, or unary op
+                for node in _ast.walk(tree):
+                    if not isinstance(node, (_ast.Expression, _ast.BinOp, _ast.UnaryOp,
+                                            _ast.Constant, _ast.Num, _ast.Add, _ast.Sub,
+                                            _ast.Mult, _ast.Div, _ast.Mod, _ast.Pow,
+                                            _ast.FloorDiv, _ast.USub, _ast.UAdd)):
+                        raise ValueError(f"Unsupported expression node: {type(node).__name__}")
+                result = eval(compile(tree, '<expr>', 'eval'), {"__builtins__": {}}, {})
                 return str(result)
             except Exception:
                 pass

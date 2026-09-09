@@ -19,7 +19,6 @@ class DialogueManager:
         self.tokenizer = tokenizer
         self.intent_classifier = intent_classifier
         self.sentiment_analyzer = sentiment_analyzer
-        self.persona = persona
 
         self.top_k = top_k
         self.top_p = top_p
@@ -37,16 +36,7 @@ class DialogueManager:
         # GPT-2 standard token IDs
         self.problem_id = getattr(tokenizer, "get_problem_index", lambda: -1)()
         self.final_id = getattr(tokenizer, "get_final_index", lambda: -1)()
-        self.user_id = getattr(tokenizer, "get_user_index", lambda: -1)()
-        self.assistant_id = getattr(tokenizer, "get_assistant_index", lambda: -1)()
-        self.tool_result_id = getattr(tokenizer, "get_tool_result_index", lambda: -1)()
-        self.system_id = getattr(tokenizer, "get_system_index", lambda: -1)()
         self.end_id = getattr(tokenizer, "get_end_index", lambda: -1)()
-        self.sep_id = getattr(tokenizer, "get_sep_index", lambda: -1)()
-        self.thinking_id = getattr(tokenizer, "get_thinking_index", lambda: -1)()
-        self.problem_id = getattr(tokenizer, "get_problem_index", lambda: -1)()
-        self.final_id = getattr(tokenizer, "get_final_index", lambda: -1)()
-        self.thinking_mode_id = getattr(tokenizer, "get_thinking_mode_index", lambda: -1)()
 
         # Agentic token IDs
         self.tool_call_id = getattr(tokenizer, "get_tool_call_index", lambda: -1)()
@@ -311,9 +301,6 @@ class DialogueManager:
                         pass  # If retry fails, keep what we have
 
         # Decode thinking and response separately
-        thinking_text = None
-        response_text = None
-
         try:
             # Decode all generated tokens to extract thinking
             full_text = self.tokenizer.decode(generated)
@@ -351,14 +338,14 @@ class DialogueManager:
         logger.debug(f"Decoded response ({len(response_text or '')} chars): '{(response_text or '')[:100]}'")
 
         if not response_text or response_text.strip() == "":
-            return {'thinking': thinking_text, 'response': self.default_response}
+            return {'thinking': thinking_text, 'response': self.default_response, 'intent': intent_label, 'sentiment': sentiment_label}
 
         # Ensure minimum response length
         tokens = response_text.split()
         if self.min_length is not None and len(tokens) < self.min_length:
-            return {'thinking': thinking_text, 'response': self.default_response}
+            return {'thinking': thinking_text, 'response': self.default_response, 'intent': intent_label, 'sentiment': sentiment_label}
 
-        return {'thinking': thinking_text, 'response': response_text}
+        return {'thinking': thinking_text, 'response': response_text, 'intent': intent_label, 'sentiment': sentiment_label}
 
     def generate_response_agent(self, user_text):
         """Agentic response generation with tool call loop.

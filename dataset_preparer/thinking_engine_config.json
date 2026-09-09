@@ -1,0 +1,1157 @@
+{
+  "es": {
+    "connectors": [
+      "En primer lugar,",
+      "Además,",
+      "Por otro lado,",
+      "Asimismo,",
+      "Finalmente,",
+      "En conclusión,"
+    ],
+    "overflow_connector": "También, ",
+    "analyze": "Analizando",
+    "about": "sobre",
+    "content_of": "el contenido del texto",
+    "text_contains": "El texto contiene {s} oraciones con {w} palabras en total",
+    "type_default": "El contenido presenta información relevante",
+    "concepts_prefix": "Los conceptos principales identificados son:",
+    "entities_prefix": "Se mencionan las siguientes entidades:",
+    "answer_terms": "Términos clave que conectan con la respuesta:",
+    "technical_note": "El contenido incluye terminología técnica especializada",
+    "question_default": "La consulta solicita información específica sobre el tema",
+    "type_desc": {
+      "qa": "Se trata de una pregunta que requiere una respuesta específica",
+      "technical": "El contenido es técnico y contiene datos numéricos o terminología especializada",
+      "narrative": "El texto presenta una narrativa o descripción de eventos",
+      "instructional": "El contenido proporciona instrucciones o directrices a seguir",
+      "factual": "Se presenta información factual y objetiva sobre el tema",
+      "conversational": "El texto tiene un tono conversacional y coloquial"
+    },
+    "question_types": {
+      "qué": "La consulta solicita información específica sobre el tema",
+      "que": "La consulta solicita información específica sobre el tema",
+      "cómo": "La consulta solicita un procedimiento o explicación",
+      "como": "La consulta solicita un procedimiento o explicación",
+      "por qué": "La consulta busca una razón o explicación causal",
+      "porque": "La consulta busca una razón o explicación causal",
+      "dónde": "La consulta solicita información sobre una ubicación",
+      "donde": "La consulta solicita información sobre una ubicación",
+      "cuándo": "La consulta solicita información temporal",
+      "cuando": "La consulta solicita información temporal",
+      "cuánto": "La consulta solicita información cuantitativa",
+      "cuanto": "La consulta solicita información cuantitativa"
+    },
+    "meta_patterns": [
+      "^(el usuario|the user|el humano|the human",
+      "^(saludo|greeting|despedida|farewell",
+      "^(respondo|i respond|contestando|answering",
+      "^(el bot|the bot|asistente|assistant",
+      "(el usuario|the use",
+      "(debo|i should|debería",
+      "(la intención|the intention",
+      "(la respuesta|the response"
+    ]
+  },
+  "fr": {
+    "connectors": [
+      "Premièrement,",
+      "De plus,",
+      "D'autre part,",
+      "Également,",
+      "Enfin,",
+      "En conclusion,"
+    ],
+    "overflow_connector": "En outre, ",
+    "analyze": "Analyse",
+    "about": "de",
+    "content_of": "le contenu du texte",
+    "text_contains": "Le texte contient {s} phrases avec {w} mots au total",
+    "type_default": "Le contenu présente des informations pertinentes",
+    "concepts_prefix": "Les concepts clés identifiés sont :",
+    "entities_prefix": "Les entités mentionnées sont :",
+    "answer_terms": "Termes clés liés à la réponse :",
+    "technical_note": "Le contenu inclut une terminologie technique spécialisée",
+    "question_default": "La requête demande des informations spécifiques sur le sujet",
+    "type_desc": {
+      "qa": "Il s'agit d'une question qui nécessite une réponse spécifique",
+      "technical": "Le contenu est technique et contient des données numériques ou une terminologie spécialisée",
+      "narrative": "Le texte présente un récit ou une description d'événements",
+      "instructional": "Le contenu fournit des instructions ou des directives à suivre",
+      "factual": "Des informations factuelles et objectives sont présentées sur le sujet",
+      "conversational": "Le texte a un ton conversationnel et familier"
+    },
+    "question_types": {
+      "quoi": "La requête demande des informations spécifiques sur le sujet",
+      "comment": "La requête demande une procédure ou une explication",
+      "pourquoi": "La requête cherche une raison ou une explication causale",
+      "où": "La requête demande des informations sur un emplacement",
+      "quand": "La requête demande des informations temporelles",
+      "combien": "La requête demande des informations quantitatives"
+    },
+    "meta_patterns": []
+  },
+  "it": {
+    "connectors": [
+      "In primo luogo,",
+      "Inoltre,",
+      "D'altra parte,",
+      "Allo stesso modo,",
+      "Infine,",
+      "In conclusione,"
+    ],
+    "overflow_connector": "Inoltre, ",
+    "analyze": "Analisi",
+    "about": "di",
+    "content_of": "il contenuto del testo",
+    "text_contains": "Il testo contiene {s} frasi con {w} parole in totale",
+    "type_default": "Il contenuto presenta informazioni rilevanti",
+    "concepts_prefix": "I concetti chiave identificati sono:",
+    "entities_prefix": "Le entità menzionate sono:",
+    "answer_terms": "Termini chiave collegati alla risposta:",
+    "technical_note": "Il contenuto include terminologia tecnica specializzata",
+    "question_default": "La richiesta chiede informazioni specifiche sull'argomento",
+    "type_desc": {
+      "qa": "Si tratta di una domanda che richiede una risposta specifica",
+      "technical": "Il contenuto è tecnico e contiene dati numerici o terminologia specializzata",
+      "narrative": "Il testo presenta una narrazione o descrizione di eventi",
+      "instructional": "Il contenuto fornisce istruzioni o linee guida da seguire",
+      "factual": "Vengono presentate informazioni fattuali e oggettive sull'argomento",
+      "conversational": "Il testo ha un tono conversazionale e colloquiale"
+    },
+    "question_types": {
+      "cosa": "La richiesta chiede informazioni specifiche sull'argomento",
+      "come": "La richiesta chiede una procedura o una spiegazione",
+      "perché": "La richiesta cerca una ragione o una spiegazione causale",
+      "dove": "La richiesta chiede informazioni su un luogo",
+      "quando": "La richiesta chiede informazioni temporali",
+      "quanto": "La richiesta chiede informazioni quantitative"
+    },
+    "meta_patterns": []
+  },
+  "pt": {
+    "connectors": [
+      "Em primeiro lugar,",
+      "Além disso,",
+      "Por outro lado,",
+      "Também,",
+      "Finalmente,",
+      "Em conclusão,"
+    ],
+    "overflow_connector": "Além disso, ",
+    "analyze": "Analisando",
+    "about": "sobre",
+    "content_of": "o conteúdo do texto",
+    "text_contains": "O texto contém {s} frases com {w} palavras no total",
+    "type_default": "O conteúdo apresenta informações relevantes",
+    "concepts_prefix": "Os conceitos-chave identificados são:",
+    "entities_prefix": "As entidades mencionadas são:",
+    "answer_terms": "Termos-chave conectados com a resposta:",
+    "technical_note": "O conteúdo inclui terminologia técnica especializada",
+    "question_default": "A consulta solicita informações específicas sobre o tema",
+    "type_desc": {
+      "qa": "Trata-se de uma pergunta que requer uma resposta específica",
+      "technical": "O conteúdo é técnico e contém dados numéricos ou terminologia especializada",
+      "narrative": "O texto apresenta uma narrativa ou descrição de eventos",
+      "instructional": "O conteúdo fornece instruções ou diretrizes a seguir",
+      "factual": "Informações factuais e objetivas são apresentadas sobre o tema",
+      "conversational": "O texto tem um tom conversacional e coloquial"
+    },
+    "question_types": {
+      "o que": "A consulta solicita informações específicas sobre o tema",
+      "como": "A consulta solicita um procedimento ou explicação",
+      "por que": "A consulta busca uma razão ou explicação causal",
+      "onde": "A consulta solicita informações sobre um local",
+      "quando": "A consulta solicita informações temporais",
+      "quanto": "A consulta solicita informações quantitativas"
+    },
+    "meta_patterns": []
+  },
+  "ro": {
+    "connectors": [
+      "În primul rând,",
+      "În plus,",
+      "Pe de altă parte,",
+      "De asemenea,",
+      "În cele din urmă,",
+      "În concluzie,"
+    ],
+    "overflow_connector": "De asemenea, ",
+    "analyze": "Analizând",
+    "about": "despre",
+    "content_of": "conținutul textului",
+    "text_contains": "Textul conține {s} propoziții cu {w} cuvinte în total",
+    "type_default": "Conținutul prezintă informații relevante",
+    "concepts_prefix": "Conceptele cheie identificate sunt:",
+    "entities_prefix": "Entitățile menționate sunt:",
+    "answer_terms": "Termeni cheie asociați cu răspunsul:",
+    "technical_note": "Conținutul include terminologie tehnică de specialitate",
+    "question_default": "Interogarea solicită informații specifice despre subiect",
+    "type_desc": {
+      "qa": "Aceasta este o întrebare care necesită un răspuns specific",
+      "technical": "Conținutul este tehnic și conține date numerice sau terminologie de specialitate",
+      "narrative": "Textul prezintă o narațiune sau descriere de evenimente",
+      "instructional": "Conținutul oferă instrucțiuni sau ghiduri de urmat",
+      "factual": "Sunt prezentate informații factuale și obiective despre subiect",
+      "conversational": "Textul are un ton conversațional și colocvial"
+    },
+    "question_types": {
+      "ce": "Interogarea solicită informații specifice despre subiect",
+      "cum": "Interogarea solicită o procedură sau o explicație",
+      "de ce": "Interogarea caută un motiv sau o explicație cauzală",
+      "unde": "Interogarea solicită informații despre o locație",
+      "când": "Interogarea solicită informații temporale",
+      "cât": "Interogarea solicită informații cantitative"
+    },
+    "meta_patterns": []
+  },
+  "ca": {
+    "connectors": [
+      "En primer lloc,",
+      "A més,",
+      "D'altra banda,",
+      "També,",
+      "Finalment,",
+      "En conclusió,"
+    ],
+    "overflow_connector": "A més, ",
+    "analyze": "Analitzant",
+    "about": "sobre",
+    "content_of": "el contingut del text",
+    "text_contains": "El text conté {s} oracions amb {w} paraules en total",
+    "type_default": "El contingut presenta informació rellevant",
+    "concepts_prefix": "Els conceptes clau identificats són:",
+    "entities_prefix": "Les entitats esmentades són:",
+    "answer_terms": "Termes clau relacionats amb la resposta:",
+    "technical_note": "El contingut inclou terminologia tècnica especialitzada",
+    "question_default": "La consulta sol·licita informació específica sobre el tema",
+    "type_desc": {
+      "qa": "Es tracta d'una pregunta que requereix una resposta específica",
+      "technical": "El contingut és tècnic i conté dades numèriques o terminologia especialitzada",
+      "narrative": "El text presenta una narració o descripció d'esdeveniments",
+      "instructional": "El contingut proporciona instruccions o pautes a seguir",
+      "factual": "Es presenten informacions factuals i objectives sobre el tema",
+      "conversational": "El text té un to conversacional i col·loquial"
+    },
+    "question_types": {
+      "què": "La consulta sol·licita informació específica sobre el tema",
+      "com": "La consulta sol·licita un procediment o explicació",
+      "per què": "La consulta busca una raó o explicació causal",
+      "on": "La consulta sol·licita informació sobre una ubicació",
+      "quan": "La consulta sol·licita informació temporal",
+      "quant": "La consulta sol·licita informació quantitativa"
+    },
+    "meta_patterns": []
+  },
+  "gl": {
+    "connectors": [
+      "En primeiro lugar,",
+      "Adxemais,",
+      "Por outra banda,",
+      "Tamén,",
+      "Finalmente,",
+      "En conclusión,"
+    ],
+    "overflow_connector": "Adxemais, ",
+    "analyze": "Analizando",
+    "about": "sobre",
+    "content_of": "o contido do texto",
+    "text_contains": "O texto contén {s} oracións con {w} palabras en total",
+    "type_default": "O contido presenta información relevante",
+    "concepts_prefix": "Os conceptos clave identificados son:",
+    "entities_prefix": "As entidades mencionadas son:",
+    "answer_terms": "Termos clave relacionados coa resposta:",
+    "technical_note": "O contido inclúe terminoloxía técnica especializada",
+    "question_default": "A consulta solicita información específica sobre o tema",
+    "type_desc": {
+      "qa": "Trátase dunha pregunta que require unha resposta específica",
+      "technical": "O contido é técnico e contén datos numéricos ou terminoloxía especializada",
+      "narrative": "O texto presenta unha narración ou descrición de eventos",
+      "instructional": "O contido proporciona instrucións ou directrices a seguir",
+      "factual": "Preséntanse informacións factuais e obxectivas sobre o tema",
+      "conversational": "O texto ten un ton conversacional e coloquial"
+    },
+    "question_types": {
+      "qué": "A consulta solicita información específica sobre o tema",
+      "como": "A consulta solicita un procedemento ou explicación",
+      "por que": "A consulta busca unha razón ou explicación causal",
+      "onde": "A consulta solicita información sobre unha ubicación",
+      "cando": "A consulta solicita información temporal",
+      "canto": "A consulta solicita información cuantitativa"
+    },
+    "meta_patterns": []
+  },
+  "en": {
+    "connectors": [
+      "First,",
+      "Additionally,",
+      "On the other hand,",
+      "Likewise,",
+      "Finally,",
+      "In conclusion,"
+    ],
+    "overflow_connector": "Also, ",
+    "analyze": "Analyzing",
+    "about": "about",
+    "content_of": "the content of the text",
+    "text_contains": "The text contains {s} sentences with {w} words in total",
+    "type_default": "The content presents relevant information",
+    "concepts_prefix": "The key concepts identified are:",
+    "entities_prefix": "The mentioned entities are:",
+    "answer_terms": "Key terms connected to the answer:",
+    "technical_note": "The content includes specialized technical terminology",
+    "question_default": "The query requests specific information about the topic",
+    "type_desc": {
+      "qa": "This is a question that requires a specific answer",
+      "technical": "The content is technical and contains numerical data or specialized terminology",
+      "narrative": "The text presents a narrative or description of events",
+      "instructional": "The content provides instructions or guidelines to follow",
+      "factual": "Factual and objective information is presented about the topic",
+      "conversational": "The text has a conversational and colloquial tone"
+    },
+    "question_types": {
+      "what": "The query requests specific information about the topic",
+      "how": "The query requests a procedure or explanation",
+      "why": "The query seeks a reason or causal explanation",
+      "where": "The query requests information about a location",
+      "when": "The query requests temporal information",
+      "how much": "The query requests quantitative information"
+    },
+    "meta_patterns": []
+  },
+  "de": {
+    "connectors": [
+      "Zunächst,",
+      "Darüber hinaus,",
+      "Andererseits,",
+      "Ebenso,",
+      "Schließlich,",
+      "Zusammenfassend,"
+    ],
+    "overflow_connector": "Außerdem, ",
+    "analyze": "Analysiere",
+    "about": "über",
+    "content_of": "den Inhalt des Textes",
+    "text_contains": "Der Text enthält {s} Sätze mit {w} Wörtern insgesamt",
+    "type_default": "Der Inhalt präsentiert relevante Informationen",
+    "concepts_prefix": "Die identifizierten Schlüsselkonzepte sind:",
+    "entities_prefix": "Die erwähnten Entitäten sind:",
+    "answer_terms": "Schlüsselwörter, die mit der Antwort verbunden sind:",
+    "technical_note": "Der Inhalt enthält spezialisierte Fachterminologie",
+    "question_default": "Die Anfrage fordert spezifische Informationen über das Thema",
+    "type_desc": {
+      "qa": "Dies ist eine Frage, die eine spezifische Antwort erfordert",
+      "technical": "Der Inhalt ist technisch und enthält numerische Daten oder Fachterminologie",
+      "narrative": "Der Text präsentiert eine Erzählung oder Beschreibung von Ereignissen",
+      "instructional": "Der Inhalt bietet Anweisungen oder Richtlinien zur Befolgung",
+      "factual": "Es werden sachliche und objektive Informationen zum Thema präsentiert",
+      "conversational": "Der Text hat einen unterhaltenden und umgangssprachlichen Ton"
+    },
+    "question_types": {
+      "was": "Die Anfrage fordert spezifische Informationen über das Thema",
+      "wie": "Die Anfrage fordert eine Prozedur oder Erklärung",
+      "warum": "Die Anfrage sucht einen Grund oder eine Kausalitätserklärung",
+      "wo": "Die Anfrage fordert Informationen über einen Ort",
+      "wann": "Die Anfrage fordert zeitliche Informationen",
+      "wie viel": "Die Anfrage fordert quantitative Informationen"
+    },
+    "meta_patterns": []
+  },
+  "nl": {
+    "connectors": [
+      "Ten eerste,",
+      "Bovendien,",
+      "Aan de andere kant,",
+      "Evenzo,",
+      "Tot slot,",
+      "Tot besluit,"
+    ],
+    "overflow_connector": "Ook, ",
+    "analyze": "Analyseren",
+    "about": "over",
+    "content_of": "de inhoud van de tekst",
+    "text_contains": "De tekst bevat {s} zinnen met {w} woorden in totaal",
+    "type_default": "De inhoud presenteert relevante informatie",
+    "concepts_prefix": "De geïdentificeerde sleutelconcepten zijn:",
+    "entities_prefix": "De genoemde entiteiten zijn:",
+    "answer_terms": "Sleutelwoorden die verband houden met het antwoord:",
+    "technical_note": "De inhoud bevat gespecialiseerde technische terminologie",
+    "question_default": "Het verzoek vraagt om specifieke informatie over het onderwerp",
+    "type_desc": {
+      "qa": "Dit is een vraag die een specifiek antwoord vereist",
+      "technical": "De inhoud is technisch en bevat numerieke gegevens of gespecialiseerde terminologie",
+      "narrative": "De tekst presenteert een verhaal of beschrijving van gebeurtenissen",
+      "instructional": "De inhoud biedt instructies of richtlijnen om te volgen",
+      "factual": "Feitelijke en objectieve informatie wordt gepresenteerd over het onderwerp",
+      "conversational": "De tekst heeft een informele en alledaagse toon"
+    },
+    "question_types": {
+      "wat": "Het verzoek vraagt om specifieke informatie over het onderwerp",
+      "hoe": "Het verzoek vraagt om een procedure of uitleg",
+      "waarom": "Het verzoek zoekt een reden of causale uitleg",
+      "waar": "Het verzoek vraagt om informatie over een locatie",
+      "wanneer": "Het verzoek vraagt om temporele informatie",
+      "hoeveel": "Het verzoek vraagt om kwantitatieve informatie"
+    },
+    "meta_patterns": []
+  },
+  "sv": {
+    "connectors": [
+      "Först,",
+      "Dessutom,",
+      "Å andra sidan,",
+      "Likaså,",
+      "Slutligen,",
+      "Sammanfattningsvis,"
+    ],
+    "overflow_connector": "Också, ",
+    "analyze": "Analyserar",
+    "about": "om",
+    "content_of": "textens innehåll",
+    "text_contains": "Texten innehåller {s} meningar med {w} ord totalt",
+    "type_default": "Innehållet presenterar relevant information",
+    "concepts_prefix": "De identifierade nyckelkoncepten är:",
+    "entities_prefix": "De nämnda entiteterna är:",
+    "answer_terms": "Nyckelord som är kopplade till svaret:",
+    "technical_note": "Innehållet innehåller specialiserad teknisk terminologi",
+    "question_default": "Förfrågan begär specifik information om ämnet",
+    "type_desc": {
+      "qa": "Detta är en fråga som kräver ett specifikt svar",
+      "technical": "Innehållet är tekniskt och innehåller numeriska data eller specialiserad terminologi",
+      "narrative": "Texten presenterar en berättelse eller beskrivning av händelser",
+      "instructional": "Innehållet ger instruktioner eller riktlinjer att följa",
+      "factual": "Faktabaserad och objektiv information presenteras om ämnet",
+      "conversational": "Texten har en avslappnad och daglig ton"
+    },
+    "question_types": {
+      "vad": "Förfrågan begär specifik information om ämnet",
+      "hur": "Förfrågan begär en procedur eller förklaring",
+      "varför": "Förfrågan söker en anledning eller orsakssamband",
+      "var": "Förfrågan begär information om en plats",
+      "när": "Förfrågan begär temporal information",
+      "hur mycket": "Förfrågan begär kvantitativ information"
+    },
+    "meta_patterns": []
+  },
+  "da": {
+    "connectors": [
+      "Først,",
+      "Derudover,",
+      "På den anden side,",
+      "Ligeledes,",
+      "Til sidst,",
+      "Afslutningsvis,"
+    ],
+    "overflow_connector": "Også, ",
+    "analyze": "Analyserer",
+    "about": "om",
+    "content_of": "tekstens indhold",
+    "text_contains": "Teksten indeholder {s} sætninger med {w} ord i alt",
+    "type_default": "Indholdet præsenterer relevant information",
+    "concepts_prefix": "De identificerede nøglekoncepter er:",
+    "entities_prefix": "De nævnte enheder er:",
+    "answer_terms": "Nøgleord der er forbundet med svaret:",
+    "technical_note": "Indholdet indeholder specialiseret teknisk terminologi",
+    "question_default": "Forespørgslen anmoder om specifik information om emnet",
+    "type_desc": {
+      "qa": "Dette er et spørgsmål, der kræver et specifikt svar",
+      "technical": "Indholdet er teknisk og indeholder numeriske data eller specialiseret terminologi",
+      "narrative": "Teksten præsenterer en fortælling eller beskrivelse af begivenheder",
+      "instructional": "Indholdet giver instruktioner eller retningslinjer at følge",
+      "factual": "Faktuelle og objektive informationer præsenteres om emnet",
+      "conversational": "Teksten har en afslappet og dagligdags tone"
+    },
+    "question_types": {
+      "hvad": "Forespørgslen anmoder om specifik information om emnet",
+      "hvordan": "Forespørgslen anmoder om en procedure eller forklaring',",
+      "hvorfor": "Forespørgslen søger en årsag eller årsagsforklaring',",
+      "hvor": "Forespørgslen anmoder om information om et sted',",
+      "hvornår": "Forespørgslen anmoder om tidsmæssig information",
+      "hvor meget": "Forespørgslen anmoder om kvantitativ information"
+    },
+    "meta_patterns": []
+  },
+  "nb": {
+    "connectors": [
+      "Først,",
+      "Videre,",
+      "På den annen side,",
+      "Likeså,",
+      "Til slutt,",
+      "Oppsummerende,"
+    ],
+    "overflow_connector": "Også, ",
+    "analyze": "Analyserer",
+    "about": "om",
+    "content_of": "tekstens innhold",
+    "text_contains": "Teksten inneholder {s} setninger med {w} ord totalt",
+    "type_default": "Innholdet presenterer relevant informasjon",
+    "concepts_prefix": "De identifiserte nøkkelkonseptene er:",
+    "entities_prefix": "De nevnte enhetene er:",
+    "answer_terms": "Nøkkelord som er forbundet med svaret:",
+    "technical_note": "Innholdet inneholder spesialisert teknisk terminologi",
+    "question_default": "Forespørselen ber om spesifikk informasjon om emnet",
+    "type_desc": {
+      "qa": "Dette er et spørsmål som krever et spesifikt svar",
+      "technical": "Innholdet er teknisk og inneholder numeriske data eller spesialisert terminologi",
+      "narrative": "Teksten presenterer en fortelling eller beskrivelse av hendelser",
+      "instructional": "Innholdet gir instruksjoner eller retningslinjer å følge",
+      "factual": "Faktiske og objektive informasjon presenteres om emnet",
+      "conversational": "Teksten har en avslappet og dagligdags tone"
+    },
+    "question_types": {
+      "hva": "Forespørselen ber om spesifikk informasjon om emnet',",
+      "hvordan": "Forespørselen ber om en prosedyre eller forklaring",
+      "hvorfor": "Forespørselen søker en årsak eller årsakssammenheng',",
+      "hvor": "Forespørselen ber om informasjon om et sted',",
+      "når": "Forespørselen ber om tidsmessig informasjon",
+      "hvor mye": "Forespørselen ber om kvantitativ informasjon"
+    },
+    "meta_patterns": []
+  },
+  "pl": {
+    "connectors": [
+      "Po pierwsze,",
+      "Ponadto,",
+      "Z drugiej strony,",
+      "Podobnie,",
+      "Na koniec,",
+      "Podsumowując,"
+    ],
+    "overflow_connector": "Także, ",
+    "analyze": "Analizując",
+    "about": "o",
+    "content_of": "zawartość tekstu",
+    "text_contains": "Tekst zawiera {s} zdań z {w} słowami łącznie",
+    "type_default": "Zawartość przedstawia istotne informacje",
+    "concepts_prefix": "Zidentyfikowane kluczowe koncepcje to:",
+    "entities_prefix": "Wspomniane podmioty to:",
+    "answer_terms": "Kluczowe słowa powiązane z odpowiedzią:",
+    "technical_note": "Zawartość zawiera specjalistyczną terminologię techniczną",
+    "question_default": "Zapytanie prosi o konkretne informacje na temat",
+    "type_desc": {
+      "qa": "Jest to pytanie wymagające konkretnej odpowiedzi",
+      "technical": "Zawartość jest techniczna i zawiera dane liczbowe lub specjalistyczną terminologię",
+      "narrative": "Tekst przedstawia narrację lub opis wydarzeń",
+      "instructional": "Zawartość zapewnia instrukcje lub wytyczne do przestrzegania',",
+      "factual": "Przedstawiono faktyczne i obiektywne informacje na temat",
+      "conversational": "Tekst ma ton rozmowny i potoczny"
+    },
+    "question_types": {
+      "co": "Zapytanie prosi o konkretne informacje na temat",
+      "jak": "Zapytanie prosi o procedurę lub wyjaśnienie',",
+      "dlaczego": "Zapytanie szuka przyczyny lub wyjaśnienia przyczynowego",
+      "gdzie": "Zapytanie prosi o informacje o lokalizacji",
+      "kiedy": "Zapytanie prosi o informacje czasowe',",
+      "ile": "Zapytanie prosi o informacje ilościowe"
+    },
+    "meta_patterns": []
+  },
+  "cs": {
+    "connectors": [
+      "Za prvé,",
+      "Kromě toho,",
+      "Na druhou stranu,",
+      "Obdobně,",
+      "Nakonec,",
+      "Shrnutí,"
+    ],
+    "overflow_connector": "Také, ",
+    "analyze": "Analyzuji",
+    "about": "o",
+    "content_of": "obsah textu",
+    "text_contains": "Text obsahuje {s} vět s {w} slovy celkem",
+    "type_default": "Obsah prezentuje relevantní informace",
+    "concepts_prefix": "Identifikované klíčové koncepty jsou:",
+    "entities_prefix": "Zmíněné entity jsou:",
+    "answer_terms": "Klíčová slova spojená s odpovědí:",
+    "technical_note": "Obsah zahrnuje specializovanou technickou terminologii",
+    "question_default": "Dotaz žádá konkrétní informace o tématu",
+    "type_desc": {
+      "qa": "Jde o otázku, která vyžaduje konkrétní odpověď",
+      "technical": "Obsah je technický a obsahuje numerická data nebo specializovanou terminologii",
+      "narrative": "Text prezentuje vyprávění nebo popis událostí",
+      "instructional": "Obsah poskytuje instrukce nebo pokyny k dodržování",
+      "factual": "Prezentují se faktické a objektivní informace o tématu",
+      "conversational": "Text má konverzační a hovorový tón"
+    },
+    "question_types": {
+      "co": "Dotaz žádá konkrétní informace o tématu",
+      "jak": "Dotaz žádá postup nebo vysvětlení',",
+      "proč": "Dotaz hledá důvod nebo příčinné vysvětlení',",
+      "kde": "Dotaz žádá informace o umístění',",
+      "kdy": "Dotaz žádá časové informace',",
+      "kolik": "Dotaz žádá kvantitativní informace"
+    },
+    "meta_patterns": []
+  },
+  "sk": {
+    "connectors": [
+      "Po prvé,",
+      "Okrem toho,",
+      "Na druhej strane,",
+      "Podobne,",
+      "Nakoniec,",
+      "Na záver,"
+    ],
+    "overflow_connector": "Tiež, ",
+    "analyze": "Analyzujem",
+    "about": "o",
+    "content_of": "obsah textu",
+    "text_contains": "Text obsahuje {s} viet s {w} slovami celkom",
+    "type_default": "Obsah prezentuje relevantné informácie",
+    "concepts_prefix": "Identifikované kľúčové koncepty sú:",
+    "entities_prefix": "Spomenuté entity sú:",
+    "answer_terms": "Kľúčové slová spojené s odpoveďou:",
+    "technical_note": "Obsah zahŕňa špecializovanú technickú terminológiu",
+    "question_default": "Dopyt žiada konkrétne informácie o téme",
+    "type_desc": {
+      "qa": "Ide o otázku, ktorá vyžaduje konkrétnu odpoveď",
+      "technical": "Obsah je technický a obsahuje numerické dáta alebo špecializovanú terminológiu",
+      "narrative": "Text prezentuje rozprávanie alebo popis udalostí",
+      "instructional": "Obsah poskytuje inštrukcie alebo pokyny na dodržiavanie",
+      "factual": "Prezentujú sa faktické a objektívne informácie o téme",
+      "conversational": "Text má konverzačný a hovorový tón"
+    },
+    "question_types": {
+      "čo": "Dopyt žiada konkrétne informácie o téme",
+      "ako": "Dopyt žiada postup alebo vysvetlenie',",
+      "prečo": "Dopyt hľadá dôvod alebo príčinné vysvetlenie',",
+      "kde": "Dopyt žiada informácie o umiestnení',",
+      "kedy": "Dopyt žiada časové informácie',",
+      "koľko": "Dopyt žiada kvantitatívne informácie"
+    },
+    "meta_patterns": []
+  },
+  "bg": {
+    "connectors": [
+      "Първо,",
+      "Освен това,",
+      "От друга страна,",
+      "Също така,",
+      "Накрая,",
+      "В заключение,"
+    ],
+    "overflow_connector": "Също, ",
+    "analyze": "Анализирам",
+    "about": "относно",
+    "content_of": "съдържанието на текста",
+    "text_contains": "Текстът съдържа {s} изречения с {w} думи общо",
+    "type_default": "Съдържанието представя relevantна информация",
+    "concepts_prefix": "Идентифицираните ключови концепции са:",
+    "entities_prefix": "Споменатите обекти са:",
+    "answer_terms": "Ключови думи, свързани с отговора:",
+    "technical_note": "Съдържанието включва специализирана техническа терминология",
+    "question_default": "Заявката моли за конкретна информация относно темата",
+    "type_desc": {
+      "qa": "Това е въпрос, който изисква конкретен отговор",
+      "technical": "Съдържанието е техническо и съдържа числови данни или специализирана терминология",
+      "narrative": "Текстът представя разказ или описание на събития",
+      "instructional": "Съдържанието предоставя инструкции или насоки за следване",
+      "factual": "Представени са фактически и обективни информации относно темата",
+      "conversational": "Текстът има разговорен и ежедневен тон"
+    },
+    "question_types": {
+      "какво": "Заявката моли за конкретна информация относно темата",
+      "как": "Заявката моли за процедура или обяснение',",
+      "защо": "Заявката търси причина или причинно обяснение',",
+      "къде": "Заявката моли за информация за местоположение',",
+      "кога": "Заявката моли за времева информация',",
+      "колко": "Заявката моли за количествена информация"
+    },
+    "meta_patterns": []
+  },
+  "hr": {
+    "connectors": [
+      "Prvo,",
+      "Štoviše,",
+      "S druge strane,",
+      "Također,",
+      "Napokon,",
+      "Zaključno,"
+    ],
+    "overflow_connector": "Također, ",
+    "analyze": "Analiziram",
+    "about": "o",
+    "content_of": "sadržaj teksta",
+    "text_contains": "Tekst sadrži {s} rečenica s {w} riječi ukupno",
+    "type_default": "Sadržaj prezentira relevantne informacije",
+    "concepts_prefix": "Identificirani ključni koncepti su:",
+    "entities_prefix": "Spomenuti entiteti su:",
+    "answer_terms": "Ključne riječi povezane s odgovorom:",
+    "technical_note": "Sadržaj uključuje specijaliziranu tehničku terminologiju",
+    "question_default": "Upit traži specifične informacije o temi",
+    "type_desc": {
+      "qa": "To je pitanje koje zahtijeva specifičan odgovor",
+      "technical": "Sadržaj je tehnički i sadrži numeričke podatke ili specijaliziranu terminologiju",
+      "narrative": "Tekst prezentira naraciju ili opis događaja",
+      "instructional": "Sadržaj pruža upute ili smjernice za praćenje",
+      "factual": "Prezentirane su činjenične i objektivne informacije o temi",
+      "conversational": "Tekst ima konverzacijski i kolokvijalni ton"
+    },
+    "question_types": {
+      "što": "Upit traži specifične informacije o temi',",
+      "kako": "Upit traži postupak ili objašnjenje',",
+      "zašto": "Upit traži razlog ili uzročno objašnjenje',",
+      "gdje": "Upit traži informacije o lokaciji",
+      "kada": "Upit traži vremenske informacije',",
+      "koliko": "Upit traži količinske informacije"
+    },
+    "meta_patterns": []
+  },
+  "sr": {
+    "connectors": [
+      "Прво,",
+      "Штавише,",
+      "С друге стране,",
+      "Такође,",
+      "Напослетку,",
+      "Закључно,"
+    ],
+    "overflow_connector": "Такође, ",
+    "analyze": "Анализiram",
+    "about": "о",
+    "content_of": "садржај текста",
+    "text_contains": "Текст садржи {s} реченица са {w} речи укупно",
+    "type_default": "Садржај презентира релевантне информације",
+    "concepts_prefix": "Идентификовани кључни конCEPTи су:",
+    "entities_prefix": "Споменути ентитети су:",
+    "answer_terms": "Кључне речи повезане са одговором:",
+    "technical_note": "Садржај укључује специјализовану техничку терминологију",
+    "question_default": "Упит тражи специфичне информације о теми",
+    "type_desc": {
+      "qa": "То је питање које захтева специфичан одговор",
+      "technical": "Садржај је технички и садржи нумеричке податке или специјализовану терминологију",
+      "narrative": "Текст презентира нарацију или опис догађаја",
+      "instructional": "Садржај пружа упуте или смернице за праћење",
+      "factual": "Презентоване су чињеничне и објективне информације о теми",
+      "conversational": "Текст има конверзацијски и колоквијални тон"
+    },
+    "question_types": {
+      "шта": "Упит тражи специфичне информације о теми",
+      "како": "Упит тражи поступак или објашњење",
+      "зашто": "Упит тражи разлог или узрочно објашњење',",
+      "где": "Упит тражи информације о локацији',",
+      "када": "Упит тражи временске информације',",
+      "колико": "Упит тражи квантитативне информације"
+    },
+    "meta_patterns": []
+  },
+  "sl": {
+    "connectors": [
+      "Najprej,",
+      "Poleg tega,",
+      "Po drugi strani,",
+      "Prav tako,",
+      "Nazadnje,",
+      "Zaključno,"
+    ],
+    "overflow_connector": "Tudi, ",
+    "analyze": "Analiziram",
+    "about": "o",
+    "content_of": "vsebino besedila",
+    "text_contains": "Besedilo vsebuje {s} povedi z {w} besedami skupaj",
+    "type_default": "Vsebina predstavlja relevantne informacije",
+    "concepts_prefix": "Identificirani ključni koncepti so:",
+    "entities_prefix": "Omenjene entitete so:",
+    "answer_terms": "Ključne besede, povezane z odgovorom:",
+    "technical_note": "Vsebina vključuje specializirano tehnično terminologijo",
+    "question_default": "Poizvedba zahteva specifične informacije o temi",
+    "type_desc": {
+      "qa": "To je vprašanje, ki zahteva specifičen odgovor",
+      "technical": "Vsebina je tehnična in vsebuje numerične podatke ali specializirano terminologijo",
+      "narrative": "Besedilo predstavlja pripoved ali opis dogodkov",
+      "instructional": "Vsebina zagotavlja navodila ali smernice za upoštevanje",
+      "factual": "Predstavljena so dejstva in objektivne informacije o temi",
+      "conversational": "Besedilo ima pogovorni in vsakdanji ton"
+    },
+    "question_types": {
+      "kaj": "Poizvedba zahteva specifične informacije o temi",
+      "kako": "Poizvedba zahteva postopek ali pojasnilo',",
+      "zakaj": "Poizvedba išče razlog ali vzročno pojasnilo',",
+      "kje": "Poizvedba zahteva informacije o lokaciji',",
+      "kdaj": "Poizvedba zahteva časovne informacije',",
+      "koliko": "Poizvedba zahteva količinske informacije"
+    },
+    "meta_patterns": []
+  },
+  "bs": {
+    "connectors": [
+      "Prvo,",
+      "Štoviše,",
+      "S druge strane,",
+      "Također,",
+      "Napokon,",
+      "Zaključno,"
+    ],
+    "overflow_connector": "Također, ",
+    "analyze": "Analiziram",
+    "about": "o",
+    "content_of": "sadržaj teksta",
+    "text_contains": "Tekst sadrži {s} rečenica sa {w} riječi ukupno",
+    "type_default": "Sadržaj prezentira relevantne informacije",
+    "concepts_prefix": "Identificirani ključni koncepti su:",
+    "entities_prefix": "Spomenuti entiteti su:",
+    "answer_terms": "Ključne riječi povezane sa odgovorom:",
+    "technical_note": "Sadržaj uključuje specijaliziranu tehničku terminologiju",
+    "question_default": "Upit traži specifične informacije o temi",
+    "type_desc": {
+      "qa": "To je pitanje koje zahtijeva specifičan odgovor",
+      "technical": "Sadržaj je tehnički i sadrži numeričke podatke ili specijaliziranu terminologiju",
+      "narrative": "Tekst prezentira naraciju ili opis događaja",
+      "instructional": "Sadržaj pruža upute ili smjernice za praćenje",
+      "factual": "Prezentirane su činjenične i objektivne informacije o temi",
+      "conversational": "Tekst ima konverzacijski i kolokvijalni ton"
+    },
+    "question_types": {
+      "šta": "Upit traži specifične informacije o temi",
+      "kako": "Upit traži postupak ili objašnjenje',",
+      "zašto": "Upit traži razlog ili uzročno objašnjenje',",
+      "gdje": "Upit traži informacije o lokaciji",
+      "kada": "Upit traži vremenske informacije",
+      "koliko": "Upit traži količinske informacije"
+    },
+    "meta_patterns": []
+  },
+  "mk": {
+    "connectors": [
+      "Прво,",
+      "Покрај тоа,",
+      "Од друга страна,",
+      "Исто така,",
+      "На крајот,",
+      "Заклучно,"
+    ],
+    "overflow_connector": "Исто така, ",
+    "analyze": "Анализирам",
+    "about": "за",
+    "content_of": "содржината на текстот",
+    "text_contains": "Текстот содржи {s} реченици со {w} зборови вкупно",
+    "type_default": "Содржината претставува релевантни информации",
+    "concepts_prefix": "Идентификуваните клучни концепти се:",
+    "entities_prefix": "Споменатите ентитети се:",
+    "answer_terms": "Клучни зборови поврзани со одговорот:",
+    "technical_note": "Содржината вклучува специјализирана техничка терминологија",
+    "question_default": "Барањето бара специфични информации за темата",
+    "type_desc": {
+      "qa": "Тоа е прашање кое бара конкретен одговор",
+      "technical": "Содржината е техничка и содржи нумерички податоци или специјализирана терминологија",
+      "narrative": "Текстот претставува нарација или опис на настани",
+      "instructional": "Содржината обезбедува упатства или насоки за следење",
+      "factual": "Претставени се фактички и објективни информации за темата",
+      "conversational": "Текстот има разговорен и секојдневен тон"
+    },
+    "question_types": {
+      "што": "Барањето бара специфични информации за темата",
+      "како": "Барањето бара постапка или објаснување',",
+      "зошто": "Барањето бара причина или причинско објаснување',",
+      "каде": "Барањето бара информации за локација",
+      "кога": "Барањето бара временски информации",
+      "колку": "Барањето бара квантитативни информации"
+    },
+    "meta_patterns": []
+  },
+  "lt": {
+    "connectors": [
+      "Pirma,",
+      "Be to,",
+      "Kita vertus,",
+      "Taip pat,",
+      "Galiausiai,",
+      "Apibendrinant,"
+    ],
+    "overflow_connector": "Taip pat, ",
+    "analyze": "Analizuoju",
+    "about": "apie",
+    "content_of": "teksto turinį",
+    "text_contains": "Tekste yra {s} sakinių su {w} žodžiais iš viso",
+    "type_default": "Turinys pateikia aktualią informaciją",
+    "concepts_prefix": "Identifikuotos pagrindinės koncepcijos:",
+    "entities_prefix": "Paminėti subjektai:",
+    "answer_terms": "Pagrindiniai žodžiai, susiję su atsakymu:",
+    "technical_note": "Turinyje yra specializuota techninė terminologija",
+    "question_default": "Užklausa prašo konkrečios informacijos apie temą",
+    "type_desc": {
+      "qa": "Tai klausimas, reikalaujantis konkretaus atsakymo",
+      "technical": "Turinys yra techninis ir turi skaitinius duomenis ar specializuotą terminologiją",
+      "narrative": "Tekstas pateikia pasakojimą ar įvykių aprašymą",
+      "instructional": "Turinys pateikia instrukcijas ar gaires, kurių reikia laikytis",
+      "factual": "Pateikiami faktiniai ir objektyvūs duomenys apie temą",
+      "conversational": "Tekstas turi pokalbio ir kasdienį toną"
+    },
+    "question_types": {
+      "kas": "Užklausa prašo konkrečios informacijos apie temą",
+      "kaip": "Užklausa prašo procedūros ar paaiškinimo',",
+      "kodėl": "Užklausa ieško priežasties ar priežastinio paaiškinimo',",
+      "kur": "Užklausa prašo informacijos apie vietą",
+      "kada": "Užklausa prašo laiko informacijos",
+      "kiek": "Užklausa prašo kiekybinės informacijos"
+    },
+    "meta_patterns": []
+  },
+  "lv": {
+    "connectors": [
+      "Vispirms,",
+      "Turklāt,",
+      "No otras puses,",
+      "Arī,",
+      "Visbeidzot,",
+      "Nobeigumā,"
+    ],
+    "overflow_connector": "Arī, ",
+    "analyze": "Analizēju",
+    "about": "par",
+    "content_of": "teksta saturu",
+    "text_contains": "Tekstā ir {s} teikumi ar {w} vārdiem kopā",
+    "type_default": "Saturs prezentē atbilstošu informāciju",
+    "concepts_prefix": "Identificētās galvenās koncepcijas ir:",
+    "entities_prefix": "Pieminētās entītes ir:",
+    "answer_terms": "Galvenie vārdi, kas saistīti ar atbildi:",
+    "technical_note": "Saturs ietver specializētu tehnisko terminoloģiju",
+    "question_default": "Pieprasījums lūdz specifisku informāciju par tēmu",
+    "type_desc": {
+      "qa": "Tas ir jautājums, kas prasa specifisku atbildi",
+      "technical": "Saturs ir tehnisks un satur skaitliskus datus vai specializētu terminoloģiju",
+      "narrative": "Teksts prezentē stāstu vai notikumu aprakstu",
+      "instructional": "Saturs sniedz instrukcijas vai vadlīnijas, kam jāseko",
+      "factual": "Tiek prezentēta faktiska un objektīva informācija par tēmu",
+      "conversational": "Tekstam ir sarunvalodas un ikdienišķs tonis"
+    },
+    "question_types": {
+      "kas": "Pieprasījums lūdz specifisku informāciju par tēmu",
+      "kā": "Pieprasījums lūdz procedūru vai paskaidrojumu',",
+      "kāpēc": "Pieprasījums meklē iemeslu vai cēloņu paskaidrojumu',",
+      "kur": "Pieprasījums lūdz informāciju par atrašanās vietu',",
+      "kad": "Pieprasījums lūdz laika informāciju',",
+      "cik": "Pieprasījums lūdz kvantitatīvu informāciju"
+    },
+    "meta_patterns": []
+  },
+  "fi": {
+    "connectors": [
+      "Ensinnäkin,",
+      "Lisäksi,",
+      "Toisaalta,",
+      "Samoin,",
+      "Lopuksi,",
+      "Yhteenvetona,"
+    ],
+    "overflow_connector": "Myös, ",
+    "analyze": "Analysoin",
+    "about": "aiheesta",
+    "content_of": "tekstin sisällön",
+    "text_contains": "Teksti sisältää {s} lausetta ja {w} sanaa yhteensä",
+    "type_default": "Sisältö esittää merkityksellistä tietoa",
+    "concepts_prefix": "Tunnistetut avainkäsitteet ovat:",
+    "entities_prefix": "Mainitut kokonaisuudet ovat:",
+    "answer_terms": "Avainsanat, jotka liittyvät vastaukseen:",
+    "technical_note": "Sisältö sisältää erikoistunutta teknistä terminologiaa",
+    "question_default": "Kysely pyytää spesifistä tietoa aiheesta",
+    "type_desc": {
+      "qa": "Tämä on kysymys, joka vaatii spesifin vastauksen",
+      "technical": "Sisältö on teknistä ja sisältää numeerisia tietoja tai erikoistunutta terminologiaa",
+      "narrative": "Teksti esittää kertomuksen tai tapahtumien kuvauksen",
+      "instructional": "Sisältö tarjoaa ohjeita tai suuntaviivoja noudatettavaksi",
+      "factual": "Aiheesta esitetään faktuaalia ja objektiivista tietoa",
+      "conversational": "Tekstillä on keskusteleva ja arkinen ääni"
+    },
+    "question_types": {
+      "mikä": "Kysely pyytää spesifistä tietoa aiheesta",
+      "miten": "Kysely pyytää menettelyä tai selitystä',",
+      "miksi": "Kysely etsii syytä tai kausaalista selitystä',",
+      "missä": "Kysely pyytää tietoa sijainnista",
+      "milloin": "Kysely pyytää aikatietoja',",
+      "kuinka paljon": "Kysely pyytää kvantitatiivista tietoa"
+    },
+    "meta_patterns": []
+  },
+  "et": {
+    "connectors": [
+      "Esiteks,",
+      "Lisaks,",
+      "Teisalt,",
+      "Samuti,",
+      "Lõpuks,",
+      "Kokkuvõttes,"
+    ],
+    "overflow_connector": "Samuti, ",
+    "analyze": "Analüüsin",
+    "about": "teemal",
+    "content_of": "teksti sisu",
+    "text_contains": "Tekst sisaldab {s} lauset ja {w} sõna kokku",
+    "type_default": "Sisu esitab asjakohast teavet",
+    "concepts_prefix": "Tuvastatud võtmekontseptsioonid on:",
+    "entities_prefix": "Mainitud üksused on:",
+    "answer_terms": "Võtmesõnad, mis on seotud vastusega:",
+    "technical_note": "Sisu sisaldab spetsialiseeritud tehnilist terminoloogiat",
+    "question_default": "Päring palub spetsiifilist teavet teema kohta",
+    "type_desc": {
+      "qa": "See on küsimus, mis nõuab spetsiifilist vastust",
+      "technical": "Sisu on tehniline ja sisaldab numbrilisi andmeid või spetsialiseeritud terminoloogiat',",
+      "narrative": "Tekst esitab jutustuse või sündmuste kirjelduse',",
+      "instructional": "Sisu pakub juhiseid või suuniseid järgimiseks',",
+      "factual": "Teemal esitatakse faktilist ja objektiivset teavet",
+      "conversational": "Tekstil on vestluslik ja igapäevane toon"
+    },
+    "question_types": {
+      "mis": "Päring palub spetsiifilist teavet teema kohta",
+      "kuidas": "Päring palub protseduuri või selgitust',",
+      "miks": "Päring otsib põhjust või põhjuslikku selgitust',",
+      "kus": "Päring palub teavet asukoha kohta',",
+      "millal": "Päring palub ajalist teavet',",
+      "kui palju": "Päring palub kvantitatiivset teavet"
+    },
+    "meta_patterns": []
+  },
+  "hu": {
+    "connectors": [
+      "Először is,",
+      "Ezenkívül,",
+      "Másrészt,",
+      "Szintén,",
+      "Végül,",
+      "Összefoglalva,"
+    ],
+    "overflow_connector": "Szintén, ",
+    "analyze": "Elemezem",
+    "about": "erről",
+    "content_of": "a szöveg tartalmát",
+    "text_contains": "A szöveg {s} mondatot tartalmaz, összesen {w} szóval",
+    "type_default": "A tartalom releváns információkat mutat be",
+    "concepts_prefix": "Az azonosított kulcsfogalmak:",
+    "entities_prefix": "A megemlített entitások:",
+    "answer_terms": "Kulcsszavak, amelyek kapcsolódnak a válaszhoz:",
+    "technical_note": "A tartalom specializált technikai terminológiát tartalmaz",
+    "question_default": "A kérés konkrét információkat kér a témáról",
+    "type_desc": {
+      "qa": "Ez egy kérdés, amely konkrét választ igényel",
+      "technical": "A tartalom technikai, és számadatokat vagy specializált terminológiát tartalmaz",
+      "narrative": "A szöveg elbeszélést vagy események leírását mutatja be",
+      "instructional": "A tartalom utasításokat vagy irányelveket nyújt a követéshez",
+      "factual": "Tényeken alapuló és objektív információk jelennek meg a témáról",
+      "conversational": "A szöveg beszélgetési és hétköznapi hangnemű"
+    },
+    "question_types": {
+      "mi": "A kérés konkrét információkat kér a témáról",
+      "hogyan": "A kérés eljárást vagy magyarázatot kér',",
+      "miért": "A kérés okot vagy ok-okozati magyarázatot keres',",
+      "hol": "A kérés információt kér egy helyről',",
+      "mikor": "A kérés időbeli információkat kér',",
+      "mennyi": "A kérés mennyiségi információkat kér"
+    },
+    "meta_patterns": []
+  },
+  "ga": {
+    "connectors": [
+      "Ar dtús,",
+      "Chomh maith le sin,",
+      "Ar an taobh eile,",
+      "Chomh maith,",
+      "Faoi dheireadh,",
+      "Mar fhocal scoir,"
+    ],
+    "overflow_connector": "Chomh maith, ",
+    "analyze": "Ag anailísiú",
+    "about": "faoi",
+    "content_of": "ábhar an téacs",
+    "text_contains": "Tá {s} abairte agus {w} focal iomlán sa téacs",
+    "type_default": "Léiríonn an t-ábhar faisnéis thábhachtach",
+    "concepts_prefix": "Na coincheapa tábhachtacha a bhraitheadh:",
+    "entities_prefix": "Na heintitis a luadh:",
+    "answer_terms": "Téarmaí tábhachtacha a bhaineann leis an bhfreagra:",
+    "technical_note": "Áirítear sa t-ábhar téarmaíocht theicniúil speisialaithe",
+    "question_default": "Iarrann an fiosrúchán faisnéis ar leith faoin ábhar",
+    "type_desc": {
+      "qa": "Is ceist é seo a éilíonn freagra ar leith",
+      "technical": "Tá an t-ábhar teicniúil agus tá sonraí uimhriúla nó téarmaíocht speisialaithe ann",
+      "narrative": "Léiríonn an téacs scéal nó cur síos ar imeachtaí",
+      "instructional": "Soláthraíonn an t-ábhar treoracha nó treoirlínte le leanúint",
+      "factual": "Tá faisnéis fhiúntach agus oibiachtúil curtha i láthair faoin ábhar",
+      "conversational": "Tá tón comhrá agus coiteann ag an téacs"
+    },
+    "question_types": {
+      "cad": "Iarrann an fiosrúchán faisnéis ar leith faoin ábhar",
+      "conas": "Iarrann an fiosrúchán nós imeartha nó míniú',",
+      "cén fáth": "Lorgann an fiosrúchán cúis nó míniú cúiseach',",
+      "cá háit": "Iarrann an fiosrúchán faisnéis faoi shuíomh',",
+      "cathain": "Iarrann an fiosrúchán faisnéis ama",
+      "cé mhéad": "Iarrann an fiosrúchán faisnéis chainníochtúil"
+    },
+    "meta_patterns": []
+  },
+  "el": {
+    "connectors": [
+      "Πρώτον,",
+      "Επιπλέον,",
+      "Από την άλλη πλευρά,",
+      "Επίσης,",
+      "Τελικά,",
+      "Συμπερασματικά,"
+    ],
+    "overflow_connector": "Επίσης, ",
+    "analyze": "Αναλύω",
+    "about": "σχετικά με",
+    "content_of": "το περιεχόμενο του κειμένου",
+    "text_contains": "Το κείμενο περιέχει {s} προτάσεις με {w} λέξεις συνολικά",
+    "type_default": "Το περιεχόμενο παρουσιάζει σχετικές πληροφορίες",
+    "concepts_prefix": "Τα ταυτοποιημένα βασικά θέματα είναι:",
+    "entities_prefix": "Τα αναφερόμενα αντικείμενα είναι:",
+    "answer_terms": "Βασικές λέξεις που συνδέονται με την απάντηση:",
+    "technical_note": "Το περιεχόμενο περιλαμβάνει ειδικευμένη τεχνική τερμινολογία",
+    "question_default": "Το αίτημα ζητά συγκεκριμένες πληροφορίες για το θέμα",
+    "type_desc": {
+      "qa": "Αυτό είναι μια ερώτηση που απαιτεί συγκεκριμένη απάντηση",
+      "technical": "Το περιεχόμενο είναι τεχνικό και περιέχει αριθμητικά δεδομένα ή ειδικευμένη τερμινολογία",
+      "narrative": "Το κείμενο παρουσιάζει αφήγηση ή περιγραφή γεγονότων",
+      "instructional": "Το περιεχόμενο παρέχει οδηγίες ή κατευθυντήριες γραμμές για ακολούθηση",
+      "factual": "Παρουσιάζονται γεγοντολογικές και αντικειμενικές πληροφορίες για το θέμα",
+      "conversational": "Το κείμενο έχει συζητητικό και καθημερινό τόνο"
+    },
+    "question_types": {
+      "τι": "Το αίτημα ζητά συγκεκριμένες πληροφορίες για το θέμα",
+      "πώς": "Το αίτημα ζητά διαδικασία ή εξήγηση',",
+      "γιατί": "Το αίτημα ψάχνει αιτία ή αιτιολογική εξήγηση',",
+      "πού": "Το αίτημα ζητά πληροφορίες για τοποθεσία',",
+      "πότε": "Το αίτημα ζητά χρονικές πληροφορίες',",
+      "πόσο": "Το αίτημα ζητά ποσοτικές πληροφορίες"
+    },
+    "meta_patterns": []
+  },
+  "sq": {
+    "connectors": [
+      "Së pari,",
+      "Për më tepër,",
+      "Nga ana tjetër,",
+      "Gjithashtu,",
+      "Së fundi,",
+      "Përmbledhtas,"
+    ],
+    "overflow_connector": "Gjithashtu, ",
+    "analyze": "Duke analizuar",
+    "about": "rreth",
+    "content_of": "përmbajtjen e tekstit",
+    "text_contains": "Teksti përmban {s} fjali me {w} fjalë në total",
+    "type_default": "Përmbajtja paraqet informacione të rëndësishme",
+    "concepts_prefix": "Konceptet kryesore të identifikuara janë:",
+    "entities_prefix": "Entitetet e përmendura janë:",
+    "answer_terms": "Fjalët kryesore të lidhura me përgjigjen:",
+    "technical_note": "Përmbajtja përfshin terminologji të specializuar teknike",
+    "question_default": "Kërkesa kërkon informacione specifike për temën",
+    "type_desc": {
+      "qa": "Kjo është një pyetje që kërkon një përgjigje specifike",
+      "technical": "Përmbajtja është teknike dhe përmban të dhëna numerike ose terminologji të specializuar",
+      "narrative": "Teksti paraqet një rrëfim ose përshkrim të ngjarjeve",
+      "instructional": "Përmbajtja ofron udhëzime ose udhëzues për t'u ndjekur",
+      "factual": "Paraqiten informacione faktike dhe objektive për temën",
+      "conversational": "Teksti ka një ton bisedues dhe të përditshëm"
+    },
+    "question_types": {
+      "ça": "Kërkesa kërkon informacione specifike për temën",
+      "si": "Kërkesa kërkon një procedurë ose shpjegim',",
+      "pse": "Kërkesa kërkon një arsye ose shpjegim shkakësor',",
+      "ku": "Kërkesa kërkon informacione për një vendndodhje',",
+      "kur": "Kërkesa kërkon informacione kohore",
+      "sa": "Kërkesa kërkon informacione sasiore"
+    },
+    "meta_patterns": []
+  }
+}

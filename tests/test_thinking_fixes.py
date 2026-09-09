@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dataset_preparer.thinking_quality import validate_thinking, filter_low_quality
-from training.trainer import TrainingConfig, TRAINING_CONFIG
+from training.trainer import TrainingConfig
 
 
 class TestThinkingQualityThreshold:
@@ -44,11 +44,6 @@ class TestThinkingLossWeight:
         config = TrainingConfig()
         assert config.thinking_loss_weight == 1.0, \
             f"Expected thinking_loss_weight=1.0, got {config.thinking_loss_weight}"
-
-    def test_training_dict_default_is_10(self):
-        """TRAINING_CONFIG dict thinking_loss_weight should be 1.0."""
-        assert TRAINING_CONFIG['thinking_loss_weight'] == 1.0, \
-            f"Expected TRAINING_CONFIG thinking_loss_weight=1.0, got {TRAINING_CONFIG['thinking_loss_weight']}"
 
 
 class TestDoubleForwardPass:

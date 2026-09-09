@@ -12,7 +12,6 @@ from .utils import (
     stream_generator_wrapper_sync_to_async,
     llama_create_stream_sync,
     model_create_compat_sync,
-    build_text_completion_response,
     build_chat_completion_response,
     parse_thinking_response,
 )
@@ -59,13 +58,44 @@ async def models_reload(request: Request):
 
     Body (optional):
         model_path: str  # Path to .gguf file to load
+        api_key: str     # API key for authentication
     """
+    import os as _os
+    api_key = _os.environ.get("MODEL_RELOAD_API_KEY", "")
+    if not api_key:
+        return Response(
+            content=json.dumps({"error": "Model reload is disabled (set MODEL_RELOAD_API_KEY to enable)"}).encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            status_code=403,
+        )
+
     try:
         data = await request.json()
     except Exception:
         data = {}
 
+    provided_key = (data or {}).get("api_key", "")
+    import hmac
+    if not hmac.compare_digest(provided_key, api_key):
+        return Response(
+            content=json.dumps({"error": "Invalid or missing api_key"}).encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            status_code=403,
+        )
+
     model_path = data.get("model_path") if data else None
+
+    # Validate model_path is within allowed directories
+    if model_path:
+        allowed_dirs = [str(MODEL_PATH.parent), str(EXPORTED_DIR)] if EXPORTED_DIR else [str(MODEL_PATH.parent)]
+        import pathlib
+        resolved = pathlib.Path(model_path).resolve()
+        if not any(resolved.is_relative_to(pathlib.Path(d)) for d in allowed_dirs):
+            return Response(
+                content=json.dumps({"error": "model_path must be within the models or exported directory"}).encode("utf-8"),
+                media_type="application/json; charset=utf-8",
+                status_code=403,
+            )
 
     try:
         loaded_path = model.reload(model_path)
@@ -79,13 +109,13 @@ async def models_reload(request: Request):
         }
     except FileNotFoundError as e:
         return Response(
-            content=json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8"),
+            content=json.dumps({"error": "Model file not found"}).encode("utf-8"),
             media_type="application/json; charset=utf-8",
             status_code=404,
         )
     except Exception as e:
         return Response(
-            content=json.dumps({"error": f"Failed to reload model: {str(e)}"}, ensure_ascii=False).encode("utf-8"),
+            content=json.dumps({"error": "Failed to reload model"}).encode("utf-8"),
             media_type="application/json; charset=utf-8",
             status_code=500,
         )
@@ -238,10 +268,12 @@ async def v1_chat_completions_agentic(request: Request):
     # Use agentic streaming if agent is enabled
     if stream and agent_enabled:
         async def agentic_event_stream():
+            import asyncio
             from inference.chat_engine import get_chat_engine_instance, stream_chat_agentic
             
-            engine = get_chat_engine_instance()
-            response = engine.generate_response(prompt, full=True)
+            loop = asyncio.get_running_loop()
+            engine = await loop.run_in_executor(None, get_chat_engine_instance)
+            response = await loop.run_in_executor(None, lambda: engine.generate_response(prompt, full=True))
             
             if isinstance(response, dict):
                 for chunk in stream_chat_agentic(response):
@@ -269,8 +301,8 @@ async def v1_chat_completions_agentic(request: Request):
     try:
         from inference.chat_engine import get_chat_engine_instance
         
-        engine = get_chat_engine_instance()
-        response = engine.generate_response(prompt, full=True)
+        engine = await loop.run_in_executor(None, get_chat_engine_instance)
+        response = await loop.run_in_executor(None, lambda: engine.generate_response(prompt, full=True))
         
         # Build agentic response
         result = {

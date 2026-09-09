@@ -1,0 +1,1 @@
+<|en|><|problem|>Instead, let’s “slice” the geometry. T o do that, we’ll add a Grid. And increase its resolution to 100 by 100 Edges. Rotate and scale it so it encompasses the buildings. And move it so it’s not overlapping or inside the buildings.<|final|>

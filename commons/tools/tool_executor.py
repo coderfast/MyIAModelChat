@@ -1,7 +1,6 @@
 """Tool execution with cross-platform shell support and security."""
 
 import re
-import json
 import platform
 import subprocess
 import logging
@@ -70,25 +69,6 @@ def execute_bash(command: str, timeout: int = 30) -> str:
 class ShellSecurity:
     """Validates commands against safe/blocked patterns."""
 
-    SAFE_COMMANDS_WINDOWS = [
-        'Get-ChildItem', 'Get-Content', 'Get-Item', 'Test-Path', 'Resolve-Path',
-        'Get-Process', 'Get-Service', 'Get-Host', 'Get-Date', 'Get-Command',
-        'Get-Help', 'Get-Variable', 'Select-String', 'Measure-Object',
-        'Sort-Object', 'Where-Object', 'Format-Table', 'Format-List',
-        'Out-String', 'ConvertTo-Json', 'ConvertFrom-Json',
-        'cat', 'ls', 'dir', 'echo', 'pwd', 'whoami', 'date',
-    ]
-
-    SAFE_COMMANDS_UNIX = [
-        'ls', 'll', 'la', 'tree', 'find', 'which', 'whereis',
-        'cat', 'head', 'tail', 'less', 'more', 'file', 'stat',
-        'grep', 'egrep', 'wc', 'diff', 'md5sum', 'sha256sum',
-        'ps', 'top', 'uptime', 'who', 'last',
-        'uname', 'hostname', 'id', 'whoami', 'date', 'cal',
-        'env', 'printenv', 'free', 'df', 'du', 'mount',
-        'echo', 'printf', 'bc', 'jq',
-    ]
-
     BLOCKED_PATTERNS = [
         r'Remove-Item\s+-Recurse', r'Remove-Item\s+-Force',
         r'del\s+/[sSqQfF]', r'Format-Volume', r'Initialize-Disk',
@@ -109,11 +89,6 @@ class ShellSecurity:
             if re.search(pattern, command, re.IGNORECASE):
                 return False, f"Blocked: matches destructive pattern '{pattern}'"
         return True, "OK"
-
-    @classmethod
-    def sanitize_command(cls, command: str) -> str:
-        """Remove dangerous characters from command."""
-        return command.strip().rstrip('`')
 
 
 class ToolExecutor:

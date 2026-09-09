@@ -351,8 +351,7 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         opset_version=14,
     )
 
-    # Build stem and output directory
-    stem = Path(pth_path).stem
+    # Build output directory
     onnx_dir = os.path.join(EXPORTED_DIR, f"{stem}_onnx")
     os.makedirs(onnx_dir, exist_ok=True)
 
@@ -495,7 +494,6 @@ def _extract_agentic_metadata(tokenizer, ckpt: dict) -> dict:
     # Extract agentic tokens
     agentic_token_names = [
         'thinking', 'thinking_end', 'tool_call', 'tool_call_end',
-        'observation', 'observation_end', 'action', 'action_end'
     ]
     
     for token_name in agentic_token_names:
@@ -503,14 +501,14 @@ def _extract_agentic_metadata(tokenizer, ckpt: dict) -> dict:
         if hasattr(tokenizer, getter_name):
             token_id = getattr(tokenizer, getter_name)()
             if token_id >= 0:
-                token_str = f"<{token_name}>" if not token_name.startswith('thinking') else f"<{token_name.replace('_', ' ')}>"
+                token_str = f"<|{token_name}|>"
                 metadata["agentic_tokens"][token_name] = {
                     "id": token_id,
                     "token": token_str
                 }
     
     # Extract mode tokens
-    mode_token_names = ['context', 'answer', 'thinking_mode']
+    mode_token_names = ['thinking_mode']
     for token_name in mode_token_names:
         getter_name = f"get_{token_name}_index"
         if hasattr(tokenizer, getter_name):

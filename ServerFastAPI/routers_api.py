@@ -13,7 +13,6 @@ from .utils import (
     stream_generator_wrapper_sync_to_async,
     llama_create_stream_sync,
     model_create_compat_sync,
-    build_text_completion_response,
     build_chat_completion_response,
     parse_thinking_response,
 )

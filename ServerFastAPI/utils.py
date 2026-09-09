@@ -1,7 +1,6 @@
 import json
 import time
 import asyncio
-import inspect
 import logging
 from functools import partial
 from typing import Any, Dict, List, Optional
@@ -289,15 +288,18 @@ async def stream_generator_wrapper_sync_to_async(sync_gen_func, *args, media_typ
 
 
 def build_prompt_from_messages(messages: List[Dict[str, Any]]) -> str:
-    parts = []
+    """Build prompt from message list using GPT-2 standard tokens."""
+    parts: List[str] = []
     for m in messages:
         role = (m.get("role") or "user").lower()
         content = m.get("content", "")
-        if role in ("system", "assistant", "user"):
-            parts.append(f"{role}: {content}")
+        if role == "system":
+            parts.append(f"<|system|>{content}<|end|>")
+        elif role == "assistant":
+            parts.append(f"<|assistant|>{content}<|end|>")
         else:
-            parts.append(f"user: {content}")
-    parts.append("assistant: ")
+            parts.append(f"<|user|>{content}<|end|>")
+    parts.append("<|assistant|>")
     return "\n".join(parts)
 
 

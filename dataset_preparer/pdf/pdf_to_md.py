@@ -109,19 +109,13 @@ def pdf_to_md(config: dict) -> int:
                         for chunk in chunks:
                             chunk = clean_text(chunk)
                             if chunk:
-                                if fmt == 'chat':
-                                    md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
-                                else:
-                                    md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
+                                md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
                                 safe_name = f"pdf_{file_stem}_{generated:06d}.md"
                                 with open(os.path.join(file_output_dir, safe_name), 'w', encoding='utf-8') as f:
                                     f.write(md_content)
                                 generated += 1
                     else:
-                        if fmt == 'chat':
-                            md_content = f"{lang_token}<|problem|>{para}<|final|>"
-                        else:
-                            md_content = f"{lang_token}<|problem|>{para}<|final|>"
+                        md_content = f"{lang_token}<|problem|>{para}<|final|>"
                         safe_name = f"pdf_{file_stem}_{generated:06d}.md"
                         with open(os.path.join(file_output_dir, safe_name), 'w', encoding='utf-8') as f:
                             f.write(md_content)

@@ -4,7 +4,7 @@ import platform
 import json
 import os
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional, Any
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,6 @@ def _read_file(path: str) -> str:
 
 def _list_directory(path: str = ".") -> str:
     """List directory contents."""
-    import os
     try:
         entries = []
         for entry in sorted(os.listdir(path)):

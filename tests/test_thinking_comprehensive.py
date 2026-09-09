@@ -4,7 +4,6 @@ Tests cover: BPE thinking symbols, thinking quality, source validators edge case
 thinking generator depth, training metrics, and pipeline data flow.
 """
 import torch
-import torch.nn as nn
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

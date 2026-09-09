@@ -8,18 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Dict, List, Tuple
-from dataclasses import dataclass
 
 from .chatmodel import ChatModel
-
-
-@dataclass
-class MoEConfig:
-    """Configuration for MoE layer."""
-    num_experts: int = 4
-    top_k: int = 2
-    load_balance_weight: float = 0.01
-    expert_capacity_factor: float = 1.25
 
 
 class MoELayer(nn.Module):
@@ -137,13 +127,6 @@ class ChatModelMoE(ChatModel):
         # Replace FFN in each transformer block with MoE
         self._replace_ffn_with_moe()
         
-        # Routing statistics
-        self.routing_stats: Dict[str, List[float]] = {
-            'gate_scores_entropy': [],
-            'expert_utilization': [],
-            'load_balance_loss': [],
-        }
-    
     def _replace_ffn_with_moe(self):
         """Replace FFN layers with MoE layers in all transformer blocks."""
         for layer in self.model.transformer.h:
@@ -206,7 +189,7 @@ class ChatModelMoE(ChatModel):
         """
         if gate_scores is None:
             if not self._all_gate_scores:
-                return torch.tensor(0.0)
+                return torch.tensor(0.0, device=next(self.parameters()).device)
             gate_scores = torch.stack([s.detach() if s.requires_grad else s for s in self._all_gate_scores])
             gate_scores = gate_scores.to(next(self.parameters()).device)
         

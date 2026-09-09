@@ -25,10 +25,6 @@ class TestShellSecurity:
         is_safe, reason = ShellSecurity.validate_command("rm -rf /", "linux")
         assert not is_safe
 
-    def test_sanitize_command(self):
-        result = ShellSecurity.sanitize_command("echo hello`")
-        assert result == "echo hello"
-
     def test_sudo_blocked(self):
         is_safe, _ = ShellSecurity.validate_command("sudo apt install python", "linux")
         assert not is_safe

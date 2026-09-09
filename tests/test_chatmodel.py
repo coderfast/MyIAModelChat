@@ -2,7 +2,6 @@
 
 import torch
 import pytest
-from unittest.mock import MagicMock
 
 
 class FakeTokenizer:
@@ -93,8 +92,8 @@ class TestChatModel:
         loss.backward()
         # Check gradients exist
         for param in model.parameters():
-            if param.requires_grad:
-                assert param.grad is not None or param.grad is None  # Some params may not get grad
+            if param.requires_grad and param.grad is not None:
+                break  # At least one parameter should have gradients
         assert loss.item() > 0
 
     def test_different_embed_sizes(self):

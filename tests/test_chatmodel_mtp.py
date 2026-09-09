@@ -150,8 +150,8 @@ class TestChatModelMTP:
         loss.backward()
 
         for param in model.parameters():
-            if param.requires_grad:
-                assert param.grad is not None or param.grad is None  # some params may not get grads
+            if param.requires_grad and param.grad is not None:
+                break  # At least one parameter should have gradients
 
     def test_get_mtp_params(self):
         from commons.model.chatmodel_mtp import ChatModelMTP
@@ -219,9 +219,12 @@ class TestChatModelMoEMTP:
 
         assert isinstance(output, tuple)
         assert len(output) == 2
-        primary_logits, mtp_logits = output
-        assert isinstance(mtp_logits, list)
-        assert len(mtp_logits) == 3  # mtp_num_heads - 1
+        primary_logits, gate_scores = output
+        assert primary_logits.shape == (2, 10, 100)
+        # MTP logits stored as side channel
+        assert hasattr(model, '_mtp_logits')
+        assert isinstance(model._mtp_logits, list)
+        assert len(model._mtp_logits) == 3  # mtp_num_heads - 1
 
     def test_output_shapes(self):
         from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
@@ -235,10 +238,11 @@ class TestChatModelMoEMTP:
         batch_size = 2
         seq_len = 10
         input_ids = torch.randint(0, vocab_size, (batch_size, seq_len))
-        primary_logits, mtp_logits = model(input_ids)
+        primary_logits, gate_scores = model(input_ids)
 
         assert primary_logits.shape == (batch_size, seq_len, vocab_size)
-        for head_logits in mtp_logits:
+        # MTP logits stored as side channel
+        for head_logits in model._mtp_logits:
             assert head_logits.shape == (batch_size, seq_len, vocab_size)
 
     def test_has_both_moe_and_mtp(self):

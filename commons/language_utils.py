@@ -4,9 +4,7 @@ Multilingual language detection and utilities.
 Supports all EU official languages (24) + Eastern European languages.
 Reusable across data preparation, thinking engine, and dataset modules.
 """
-import re
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -326,14 +324,14 @@ LANGUAGE_INDICATORS = {
         'name': 'Lithuanian',
         'family': 'baltic',
         'indicators': [' tas ', ' ta ', ' to ', ' tie ', ' tą ', ' tai ',
-                       ' ir ', ' yra ', ' yra ', ' ne ',
+                       ' ir ', ' yra ', ' ne ',
                        'nes', 'todėl', 'tačiau', 'be to'],
     },
     'lv': {
         'name': 'Latvian',
         'family': 'baltic',
         'indicators': [' tas ', ' ta ', ' tie ', ' tās ', ' šis ', ' šī ',
-                       ' un ', ' ir ', ' ir ', ' ne ',
+                       ' un ', ' ir ', ' ne ',
                        'jo', 'tāpēc', 'tomēr', 'turklāt'],
     },
 
@@ -348,8 +346,8 @@ LANGUAGE_INDICATORS = {
     'et': {
         'name': 'Estonian',
         'family': 'finno-ugric',
-        'indicators': [' see ', ' too ', ' need ', ' selle ', ' selle ',
-                       ' ja ', ' on ', ' on ', ' ei ',
+        'indicators': [' see ', ' too ', ' need ', ' selle ',
+                       ' ja ', ' on ', ' ei ',
                        'sest', 'seetõttu', 'aga', 'lisaks'],
     },
     'hu': {

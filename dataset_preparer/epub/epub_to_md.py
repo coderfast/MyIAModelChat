@@ -134,10 +134,7 @@ def epub_to_md(config: dict) -> int:
                     continue
 
                 if not enable_chunking or len(chapter.split()) <= max_tokens:
-                    if fmt == 'chat':
-                        md_content = f"{lang_token}<|problem|>{chapter}<|final|>"
-                    else:
-                        md_content = f"{lang_token}<|problem|>{chapter}<|final|>"
+                    md_content = f"{lang_token}<|problem|>{chapter}<|final|>"
                     safe_name = f"epub_{file_stem}_{generated:06d}.md"
                     with open(os.path.join(file_output_dir, safe_name), 'w', encoding='utf-8') as f:
                         f.write(md_content)
@@ -153,19 +150,13 @@ def epub_to_md(config: dict) -> int:
                         for chunk in chunks:
                             chunk = clean_text(chunk)
                             if chunk:
-                                if fmt == 'chat':
-                                    md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
-                                else:
-                                    md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
+                                md_content = f"{lang_token}<|problem|>{chunk}<|final|>"
                                 safe_name = f"epub_{file_stem}_{generated:06d}.md"
                                 with open(os.path.join(file_output_dir, safe_name), 'w', encoding='utf-8') as f:
                                     f.write(md_content)
                                 generated += 1
                     else:
-                        if fmt == 'chat':
-                            md_content = f"{lang_token}<|problem|>{paragraph}<|final|>"
-                        else:
-                            md_content = f"{lang_token}<|problem|>{paragraph}<|final|>"
+                        md_content = f"{lang_token}<|problem|>{paragraph}<|final|>"
                         safe_name = f"epub_{file_stem}_{generated:06d}.md"
                         with open(os.path.join(file_output_dir, safe_name), 'w', encoding='utf-8') as f:
                             f.write(md_content)

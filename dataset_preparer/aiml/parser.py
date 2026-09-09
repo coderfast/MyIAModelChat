@@ -7,9 +7,7 @@ Expands: wildcards with examples, <random><li> into N samples
 Filters: quality pre-contamination
 """
 import re
-import random
 import html
-import unicodedata
 import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Union

@@ -8,7 +8,6 @@ Usage:
     dataloader = DataLoader(dataset, batch_size=32, collate_fn=trainer.collate_fn)
 """
 
-import torch
 from torch.utils.data import Dataset
 
 

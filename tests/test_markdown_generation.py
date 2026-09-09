@@ -239,4 +239,4 @@ class TestMarkdownStructure:
         for d in expected_dirs:
             dir_path = os.path.join(md_root, d)
             # Directory should exist or be creatable
-            assert d in expected_dirs
+            assert os.path.isdir(dir_path) or os.access(os.path.dirname(dir_path) or '.', os.W_OK)

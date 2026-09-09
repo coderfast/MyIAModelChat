@@ -18,6 +18,10 @@ from typing import List, Dict, Tuple, Optional
 from collections import Counter
 from dataset_preparer.aiml.loader import AIMLLoader
 from datasets import load_dataset, concatenate_datasets, Dataset
+from commons.utils.text_utils import (
+    normalize_unicode, clean_text, split_sentences, split_paragraphs,
+    chunk_text_by_tokens, clean_page_artifacts,
+)
 import sys
 import multiprocessing as mp
 from config import OLLAMA_MODEL
@@ -75,327 +79,6 @@ import re
 
 # spaCy model singleton cache
 _spacy_nlp = None
-
-
-def normalize_unicode(text: str) -> str:
-    """Normalize Unicode text to NFKC form for consistency."""
-    return unicodedata.normalize('NFKC', text)
-
-
-# UTF-8 multi-byte sequences (above ASCII 0x7F) appear as Latin-1 chars
-# when mis-decoded. Detect any char in the 0x80-0xFF range (Latin-1 extended).
-_MOJIBAKE_DETECT = re.compile(r'[\x80-\xff]')
-
-# Encodings to try, ordered by likelihood for European web content.
-# Latin-1/CP1252 first (most common), then ISO-8859, Windows, KOI8, Mac.
-_MOJIBAKE_ENCODINGS = [
-    'latin-1',       # ISO-8859-1 (superset: maps all 0x00-0xFF codepoints)
-    'cp1252',        # Windows-1252 (Western European with smart quotes, euro)
-    # Windows codepages (Central/Eastern/Southern European)
-    'cp1250',        # Central European (Polish, Czech, Slovak, Hungarian, etc.)
-    'cp1251',        # Cyrillic (Russian, Ukrainian, Bulgarian, etc.)
-    'cp1253',        # Greek
-    'cp1254',        # Turkish
-    'cp1255',        # Hebrew
-    'cp1256',        # Arabic
-    'cp1257',        # Baltic (Lithuanian, Latvian, Estonian)
-    'cp1258',        # Vietnamese
-    # ISO-8859 family
-    'iso8859-2',     # Latin-2 (Central European)
-    'iso8859-3',     # Latin-3 (South European: Maltese, Esperanto)
-    'iso8859-4',     # Latin-4 (North European: Estonian, Latvian, Lithuanian)
-    'iso8859-5',     # Cyrillic
-    'iso8859-6',     # Arabic
-    'iso8859-7',     # Greek
-    'iso8859-8',     # Hebrew
-    'iso8859-9',     # Latin-5 (Turkish)
-    'iso8859-10',    # Latin-6 (Nordic)
-    'iso8859-11',    # Thai
-    'iso8859-13',    # Baltic
-    'iso8859-14',    # Celtic (Irish, Welsh)
-    'iso8859-15',    # Latin-9 (superset of ISO-8859-1 with euro, French/Finnish)
-    'iso8859-16',    # Latin-10 (South-Eastern European)
-    # KOI8 family (Cyrillic)
-    'koi8-r',        # Russian
-    'koi8-u',        # Ukrainian
-    # Macintosh legacy
-    'macroman',      # Western European
-    'maccyrillic',   # Cyrillic
-    'macgreek',      # Greek
-    'macturkish',    # Turkish
-    'maciceland',    # Icelandic
-    'maccentraleurope',  # Central European
-]
-
-
-def _repair_mojibake(text: str) -> str:
-    """Repair mojibake caused by UTF-8 bytes decoded as a single-byte encoding.
-
-    Tries re-encoding with each candidate encoding and decoding as UTF-8.
-    Covers all European languages plus Greek, Cyrillic, Arabic, Hebrew, Thai.
-    """
-    if not text or not isinstance(text, str):
-        return text
-
-    # Fast check: no chars above 0x7F means no mojibake possible
-    if not _MOJIBAKE_DETECT.search(text):
-        return text
-
-    # Try each encoding: re-encode to bytes, then decode as UTF-8
-    for encoding in _MOJIBAKE_ENCODINGS:
-        try:
-            repaired = text.encode(encoding, errors='strict').decode('utf-8', errors='strict')
-            return repaired
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            continue
-
-    # Partial mojibake or mixed encoding: try char-by-char recovery
-    result = []
-    buf = []
-    for ch in text:
-        if ord(ch) > 0x7F:
-            buf.append(ch)
-        else:
-            if buf:
-                result.append(_decode_mojibake_buf(buf))
-                buf = []
-            result.append(ch)
-    if buf:
-        result.append(_decode_mojibake_buf(buf))
-    return ''.join(result)
-
-
-def _decode_mojibake_buf(buf):
-    """Try to decode a buffer of high-byte chars as mojibake."""
-    s = ''.join(buf)
-    for encoding in _MOJIBAKE_ENCODINGS:
-        try:
-            return s.encode(encoding, errors='strict').decode('utf-8', errors='strict')
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            continue
-    return s  # Not mojibake, return as-is
-
-
-def clean_text(text: str) -> str:
-    """Clean text by removing extra whitespace, repairing encoding, and normalizing."""
-    if not text or not isinstance(text, str):
-        return ""
-
-    # Repair mojibake BEFORE normalization (NFKC can't fix double-decoded bytes)
-    text = _repair_mojibake(text)
-
-    # Normalize Unicode
-    text = normalize_unicode(text)
-
-    # Remove multiple whitespace characters
-    text = re.sub(r'\s+', ' ', text)
-
-    # Strip leading/trailing whitespace
-    text = text.strip()
-
-    return text
-
-
-def split_sentences(text: str) -> List[str]:
-    """
-    Split text into sentences using spaCy if available, fallback to regex-based splitting.
-
-    Args:
-        text: Input text to split
-
-    Returns:
-        List of sentences
-    """
-    if not text or not isinstance(text, str):
-        return []
-
-    # Clean text first
-    text = clean_text(text)
-
-    if not text:
-        return []
-
-    # Try spaCy first (most accurate)
-    if SPACY_AVAILABLE:
-        try:
-            global _spacy_nlp
-            if _spacy_nlp is None:
-                try:
-                    _spacy_nlp = spacy.load('es_core_news_sm')
-                except OSError:
-                    try:
-                        _spacy_nlp = spacy.load('en_core_web_sm')
-                    except OSError:
-                        _spacy_nlp = spacy.blank("en")
-                        _spacy_nlp.add_pipe("sentencizer")
-
-            doc = _spacy_nlp(text)
-            sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
-            return sentences
-        except Exception:
-            pass
-
-    # Fallback: improved regex-based sentence splitting
-    # Split on sentence-ending punctuation followed by space or end of string
-    # Handles: Dr. Smith, 3.14, URLs, etc.
-    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z¡¿])', text)
-
-    # Filter empty sentences
-    sentences = [s.strip() for s in sentences if s.strip()]
-
-    return sentences
-
-
-def split_paragraphs(text: str, min_length: int = 20) -> List[str]:
-    """
-    Split text into paragraphs by blank lines, falling back to grouped sentences.
-
-    Preserves semantic coherence better than single sentences. If the text has
-    no blank-line separators, groups 2-3 consecutive sentences into paragraphs.
-
-    Args:
-        text: Input text to split
-        min_length: Minimum character length for a paragraph to be kept
-
-    Returns:
-        List of paragraphs
-    """
-    if not text or not isinstance(text, str):
-        return []
-
-    # Normalize unicode but preserve newlines for paragraph splitting
-    text = normalize_unicode(text)
-    if not text.strip():
-        return []
-
-    # Split on blank lines / double newlines BEFORE cleaning whitespace
-    raw_paragraphs = re.split(r'\n\s*\n', text)
-    paragraphs = [clean_text(p) for p in raw_paragraphs]
-    paragraphs = [p for p in paragraphs if p]
-
-    # If no blank-line separated paragraphs, group sentences into paragraphs
-    if len(paragraphs) <= 1:
-        sentences = split_sentences(text)
-        if len(sentences) <= 1:
-            paragraphs = sentences if sentences else []
-        else:
-            paragraphs = []
-            for i in range(0, len(sentences), 3):
-                grouped = ' '.join(sentences[i:i + 3])
-                if grouped.strip():
-                    paragraphs.append(grouped)
-
-    return [p for p in paragraphs if len(p) >= min_length]
-
-
-def chunk_text_by_tokens(text: str, max_tokens: int = 512, overlap_tokens: int = 50) -> List[str]:
-    """
-    Split text into overlapping chunks by token count.
-    Useful for models with fixed context windows.
-
-    Args:
-        text: Input text to chunk
-        max_tokens: Maximum tokens per chunk (default 512)
-        overlap_tokens: Number of overlapping tokens between chunks (default 50)
-
-    Returns:
-        List of text chunks
-    """
-    if not text or not isinstance(text, str):
-        return []
-
-    # Simple word-based tokenization (approximation)
-    # For production, use actual tokenizer
-    words = text.split()
-
-    if len(words) <= max_tokens:
-        return [text] if text.strip() else []
-
-    chunks = []
-    start = 0
-
-    while start < len(words):
-        end = min(start + max_tokens, len(words))
-        chunk = ' '.join(words[start:end])
-        if chunk.strip():
-            chunks.append(chunk)
-
-        # Move start forward, accounting for overlap
-        step = max(1, max_tokens - overlap_tokens)
-        start += step
-
-        # Safety check to avoid infinite loop
-        if start >= len(words):
-            break
-
-    return chunks
-
-
-# Patterns for removing page artifacts (headers, footers, page numbers)
-PAGE_NUMBER_ONLY = re.compile(r'^\s*\d{1,4}\s*$')
-PAGE_REF_LINE = re.compile(
-    r'^\s*(?:p(?:ágina|ag)?\.?\s*\d+|page\s*\d+|'
-    r'p\.\s*\d+\s*(?:de|of|/)\s*\d+|\d+\s*[-–/]\s*\d+)\s*$',
-    re.IGNORECASE
-)
-
-
-def clean_page_artifacts(page_texts: List[str], min_repeat_pages: int = 2) -> List[str]:
-    """
-    Remove headers, footers and page numbers from extracted page texts.
-
-    Uses cross-page repetition: a short line that appears at the top or bottom
-    of two or more pages is treated as a repeated header/footer and dropped.
-    Standalone page numbers and page-reference lines are removed from every page.
-
-    Args:
-        page_texts: List of raw text extracted per page (order matters)
-        min_repeat_pages: Minimum pages where a line must repeat to be considered
-                          a header/footer
-
-    Returns:
-        List of cleaned page texts
-    """
-    if not page_texts:
-        return page_texts
-
-    # Collect candidate header/footer lines from the first and last lines of each page
-    header_candidates = Counter()
-    footer_candidates = Counter()
-
-    for page_text in page_texts:
-        lines = [ln.strip() for ln in page_text.split('\n') if ln.strip()]
-        if not lines:
-            continue
-        # First 3 lines = potential header; last 3 lines = potential footer
-        for ln in lines[:3]:
-            header_candidates[ln] += 1
-        for ln in lines[-3:]:
-            footer_candidates[ln] += 1
-
-    repeated_headers = {ln for ln, count in header_candidates.items()
-                        if count >= min_repeat_pages and len(ln) <= 60}
-    repeated_footers = {ln for ln, count in footer_candidates.items()
-                        if count >= min_repeat_pages and len(ln) <= 60}
-
-    cleaned = []
-    for page_text in page_texts:
-        lines = page_text.split('\n')
-        out_lines = []
-        for i, ln in enumerate(lines):
-            stripped = ln.strip()
-            if not stripped:
-                out_lines.append('')
-                continue
-            if PAGE_NUMBER_ONLY.match(stripped) or PAGE_REF_LINE.match(stripped):
-                continue
-            if stripped in repeated_headers or stripped in repeated_footers:
-                continue
-            # Fix hyphen line breaks (word-wrapped words split across lines)
-            out_lines.append(stripped)
-        cleaned.append('\n'.join(out_lines))
-
-    return cleaned
 
 
 def deduplicate_texts(texts: List[str], threshold: float = 0.8) -> List[str]:
@@ -2052,7 +1735,7 @@ class DataPreparer:
             logger.info(f"  Adding AIML data: {len(self.aiml_data)} samples")
         
         if self.hf_data is not None and len(self.hf_data) > 0:
-            hf_with_source = self._add_source_column(self.hf_data, 'hf')
+            hf_with_source = self._add_source_column(self.hf_data, 'HuggingFace')
             datasets_to_combine.append(hf_with_source)
             total_samples += len(self.hf_data)
             logger.info(f"  Adding HuggingFace data: {len(self.hf_data)} samples")
@@ -2667,22 +2350,39 @@ class DataPreparer:
         if categories and isinstance(categories, str):
             categories = [c.strip() for c in categories.split(',')]
 
-        texts = [item.get('input_ids', '') for item in self.combined_data]
-        sources = [item.get('source', 'unknown') for item in self.combined_data]
+        items = list(self.combined_data)
+        texts = [item.get('input_ids', '') for item in items]
+        original_sources = [item.get('source', 'unknown') for item in items]
 
         nf = NoiseFilter(categories=categories)
         result = nf.filter_batch(texts)
 
         if result.discarded:
+            # Build index mapping: track which original indices were kept
+            kept_indices = set()
+            for i, text in enumerate(texts):
+                if text in result.kept or any(k == text for k in result.kept):
+                    kept_indices.add(i)
+            # Fallback: if text-based matching fails, use positional approach
+            if len(kept_indices) != len(result.kept):
+                discarded_indices = set()
+                for d in result.discarded:
+                    for i, text in enumerate(texts):
+                        if i not in discarded_indices and text == d.get('text', ''):
+                            discarded_indices.add(i)
+                            break
+                kept_indices = set(range(len(texts))) - discarded_indices
+
             kept_data = []
-            for i, text in enumerate(result.kept):
-                if i < len(sources):
-                    kept_data.append({'input_ids': text, 'source': sources[i]})
-                else:
-                    kept_data.append({'input_ids': text})
+            for i in sorted(kept_indices):
+                if i < len(items):
+                    kept_data.append(dict(items[i]))
             self.combined_data = Dataset.from_list(kept_data)
         else:
-            kept_data = [{'input_ids': t, 'source': s} for t, s in zip(result.kept, sources)]
+            kept_data = []
+            for i, t in enumerate(result.kept):
+                if i < len(items):
+                    kept_data.append(dict(items[i]))
             self.combined_data = Dataset.from_list(kept_data)
 
         removed = original_count - len(self.combined_data)
@@ -2696,7 +2396,7 @@ class DataPreparer:
             for d in result.discarded:
                 reason = d.get('reason', 'unknown')
                 per_source_discarded[reason] = per_source_discarded.get(reason, 0) + 1
-            for source_name in set(sources):
+            for source_name in self._get_source_names():
                 source_discards = {r: c for r, c in per_source_discarded.items()}
                 audit.update_source(source_name, after_noise=original_count - removed, discarded=source_discards)
 
@@ -2710,12 +2410,21 @@ class DataPreparer:
             return
 
         original_count = len(self.combined_data)
-        texts = [item.get('input_ids', '') for item in self.combined_data]
+        original_items = list(self.combined_data)
+        texts = [item.get('input_ids', '') for item in original_items]
 
         qf = QualityFilter()
         result = qf.filter_batch(texts)
 
-        kept_data = [{'input_ids': t} for t in result.kept]
+        # Rebuild dataset preserving all columns for kept items
+        kept_set = set()
+        for text in result.kept:
+            for i, item in enumerate(original_items):
+                if item.get('input_ids', '') == text and i not in kept_set:
+                    kept_set.add(i)
+                    break
+
+        kept_data = [dict(original_items[i]) for i in sorted(kept_set)]
         self.combined_data = Dataset.from_list(kept_data)
 
         removed = original_count - len(self.combined_data)
@@ -2741,18 +2450,25 @@ class DataPreparer:
         dedup_mode = getattr(self.args, 'dedup_mode', 'all')
         dedup_threshold = getattr(self.args, 'dedup_threshold', 0.8)
 
-        texts = [item.get('input_ids', '') for item in self.combined_data]
-        sources = [item.get('source', 'unknown') for item in self.combined_data]
+        original_items = list(self.combined_data)
+        texts = [item.get('input_ids', '') for item in original_items]
+        sources = [item.get('source', 'unknown') for item in original_items]
 
         dedup = CrossSourceDeduplicator(mode=dedup_mode, near_threshold=dedup_threshold)
         result = dedup.deduplicate(texts, sources)
 
+        # Rebuild dataset preserving all columns for unique items
         kept_data = []
         for item in result.unique_with_source:
-            entry = {'input_ids': item['text']}
-            if 'source' in item:
-                entry['source'] = item['source']
-            kept_data.append(entry)
+            text = item.get('text', '')
+            # Find original item with matching text to preserve all columns
+            for orig in original_items:
+                if orig.get('input_ids', '') == text:
+                    kept_data.append(dict(orig))
+                    break
+            else:
+                # Fallback: create minimal entry
+                kept_data.append({'input_ids': text, 'source': item.get('source', 'unknown')})
 
         self.combined_data = Dataset.from_list(kept_data)
 
@@ -2787,7 +2503,7 @@ class DataPreparer:
         kept_data = []
         for idx in result.kept_indices:
             item = self.combined_data[idx]
-            kept_data.append({'input_ids': item.get('input_ids', ''), 'source': item.get('source', 'unknown')})
+            kept_data.append(dict(item))
 
         self.combined_data = Dataset.from_list(kept_data)
 
@@ -2844,12 +2560,13 @@ class DataPreparer:
         allowed_languages = getattr(self.args, 'allowed_languages', ['es', 'en'])
 
         texts = [item.get('input_ids', '') for item in self.combined_data]
-        sources = [item.get('source', 'unknown') for item in self.combined_data]
 
-        filtered_texts = filter_by_language(texts, allowed_languages=allowed_languages)
+        filtered_results = []
+        for item, text in zip(self.combined_data, texts):
+            if text and filter_by_language([text], allowed_languages=allowed_languages):
+                filtered_results.append(item)
 
-        kept_data = [{'input_ids': t, 'source': s} for t, s in zip(filtered_texts, sources) if t]
-        self.combined_data = Dataset.from_list(kept_data)
+        self.combined_data = Dataset.from_list(filtered_results)
 
         removed = original_count - len(self.combined_data)
         logger.info(f"  Language filter: {original_count} -> {len(self.combined_data)} ({removed} removed)")

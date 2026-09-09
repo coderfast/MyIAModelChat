@@ -82,7 +82,6 @@ class TestTrainerModeAwareLoss:
 
     def test_detect_thinking_data_with_mode_tokens(self, sp_tokenizer):
         """Test that _detect_thinking_data detects mode tokens."""
-        from training.trainer import Trainer
         problem_id = sp_tokenizer.get_problem_index()
         final_id = sp_tokenizer.get_final_index()
         tm_id = sp_tokenizer.get_thinking_mode_index()
@@ -101,7 +100,6 @@ class TestTrainerModeAwareLoss:
 
     def test_detect_thinking_data_without_mode_tokens(self, sp_tokenizer):
         """Test that _detect_thinking_data returns False for plain text."""
-        from training.trainer import Trainer
         sample = torch.tensor([[100, 101, 102, 103]])
         problem_id = sp_tokenizer.get_problem_index()
         tm_id = sp_tokenizer.get_thinking_mode_index()

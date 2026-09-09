@@ -99,12 +99,14 @@ class ChatModelMTP(ChatModel):
         return primary_logits, mtp_logits
 
     def get_mtp_head_accuracies(self, predictions: torch.Tensor,
-                                 targets: torch.Tensor) -> Dict[str, float]:
+                                 targets: torch.Tensor,
+                                 mtp_logits_list=None) -> Dict[str, float]:
         """Compute per-head accuracy for MTP predictions.
 
         Args:
-            predictions: Primary model predictions (batch, seq_len)
+            predictions: Primary model predictions (batch, seq_len, vocab_size)
             targets: Target token IDs (batch, seq_len)
+            mtp_logits_list: Optional list of MTP head logits for computing MTP accuracies
 
         Returns:
             Dictionary mapping head names to accuracy values
@@ -112,10 +114,23 @@ class ChatModelMTP(ChatModel):
         metrics = {}
 
         # Primary head accuracy (token t+1)
-        non_pad = targets.ne(0)  # assuming pad_idx=0
+        pad_idx = getattr(self, '_pad_id', 0)
+        non_pad = targets.ne(pad_idx)
         if non_pad.any():
             correct = (predictions.argmax(dim=-1) == targets) & non_pad
             metrics['primary_accuracy'] = correct.float().sum().item() / non_pad.float().sum().item()
+
+        # MTP head accuracies (tokens t+2, t+3, ...)
+        if mtp_logits_list:
+            for k, head_logits in enumerate(mtp_logits_list):
+                shift = k + 2
+                if targets.size(1) > shift:
+                    mtp_preds = head_logits[:, :-shift]
+                    mtp_targets = targets[:, shift:]
+                    mtp_non_pad = mtp_targets.ne(pad_idx)
+                    if mtp_non_pad.any():
+                        mtp_correct = (mtp_preds.argmax(dim=-1) == mtp_targets) & mtp_non_pad
+                        metrics[f'mtp_head_{k}_accuracy'] = mtp_correct.float().sum().item() / mtp_non_pad.float().sum().item()
 
         return metrics
 

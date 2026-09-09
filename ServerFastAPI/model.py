@@ -9,11 +9,6 @@ try:
 except Exception:
     Llama = None
 
-try:
-    import onnxruntime as ort
-except Exception:
-    ort = None
-
 BASE_DIR = Path(__file__).resolve().parent
 ENV_PATH = BASE_DIR / ".env"
 

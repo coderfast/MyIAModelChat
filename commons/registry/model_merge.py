@@ -54,13 +54,18 @@ def merge_models(
 
     logger.info(f"Merging {len(model_paths)} models with weights: {weights}")
 
-    # Load all state dicts
+    # Load all state dicts and extract metadata in one pass
     state_dicts = []
+    all_metadata = []
     ref_metadata = None
     for path in model_paths:
         ckpt = torch.load(path, map_location='cpu', weights_only=False)
         if isinstance(ckpt, dict):
             sd = ckpt.get('model_state_dict', ckpt)
+            all_metadata.append({
+                'architecture': ckpt.get('architecture', {}),
+                'dataset_source': ckpt.get('dataset_source', Path(path).stem),
+            })
             if ref_metadata is None:
                 ref_metadata = {
                     'epoch': ckpt.get('epoch'),
@@ -69,6 +74,7 @@ def merge_models(
                 }
         else:
             sd = ckpt
+            all_metadata.append({'architecture': {}, 'dataset_source': Path(path).stem})
         state_dicts.append(sd)
 
     # Merge by weighted average
@@ -89,15 +95,9 @@ def merge_models(
         names = [Path(p).stem for p in model_paths]
         output_path = os.path.join(MODELS_DIR, '+'.join(names) + '.pth')
 
-    # Load metadata from first model for architecture info
-    meta = load_model_metadata(model_paths[0])
-
-    # Build dataset_source string
-    dataset_sources = []
-    for p in model_paths:
-        m = load_model_metadata(p)
-        ds = m.get('dataset_source', Path(p).stem)
-        dataset_sources.append(ds)
+    # Use metadata already extracted during loading (no redundant checkpoint loads)
+    meta = all_metadata[0] if all_metadata else {}
+    dataset_sources = [m.get('dataset_source', '?') for m in all_metadata]
 
     torch.save({
         'model_state_dict': merged,

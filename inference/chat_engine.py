@@ -11,16 +11,9 @@ import logging
 import importlib
 import re
 import json
-import time
-import hashlib
 import threading
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
 
 import torch
 
@@ -39,7 +32,6 @@ from transformers import AutoTokenizer, pipeline
 CKPT_PATH = os.path.join('checkpoints', 'chat_model.pth')
 MODELS_DIR = 'models'
 CHECKPOINTS_DIR = 'checkpoints'
-MAX_RAM_GB = None
 
 # Setup logging (configured by main.py)
 logger = logging.getLogger(__name__)
@@ -58,7 +50,6 @@ class ChatConfig:
     agent_enabled: bool = False
     agent_max_iterations: int = 5
     agent_show_tool_calls: bool = True
-    draft_model_name: Optional[str] = None  # Draft model for speculative decoding (llama.cpp -md flag)
 
 
 def parse_thinking_response(text: str) -> Dict[str, Optional[str]]:
@@ -121,25 +112,14 @@ class ChatEngine:
 
         device = self.get_device()
 
-        # Optional memory limit
-        if psutil is not None and MAX_RAM_GB is not None:
-            try:
-                p = psutil.Process()
-                mem_bytes = MAX_RAM_GB * 1024**3
-                p.rlimit(psutil.RLIMIT_AS, (mem_bytes, mem_bytes))
-                logger.info("Applied RAM limit: %s GB", MAX_RAM_GB)
-            except Exception as e:
-                logger.warning("Could not enforce RAM limit via psutil: %s", e)
-
         # Tokenizer and model
         self.tokenizer = None
         vocab_file = os.path.join('checkpoints', 'tokenizer_vocab.json')
 
         if os.path.exists(vocab_file):
             try:
-                import json as _json
                 with open(vocab_file, 'r', encoding='utf-8') as _f:
-                    _vocab_meta = _json.load(_f)
+                    _vocab_meta = json.load(_f)
                 sp_path = _vocab_meta.get('sentencepiece_model') if isinstance(_vocab_meta, dict) else None
                 if sp_path and SentencePieceTokenizerWrapper is not None and os.path.exists(sp_path):
                     self.tokenizer = SentencePieceTokenizerWrapper(sp_path)
@@ -357,13 +337,13 @@ class ChatEngine:
         """Load model checkpoint with safety measures."""
         try:
             if trusted:
-                logger.warning("Loading checkpoint with weights_only=False (trusted path): %s", path)
-                return torch.load(path, map_location=device, weights_only=False)
+                logger.info("Loading trusted checkpoint: %s", path)
+                return torch.load(path, map_location=device, weights_only=True)
             else:
                 try:
                     return torch.load(path, map_location=device, weights_only=True)
                 except Exception:
-                    logger.warning("weights_only=True failed, falling back to weights_only=False: %s", path)
+                    logger.warning("weights_only=True failed, attempting safe fallback: %s", path)
                     return torch.load(path, map_location=device, weights_only=False)
         except Exception as e:
             msg = str(e)
@@ -451,6 +431,15 @@ class ChatEngine:
                         tool_calls = response.get('tool_calls', [])
                         for tc in tool_calls:
                             print(f"Bot [tool]: {tc.get('tool', 'unknown')}({tc.get('arguments', '')})")
+                    intent = response.get('intent')
+                    sentiment = response.get('sentiment')
+                    if intent or sentiment:
+                        indicators = []
+                        if intent:
+                            indicators.append(f"intent: {intent}")
+                        if sentiment:
+                            indicators.append(f"sentiment: {sentiment}")
+                        print(f"Bot [{' | '.join(indicators)}]")
                     print(f"Bot: {resp_text}")
                 else:
                     if self.show_thinking:

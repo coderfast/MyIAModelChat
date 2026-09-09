@@ -66,7 +66,7 @@ class ChatModelMoEMTP(ChatModelMoE):
 
         Returns:
             primary_logits: Output logits for next token (batch, seq_len, vocab_size)
-            mtp_logits: List of logit tensors from MTP heads, each (batch, seq_len, vocab_size)
+            gate_scores: List of gate score tensors from MoE layers (for load balancing)
         """
         # Clear gate scores
         self._all_gate_scores.clear()
@@ -82,10 +82,10 @@ class ChatModelMoEMTP(ChatModelMoE):
         # Primary prediction (next token)
         primary_logits = self.model.lm_head(hidden_states)
 
-        # MTP predictions for future tokens
-        mtp_logits = [head(hidden_states) for head in self.mtp_heads]
+        # MTP predictions for future tokens (stored as side channel for loss computation)
+        self._mtp_logits = [head(hidden_states) for head in self.mtp_heads]
 
-        return primary_logits, mtp_logits
+        return primary_logits, self._all_gate_scores if self._all_gate_scores else None
 
     def get_mtp_head_accuracies(self, predictions: torch.Tensor,
                                  targets: torch.Tensor) -> Dict[str, float]:

@@ -4,7 +4,6 @@ Uses the AIMLParser for full element resolution and wildcard expansion.
 """
 import os
 import logging
-from xml.etree import ElementTree
 
 from datasets import Dataset
 

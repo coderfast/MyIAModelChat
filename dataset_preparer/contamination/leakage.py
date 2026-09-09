@@ -69,8 +69,19 @@ class LeakageDetector:
         if not texts or len(texts) < 2:
             return result
 
+        # Safety limit: for large datasets, sample to avoid O(n^2) memory/time
+        MAX_PAIRWISE = 5000
+        if len(texts) > MAX_PAIRWISE:
+            import random
+            sampled_indices = sorted(random.sample(range(len(texts)), MAX_PAIRWISE))
+            sampled_texts = [texts[i] for i in sampled_indices]
+            logger.info(f"  Leakage: sampling {MAX_PAIRWISE}/{len(texts)} texts for pairwise comparison")
+        else:
+            sampled_indices = list(range(len(texts)))
+            sampled_texts = texts
+
         ngram_sets = []
-        for text in texts:
+        for text in sampled_texts:
             words = text.lower().split()
             ngrams = set()
             for i in range(max(0, len(words) - self.ngram_size + 1)):
@@ -81,8 +92,8 @@ class LeakageDetector:
         overlap_pairs = []
         flagged = set()
 
-        for i in range(len(texts)):
-            for j in range(i + 1, len(texts)):
+        for i in range(len(sampled_texts)):
+            for j in range(i + 1, len(sampled_texts)):
                 if not ngram_sets[i] or not ngram_sets[j]:
                     continue
                 intersection = ngram_sets[i] & ngram_sets[j]
@@ -91,9 +102,9 @@ class LeakageDetector:
                     continue
                 jaccard = len(intersection) / len(union)
                 if jaccard >= self.overlap_threshold:
-                    overlap_pairs.append((i, j, jaccard))
-                    flagged.add(i)
-                    flagged.add(j)
+                    overlap_pairs.append((sampled_indices[i], sampled_indices[j], jaccard))
+                    flagged.add(sampled_indices[i])
+                    flagged.add(sampled_indices[j])
 
         result.overlap_pairs = overlap_pairs
         result.flagged_indices = sorted(flagged)

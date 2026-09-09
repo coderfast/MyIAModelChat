@@ -3,7 +3,7 @@ Tests for AIML Parser - Wildcard expansion and fallback mechanisms.
 """
 import pytest
 from xml.etree import ElementTree
-from dataset_preparer.aiml.parser import AIMLParser, parse_aiml_file
+from dataset_preparer.aiml.parser import AIMLParser
 
 
 class TestAIMLParserWildcards:

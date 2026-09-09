@@ -244,9 +244,11 @@ class SentencePieceTokenizerWrapper:
         for i in range(self.sp.get_piece_size()):
             piece = self.sp.id_to_piece(i)
             vocab[piece] = i
-            # BPE merges: piece pairs from SentencePiece
-            if i >= self.sp.bos_id() + 1 and piece.startswith('▁') is False:
-                pass  # SentencePiece handles merges internally
+            # BPE merges: generate from consecutive piece pairs
+            if i >= 1 and not piece.startswith('▁') and i < self.sp.get_piece_size() - 1:
+                next_piece = self.sp.id_to_piece(i + 1)
+                if not next_piece.startswith('▁'):
+                    merges.append((piece, next_piece))
 
         # Get special token IDs
         pad_id = self.get_pad_index()

@@ -1,0 +1,1 @@
+<|en|><|problem|>Go to Front orthographic view. In Edit Mode press A to select all and press X, then choose Only Faces. Now we just have this grid of Edges. Rename the buildings geometry to Buildings, to keep things organised. Now with the buildings selected in Object Mode, switch to Edit Mode. Hold Ctrl and in the outliner, select the Grid.<|final|>

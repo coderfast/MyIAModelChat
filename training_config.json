@@ -1,6 +1,6 @@
 {
   "training": {
-    "epochs": 50,
+    "epochs": 1,
     "checkpoint_name": "chat_model",
     "dataset_source": "dataset_cache"
   },
@@ -45,7 +45,7 @@
     "kd_enabled": false,
     "kd_temperature": 2.0,
     "kd_loss_weight": 0.5,
-    "kd_epochs": 50
+    "kd_epochs": 1
   },
   "validation": {
     "split": 0.1,

@@ -1,0 +1,1 @@
+<|en|><|problem|>Go to Mesh > Knife Project. And then make sure Cut Through is enabled. You may have to wait a few seconds after enabling Cut Through, for it to work. Now the buildings are ‘sliced’ , giving them all enough geometry so that the texture is not distorted.<|final|>

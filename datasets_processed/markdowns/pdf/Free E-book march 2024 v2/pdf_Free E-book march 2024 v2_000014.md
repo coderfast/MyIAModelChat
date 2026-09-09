@@ -1,0 +1,1 @@
+<|en|><|problem|>Press Ctrl+B to bevel, and scroll the mouse wheel up to add one segment. Changing the Shape to 0 gives us the exact shape we need.<|final|>

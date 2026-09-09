@@ -14,11 +14,6 @@ import logging
 import multiprocessing as mp
 from config import OLLAMA_MODEL
 
-# Force CPU-only mode BEFORE torch import to prevent CUDA context initialization
-if '--cpu' in sys.argv:
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
-    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-
 try:
     import psutil
 except ImportError:
@@ -206,6 +201,82 @@ def setup_cpu_configuration(args):
     logger.info("=" * 80)
 
 
+def _build_training_config(args, json_config=None):
+    """Build TrainingConfig from CLI args, optionally overriding with JSON config.
+
+    When json_config is provided, CLI values override JSON only if they differ
+    from the argparse defaults (i.e., the user explicitly passed them).
+    """
+    tc_fields = {}
+    # Fields with direct args access and comparison override
+    _direct_override = {
+        'epochs': ('epochs', 1),
+        'checkpoint_name': ('checkpoint_name', 'chat_model'),
+        'dataset_source': ('dataset', 'dataset_cache'),
+        'device_mode': ('device_mode', 'auto'),
+        'num_cores': ('num_cores', 0),
+        'num_threads': ('num_threads', 0),
+        'max_ram_fraction': ('max_ram_fraction', 0.75),
+        'thinking_loss_weight': ('thinking_loss_weight', 0.5),
+        'thinking_max_tokens': ('thinking_max_tokens', 64),
+    }
+    for tc_field, (arg_name, default) in _direct_override.items():
+        val = getattr(args, arg_name)
+        if json_config is not None and default is not None and val == default:
+            val = getattr(json_config, tc_field)
+        tc_fields[tc_field] = val
+
+    # Falsy-check fields (use JSON if CLI value is falsy)
+    _falsy_fallback = ['gpu_indices', 'use_vulkan', 'thinking_enabled', 'statistics']
+    for tc_field in _falsy_fallback:
+        val = getattr(args, tc_field)
+        if json_config is not None and not val:
+            val = getattr(json_config, tc_field)
+        tc_fields[tc_field] = val
+
+    # getattr fields with comparison override
+    _getattr_override = {
+        'agent_loss_weight': (1.0,), 'agent_ratio': (0.3,),
+        'moe_num_experts': (4,), 'moe_top_k': (2,),
+        'moe_load_balance_weight': (0.01,),
+        'mtp_num_heads': (4,), 'mtp_loss_weight': (0.3,),
+        'draft_num_layers': (2,), 'draft_embed_size': (128,),
+        'draft_hidden_size': (256,), 'draft_n_head': (2,),
+        'draft_kd_temperature': (2.0,), 'draft_kd_loss_weight': (0.5,),
+        'draft_kd_epochs': (10,),
+        'tensorboard_log_dir': ('runs',), 'tensorboard_comment': ('',),
+        'tensorboard_freq': (1,),
+        'val_split': (0.1,), 'val_batches': (0,),
+        'early_stopping_patience': (0,),
+    }
+    for tc_field, (default,) in _getattr_override.items():
+        val = getattr(args, tc_field, default)
+        if json_config is not None and val == default:
+            val = getattr(json_config, tc_field)
+        tc_fields[tc_field] = val
+
+    # getattr OR fields (boolean flags - use JSON if CLI is False/None)
+    _getattr_or = [
+        'max_ram_bytes', 'agent_enabled', 'moe_enabled', 'moe_freeze_attention',
+        'mtp_enabled', 'draft_enabled', 'draft_kd_enabled', 'tensorboard_enabled',
+    ]
+    for tc_field in _getattr_or:
+        val = getattr(args, tc_field, None)
+        if json_config is not None and not val:
+            val = getattr(json_config, tc_field)
+        tc_fields[tc_field] = val
+
+    # Identical in both branches (always from args)
+    tc_fields['log_metrics_csv'] = not getattr(args, 'no_metrics_csv', False)
+    tc_fields['rank'] = args.rank
+    tc_fields['local_rank'] = args.local_rank
+    tc_fields['world_size'] = args.world_size
+    tc_fields['master_addr'] = args.master_addr
+    tc_fields['master_port'] = args.master_port
+
+    return TrainingConfig(**tc_fields)
+
+
 if __name__ == '__main__':
     try:
         # Calculate default CPU configuration
@@ -224,10 +295,13 @@ if __name__ == '__main__':
             description='MyIAModelChat - AI Chat Model Training and Inference',
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=f"""
-OPERATIONS:
-  --train              Train the neural network model
-  --chat               Run interactive chat interface
-  --prepare-data       Prepare and validate datasets only
+OPERATIONS (full pipeline):
+  Step 1: --generate-md   Generate .md files from raw data sources
+  Step 2: --prepare-data  Prepare and tokenize datasets (creates cache)
+  Step 3: --train         Train the neural network model
+  Step 4: --chat          Run interactive chat interface
+
+OTHER OPERATIONS:
   --clear-cache        Clear cached datasets and exit
   --list-models        List available trained models
   --export NAME        Export model to GGUF/ONNX (use NAME+NAME for merge)
@@ -239,12 +313,13 @@ MODEL LIBRARY:
   --formats F1,F2      Export formats: gguf, onnx, onnx_int8 (default: gguf,onnx)
   --quantization TYPE  GGUF quantization: f32, f16, q4_0, q4_k_m, q5_k_m, q6_k, q8_0, etc. (default: q8_0)
 
-DATA SOURCES (required with --prepare-data only):
+DATA SOURCES (used with --generate-md and/or --prepare-data):
   --aiml               Include AIML data from datasets_source/aiml directory
   --hf                 Include Hugging Face datasets
   --pdf                Include PDF data from datasets_source/pdf directory
   --epub               Include EPUB data from datasets_source/epub directory
   --web                Include web documentation data (scrapes from URL)
+  --csv                Include CSV data from datasets_source/csv directory
   --web-url URL        Seed URL to scrape (reads datasets_source/web/urls_to_process.json if not set)
   --web-max-pages N    Max pages per URL (default: 50)
   --web-max-depth N    Max link-following depth (default: 3)
@@ -267,12 +342,21 @@ STATISTICS:
   --statistics          Show detailed per-step timing during training
 
 EXAMPLES:
-  # Prepare data (create/update cache)
+  # Full pipeline: generate markdowns -> prepare data -> train -> chat
+  python main.py --generate-md --aiml --hf --pdf
+  python main.py --prepare-data --aiml --hf --bpe-vocab-size 8000
+  python main.py --train --epochs 30
+  python main.py --chat --model ciencias_naturales
+
+  # Step 1: Generate markdown files from raw data sources
+  python main.py --generate-md --aiml --hf --pdf --epub --web --csv
+
+  # Step 2: Prepare data (creates dataset cache)
   python main.py --prepare-data --aiml --hf --pdf --epub
   python main.py --prepare-data --aiml --bpe-vocab-size 8000
   python main.py --prepare-data --web  (scrapes URLs from datasets_source/web/urls_to_process.json)
 
-  # Train model (always uses cached dataset from prepare-data)
+  # Step 3: Train model (uses cached dataset)
   python main.py --train --epochs 10
   python main.py --train --checkpoint-name ciencias_naturales --epochs 10
   python main.py --train --cpu --num-cores 4 --num-threads 4
@@ -280,17 +364,18 @@ EXAMPLES:
   python main.py --train --gpu 0,1 --epochs 10       (DDP multi-GPU)
   python main.py --train --cpu+gpu 0 --epochs 10     (CPU+GPU hybrid)
 
+  # Step 4: Chat with trained model
   python main.py --chat --model ciencias_naturales
   python main.py --chat --model ciencias_naturales+programacion
   python main.py --chat --cpu --num-cores 4 --num-threads 4
 
+  # Utility commands
   python main.py --gpu-enum
   python main.py --list-models
   python main.py --model-info chat_model
   python main.py --export ciencias_naturales --formats gguf,onnx,onnx_int8
   python main.py --export chat_model --formats gguf --quantization q4_k_m
   python main.py --export chat_model --formats onnx --onnx-quant-type int8 --onnx-static
-  python main.py --export chat_model --formats onnx --onnx-quant-type fp8_e4m3fn --onnx-static
             """
         )
         
@@ -520,12 +605,10 @@ EXAMPLES:
         
         args = parser.parse_args()
 
-        # Force agent_ratio=0 for small models — can't learn agentic patterns
-        # Default embed_size is 256 (< 300), so agentic is disabled unless user overrides
+        # Warn if agent_ratio is set but embed_size may be too small (default 256)
+        # Allow user to override — don't force-disable
         if hasattr(args, 'agent_ratio') and args.agent_ratio > 0:
-            args.agent_ratio = 0.0
-            args.agent_enabled = False
-            logger.info("Agent ratio forced to 0.0 (model too small for agentic patterns)")
+            logger.info(f"Agent ratio: {args.agent_ratio} (ensure embed_size >= 300 for best results)")
 
         # Handle --gpu-enum before validation
         if args.gpu_enum:
@@ -681,8 +764,6 @@ EXAMPLES:
                         from dataset_preparer.csv.csv_to_md import load_config, csv_to_md
                         cfg = load_config(config_path)
                         count = csv_to_md(cfg)
-                    else:
-                        count = 0
                     total_generated += count
                     logger.info(f"  {source}: {count} files generated")
                 except Exception as e:
@@ -727,118 +808,17 @@ EXAMPLES:
 
             # Handle --generate-config: generate default JSON and exit
             if args.generate_config is not None:
-                from training.trainer import TrainingConfig
                 config_path = args.generate_config
                 TrainingConfig.generate_default(config_path)
                 logger.info(f"Default training config generated: {config_path}")
                 logger.info("Edit the file and run with: python main.py --train --config " + config_path)
                 sys.exit(0)
 
-            # Load JSON config if provided (CLI args override JSON values)
-            if args.config is not None:
-                from training.trainer import TrainingConfig
-                json_config = TrainingConfig.from_json(args.config)
-                # CLI args override JSON values
-                config = TrainingConfig(
-                    epochs=args.epochs if args.epochs != 1 else json_config.epochs,
-                    checkpoint_name=args.checkpoint_name if args.checkpoint_name != "chat_model" else json_config.checkpoint_name,
-                    dataset_source=args.dataset if args.dataset != "dataset_cache" else json_config.dataset_source,
-                    device_mode=args.device_mode if args.device_mode != "auto" else json_config.device_mode,
-                    gpu_indices=args.gpu_indices if args.gpu_indices else json_config.gpu_indices,
-                    use_vulkan=args.use_vulkan if args.use_vulkan else json_config.use_vulkan,
-                    num_cores=args.num_cores if args.num_cores != default_num_cores else json_config.num_cores,
-                    num_threads=args.num_threads if args.num_threads != default_num_threads else json_config.num_threads,
-                    max_ram_fraction=args.max_ram_fraction if args.max_ram_fraction != 0.75 else json_config.max_ram_fraction,
-                    max_ram_bytes=getattr(args, 'max_ram_bytes', None) or json_config.max_ram_bytes,
-                    thinking_loss_weight=args.thinking_loss_weight if args.thinking_loss_weight != 1.0 else json_config.thinking_loss_weight,
-                    thinking_enabled=args.thinking_enabled if args.thinking_enabled else json_config.thinking_enabled,
-                    thinking_max_tokens=args.thinking_max_tokens if args.thinking_max_tokens != 64 else json_config.thinking_max_tokens,
-                    statistics=args.statistics if args.statistics else json_config.statistics,
-                    agent_enabled=getattr(args, 'agent_enabled', False) or json_config.agent_enabled,
-                    agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0) if getattr(args, 'agent_loss_weight', 1.0) != 1.0 else json_config.agent_loss_weight,
-                    agent_ratio=getattr(args, 'agent_ratio', 0.3) if getattr(args, 'agent_ratio', 0.3) != 0.3 else json_config.agent_ratio,
-                    moe_enabled=getattr(args, 'moe_enabled', False) or json_config.moe_enabled,
-                    moe_num_experts=getattr(args, 'moe_num_experts', 4) if getattr(args, 'moe_num_experts', 4) != 4 else json_config.moe_num_experts,
-                    moe_top_k=getattr(args, 'moe_top_k', 2) if getattr(args, 'moe_top_k', 2) != 2 else json_config.moe_top_k,
-                    moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01) if getattr(args, 'moe_load_balance_weight', 0.01) != 0.01 else json_config.moe_load_balance_weight,
-                    moe_freeze_attention=getattr(args, 'moe_freeze_attention', False) or json_config.moe_freeze_attention,
-                    mtp_enabled=getattr(args, 'mtp_enabled', False) or json_config.mtp_enabled,
-                    mtp_num_heads=getattr(args, 'mtp_num_heads', 4) if getattr(args, 'mtp_num_heads', 4) != 4 else json_config.mtp_num_heads,
-                    mtp_loss_weight=getattr(args, 'mtp_loss_weight', 0.3) if getattr(args, 'mtp_loss_weight', 0.3) != 0.3 else json_config.mtp_loss_weight,
-                    draft_enabled=getattr(args, 'draft_enabled', False) or json_config.draft_enabled,
-                    draft_num_layers=getattr(args, 'draft_num_layers', 2) if getattr(args, 'draft_num_layers', 2) != 2 else json_config.draft_num_layers,
-                    draft_embed_size=getattr(args, 'draft_embed_size', 128) if getattr(args, 'draft_embed_size', 128) != 128 else json_config.draft_embed_size,
-                    draft_hidden_size=getattr(args, 'draft_hidden_size', 256) if getattr(args, 'draft_hidden_size', 256) != 256 else json_config.draft_hidden_size,
-                    draft_n_head=getattr(args, 'draft_n_head', 2) if getattr(args, 'draft_n_head', 2) != 2 else json_config.draft_n_head,
-                    draft_kd_enabled=getattr(args, 'draft_kd_enabled', False) or json_config.draft_kd_enabled,
-                    draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0) if getattr(args, 'draft_kd_temperature', 2.0) != 2.0 else json_config.draft_kd_temperature,
-                    draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5) if getattr(args, 'draft_kd_loss_weight', 0.5) != 0.5 else json_config.draft_kd_loss_weight,
-                    draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10) if getattr(args, 'draft_kd_epochs', 10) != 10 else json_config.draft_kd_epochs,
-                    tensorboard_enabled=getattr(args, 'tensorboard_enabled', False) or json_config.tensorboard_enabled,
-                    tensorboard_log_dir=getattr(args, 'tensorboard_log_dir', 'runs') if getattr(args, 'tensorboard_log_dir', 'runs') != 'runs' else json_config.tensorboard_log_dir,
-                    tensorboard_comment=getattr(args, 'tensorboard_comment', '') if getattr(args, 'tensorboard_comment', '') != '' else json_config.tensorboard_comment,
-                    tensorboard_freq=getattr(args, 'tensorboard_freq', 1) if getattr(args, 'tensorboard_freq', 1) != 1 else json_config.tensorboard_freq,
-                    val_split=getattr(args, 'val_split', 0.1) if getattr(args, 'val_split', 0.1) != 0.1 else json_config.val_split,
-                    val_batches=getattr(args, 'val_batches', 0) if getattr(args, 'val_batches', 0) != 0 else json_config.val_batches,
-                    early_stopping_patience=getattr(args, 'early_stopping_patience', 0) if getattr(args, 'early_stopping_patience', 0) != 0 else json_config.early_stopping_patience,
-                    log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
-                    rank=args.rank,
-                    local_rank=args.local_rank,
-                    world_size=args.world_size,
-                    master_addr=args.master_addr,
-                    master_port=args.master_port,
-                )
+            # Build TrainingConfig from args + optional JSON override
+            json_config = TrainingConfig.from_json(args.config) if args.config else None
+            config = _build_training_config(args, json_config)
+            if json_config:
                 logger.info(f"Loaded training config from: {args.config}")
-            else:
-                config = TrainingConfig(
-                    epochs=args.epochs,
-                    checkpoint_name=args.checkpoint_name,
-                    dataset_source=args.dataset,
-                    device_mode=args.device_mode,
-                    gpu_indices=args.gpu_indices,
-                    use_vulkan=args.use_vulkan,
-                    num_cores=args.num_cores,
-                    num_threads=args.num_threads,
-                    max_ram_fraction=args.max_ram_fraction,
-                    max_ram_bytes=getattr(args, 'max_ram_bytes', None),
-                    thinking_loss_weight=args.thinking_loss_weight,
-                    thinking_enabled=args.thinking_enabled,
-                    thinking_max_tokens=args.thinking_max_tokens,
-                    statistics=args.statistics,
-                    agent_enabled=getattr(args, 'agent_enabled', False),
-                    agent_loss_weight=getattr(args, 'agent_loss_weight', 1.0),
-                    agent_ratio=getattr(args, 'agent_ratio', 0.3),
-                    moe_enabled=getattr(args, 'moe_enabled', False),
-                    moe_num_experts=getattr(args, 'moe_num_experts', 4),
-                    moe_top_k=getattr(args, 'moe_top_k', 2),
-                    moe_load_balance_weight=getattr(args, 'moe_load_balance_weight', 0.01),
-                    moe_freeze_attention=getattr(args, 'moe_freeze_attention', False),
-                    mtp_enabled=getattr(args, 'mtp_enabled', False),
-                    mtp_num_heads=getattr(args, 'mtp_num_heads', 4),
-                    mtp_loss_weight=getattr(args, 'mtp_loss_weight', 0.3),
-                    draft_enabled=getattr(args, 'draft_enabled', False),
-                    draft_num_layers=getattr(args, 'draft_num_layers', 2),
-                    draft_embed_size=getattr(args, 'draft_embed_size', 128),
-                    draft_hidden_size=getattr(args, 'draft_hidden_size', 256),
-                    draft_n_head=getattr(args, 'draft_n_head', 2),
-                    draft_kd_enabled=getattr(args, 'draft_kd_enabled', False),
-                    draft_kd_temperature=getattr(args, 'draft_kd_temperature', 2.0),
-                    draft_kd_loss_weight=getattr(args, 'draft_kd_loss_weight', 0.5),
-                    draft_kd_epochs=getattr(args, 'draft_kd_epochs', 10),
-                    tensorboard_enabled=getattr(args, 'tensorboard_enabled', False),
-                    tensorboard_log_dir=getattr(args, 'tensorboard_log_dir', 'runs'),
-                    tensorboard_comment=getattr(args, 'tensorboard_comment', ''),
-                    tensorboard_freq=getattr(args, 'tensorboard_freq', 1),
-                    val_split=getattr(args, 'val_split', 0.1),
-                    val_batches=getattr(args, 'val_batches', 0),
-                    early_stopping_patience=getattr(args, 'early_stopping_patience', 0),
-                    log_metrics_csv=not getattr(args, 'no_metrics_csv', False),
-                    rank=args.rank,
-                    local_rank=args.local_rank,
-                    world_size=args.world_size,
-                    master_addr=args.master_addr,
-                    master_port=args.master_port,
-                )
             trainer = Trainer(config)
             training_thread = threading.Thread(target=trainer.performMainTrain, name="TrainingThread", daemon=False)
             training_thread.start()
@@ -888,11 +868,12 @@ EXAMPLES:
             )
             engine = ChatEngine(config)
             engine.start_chat_loop()
-        
+            sys.exit(0)
+
         logger.info("=" * 80)
         logger.info("[OK] Program completed successfully")
         logger.info("=" * 80)
-    
+
     except KeyboardInterrupt:
         logger.warning("\nProgram interrupted by user")
         sys.exit(0)

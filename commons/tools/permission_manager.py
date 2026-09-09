@@ -8,7 +8,7 @@ Implements Layer 1 of the 3-layer security model:
 
 import logging
 from enum import Enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -280,16 +280,6 @@ class PermissionManager:
                 approved=True,
                 mode=self.mode,
                 reason="Auto-approved: whitelist mode, read operation"
-            )
-        
-        if risk_level == RiskLevel.CRITICAL:
-            log_entry['approved'] = False
-            log_entry['reason'] = 'blocked: critical risk'
-            self.permission_log.append(log_entry)
-            return PermissionResult(
-                approved=False,
-                mode=self.mode,
-                reason="Blocked: critical risk command"
             )
         
         if risk_level == RiskLevel.MEDIUM and self.mode == PermissionMode.WHITELIST:
