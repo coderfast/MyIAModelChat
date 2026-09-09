@@ -1,0 +1,13 @@
+{
+    "source_dir": "datasets_source/markdown",
+    "output_dir": "datasets_processed/markdowns/markdown",
+    "format": "problem_final",
+    "chunking": {
+        "enabled": false,
+        "max_tokens": 512,
+        "overlap_tokens": 50
+    },
+    "quality": {
+        "min_paragraph_length": 5
+    }
+}

@@ -27,6 +27,7 @@ from commons.registry.model_merge import merge_from_names, parse_merge_spec
 from commons.registry.model_export import export_cli
 from dataset_preparer.data_preparer import prepare_datasets_for_training, DataPreparer
 from commons.utils.device_utils import enumerate_gpus
+from commons.utils.dir_utils import ensure_project_dirs
 from training.trainer import Trainer, TrainingConfig
 from inference.chat_engine import ChatEngine, ChatConfig
 
@@ -95,8 +96,8 @@ def validate_arguments(args):
     if not (args.train or args.chat or args.prepare_data or args.clear_cache or args.list_models or args.model_info or args.export or args.generate_md):
         return False, "Please specify: --train, --chat, --prepare-data, --generate-md, --clear-cache, --list-models, --model-info, or --export"
 
-    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web or args.csv):
-        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, --web, or --csv"
+    if args.prepare_data and not (args.aiml or args.hf or args.pdf or args.epub or args.web or args.csv or args.markdown):
+        return False, "Specify data source for --prepare-data: --aiml, --hf, --pdf, --epub, --web, --csv, or --markdown"
 
     if args.train:
         cache_path = os.path.join('dataset_cache', 'prepared_dataset')
@@ -279,6 +280,9 @@ def _build_training_config(args, json_config=None):
 
 if __name__ == '__main__':
     try:
+        # Ensure all project directories exist
+        ensure_project_dirs()
+
         # Calculate default CPU configuration
         system_cpu_count = mp.cpu_count()
         default_num_cores = max(
@@ -320,6 +324,7 @@ DATA SOURCES (used with --generate-md and/or --prepare-data):
   --epub               Include EPUB data from datasets_source/epub directory
   --web                Include web documentation data (scrapes from URL)
   --csv                Include CSV data from datasets_source/csv directory
+  --markdown           Include Markdown data from datasets_source/markdown directory
   --web-url URL        Seed URL to scrape (reads datasets_source/web/urls_to_process.json if not set)
   --web-max-pages N    Max pages per URL (default: 50)
   --web-max-depth N    Max link-following depth (default: 3)
@@ -434,6 +439,7 @@ EXAMPLES:
         parser.add_argument("--epub", action='store_true', help="Include EPUB data")
         parser.add_argument("--web", action='store_true', help="Include web documentation data")
         parser.add_argument("--csv", action='store_true', help="Include CSV data")
+        parser.add_argument("--markdown", action='store_true', help="Include Markdown data from datasets_source/markdown directory")
         parser.add_argument("--web-url", type=str, default=None,
                             help="Seed URL to scrape (reads from datasets_source/web/urls_to_process.json if not set)")
         parser.add_argument("--web-max-pages", type=int, default=50,
@@ -728,6 +734,7 @@ EXAMPLES:
             if args.epub: sources.append('epub')
             if args.web: sources.append('web')
             if args.csv: sources.append('csv')
+            if args.markdown: sources.append('markdown')
             if not sources:
                 sources = ['aiml', 'hf', 'pdf', 'epub', 'web', 'csv']
 
@@ -764,6 +771,10 @@ EXAMPLES:
                         from dataset_preparer.csv.csv_to_md import load_config, csv_to_md
                         cfg = load_config(config_path)
                         count = csv_to_md(cfg)
+                    elif source == 'markdown':
+                        from dataset_preparer.markdown.markdown_to_md import load_config, markdown_to_md
+                        cfg = load_config(config_path)
+                        count = markdown_to_md(cfg)
                     total_generated += count
                     logger.info(f"  {source}: {count} files generated")
                 except Exception as e:

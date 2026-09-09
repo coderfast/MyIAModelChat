@@ -356,6 +356,7 @@ class DataPreparer:
         self.epub_data = None
         self.web_data = None
         self.csv_data = None
+        self.markdown_data = None
         self.combined_data = None
         self.statistics = {}
 
@@ -578,7 +579,7 @@ class DataPreparer:
             md_root = os.path.join('datasets_processed', 'markdowns')
             md_available = os.path.exists(md_root) and any(
                 os.path.isdir(os.path.join(md_root, d))
-                for d in ['aiml', 'pdf', 'epub', 'web', 'hf', 'csv']
+                for d in ['aiml', 'pdf', 'epub', 'web', 'hf', 'csv', 'markdown']
                 if os.path.exists(os.path.join(md_root, d))
             )
 
@@ -616,6 +617,11 @@ class DataPreparer:
                 if hasattr(self.args, 'csv') and self.args.csv:
                     logger.info("[5/7] Loading CSV data...")
                     self.csv_data = self._load_csv()
+
+                # Load Markdown data
+                if hasattr(self.args, 'markdown') and self.args.markdown:
+                    logger.info("[5.5/7] Loading Markdown data...")
+                    self.markdown_data = self._load_markdown_data()
 
                 # Combine datasets
                 logger.info("[6/7] Combining datasets...")
@@ -1045,6 +1051,112 @@ class DataPreparer:
 
         except Exception as e:
             logger.warning(f"  ⚠ Error reading CSV files: {e}")
+            return Dataset.from_list([])
+
+    def _load_markdown_data(self) -> Dataset:
+        """
+        Load text data from Markdown files in datasets_source/markdown directory.
+
+        Splits each .md file into paragraphs/sections and creates training samples.
+
+        Returns:
+            Hugging Face Dataset with Markdown text data
+        """
+        md_dir = os.path.join('datasets_source', 'markdown')
+
+        if not os.path.exists(md_dir):
+            os.makedirs(md_dir, exist_ok=True)
+            logger.info(f"  Created directory: {md_dir}")
+            logger.info(f"  Place Markdown files in '{md_dir}' directory to load them")
+            return Dataset.from_list([])
+
+        enable_chunking = getattr(self.args, 'enable_chunking', False)
+        max_tokens = getattr(self.args, 'chunk_max_tokens', 512)
+        overlap_tokens = getattr(self.args, 'chunk_overlap', 50)
+
+        md_texts = []
+        md_count = 0
+
+        for filename in os.listdir(md_dir):
+            if not filename.lower().endswith('.md'):
+                continue
+
+            file_path = os.path.join(md_dir, filename)
+            try:
+                logger.info(f"  Reading Markdown: {filename}...")
+
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                if not content or not content.strip():
+                    logger.warning(f"  Empty file: {filename}")
+                    continue
+
+                # Detect language from the whole document
+                file_lang = 'unknown'
+                try:
+                    from commons.language_utils import detect_language as _detect_lang
+                    file_lang = _detect_lang(content[:3000])
+                except Exception:
+                    pass
+
+                # Remove image references (e.g. ![alt](path))
+                content = re.sub(r'!\[.*?\]\(.*?\)', '', content)
+
+                # Extract code blocks as separate samples (they are valuable content)
+                code_blocks = re.findall(r'```[\s\S]*?```', content)
+                for block in code_blocks:
+                    # Strip triple backticks and optional language tag
+                    code_text = re.sub(r'^```\w*\n?', '', block)
+                    code_text = re.sub(r'```\s*$', '', code_text)
+                    code_text = code_text.strip()
+                    if code_text and len(code_text.split()) >= 3:
+                        md_texts.append({
+                            'input_ids': code_text,
+                            'file_path': file_path,
+                            'language': file_lang,
+                        })
+
+                # Remove code blocks from main content (already extracted above)
+                content = re.sub(r'```[\s\S]*?```', '', content)
+
+                # Remove inline code backticks but KEEP the code text
+                content = re.sub(r'`([^`]+)`', r'\1', content)
+
+                # Remove HTML tags
+                content = re.sub(r'<[^>]+>', '', content)
+
+                # Split into paragraphs (double newline)
+                paragraphs = re.split(r'\n\s*\n', content)
+
+                paragraph_count = 0
+                for paragraph in paragraphs:
+                    paragraph = clean_text(paragraph)
+                    if len(paragraph) < 5:
+                        continue
+
+                    # Keep headings — they carry section context
+                    # Keep everything else that has content
+                    md_texts.append({
+                        'input_ids': paragraph,
+                        'file_path': file_path,
+                        'language': file_lang,
+                    })
+                    paragraph_count += 1
+
+                md_count += 1
+                logger.info(f"  Loaded: {filename} ({paragraph_count} paragraphs + {len(code_blocks)} code blocks)")
+
+            except Exception as e:
+                logger.warning(f"  Error loading {filename}: {e}")
+
+        if md_texts:
+            dataset = Dataset.from_list(md_texts)
+            logger.info(f"Total Markdown files processed: {md_count}")
+            logger.info(f"Total Markdown samples: {len(dataset)}")
+            return dataset
+        else:
+            logger.warning(f"  No Markdown files found in '{md_dir}' directory")
             return Dataset.from_list([])
 
     def _load_web_data(self) -> Dataset:
@@ -1664,6 +1776,9 @@ class DataPreparer:
         Each .md file should already contain GPT-2 standard tokens applied
         by the *_to_md.py generation scripts.
 
+        Subdirectories are discovered automatically — any folder inside
+        datasets_processed/markdowns/ that contains .md files is included.
+
         Returns:
             Hugging Face Dataset with all markdown content
         """
@@ -1675,15 +1790,16 @@ class DataPreparer:
             return Dataset.from_list([])
 
         samples = []
-        source_map = {
-            'aiml': 'AIML', 'pdf': 'PDF', 'epub': 'EPUB',
-            'web': 'Web', 'hf': 'HuggingFace', 'csv': 'CSV',
-        }
 
-        for source_key, source_label in source_map.items():
+        # Discover subdirectories dynamically
+        source_dirs = sorted([
+            d for d in os.listdir(md_root)
+            if os.path.isdir(os.path.join(md_root, d))
+        ])
+
+        for source_key in source_dirs:
             source_dir = os.path.join(md_root, source_key)
-            if not os.path.exists(source_dir):
-                continue
+            source_label = source_key.capitalize()
 
             md_files = []
             for root, dirs, files in os.walk(source_dir):
@@ -1763,6 +1879,12 @@ class DataPreparer:
             datasets_to_combine.append(csv_with_source)
             total_samples += len(self.csv_data)
             logger.info(f"  Adding CSV data: {len(self.csv_data)} samples")
+
+        if self.markdown_data is not None and len(self.markdown_data) > 0:
+            md_with_source = self._add_source_column(self.markdown_data, 'Markdown')
+            datasets_to_combine.append(md_with_source)
+            total_samples += len(self.markdown_data)
+            logger.info(f"  Adding Markdown data: {len(self.markdown_data)} samples")
 
         if not datasets_to_combine:
             logger.warning("  ⚠ No datasets to combine!")
@@ -1999,6 +2121,7 @@ class DataPreparer:
             'epub': self.epub_data,
             'web': self.web_data,
             'csv': self.csv_data,
+            'markdown': self.markdown_data,
         }
 
         cleaned_datasets = []
@@ -2029,6 +2152,8 @@ class DataPreparer:
                         self.web_data = cleaned_ds
                     elif source_name == 'csv':
                         self.csv_data = cleaned_ds
+                    elif source_name == 'markdown':
+                        self.markdown_data = cleaned_ds
             except Exception as e:
                 logger.warning(f"  ⚠ Validation failed for {source_name}: {e}")
                 cleaned_datasets.append(dataset)
@@ -2065,6 +2190,7 @@ class DataPreparer:
             from dataset_preparer.epub.thinking import EPUBThinkingGenerator
             from dataset_preparer.web.thinking import WebThinkingGenerator
             from dataset_preparer.hf.thinking import HFThinkingGenerator
+            from dataset_preparer.markdown.thinking import MarkdownThinkingGenerator
             from dataset_preparer.thinking_quality import validate_thinking
         except ImportError as e:
             logger.warning(f"  ⚠ Thinking generator modules not found: {e}")
@@ -2098,6 +2224,7 @@ class DataPreparer:
             'epub': EPUBThinkingGenerator(engine, teacher, depth=thinking_depth),
             'web': WebThinkingGenerator(engine, teacher, depth=thinking_depth),
             'hf': HFThinkingGenerator(engine, teacher, depth=thinking_depth),
+            'markdown': MarkdownThinkingGenerator(engine, teacher, depth=thinking_depth),
         }
 
         source_datasets = {
@@ -2107,6 +2234,7 @@ class DataPreparer:
             'epub': self.epub_data,
             'web': self.web_data,
             'csv': self.csv_data,
+            'markdown': self.markdown_data,
         }
 
         thinking_datasets = []
