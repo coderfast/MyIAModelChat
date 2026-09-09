@@ -1,1 +1,0 @@
-<|en|><|problem|>Then move the Plane behind the buildings and scale it up as necessary to fill the frame. Add some Edge Loops (Ctrl+R) so that the texture won’t be distorted.<|final|>

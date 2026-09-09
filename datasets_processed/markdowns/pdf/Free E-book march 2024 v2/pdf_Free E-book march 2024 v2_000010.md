@@ -1,1 +1,0 @@
-<|en|><|problem|>And then it’s just a matter of adjusting the shape by moving Faces. If you press G twice, select an Edge to slide along - it will turn yellow - and then C, you can slide ‘outwards’ along that Edge. This can be convenient if you’ve rotated something in Edit Mode, and need to move along its local orientation.<|final|>

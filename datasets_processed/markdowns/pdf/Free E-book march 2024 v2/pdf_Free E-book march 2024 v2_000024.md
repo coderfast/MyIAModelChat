@@ -1,1 +1,0 @@
-<|en|><|problem|>T o control the look of the haze, we can use the Anisotropy value as well. I think it’s a lot of fun to play with these kinds of values, as you quickly get different looks. However you can also just move the volume cube. If you place it just before the Camera like this, the buildings nearest the Camera will have a bit more contrast.<|final|>
