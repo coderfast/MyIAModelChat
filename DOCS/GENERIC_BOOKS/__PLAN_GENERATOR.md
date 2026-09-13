@@ -190,78 +190,107 @@ GENERIC_BOOKS/
 | 149 | Viajes y Turismo | 149_viajes_turismo.md |
 | 150 | Educacion y Formacion | 150_educacion_formacion.md |
 
-## Metricas Esperadas
+## Metricas Finales
 
-| Metrica | Valor Estimado |
+| Metrica | Valor Real |
 |---|---|
-| Total de archivos MD | 150 archivos individuales |
-| Tamano por archivo | 150-300 KB |
-| Tamano total estimado | 22.5 - 45 MB |
-| Palabras por archivo | ~25,000 - 50,000 |
-| Palabras totales estimadas | ~3.75M - 7.5M |
+| Total de archivos MD | 151 archivos individuales |
+| Tamano por archivo (001-120) | 100-300 KB |
+| Tamano por archivo (121-150) | 988-1523 KB (contenidos extensos) |
+| Tamano total estimado | ~35-40 MB |
 | Formato | Libro en MD con capitulos y secciones |
-
-## Formato de Cada Libro
-
-Cada MD sigue la estructura de un libro:
-
-```markdown
-# [Titulo del Libro]
-
-## Capitulo 1: [Nombre del Capitulo]
-
-### [Seccion 1.1]
-Parrafo elaborado de 4-6 oraciones con informacion detallada,
-ejemplos, contexto historico y aplicaciones practicas.
-
-### [Seccion 1.2]
-Otro parrafo complementario con mas detalles y profundidad.
-
-## Capitulo 2: [Nombre del Capitulo]
-...
-```
-
-## Pipeline de Integracion
-
-Una vez generados los MDs, se integran al entrenamiento con:
-
-```bash
-# Copiar MDs a datasets_source/markdown/
-cp GENERIC_BOOKS/*.md datasets_source/markdown/
-
-# Preparar datos
-python main.py --prepare-data --markdown --aiml
-
-# Entrenar
-python main.py --train --epochs 30
-```
 
 ## Fases de Generacion
 
-1. **Fase 1:** Crear topics.json con 150 topics individuales ✅
-2. **Fase 2:** Generar topics 1-10 (Instituciones UE: Historia, Parlamento, Comision, Consejos) 🔨
-3. **Fase 3:** Generar topics 11-20 (Tribunales, Derechos, Schengen, EPSO) 🔨
-4. **Fase 4:** Generar topics 21-30 (Funcionarios, Tratados, Politicas UE) 🔨
-5. **Fase 5:** Generar topics 31-40 (Pacto Verde, Digitalizacion, Brexit, Futuro UE) 🔨
-6. **Fase 6:** Generar topics 41-80 (General: Conversacion, Geografia, Espana, Historia, Ciencias) 🔨
-7. **Fase 7:** Generar topics 81-120 (General: Biologia, Fisica, Astronomia, Tech, Salud, Cocina, Deportes) 🔨
-8. **Fase 8:** Generar topics 121-150 (General: Animales, Medio Ambiente, Arte, Literatura, Matematicas) 🔨
-9. **Fase 9:** Validacion final: conteo de archivos, verificacion de tamano, estimacion de muestras
+1. **Fase 1:** Crear topics.json con 151 topics individuales ✅
+2. **Fase 2:** Generar topics 1-40 (Union Europea) ✅
+3. **Fase 3:** Generar topics 41-60 (General: Conversacion, Geografia) ✅
+4. **Fase 4:** Generar topics 61-86 (Espana, Historia, Ciencias) ✅
+5. **Fase 5:** Generar topics 87-120 (Fisica, Astronomia, Tech, Salud, Cocina, Deportes) ✅
+6. **Fase 6:** Generar topics 121-150 (Animales, Medio Ambiente, Arte, Literatura, Matematicas) ✅
+7. **Fase 7:** Ampliar archivos por debajo de 150 KB ✅
+8. **Fase 8:** Corregir topics.json (ID duplicado) ✅
+9. **Fase 9:** Validacion final ✅
 
 ## Estado Actual
 
 | Fase | Estado |
 |------|--------|
-| Fase 1: topics.json | ✅ Completado |
-| Fase 2: Topics 1-10 | 🔨 En progreso |
-| Fase 3: Topics 11-20 | 🔨 En progreso |
-| Fase 4: Topics 21-30 | 🔨 En progreso |
-| Fase 5: Topics 31-40 | 🔨 En progreso |
-| Fase 6: Topics 41-80 | ⏳ Pendiente |
-| Fase 7: Topics 81-120 | ⏳ Pendiente |
-| Fase 8: Topics 121-150 | ⏳ Pendiente |
-| Fase 9: Validacion | ⏳ Pendiente |
+| Fase 1: topics.json | ✅ Completado (151 topics) |
+| Fase 2: Topics 1-40 (UE) | ✅ Completado (40 archivos) |
+| Fase 3: Topics 41-60 (General) | ✅ Completado (20 archivos) |
+| Fase 4: Topics 61-86 (Historia/Ciencias) | ✅ Completado (26 archivos) |
+| Fase 5: Topics 87-120 (Tech/Salud/Deportes) | ✅ Completado (34 archivos) |
+| Fase 6: Topics 121-150 (Arte/Matematicas) | ✅ Completado (30 archivos) |
+| Fase 7: Ampliacion de archivos | ✅ Completado (27 archivos ampliados) |
+| Fase 8: Correccion topics.json | ✅ Completado |
+| Fase 9: Validacion final | ✅ Completado |
+
+## Resumen de Trabajo Realizado
+
+### Archivos ampliados (27 archivos de <150 KB a 150+ KB):
+- 044_transporte_movilidad.md: 78 → 159.7 KB
+- 045_clima_tiempo.md: 60.6 → 194.5 KB
+- 046_rutina_diaria.md: 58 → 177.6 KB
+- 047_la_familia.md: 53.7 → 210.8 KB
+- 048_emociones_sentimientos.md: 54 → 190 KB
+- 049_planes_actividades.md: 55.1 → 153.2 KB
+- 050_continentes_oceanos.md: 48.7 → 155.2 KB
+- 051_paises_europa.md: 56.3 → 157.5 KB
+- 056_climas_mundo.md: 83.9 → 155.2 KB
+- 065_espana_rural_pueblos.md: 50.6 → 153.4 KB
+- 066_civilizaciones_antiguas.md: 33.2 → 168.1 KB
+- 067_la_edad_media.md: 13.5 → 150.9 KB
+- 068_el_renacimiento.md: 26 → 150.4 KB
+- 069_descubrimientos_exploraciones.md: 22.1 → 211.1 KB
+- 070_la_revolucion_industrial.md: 27.2 → 155.7 KB
+- 071_espana_siglo_xx.md: 23.1 → 151.9 KB
+- 072_historia_de_la_ciencia.md: 27 → 158.1 KB
+- 073_civilizaciones_fluviales.md: 23.1 → 151 KB
+- 074_historia_del_comercio.md: 24.4 → 152.4 KB
+- 075_el_sistema_solar.md: 27 → 165.3 KB
+- 076_estructura_de_la_tierra.md: 31 → 153.4 KB
+- 077_placas_tectonicas.md: 30 → 171 KB
+- 078_el_ciclo_del_agua.md: 32 → 159.2 KB
+- 079_las_eras_geologicas.md: 41.6 → 166.4 KB
+- 080_recursos_naturales.md: 39.1 → 157.7 KB
+- 086_enfermedades_comunes.md: 47.1 → 182.8 KB
+- 111_carnes_pescados.md: 80.9 → 216.3 KB
+- 151_biologia_molecular.md: 69.9 → 236.3 KB
+
+### Archivos creados (32 archivos nuevos):
+- 052_paises_america.md
+- 053_paises_asia_africa.md
+- 054_capitales_ciudades.md
+- 055_rios_lagos_montanas.md
+- 057_oceanografia_basica.md
+- 058_comunidades_autonomas.md
+- 059_ciudades_principales_espana.md
+- 060_paises_habla_hispana.md
+- 087_fuerza_movimiento.md
+- 088_energia_tipos.md
+- 089_electricidad_basica.md
+- 090_sonido_luz.md
+- 091_estados_materia.md
+- 092_elementos_quimicos.md
+- 093_sol_luna.md
+- 094_estrellas_constelaciones.md
+- 095_galaxias_universo.md
+- 096_exploracion_espacial.md
+- 097_computadoras.md
+- 098_internet_redes.md
+- 099_smartphones_dispositivos.md
+- 100_inteligencia_artificial.md
+- 112_tecnicas_cocina_basicas.md
+- 113_cocina_espanola_tradicional.md
+- 114_cocina_internacional.md
+- 115_reposteria_basica.md
+- 116_futbol.md
+- 117_baloncesto_tenis.md
+- 118_natacion_atletismo.md
+- 119_ciclismo_deportes_motor.md
+- 120_deportes_invierno_artes_marciales.md
 
 ---
 
-*Ultima actualizacion: 2026-09-09*
+*Ultima actualizacion: 2026-09-14*
