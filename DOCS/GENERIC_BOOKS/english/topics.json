@@ -5,7 +5,7 @@
   "format": "1 topic = 1 MD = 1 libro (150-300 KB)",
   "categories": [
     {
-      "name": "Union Europea",
+      "name": "European Union",
       "topic_range": "1-40",
       "count": 40
     },
@@ -19,907 +19,907 @@
     {
       "id": 1,
       "category": "UE",
-      "title": "Historia de la Union Europea",
+      "title": "History of the European Union",
       "filename": "001_history_european_union.md"
     },
     {
       "id": 2,
       "category": "UE",
-      "title": "El Parlamento Europeo",
+      "title": "The European Parliament",
       "filename": "002_european_parliament.md"
     },
     {
       "id": 3,
       "category": "UE",
-      "title": "La Comision Europea",
+      "title": "The European Commission",
       "filename": "003_european_commission.md"
     },
     {
       "id": 4,
       "category": "UE",
-      "title": "El Consejo Europeo",
+      "title": "The European Council",
       "filename": "004_european_council.md"
     },
     {
       "id": 5,
       "category": "UE",
-      "title": "El Consejo de la Union Europea",
+      "title": "The Council of the European Union",
       "filename": "005_council_european_union.md"
     },
     {
       "id": 6,
       "category": "UE",
-      "title": "El Tribunal de Justicia de la UE",
+      "title": "The Court of Justice of the EU",
       "filename": "006_court_justice_eu.md"
     },
     {
       "id": 7,
       "category": "UE",
-      "title": "El Tribunal de Cuentas Europeo",
+      "title": "The European Court of Auditors",
       "filename": "007_european_court_auditors.md"
     },
     {
       "id": 8,
       "category": "UE",
-      "title": "El Banco Central Europeo",
+      "title": "The European Central Bank",
       "filename": "008_european_central_bank.md"
     },
     {
       "id": 9,
       "category": "UE",
-      "title": "El Comite Europeo de las Regiones",
+      "title": "The European Committee of the Regions",
       "filename": "009_committee_regions.md"
     },
     {
       "id": 10,
       "category": "UE",
-      "title": "El Defensor del Pueblo Europeo",
+      "title": "The European Ombudsman",
       "filename": "010_european_ombudsman.md"
     },
     {
       "id": 11,
       "category": "UE",
-      "title": "El Servicio Europeo de Accion Exterior",
+      "title": "The European External Action Service",
       "filename": "011_external_action_service.md"
     },
     {
       "id": 12,
       "category": "UE",
-      "title": "Derechos Fundamentales de los Ciudadanos UE",
+      "title": "Fundamental Rights of EU Citizens",
       "filename": "012_fundamental_rights_citizens.md"
     },
     {
       "id": 13,
       "category": "UE",
-      "title": "Obligaciones de los Ciudadanos UE",
+      "title": "Obligations of EU Citizens",
       "filename": "013_obligations_citizens_eu.md"
     },
     {
       "id": 14,
       "category": "UE",
-      "title": "La Carta de los Derechos Fundamentales",
+      "title": "The Charter of Fundamental Rights",
       "filename": "014_charter_fundamental_rights.md"
     },
     {
       "id": 15,
       "category": "UE",
-      "title": "El Convenio Europeo de Derechos Humanos",
+      "title": "The European Convention on Human Rights",
       "filename": "015_convention_human_rights.md"
     },
     {
       "id": 16,
       "category": "UE",
-      "title": "El Espacio Schengen",
+      "title": "The Schengen Area",
       "filename": "016_schengen_area.md"
     },
     {
       "id": 17,
       "category": "UE",
-      "title": "El Sistema EPSO de Seleccion",
+      "title": "The EPSO Selection System",
       "filename": "017_epso_system.md"
     },
     {
       "id": 18,
       "category": "UE",
-      "title": "Tipos de Funcionarios de la UE",
+      "title": "Types of EU Officials",
       "filename": "018_types_eu_officials.md"
     },
     {
       "id": 19,
       "category": "UE",
-      "title": "El Estatuto de los Funcionarios UE",
+      "title": "The Statute of EU Officials",
       "filename": "019_status_eu_officials.md"
     },
     {
       "id": 20,
       "category": "UE",
-      "title": "El Proceso Legislativo de la UE",
+      "title": "The EU Legislative Process",
       "filename": "020_legislative_process_eu.md"
     },
     {
       "id": 21,
       "category": "UE",
-      "title": "Los Tratados Fundamentales de la UE",
+      "title": "The Fundamental Treaties of the EU",
       "filename": "021_fundamental_treaties.md"
     },
     {
       "id": 22,
       "category": "UE",
-      "title": "La Politica Agricola Comun",
+      "title": "The Common Agricultural Policy",
       "filename": "022_common_agricultural_policy.md"
     },
     {
       "id": 23,
       "category": "UE",
-      "title": "La Politica de Cohesion Europea",
+      "title": "The European Cohesion Policy",
       "filename": "023_cohesion_policy.md"
     },
     {
       "id": 24,
       "category": "UE",
-      "title": "El Mercado Unico Europeo",
+      "title": "The European Single Market",
       "filename": "024_european_single_market.md"
     },
     {
       "id": 25,
       "category": "UE",
-      "title": "La Union Economica y Monetaria",
+      "title": "The Economic and Monetary Union",
       "filename": "025_economic_monetary_union.md"
     },
     {
       "id": 26,
       "category": "UE",
-      "title": "El Euro y la Zona Euro",
+      "title": "The Euro and the Eurozone",
       "filename": "026_euro_eurozone.md"
     },
     {
       "id": 27,
       "category": "UE",
-      "title": "La Politica Comercial de la UE",
+      "title": "The EU Trade Policy",
       "filename": "027_eu_trade_policy.md"
     },
     {
       "id": 28,
       "category": "UE",
-      "title": "La Politica Exterior y de Seguridad Comun",
+      "title": "The Common Foreign and Security Policy",
       "filename": "028_foreign_security_policy.md"
     },
     {
       "id": 29,
       "category": "UE",
-      "title": "Europol y la Cooperacion Policial",
+      "title": "Europol and Police Cooperation",
       "filename": "029_europol_police_cooperation.md"
     },
     {
       "id": 30,
       "category": "UE",
-      "title": "Eurojust y la Cooperacion Judicial",
+      "title": "Eurojust and Judicial Cooperation",
       "filename": "030_eurojust_judicial_cooperation.md"
     },
     {
       "id": 31,
       "category": "UE",
-      "title": "El Pacto Verde Europeo",
+      "title": "The European Green Deal",
       "filename": "031_european_green_deal.md"
     },
     {
       "id": 32,
       "category": "UE",
-      "title": "La Digitalizacion en la UE",
+      "title": "Digitalization in the EU",
       "filename": "032_eu_digitalization.md"
     },
     {
       "id": 33,
       "category": "UE",
-      "title": "Erasmus y Programas Educativos UE",
+      "title": "Erasmus and EU Educational Programs",
       "filename": "033_erasmus_educational_programs.md"
     },
     {
       "id": 34,
       "category": "UE",
-      "title": "Horizonte Europa e Investigacion",
+      "title": "Horizon Europe and Research",
       "filename": "034_horizon_europe_research.md"
     },
     {
       "id": 35,
       "category": "UE",
-      "title": "La Politica de Ampliacion de la UE",
+      "title": "The EU Enlargement Policy",
       "filename": "035_eu_enlargement_policy.md"
     },
     {
       "id": 36,
       "category": "UE",
-      "title": "El Brexit y sus Consecuencias",
+      "title": "Brexit and Its Consequences",
       "filename": "036_brexit_consequences.md"
     },
     {
       "id": 37,
       "category": "UE",
-      "title": "Espana en la Union Europea",
+      "title": "Spain in the European Union",
       "filename": "037_spain_european_union.md"
     },
     {
       "id": 38,
       "category": "UE",
-      "title": "Los Simbolos de la UE",
+      "title": "The Symbols of the EU",
       "filename": "038_eu_symbols.md"
     },
     {
       "id": 39,
       "category": "UE",
-      "title": "Las Lenguas Oficiales de la UE",
+      "title": "The Official Languages of the EU",
       "filename": "039_eu_official_languages.md"
     },
     {
       "id": 40,
       "category": "UE",
-      "title": "El Futuro de la Union Europea",
+      "title": "The Future of the European Union",
       "filename": "040_future_european_union.md"
     },
     {
       "id": 41,
       "category": "General",
-      "title": "Saludos y Presentaciones",
+      "title": "Greetings and Introductions",
       "filename": "041_greetings_introductions.md"
     },
     {
       "id": 42,
       "category": "General",
-      "title": "En el Restaurante",
+      "title": "At the Restaurant",
       "filename": "042_at_the_restaurant.md"
     },
     {
       "id": 43,
       "category": "General",
-      "title": "De Compras",
+      "title": "Shopping",
       "filename": "043_shopping.md"
     },
     {
       "id": 44,
       "category": "General",
-      "title": "Transporte y Movilidad",
+      "title": "Transport and Mobility",
       "filename": "044_transport_mobility.md"
     },
     {
       "id": 45,
       "category": "General",
-      "title": "El Clima y el Tiempo",
+      "title": "Climate and Weather",
       "filename": "045_climate_weather.md"
     },
     {
       "id": 46,
       "category": "General",
-      "title": "Rutina Diaria",
+      "title": "Daily Routine",
       "filename": "046_daily_routine.md"
     },
     {
       "id": 47,
       "category": "General",
-      "title": "La Familia",
+      "title": "The Family",
       "filename": "047_family.md"
     },
     {
       "id": 48,
       "category": "General",
-      "title": "Emociones y Sentimientos",
+      "title": "Emotions and Feelings",
       "filename": "048_emotions_feelings.md"
     },
     {
       "id": 49,
       "category": "General",
-      "title": "Planes y Actividades",
+      "title": "Plans and Activities",
       "filename": "049_plans_activities.md"
     },
     {
       "id": 50,
       "category": "General",
-      "title": "Continentes y Oceanos",
+      "title": "Continents and Oceans",
       "filename": "050_continents_oceans.md"
     },
     {
       "id": 51,
       "category": "General",
-      "title": "Paises de Europa",
+      "title": "Countries of Europe",
       "filename": "051_countries_europe.md"
     },
     {
       "id": 52,
       "category": "General",
-      "title": "Paises de America",
+      "title": "Countries of America",
       "filename": "052_countries_america.md"
     },
     {
       "id": 53,
       "category": "General",
-      "title": "Paises de Asia y Africa",
+      "title": "Countries of Asia and Africa",
       "filename": "053_countries_asia_africa.md"
     },
     {
       "id": 54,
       "category": "General",
-      "title": "Capitales y Ciudades Principales",
+      "title": "Capitals and Major Cities",
       "filename": "054_capitals_cities.md"
     },
     {
       "id": 55,
       "category": "General",
-      "title": "Rios, Lagos y Montanas",
+      "title": "Rivers, Lakes, and Mountains",
       "filename": "055_rivers_lakes_mountains.md"
     },
     {
       "id": 56,
       "category": "General",
-      "title": "Climas del Mundo",
+      "title": "Climates of the World",
       "filename": "056_world_climates.md"
     },
     {
       "id": 57,
       "category": "General",
-      "title": "Oceanografia Basica",
+      "title": "Basic Oceanography",
       "filename": "057_basic_oceanography.md"
     },
     {
       "id": 58,
       "category": "General",
-      "title": "Comunidades Autonomas de Espana",
+      "title": "Autonomous Communities of Spain",
       "filename": "058_autonomous_communities.md"
     },
     {
       "id": 59,
       "category": "General",
-      "title": "Ciudades Principales de Espana",
+      "title": "Major Cities of Spain",
       "filename": "059_major_cities_spain.md"
     },
     {
       "id": 60,
       "category": "General",
-      "title": "Paises de Habla Hispana",
+      "title": "Spanish-Speaking Countries",
       "filename": "060_spanish_speaking_countries.md"
     },
     {
       "id": 61,
       "category": "General",
-      "title": "Gastronomia Regional Espanola",
+      "title": "Spanish Regional Cuisine",
       "filename": "061_regional_spanish_cuisine.md"
     },
     {
       "id": 62,
       "category": "General",
-      "title": "Fiestas y Tradiciones de Espana",
+      "title": "Festivals and Traditions of Spain",
       "filename": "062_festivals_traditions_spain.md"
     },
     {
       "id": 63,
       "category": "General",
-      "title": "Geografia Fisica de Espana",
+      "title": "Physical Geography of Spain",
       "filename": "063_physical_geography_spain.md"
     },
     {
       "id": 64,
       "category": "General",
-      "title": "Rutas Culturales de Espana",
+      "title": "Cultural Routes of Spain",
       "filename": "064_cultural_routes_spain.md"
     },
     {
       "id": 65,
       "category": "General",
-      "title": "Espana Rural y Pueblos",
+      "title": "Rural Spain and Villages",
       "filename": "065_rural_spain_villages.md"
     },
     {
       "id": 66,
       "category": "General",
-      "title": "Civilizaciones Antiguas",
+      "title": "Ancient Civilizations",
       "filename": "066_ancient_civilizations.md"
     },
     {
       "id": 67,
       "category": "General",
-      "title": "La Edad Media",
+      "title": "The Middle Ages",
       "filename": "067_middle_ages.md"
     },
     {
       "id": 68,
       "category": "General",
-      "title": "El Renacimiento",
+      "title": "The Renaissance",
       "filename": "068_renaissance.md"
     },
     {
       "id": 69,
       "category": "General",
-      "title": "Descubrimientos y Exploraciones",
+      "title": "Discoveries and Explorations",
       "filename": "069_explorations_discoveries.md"
     },
     {
       "id": 70,
       "category": "General",
-      "title": "La Revolucion Industrial",
+      "title": "The Industrial Revolution",
       "filename": "070_industrial_revolution.md"
     },
     {
       "id": 71,
       "category": "General",
-      "title": "Espana en el Siglo XX",
+      "title": "Spain in the 20th Century",
       "filename": "071_twentieth_century.md"
     },
     {
       "id": 72,
       "category": "General",
-      "title": "Historia de la Ciencia",
+      "title": "History of Science",
       "filename": "072_history_science.md"
     },
     {
       "id": 73,
       "category": "General",
-      "title": "Las Grandes Civilizaciones Fluviales",
+      "title": "The Great River Civilizations",
       "filename": "073_river_civilizations.md"
     },
     {
       "id": 74,
       "category": "General",
-      "title": "Historia del Comercio",
+      "title": "History of Trade",
       "filename": "074_history_trade.md"
     },
     {
       "id": 75,
       "category": "General",
-      "title": "El Sistema Solar",
+      "title": "The Solar System",
       "filename": "075_solar_system.md"
     },
     {
       "id": 76,
       "category": "General",
-      "title": "Estructura de la Tierra",
+      "title": "Structure of the Earth",
       "filename": "076_earth_structure.md"
     },
     {
       "id": 77,
       "category": "General",
-      "title": "Placas Tectonicas y Vulcanismo",
+      "title": "Tectonic Plates and Volcanism",
       "filename": "077_tectonic_plates.md"
     },
     {
       "id": 78,
       "category": "General",
-      "title": "El Ciclo del Agua",
+      "title": "The Water Cycle",
       "filename": "078_water_cycle.md"
     },
     {
       "id": 79,
       "category": "General",
-      "title": "Las Eras Geologicas",
+      "title": "Geological Eras",
       "filename": "079_geological_eras.md"
     },
     {
       "id": 80,
       "category": "General",
-      "title": "Recursos Naturales",
+      "title": "Natural Resources",
       "filename": "080_natural_resources.md"
     },
     {
       "id": 81,
       "category": "General",
-      "title": "El Cuerpo Humano",
+      "title": "The Human Body",
       "filename": "081_human_body.md"
     },
     {
       "id": 82,
       "category": "General",
-      "title": "Animales Vertebrados",
+      "title": "Vertebrate Animals",
       "filename": "082_vertebrate_animals.md"
     },
     {
       "id": 83,
       "category": "General",
-      "title": "Animales Invertebrados",
+      "title": "Invertebrate Animals",
       "filename": "083_invertebrate_animals.md"
     },
     {
       "id": 84,
       "category": "General",
-      "title": "El Mundo Vegetal",
+      "title": "The Plant World",
       "filename": "084_plant_world.md"
     },
     {
       "id": 85,
       "category": "General",
-      "title": "Nutricion y Alimentacion",
+      "title": "Nutrition and Diet",
       "filename": "085_nutrition_diet.md"
     },
     {
       "id": 86,
       "category": "General",
-      "title": "Enfermedades Comunes",
+      "title": "Common Diseases",
       "filename": "086_common_diseases.md"
     },
     {
       "id": 87,
       "category": "General",
-      "title": "Fuerza y Movimiento",
+      "title": "Force and Motion",
       "filename": "087_force_motion.md"
     },
     {
       "id": 88,
       "category": "General",
-      "title": "Energia y sus Tipos",
+      "title": "Energy and Its Types",
       "filename": "088_energy_types.md"
     },
     {
       "id": 89,
       "category": "General",
-      "title": "Electricidad Basica",
+      "title": "Basic Electricity",
       "filename": "089_basic_electricity.md"
     },
     {
       "id": 90,
       "category": "General",
-      "title": "Sonido y Luz",
+      "title": "Sound and Light",
       "filename": "090_sound_light.md"
     },
     {
       "id": 91,
       "category": "General",
-      "title": "Estados de la Materia",
+      "title": "States of Matter",
       "filename": "091_states_matter.md"
     },
     {
       "id": 92,
       "category": "General",
-      "title": "Elementos Quimicos",
+      "title": "Chemical Elements",
       "filename": "092_chemical_elements.md"
     },
     {
       "id": 93,
       "category": "General",
-      "title": "El Sol y la Luna",
+      "title": "The Sun and the Moon",
       "filename": "093_sun_moon.md"
     },
     {
       "id": 94,
       "category": "General",
-      "title": "Estrellas y Constelaciones",
+      "title": "Stars and Constellations",
       "filename": "094_stars_constellations.md"
     },
     {
       "id": 95,
       "category": "General",
-      "title": "Galaxias y Universo",
+      "title": "Galaxies and the Universe",
       "filename": "095_galaxies_universe.md"
     },
     {
       "id": 96,
       "category": "General",
-      "title": "Exploracion Espacial",
+      "title": "Space Exploration",
       "filename": "096_space_exploration.md"
     },
     {
       "id": 97,
       "category": "General",
-      "title": "Las Computadoras",
+      "title": "Computers",
       "filename": "097_computers.md"
     },
     {
       "id": 98,
       "category": "General",
-      "title": "Internet y Redes",
+      "title": "Internet and Networks",
       "filename": "098_internet_networks.md"
     },
     {
       "id": 99,
       "category": "General",
-      "title": "Smartphones y Dispositivos Moviles",
+      "title": "Smartphones and Mobile Devices",
       "filename": "099_smartphones_devices.md"
     },
     {
       "id": 100,
       "category": "General",
-      "title": "Inteligencia Artificial",
+      "title": "Artificial Intelligence",
       "filename": "100_artificial_intelligence.md"
     },
     {
       "id": 101,
       "category": "General",
-      "title": "Seguridad Informatica",
+      "title": "Cybersecurity",
       "filename": "101_cybersecurity.md"
     },
     {
       "id": 102,
       "category": "General",
-      "title": "Programacion Basica",
+      "title": "Basic Programming",
       "filename": "102_basic_programming.md"
     },
     {
       "id": 103,
       "category": "General",
-      "title": "El Sistema Inmunologico",
+      "title": "The Immune System",
       "filename": "103_immune_system.md"
     },
     {
       "id": 104,
       "category": "General",
-      "title": "Historia de la Ciencia",
+      "title": "History of Science",
       "filename": "104_history_science.md"
     },
     {
       "id": 105,
       "category": "General",
-      "title": "Ecosistemas Tropicales",
+      "title": "Tropical Ecosystems",
       "filename": "105_tropical_ecosystems.md"
     },
     {
       "id": 106,
       "category": "General",
-      "title": "Filosofia Contemporanea",
+      "title": "Contemporary Philosophy",
       "filename": "106_contemporary_philosophy.md"
     },
     {
       "id": 107,
       "category": "General",
-      "title": "Inteligencia Artificial",
+      "title": "Artificial Intelligence",
       "filename": "107_artificial_intelligence.md"
     },
     {
       "id": 108,
       "category": "General",
-      "title": "Envejecimiento Saludable",
+      "title": "Healthy Aging",
       "filename": "108_healthy_aging.md"
     },
     {
       "id": 109,
       "category": "General",
-      "title": "Bienestar Emocional",
+      "title": "Emotional Well-being",
       "filename": "109_emotional_wellbeing.md"
     },
     {
       "id": 110,
       "category": "General",
-      "title": "Frutas y Verduras",
+      "title": "Fruits and Vegetables",
       "filename": "110_fruits_vegetables.md"
     },
     {
       "id": 111,
       "category": "General",
-      "title": "Carnes y Pescados",
+      "title": "Meat and Fish",
       "filename": "111_meat_fish.md"
     },
     {
       "id": 112,
       "category": "General",
-      "title": "Tecnicas de Cocina Basicas",
+      "title": "Basic Cooking Techniques",
       "filename": "112_basic_cooking_techniques.md"
     },
     {
       "id": 113,
       "category": "General",
-      "title": "Cocina Espanola Tradicional",
+      "title": "Traditional Spanish Cuisine",
       "filename": "113_traditional_spanish_cuisine.md"
     },
     {
       "id": 114,
       "category": "General",
-      "title": "Cocina Internacional",
+      "title": "International Cuisine",
       "filename": "114_international_cuisine.md"
     },
     {
       "id": 115,
       "category": "General",
-      "title": "Reposteria Basica",
+      "title": "Basic Baking",
       "filename": "115_basic_baking.md"
     },
     {
       "id": 116,
       "category": "General",
-      "title": "Futbol",
+      "title": "Football",
       "filename": "116_football.md"
     },
     {
       "id": 117,
       "category": "General",
-      "title": "Baloncesto y Tenis",
+      "title": "Basketball and Tennis",
       "filename": "117_basketball_tennis.md"
     },
     {
       "id": 118,
       "category": "General",
-      "title": "Natacion y Atletismo",
+      "title": "Swimming and Athletics",
       "filename": "118_swimming_athletics.md"
     },
     {
       "id": 119,
       "category": "General",
-      "title": "Ciclismo y Deportes de Motor",
+      "title": "Cycling and Motor Sports",
       "filename": "119_cycling_motorsports.md"
     },
     {
       "id": 120,
       "category": "General",
-      "title": "Deportes de Invierno y Artes Marciales",
+      "title": "Winter Sports and Martial Arts",
       "filename": "120_winter_sports_martial_arts.md"
     },
     {
       "id": 121,
       "category": "General",
-      "title": "Mamiferos Terrestres",
+      "title": "Terrestrial Mammals",
       "filename": "121_terrestrial_mammals.md"
     },
     {
       "id": 122,
       "category": "General",
-      "title": "Aves y Vida Marina",
+      "title": "Birds and Marine Life",
       "filename": "122_birds_marine_life.md"
     },
     {
       "id": 123,
       "category": "General",
-      "title": "Insectos y Pequenos Organismos",
+      "title": "Insects and Small Organisms",
       "filename": "123_insects_organisms.md"
     },
     {
       "id": 124,
       "category": "General",
-      "title": "Ecosistemas Terrestres",
+      "title": "Terrestrial Ecosystems",
       "filename": "124_terrestrial_ecosystems.md"
     },
     {
       "id": 125,
       "category": "General",
-      "title": "Ecosistemas Acuaticos",
+      "title": "Aquatic Ecosystems",
       "filename": "125_aquatic_ecosystems.md"
     },
     {
       "id": 126,
       "category": "General",
-      "title": "Cambio Climatico",
+      "title": "Climate Change",
       "filename": "126_climate_change.md"
     },
     {
       "id": 127,
       "category": "General",
-      "title": "Contaminacion y sus Tipos",
+      "title": "Pollution and Its Types",
       "filename": "127_pollution_types.md"
     },
     {
       "id": 128,
       "category": "General",
-      "title": "Energias Renovables",
+      "title": "Renewable Energy",
       "filename": "128_renewable_energy.md"
     },
     {
       "id": 129,
       "category": "General",
-      "title": "Reciclaje y Sostenibilidad",
+      "title": "Recycling and Sustainability",
       "filename": "129_recycling_sustainability.md"
     },
     {
       "id": 130,
       "category": "General",
-      "title": "Proteccion de la Naturaleza",
+      "title": "Nature Conservation",
       "filename": "130_nature_conservation.md"
     },
     {
       "id": 131,
       "category": "General",
-      "title": "Pintura y Escultura",
+      "title": "Painting and Sculpture",
       "filename": "131_painting_sculpture.md"
     },
     {
       "id": 132,
       "category": "General",
-      "title": "Arquitectura",
+      "title": "Architecture",
       "filename": "132_architecture.md"
     },
     {
       "id": 133,
       "category": "General",
-      "title": "Musica",
+      "title": "Music",
       "filename": "133_music.md"
     },
     {
       "id": 134,
       "category": "General",
-      "title": "Cine y Television",
+      "title": "Film and Television",
       "filename": "134_film_television.md"
     },
     {
       "id": 135,
       "category": "General",
-      "title": "Teatro y Danza",
+      "title": "Theater and Dance",
       "filename": "135_theater_dance.md"
     },
     {
       "id": 136,
       "category": "General",
-      "title": "Fotografia Artistica",
+      "title": "Artistic Photography",
       "filename": "136_artistic_photography.md"
     },
     {
       "id": 137,
       "category": "General",
-      "title": "Literatura Espanola Clasica",
+      "title": "Classic Spanish Literature",
       "filename": "137_classic_spanish_literature.md"
     },
     {
       "id": 138,
       "category": "General",
-      "title": "Literatura Latinoamericana",
+      "title": "Latin American Literature",
       "filename": "138_latin_american_literature.md"
     },
     {
       "id": 139,
       "category": "General",
-      "title": "Cuentos y Fabulas",
+      "title": "Stories and Fables",
       "filename": "139_stories_fables.md"
     },
     {
       "id": 140,
       "category": "General",
-      "title": "Poesia y Ensayo",
+      "title": "Poetry and Essay",
       "filename": "140_poetry_essay.md"
     },
     {
       "id": 141,
       "category": "General",
-      "title": "Aritmetica y Numeros",
+      "title": "Arithmetic and Numbers",
       "filename": "141_arithmetic_numbers.md"
     },
     {
       "id": 142,
       "category": "General",
-      "title": "Fracciones, Decimales y Porcentajes",
+      "title": "Fractions, Decimals, and Percentages",
       "filename": "142_fractions_decimals.md"
     },
     {
       "id": 143,
       "category": "General",
-      "title": "Geometria Basica",
+      "title": "Basic Geometry",
       "filename": "143_basic_geometry.md"
     },
     {
       "id": 144,
       "category": "General",
-      "title": "Algebra Elemental",
+      "title": "Elementary Algebra",
       "filename": "144_elementary_algebra.md"
     },
     {
       "id": 145,
       "category": "General",
-      "title": "Gramatica y Ortografia Espanola",
+      "title": "Spanish Grammar and Spelling",
       "filename": "145_grammar_spelling.md"
     },
     {
       "id": 146,
       "category": "General",
-      "title": "Comunicacion Efectiva",
+      "title": "Effective Communication",
       "filename": "146_effective_communication.md"
     },
     {
       "id": 147,
       "category": "General",
-      "title": "Trabajo y Profesiones",
+      "title": "Work and Professions",
       "filename": "147_work_professions.md"
     },
     {
       "id": 148,
       "category": "General",
-      "title": "Emprendimiento y Negocios",
+      "title": "Entrepreneurship and Business",
       "filename": "148_entrepreneurship_business.md"
     },
     {
       "id": 149,
       "category": "General",
-      "title": "Viajes y Turismo",
+      "title": "Travel and Tourism",
       "filename": "149_travel_tourism.md"
     },
     {
       "id": 150,
       "category": "General",
-      "title": "Educacion y Formacion",
+      "title": "Education and Training",
       "filename": "150_education_training.md"
     },
     {
       "id": 151,
       "category": "General",
-      "title": "Biologia Molecular",
+      "title": "Molecular Biology",
       "filename": "151_molecular_biology.md"
     }
   ]
