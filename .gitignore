@@ -80,3 +80,5 @@ error.txt
 /models/exported/chat_model_hf/tokenizer_vocab.json
 /models/exported/chat_model_hf/config.json
 /.playwright-mcp
+/datasets_processed/markdowns/markdown/DOC_AIML_21
+DOCS/GENERIC_BOOKS/english/TRANSLATIONS_IN_PROGRESS.md
