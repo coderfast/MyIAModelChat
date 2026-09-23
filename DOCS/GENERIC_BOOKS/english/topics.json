@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "total_topics": 150,
-  "language": "es",
+  "language": "en",
   "format": "1 topic = 1 MD = 1 libro (150-300 KB)",
   "categories": [
     {
