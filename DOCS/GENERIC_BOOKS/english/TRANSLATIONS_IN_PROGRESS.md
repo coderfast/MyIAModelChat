@@ -2,8 +2,8 @@
 
 **Carpeta**: `G:\PROJECTS\MyIAModelChat\DOCS\GENERIC_BOOKS\english\`
 **Fecha de inicio**: 2026-09-15
-**Ultima actualizacion**: 2026-09-23
-**Estado**: En progreso - 99 archivos pendientes de traduccion
+**Ultima actualizacion**: 2026-09-28
+**Estado**: En progreso - 94 archivos pendientes de traduccion
 
 ---
 
@@ -12,25 +12,20 @@
 | Metrica | Valor |
 |---------|-------|
 | Total de archivos MD | 151 |
-| Traducidos al ingles | 38 (25%) |
-| Pendientes en espanol | 99 (66%) |
+| Traducidos al ingles | 43 (28%) |
+| Pendientes en espanol | 94 (62%) |
 | Con titulo ingles pero cuerpo en espanol | 14 (9%) |
 | Archivo de topicos | `topics.json` (151 entradas, TODAS traducidas al ingles) |
 | Tamano esperado por archivo | 150-300 KB |
 
 ---
 
-## Archivos pendientes de traduccion (99 archivos)
+## Archivos pendientes de traduccion (94 archivos)
 
-### Union Europea (38 archivos)
+### Union Europea (33 archivos)
 
 | # | Archivo | Titulo actual (espanol) | Titulo esperado (ingles) | Tamano |
 |---|---------|-------------------------|--------------------------|--------|
-| 001 | `001_history_european_union.md` | Historia de la Union Europea | History of the European Union | 155KB |
-| 002 | `002_european_parliament.md` | El Parlamento Europeo | The European Parliament | 154KB |
-| 003 | `003_european_commission.md` | La Comision Europea | The European Commission | 152KB |
-| 004 | `004_european_council.md` | El Consejo Europeo | The European Council | 150KB |
-| 005 | `005_council_european_union.md` | El Consejo de la Union Europea | The Council of the European Union | 151KB |
 | 006 | `006_court_justice_eu.md` | El Tribunal de Justicia de la UE | The Court of Justice of the EU | 152KB |
 | 007 | `007_european_court_auditors.md` | El Tribunal de Cuentas Europeo | The European Court of Auditors | 152KB |
 | 008 | `008_european_central_bank.md` | El Banco Central Europeo | The European Central Bank | 150KB |
@@ -191,11 +186,11 @@ Estos archivos tienen el titulo en ingles pero el contenido interno contiene pal
 
 ---
 
-## Archivos ya traducidos al ingles (38 archivos)
+## Archivos ya traducidos al ingles (43 archivos)
 
 Estos archivos tienen titulo y contenido en ingles que coinciden con topics.json.
 
-053_countries_asia_africa.md, 057_basic_oceanography.md, 058_autonomous_communities.md, 060_spanish_speaking_countries.md, 063_physical_geography_spain.md, 064_cultural_routes_spain.md, 074_history_trade.md, 078_water_cycle.md, 087_force_motion.md, 090_sound_light.md, 091_states_matter.md, 092_chemical_elements.md, 093_sun_moon.md, 094_stars_constellations.md, 095_galaxies_universe.md, 096_space_exploration.md, 097_computers.md, 098_internet_networks.md, 099_smartphones_devices.md, 100_artificial_intelligence.md, 109_emotional_wellbeing.md, 110_fruits_vegetables.md, 111_meat_fish.md, 112_basic_cooking_techniques.md, 113_traditional_spanish_cuisine.md, 114_international_cuisine.md, 117_basketball_tennis.md, 118_swimming_athletics.md, 120_winter_sports_martial_arts.md, 126_climate_change.md, 128_renewable_energy.md, 132_architecture.md, 133_music.md, 136_artistic_photography.md, 143_basic_geometry.md, 144_elementary_algebra.md, 146_effective_communication.md, 151_molecular_biology.md
+001_history_european_union.md, 002_european_parliament.md, 003_european_commission.md, 004_european_council.md, 005_council_european_union.md, 053_countries_asia_africa.md, 057_basic_oceanography.md, 058_autonomous_communities.md, 060_spanish_speaking_countries.md, 063_physical_geography_spain.md, 064_cultural_routes_spain.md, 074_history_trade.md, 078_water_cycle.md, 087_force_motion.md, 090_sound_light.md, 091_states_matter.md, 092_chemical_elements.md, 093_sun_moon.md, 094_stars_constellations.md, 095_galaxies_universe.md, 096_space_exploration.md, 097_computers.md, 098_internet_networks.md, 099_smartphones_devices.md, 100_artificial_intelligence.md, 109_emotional_wellbeing.md, 110_fruits_vegetables.md, 111_meat_fish.md, 112_basic_cooking_techniques.md, 113_traditional_spanish_cuisine.md, 114_international_cuisine.md, 117_basketball_tennis.md, 118_swimming_athletics.md, 120_winter_sports_martial_arts.md, 126_climate_change.md, 128_renewable_energy.md, 132_architecture.md, 133_music.md, 136_artistic_photography.md, 143_basic_geometry.md, 144_elementary_algebra.md, 146_effective_communication.md, 151_molecular_biology.md
 
 Nota: Algunos archivos de esta lista pueden tener tamano superior a 300KB y contenido parcialmente en espanol. Requieren revision.
 
@@ -211,6 +206,7 @@ Nota: Algunos archivos de esta lista pueden tener tamano superior a 300KB y cont
 - **topics.json**: ya traducido completamente al ingles (todos los titles son en ingles)
 
 ### Resolucion de problemas anteriores
+- **Archivos 001-005**: Traducidos al ingles en sesion 2026-09-28 (UE: historia, parlamento, comision, consejo europeo, consejo UE)
 - **Archivos 104-107**: Renombrados para coincidir con contenido real (topics.json actualizado en ambas carpetas)
 - **Archivos 070-079**: topics.json actualizado para alinear con nombres reales en disco
 - **Archivos 052-057, 074, 078, 087, 097-100, 112-116**: Ya estaban traducidos al ingles (verificados en sesion 2026-09-20)
@@ -224,4 +220,4 @@ Nota: Algunos archivos de esta lista pueden tener tamano superior a 300KB y cont
 
 ---
 
-*Ultima actualizacion: 2026-09-23*
+*Ultima actualizacion: 2026-09-28*
