@@ -1560,9 +1560,9 @@ In conclusion, diseño is a dynamic and constantly evolving field that requires 
 
 
 
-## Chapter 10: El espacio y la geometry
+## Chapter 10: Space and Geometry
 
-In this chapter, we will analyze the topic of el espacio y la geometry in depth, exploring its multiple facets and dimensions. El espacio y la geometry is an essential component of geometry basica that deserves detailed and rigorous study. Throughout the following sections, we will discover the fundamental principles, practical applications, and current trends that define this fascinating field of knowledge. The analysis of el espacio y la geometry will allow us to better understand its importance within the general framework of geometry basica and its relevance to contemporary society.
+In this chapter, we will analyze the topic of Space and Geometry in depth, exploring its multiple facets and dimensions. Space and Geometry is an essential component of basic geometry that deserves detailed and rigorous study. Throughout the following sections, we will discover the fundamental principles, practical applications, and current trends that define this fascinating field of knowledge. The analysis of Space and Geometry will allow us to better understand its importance within the general framework of basic geometry and its relevance to contemporary society.
 
 
 ### Dimensiones
