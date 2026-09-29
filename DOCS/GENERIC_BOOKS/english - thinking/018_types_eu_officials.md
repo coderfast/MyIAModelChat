@@ -1,0 +1,737 @@
+# Types of EU Officials
+
+## Chapter 1: Introduction to European Public Employment
+
+### 1.1 The Principle of Equal Opportunities
+
+Public employment in the European Union is governed by fundamental principles that guarantee equal opportunities, meritocracy, and transparency in access to public office. Article 298 of the Treaty on the Functioning of the European Union establishes that the Union Administration must ensure a high level of efficiency and competence, while respecting the equal treatment of all citizens of the Union with regard to access to employment in said Administration. This principle is materialized in a recruitment system based on meritocracy, where candidates are evaluated through rigorous selection processes that measure their abilities, knowledge, and skills to perform the functions of each position.
+
+Equal opportunities are reflected in the prohibition of any form of discrimination on grounds of sex, race, color, ethnic or social origin, genetic characteristics, language, religion or convictions, political or other opinions, trade union membership, property, birth, disability, age, or sexual orientation. This equality also extends to gender equality, which is a cross-cutting objective of all Union policies and must be taken into account at all stages of the selection process. The European Commission has adopted numerous initiatives to promote gender equality in European public employment, including affirmative action measures and equality plans.
+
+The principle of meritocracy implies that selection is based exclusively on the abilities and competences of candidates, without taking into account their nationality, gender, age, or any other personal characteristic unrelated to the job. This principle is materialized in selection processes that are transparent, objective, and based on predefined criteria that allow all candidates to be evaluated impartially. Meritocracy is a fundamental pillar of the European public employment system, as it ensures that the best candidates are selected to fill positions, regardless of their origin or personal circumstances.
+
+Transparency in selection processes is another fundamental principle that guarantees equal opportunities. All selection processes are published on the EPSO (European Personnel Selection Office) portal, which provides detailed information on available positions, access requirements, selection criteria, and test results. This transparency allows any citizen of the Union to access the information and participate in the selection processes on equal terms. The EPSO portal is updated regularly and provides updated information on all ongoing selection processes.
+
+### 1.2 Selection Bodies: EPSO and Human Resources Services
+
+The European Personnel Selection Office (EPSO) is the body responsible for organizing selection processes for official positions in the institutions of the European Union. It was created in 2003 with the objective of centralizing and harmonizing selection processes, guaranteeing equal opportunities and the quality of candidates. EPSO organizes open calls to fill positions in different categories and areas of specialization, from general administration to specialized technical areas.
+
+EPSO selection processes are based on a system of written and oral tests that evaluate candidates' competences. Written tests include verbal reasoning, numerical reasoning, abstract reasoning, attention to detail, and specific job competences tests. Oral tests include structured interviews, group exercises, and oral presentations. All candidates who pass the written tests move on to the oral tests phase, where their communication skills, teamwork, and leadership abilities are evaluated.
+
+In addition to EPSO, each institution of the European Union has its own human resources service that manages the selection process for specific positions. These human resources services work in collaboration with EPSO to ensure that selection processes are carried out in accordance with the principles of equal opportunities and meritocracy. The human resources services are also responsible for managing the careers of officials once they have been hired, including their training, performance evaluation, and promotion.
+
+The collaboration between EPSO and the human resources services of the institutions is fundamental to ensure the quality and efficiency of selection processes. EPSO provides a centralized platform for the management of selection processes, while the human resources services of the institutions contribute their specific knowledge of each institution's staffing needs. This collaboration makes it possible to optimize available resources and ensure that the best candidates are selected to fill vacancies.
+
+### 1.3 The System of Categories and Grades
+
+The system of categories and grades of European public employment establishes a hierarchy of positions with different levels of responsibility and complexity. The main categories are A (senior officials), B (intermediate officials), C (assistant officials), and D (auxiliary staff). Each category is subdivided into different grades that determine the level of experience and the responsibilities of the position. This system allows for efficient management of human resources and ensures that officials are remunerated in accordance with their responsibilities and competences.
+
+Category A includes senior positions that require advanced university education and significant professional experience. Officials in this category perform management, advisory, and specialization functions in technical or legal areas. Category B includes intermediate positions that require university education and relevant professional experience. Officials in this category perform execution and control functions in different areas of administration.
+
+Category C includes execution positions that require post-secondary education or relevant professional experience. Officials in this category perform administrative, technical, or service support functions. Category D includes auxiliary staff positions that require basic education and experience in service tasks. Officials in this category perform cleaning, maintenance, and other auxiliary services functions.
+
+The system of categories and grades allows for flexible management of human resources, as it makes it possible to adapt employment conditions to the specific needs of each position. In addition, this system facilitates the mobility of officials between different positions and institutions, since the classification criteria are common to all Union institutions. The classification of positions is based on the competences required, the responsibilities of the position, and the working conditions.
+
+### 1.4 Language Policy in European Public Employment
+
+The language policy is a fundamental element of European public employment, as it reflects the linguistic diversity of the Union and guarantees equal opportunities for all citizens. The official languages of the European Union are 24, and all of them have the same legal standing in European institutions. However, in practice, the working languages are mainly English, French, and German, which are the languages most used in internal and external communications of the institutions.
+
+Knowledge of languages is a fundamental requirement for access to European public employment. Candidates must demonstrate an advanced level of knowledge of at least two official languages of the Union, one of which must be English, French, or German. This requirement ensures that officials can communicate effectively with their colleagues from other Member States and perform their functions in a multilingual environment. The level of language knowledge is evaluated through specific tests that measure listening comprehension, reading comprehension, oral expression, and written expression skills.
+
+The language policy also promotes language learning among officials. European institutions offer free language courses to their officials, which allow them to improve their linguistic knowledge and increase their professional opportunities. In addition, officials can request periods of linguistic training in other Member States, which allows them to immerse themselves in a different linguistic environment and improve their communication skills. Language learning is a key factor in the professional career of officials, as knowledge of several languages is a requirement for access to positions of greater responsibility.
+
+Linguistic diversity is also reflected in selection processes, where information is provided in all official languages of the Union. Candidates may submit their applications in any official language, although selection tests are normally carried out in the working languages. This policy ensures that all citizens of the Union have the same opportunities to access European public employment, regardless of their mother tongue. The European Commission has adopted measures to promote linguistic diversity in public employment, including the translation of official documents and simultaneous interpretation at meetings.
+
+### 1.5 Selection Processes by Contract
+
+Selection processes by contract are those in which an institution of the Union requests EPSO to organize a specific selection process to fill vacancies in said institution. These processes are used when the staffing needs of an institution cannot be covered through general open calls, or when specific competences are required that are not available in the candidate lists of open calls. Contract processes allow greater flexibility in staff selection, as they can be adapted to the specific needs of each institution.
+
+In a contract process, the institution defines the position requirements and selection criteria, and EPSO organizes the selection process in accordance with these requirements. Contract processes may include written tests, oral tests, and interviews, depending on the complexity of the position and the competences required. Candidates who pass the selection process are included in a reserve list of suitable candidates, from which the institution may select the officials who best fit its needs.
+
+Contract processes are an important tool for human resources management in Union institutions, as they allow staffing needs to be met quickly and efficiently. However, these processes must respect the principles of equal opportunities and meritocracy, and must be transparent and objective. EPSO ensures that contract processes are carried out in accordance with these principles and provides advice to institutions in defining requirements and selection criteria.
+
+The use of contract processes has increased in recent years, as European institutions face new staffing needs due to the expansion of Union competences and the evolution of political and technical challenges. These processes allow institutions to adapt quickly to these changes and ensure that they have the necessary staff to perform their functions effectively.
+
+## Chapter 2: Permanent Officials
+
+### 2.1 Definition and Characteristics
+
+Permanent officials are those who have passed a selection process convened by EPSO and have been appointed to fill a position in one of the institutions of the European Union. These officials have a specific legal status that confers rights and obligations differentiated from staff in other sectors. The employment relationship between the official and the institution is a legal relationship under Public Law, governed by the Staff Regulations of the Officials of the European Union and the Regulations applicable to other Union agents.
+
+Permanent officials are characterized by having a permanent service relationship, which means that their appointment is not subject to a specific term. However, this permanent nature does not imply that the official has an absolute right to maintain their position, as they may be assigned to another position within the same institution or to another institution, and may be separated from service in certain circumstances provided for in the regulations. The appointment of permanent officials is made by the competent authority of the institution, normally the President or the Secretary General, and is published in the Official Journal of the European Union.
+
+Permanent officials enjoy a series of privileges and immunities that allow them to perform their functions independently and impartially. These privileges and immunities are established in the Treaties and in the Protocol on the Privileges and Immunities of the European Union, and include jurisdictional immunity, tax exemption, and the protection of official documents. Privileges and immunities are not a personal benefit, but a guarantee of the independent functioning of Union institutions.
+
+The Staff Regulations establish a set of rights and obligations that regulate the service relationship between the official and the institution. Among the rights are the right to fair remuneration, the right to training, the right to medical care, and the right to retirement. Among the obligations are the duty of loyalty, the duty of impartiality, the duty of discretion, and the duty to comply with the instructions of superiors. Failure to comply with these obligations may result in disciplinary sanctions.
+
+### 2.2 The Selection Process for Permanent Officials
+
+The selection process for permanent officials is carried out through open calls published by EPSO on its web portal. These calls are published periodically and cover different categories and areas of specialization. Interested candidates must submit their application through the EPSO portal within the established deadline, together with supporting documents for their education and professional experience. The selection process is rigorous and competitive, with thousands of candidates applying for a limited number of positions.
+
+Selection tests include different types of tests that evaluate candidates' competences. Verbal reasoning tests evaluate the ability to understand and analyze complex texts. Numerical reasoning tests evaluate the ability to process and analyze quantitative data. Abstract reasoning tests evaluate the ability to identify patterns and logical relationships. Attention to detail tests evaluate the ability to identify errors and inconsistencies in documents and data. These tests are carried out in computerized format and have a limited duration.
+
+Candidates who pass the written tests are invited to take oral tests, which include structured interviews, group exercises, and oral presentations. Structured interviews evaluate candidates' personal and professional competences, such as communication skills, teamwork, leadership ability, and results orientation. Group exercises evaluate candidates' ability to work in teams, make collective decisions, and resolve conflicts. Oral presentations evaluate candidates' ability to communicate ideas clearly and convincingly.
+
+Candidates who pass all tests are included in a reserve list of suitable candidates, which is published on the EPSO portal. Institutions can then select officials from this list to fill their vacancies. The reserve list is valid for three years, during which candidates may be selected for different positions. Inclusion on the reserve list does not guarantee appointment as an official, as the final selection depends on the needs of the institutions and the specific competences of candidates.
+
+### 2.3 The Probationary Period
+
+The probationary period is a fundamental stage in the career of permanent officials, as it allows their suitability for the position and their ability to perform the assigned functions to be evaluated. The duration of the probationary period is nine months, although it may be extended by up to a maximum of six additional months in justified cases. During this period, the official is subject to a specific evaluation regime that allows the institution to assess their performance, abilities, and adaptation to the working environment.
+
+During the probationary period, the official performs the functions of their position under the supervision of a tutor designated by the institution. The tutor is responsible for guiding the official in the performance of their functions, providing feedback on their performance, and facilitating their integration into the work team. The tutor is also responsible for evaluating the official's performance and informing the competent authority of their suitability for the position.
+
+At the end of the probationary period, a final evaluation of the official's performance is carried out. If the evaluation is positive, the official is confirmed in their position and acquires the status of permanent official. If the evaluation is negative, the official's contract may be terminated without the need to justify the decision. This possibility of terminating the contract during the probationary period allows institutions to ensure that selected officials are truly suitable for the position and can perform their functions effectively.
+
+The probationary period is an opportunity for both the institution and the official. For the institution, it allows the official's suitability to be assessed before committing to a permanent appointment. For the official, it allows them to become acquainted with the working environment, the institution's expectations, and career opportunities. This period of mutual adaptation is fundamental to ensuring the satisfaction of both the institution and the official.
+
+### 2.4 The Rights and Obligations of Permanent Officials
+
+Permanent officials enjoy a series of rights established in the Staff Regulations and the applicable Regulations. Among the most important rights are the right to fair remuneration, which includes a basic salary, family benefits, and other allowances. The basic salary is determined according to the official's category and grade and is updated periodically to maintain purchasing power. Family benefits include allowances for dependent children and other family assistance.
+
+Other important rights include the right to medical care, which covers illnesses and accidents of both the official and their dependents. The right to retirement, which allows the official to retire with a pension after meeting certain age and length of service requirements. The right to training, which allows the official to improve their competences and knowledge through training courses and professional development programs. The right to annual leave, which is a minimum of 24 days per year, in addition to public holidays.
+
+Permanent officials also have obligations that they must strictly comply with. The duty of loyalty implies that the official must act at all times in the interest of the institution and the European Union, and must avoid any conduct that may harm the institution's interests. The duty of impartiality implies that the official must act objectively and impartially in the performance of their functions, without allowing themselves to be influenced by personal or other considerations. The duty of discretion implies that the official must maintain the confidentiality of information to which they have access in the performance of their functions.
+
+The duty to comply with the instructions of hierarchical superiors is another fundamental obligation of the official. This duty is not absolute, as the official may refuse to comply with instructions that are manifestly illegal or that violate fundamental rights. In such cases, the official must inform their superiors and, if necessary, the competent authorities. Failure to comply with obligations may result in disciplinary sanctions ranging from a warning to separation from service.
+
+### 2.5 The Professional Career of Permanent Officials
+
+The professional career of permanent officials develops through a system of promotions that rewards merit and experience. Promotions may be of two types: seniority promotions, which involve an advancement in category or grade within the same institution, and mobility promotions, which involve a transfer to another institution or to a higher-level position. Promotions are based on the official's performance, training, and professional experience.
+
+The seniority promotion system is based on the evaluation of the official's performance over a given period. Officials who receive a positive evaluation and who meet the training and experience requirements may be promoted to a higher grade within their category. This promotion involves an increase in responsibilities and remuneration. The promotion process is transparent and based on objective criteria that allow different candidates to be compared.
+
+Mobility promotions allow officials to transfer to other institutions or to higher-level positions within the same institution. This mobility is an important element of professional development, as it allows officials to gain new experiences and knowledge, and to broaden their career opportunities. Mobility may be voluntary, when the official requests the transfer, or mandatory, when the institution decides to transfer the official for service reasons.
+
+The career system of permanent officials also includes the possibility of participating in training and professional development programs. These programs include training courses, seminars, conferences, and exchange programs with other institutions. Continuing training is a requirement for professional development, as it allows officials to stay up to date in their area of specialization and acquire new competences. European institutions will invest significantly in the training of their officials to ensure that they have the necessary competences to meet current and future challenges.
+
+### 2.6 Performance Evaluation
+
+Performance evaluation is a fundamental process for human resources management in the institutions of the European Union. This process allows the performance of officials to be assessed and their strengths and areas for improvement to be identified. The evaluation is carried out periodically, normally once a year, and is based on objective criteria that allow the official's performance to be measured in relation to the expectations of the position.
+
+The evaluation process begins with the definition of performance objectives for the evaluation period. These objectives are established by mutual agreement between the official and their supervisor, and must be specific, measurable, achievable, relevant, and time-bound (SMART criteria). Once the objectives have been established, the official works to achieve them during the evaluation period, receiving continuous feedback from their supervisor and colleagues.
+
+At the end of the evaluation period, an evaluation meeting is held in which the supervisor and the official review the official's performance in relation to the established objectives. In this meeting, the official's strengths and areas for improvement are identified, and action plans for the following period are established. The evaluation is formally documented and incorporated into the official's personal file.
+
+The results of the performance evaluation have important consequences for the official's professional career. Officials with positive evaluations are more likely to be promoted and to access positions of greater responsibility. Officials with negative evaluations may receive additional training to improve their performance, or may be subject to disciplinary measures if their performance does not improve. Performance evaluation is therefore a key tool for ensuring the quality and efficiency of the European public service.
+
+### 2.7 Working Conditions and Remuneration
+
+The working conditions of permanent officials are regulated by the Staff Regulations and the applicable Regulations. These conditions include working hours, leave, permits, and health and safety conditions at work. The working week is 40 hours, distributed from Monday to Friday. Officials are entitled to a minimum rest of 11 consecutive hours between two working days, and to a weekly rest of at least 35 consecutive hours.
+
+Annual leave is a minimum of 24 days, which may be increased according to the official's seniority. In addition to annual leave, officials are entitled to leave for different reasons, such as sick leave, marriage leave, parental leave, and bereavement leave. These leaves are regulated in the Staff Regulations and the applicable Regulations, and their duration varies according to the reason for the leave.
+
+The remuneration of permanent officials comprises a basic salary and different allowances. The basic salary is determined according to the official's category and grade and is updated periodically to maintain purchasing power. Allowances include family benefits, dependent child allowances, specific service allowances, and other benefits. Total remuneration is competitive with that of other sectors, which allows institutions to attract and retain the best professionals.
+
+Health and safety conditions at work are a priority for European institutions. These institutions have implemented occupational risk prevention measures that include risk assessment, health and safety training, the provision of personal protective equipment, and the implementation of emergency protocols. Officials are entitled to a safe and healthy working environment, and institutions are obliged to guarantee these conditions.
+
+### 2.8 Continuing Training of Officials
+
+Continuing training is a fundamental element for the professional development of permanent officials. European institutions offer a wide range of training programs covering different areas of knowledge and competences. These programs include technical training courses, language courses, leadership and management courses, and courses on Union policies and regulations. Continuing training allows officials to stay up to date in their area of specialization and acquire new competences to meet the changing challenges of the working environment.
+
+Training programs are organized by the human resources services of the institutions, in collaboration with specialized training centers. These programs are delivered in different formats, such as in-person courses, online courses, seminars, conferences, and exchange programs. Officials may participate in these programs voluntarily or compulsorily, depending on the needs of the institution and the requirements of the position.
+
+Continuing training has important benefits for both officials and institutions. For officials, it allows them to improve their competences and knowledge, which increases their professional career opportunities. For institutions, it allows them to have qualified and up-to-date staff, which improves the efficiency and quality of the public service. Investment in continuing training is an investment in the human capital of institutions, which generates long-term benefits.
+
+European institutions also offer professional development programs that go beyond technical training. These programs include mentoring, coaching, job rotation, and special projects. These programs allow officials to develop leadership, management, and communication skills, and prepare them to assume greater responsibilities in the future. Professional development is an integral part of human resources management in European institutions.
+
+### 2.9 Health and Safety at Work
+
+Health and safety at work is a priority for the institutions of the European Union. These institutions are obliged to guarantee the safety and health of their officials at work, and have implemented a comprehensive occupational risk prevention system. This system includes risk assessment, prevention planning, health and safety training, the provision of personal protective equipment, and the implementation of emergency protocols.
+
+Risk assessment is a continuous process that allows hazards existing in the working environment to be identified and the risks associated with these hazards to be evaluated. The results of the risk assessment are used to establish prevention measures that eliminate or reduce risks to an acceptable level. Officials actively participate in the risk assessment process, as they are the ones who best know the working conditions in which they perform their functions.
+
+Health and safety training is a fundamental element of the occupational risk prevention system. Officials receive training on the risks associated with their position, applicable prevention measures, and emergency procedures. This training is delivered regularly and adapted to the specific needs of each position. Officials are obliged to participate in the training and to apply prevention measures in their daily work.
+
+European institutions have occupational health services that provide medical and psychological assistance to officials. These services carry out periodic medical examinations, evaluate health and safety conditions at work, and advise institutions on the implementation of prevention measures. Officials are entitled to receive medical assistance in the event of a work accident or occupational disease, and institutions are obliged to cover the costs associated with this assistance.
+
+### 2.10 Protection of Personal Data
+
+The protection of personal data is a fundamental right of officials of the European Union. The General Data Protection Regulation (GDPR) establishes the rules governing the processing of personal data by European institutions. These rules guarantee that officials' personal data are processed lawfully, fairly, and transparently, and that necessary measures are taken to protect these data against unauthorized access, loss, or destruction.
+
+European institutions collect and process personal data of their officials for different purposes, such as human resources management, payroll and benefits management, health and safety management at work, and the management of disciplinary procedures. These data include personal information, such as name, address, identification number, and sensitive data, such as health data, trade union membership, and political opinions.
+
+Officials have the right to access their personal data, to rectify them if they are inaccurate, and to request their erasure when they are no longer necessary for the purposes for which they were collected. They also have the right to object to the processing of their personal data and to request data portability. European institutions must inform officials about the processing of their personal data and obtain their consent when necessary.
+
+The protection of personal data is a shared responsibility between institutions and officials. Institutions must implement technical and organizational measures to protect personal data, while officials must treat personal data responsibly and confidentially. Failure to comply with data protection rules may result in disciplinary and legal sanctions.
+
+### 2.11 Conflicts of Interest
+
+Conflicts of interest are a situation in which an official's personal interests may influence the performance of their professional functions. European institutions have implemented a comprehensive system to prevent and manage conflicts of interest, in order to guarantee the impartiality and objectivity of officials in the performance of their functions. This system includes codes of conduct, declarations of interests, and control mechanisms.
+
+Officials have the obligation to declare any situation that may give rise to a conflict of interest. This declaration must be made in writing and must be updated when changes occur in the circumstances that may affect the conflict of interest. Declarations of interests are examined by the competent authorities, which may adopt measures to resolve the conflict, such as assignment to another position or abstention from decision-making.
+
+Codes of conduct establish the rules that officials must follow to avoid conflicts of interest. These rules include the prohibition of accepting gifts or benefits that may influence their impartiality, the obligation to abstain from decision-making in which they have a personal interest, and the obligation to report any external activity that may give rise to a conflict of interest. Failure to comply with these rules may result in disciplinary sanctions.
+
+European institutions have ethics committees that advise officials on conduct issues and conflicts of interest. These committees are independent and their opinions are binding. Officials may consult the ethics committees when they have doubts about whether a situation may give rise to a conflict of interest. The ethics committees are also responsible for examining declarations of interests and proposing measures to resolve detected conflicts of interest.
+
+### 2.12 Employment Protection and Gender Equality
+
+Employment protection is a fundamental right of officials of the European Union. The Staff Regulations establish the conditions under which officials may be separated from service, and guarantee that this separation is carried out fairly and transparently. Officials may only be separated from service for disciplinary reasons, for organizational reasons, or for permanent incapacity to perform their functions. In all cases, officials have the right to be heard and to present their arguments before a decision is taken.
+
+Gender equality is a cross-cutting objective of the employment policies of European institutions. These institutions have adopted measures to promote gender equality in employment, including affirmative action measures, equality plans, and protocols for the prevention and sanctioning of harassment. Gender equality is reflected in equal access to employment, equal pay for work of equal value, and equal career opportunities.
+
+European institutions have equality services that advise officials on gender equality issues and investigate complaints of sex-based discrimination. These services are also responsible for promoting gender equality through awareness-raising activities and training. Officials are entitled to receive advice and support in cases of sex-based discrimination.
+
+Work-life balance is another important measure to promote gender equality. European institutions have implemented work-life balance policies that include flexible working hours, teleworking, maternity and paternity leave, and childcare services. These policies allow officials to reconcile their professional and family responsibilities, and contribute to reducing the gender gap in employment.
+
+## Chapter 3: Temporary Agents
+
+### 3.1 Definition and Nature of Employment
+
+Temporary agents are persons who have been hired by one of the institutions of the European Union to perform a temporary position, generally for a fixed period of time. Unlike permanent officials, temporary agents have not passed a selection process convened by EPSO, but have been directly hired by the institution to meet a specific and temporary staffing need. This direct hiring allows institutions to adapt quickly to changing staffing needs.
+
+Temporary agents are characterized by having a temporary employment relationship, which means that their contract has a fixed duration that may not exceed six years. This temporary nature is a fundamental characteristic that distinguishes temporary agents from permanent officials. However, the renewal of temporary agents' contracts is common, as many institutions have staffing needs that extend over time.
+
+Temporary agents perform functions similar to those of permanent officials, but their legal status is different. The Staff Regulations do not apply to temporary agents, but they are subject to the specific provisions governing their employment. These provisions establish the employment conditions, rights and obligations of temporary agents, and the modalities for the termination of their contract.
+
+Temporary agents may be hired for different types of positions, such as administrative, technical, or advisory positions. The hiring of temporary agents is an important tool for human resources management in institutions, as it allows staffing needs to be met quickly and flexibly. However, this flexibility comes at a cost, as temporary agents do not enjoy the same rights as permanent officials.
+
+### 3.2 Different Types of Temporary Agents
+
+There are different types of temporary agents in the institutions of the European Union, each with their own characteristics and employment conditions. Type A temporary agents are those who perform senior functions that require advanced university education and significant professional experience. These agents are usually hired for advisory or specialization positions, and their remuneration is comparable to that of permanent officials in similar categories.
+
+Type B temporary agents are those who perform intermediate functions that require university education and relevant professional experience. These agents are usually hired for execution and control positions, and their remuneration is lower than that of type A temporary agents. Type C temporary agents are those who perform execution functions that require post-secondary education or relevant professional experience. These agents are usually hired for administrative or technical support positions.
+
+Type D temporary agents are those who perform service functions that require basic education and experience in service tasks. These agents are usually hired for cleaning, maintenance, or other auxiliary service positions. The hiring of type D temporary agents is less common, as these functions are usually covered by external staff hired through service companies.
+
+Temporary agents may be hired for different reasons, such as the need to cover a temporary absence of a permanent official, the need to cope with a temporary increase in workload, or the need to have specific competences that are not available among permanent officials. The hiring of temporary agents is a decision made in accordance with the specific needs of each institution.
+
+### 3.3 The Hiring Process for Temporary Agents
+
+The hiring process for temporary agents is different from that of permanent officials. While permanent officials are selected through centralized processes organized by EPSO, temporary agents are directly hired by institutions. This direct hiring process allows institutions to adapt quickly to their staffing needs, as they do not have to wait for an EPSO selection process to be convened.
+
+The hiring process for temporary agents begins with the identification of a staffing need by the institution. Once the need has been identified, the institution publishes a call for candidates on its web portal or in other media. Interested candidates submit their applications directly to the institution, which evaluates the applications and selects the most suitable candidates for the position.
+
+Selection tests for temporary agents are usually less rigorous than those for permanent officials, as they are adapted to the specific needs of the position. These tests may include written tests, interviews, and practical exercises. Candidates who pass the selection tests are invited to take a personal interview, in which their competences and suitability for the position are evaluated.
+
+Once the candidate has been selected, the institution presents them with a contract proposal that includes the employment conditions, the duration of the contract, and the remuneration. The candidate may accept or reject the proposal. If they accept, the contract is signed and the temporary agent begins to perform their functions at the institution. The hiring process for temporary agents is quick and flexible, which allows institutions to meet their staffing needs efficiently.
+
+### 3.4 Employment Conditions of Temporary Agents
+
+The employment conditions of temporary agents are regulated by specific provisions that differ from those of permanent officials. These provisions establish the remuneration conditions, working conditions, and the rights and obligations of temporary agents. The employment conditions of temporary agents are generally less favorable than those of permanent officials, which reflects the temporary nature of their contract.
+
+The remuneration of temporary agents is determined according to the category and the position. Type A temporary agents receive remuneration comparable to that of permanent officials in similar categories, while type B, C, and D temporary agents receive lower remuneration. In addition, temporary agents are not entitled to all the benefits and allowances received by permanent officials, such as retirement benefits and unemployment benefits.
+
+The working conditions of temporary agents are similar to those of permanent officials in terms of working hours, leave, and permits. However, temporary agents are not entitled to all the permits received by permanent officials, such as family leave. In addition, temporary agents are not entitled to the medical care received by permanent officials, but must take out private health insurance.
+
+Temporary agents are entitled to adequate training to perform their functions, and institutions are obliged to provide them with the necessary training. However, the training of temporary agents is generally less extensive than that of permanent officials, as their contract is temporary. Temporary agents are also entitled to a performance evaluation, which is carried out periodically and may have consequences for the renewal of their contract.
+
+### 3.5 Renewal and Termination of Contracts
+
+The renewal of temporary agents' contracts is an important issue that generates debate in European institutions. On the one hand, renewal allows institutions to retain qualified staff who are familiar with the working environment and the institution's needs. On the other hand, excessive renewal may create a situation of job insecurity, as temporary agents may be renewing their contracts for many years without obtaining the status of permanent official.
+
+European institutions have different policies regarding the renewal of temporary agents' contracts. Some institutions have restrictive policies that limit the number of renewals, while other institutions have more flexible policies that allow multiple renewals. The European Commission has adopted measures to limit the excessive renewal of temporary agents' contracts, in order to avoid job insecurity.
+
+The termination of temporary agents' contracts may occur for different reasons, such as the expiration of the contract term, mutual agreement of the parties, unilateral termination by the institution, or resignation of the temporary agent. In the case of unilateral termination by the institution, the temporary agent has the right to be heard and to present their arguments before a decision is taken. Termination of the contract may give rise to compensation in certain cases.
+
+Temporary agents who have performed their functions for a prolonged period may be entitled to certain protections in the event of termination of their contract. These protections include the right to notice, the right to compensation, and the right to be considered for vacant positions at the institution. These protections aim to ensure that temporary agents who have contributed to the functioning of the institution receive fair treatment in the event of termination of their contract.
+
+### 3.6 Rights of Temporary Agents
+
+Temporary agents enjoy a series of rights established in the provisions governing their employment. These rights include the right to fair remuneration, the right to training, the right to medical care, and the right to social protection. However, these rights are generally less extensive than those of permanent officials, which reflects the temporary nature of their contract.
+
+The right to fair remuneration implies that temporary agents must receive adequate remuneration for their work. Remuneration is determined according to the category and the position, and is updated periodically to maintain purchasing power. Temporary agents are also entitled to family benefits and other allowances, although these are generally lower than those of permanent officials.
+
+The right to training implies that temporary agents must receive the necessary training to perform their functions effectively. European institutions offer a wide range of training programs for their temporary agents, which include technical training courses, language courses, and professional development courses. Temporary agents are entitled to participate in these programs on the same terms as permanent officials.
+
+The right to medical care implies that temporary agents must receive medical care in the event of illness or accident. Temporary agents are covered by health insurance that covers medical expenses arising from illness or accident. In addition, temporary agents are entitled to sick leave on the same terms as permanent officials. These rights aim to ensure that temporary agents receive adequate protection during their employment.
+
+## Chapter 4: Local Agents
+
+### 4.1 Definition and Functions
+
+Local agents are persons who have been hired by one of the institutions of the European Union to perform a position in a Union representation in a third country. Unlike permanent officials and temporary agents, local agents are residents of the country in which they work and do not enjoy the privileges and immunities that apply to permanent officials. This hiring allows institutions to have staff who know the local context and can facilitate relations with local authorities and the population.
+
+Local agents perform administrative, technical, and service support functions in Union representations in third countries. These functions may include secretarial tasks, translation and interpretation, database management, public service, and other administrative tasks. Local agents may also perform liaison functions with local authorities and other international organizations.
+
+The hiring of local agents is an important tool for human resources management in Union representations in third countries. This hiring allows representations to have qualified staff who know the local context and can adapt to the specific needs of the country. In addition, the hiring of local agents is more economical than the hiring of permanent officials, as local agents do not receive the same benefits and allowances.
+
+Local agents are subject to the labor laws of the country in which they work, unlike permanent officials who are subject to Union Law. This legal difference has important consequences for the employment conditions, rights, and obligations of local agents. European institutions must adapt their human resources policies to the labor laws of the countries in which local agents work.
+
+### 4.2 The Hiring Process for Local Agents
+
+The hiring process for local agents is different from that of permanent officials and temporary agents. Local agents are directly hired by Union representations in third countries, following local hiring procedures. This local hiring process allows representations to adapt to the specific needs of the country and to local labor market conditions.
+
+The hiring process begins with the identification of a staffing need by the representation. Once the need has been identified, the representation publishes a call for candidates in local media or on its web portal. Interested candidates submit their applications directly to the representation, which evaluates the applications and selects the most suitable candidates for the position.
+
+Selection tests for local agents usually include written tests, interviews, and practical exercises. Written tests evaluate candidates' knowledge and competences, while interviews evaluate their communication skills and suitability for the position. Practical exercises allow candidates' ability to perform the specific functions of the position to be evaluated.
+
+Once the candidate has been selected, the representation presents them with a contract proposal that includes the employment conditions, the duration of the contract, and the remuneration. The candidate may accept or reject the proposal. If they accept, the contract is signed and the local agent begins to perform their functions at the representation. The hiring process for local agents is flexible and adapted to local labor market conditions.
+
+### 4.3 Employment Conditions of Local Agents
+
+The employment conditions of local agents are regulated by the labor laws of the country in which they work, unlike permanent officials who are subject to Union Law. This legal difference has important consequences for the employment conditions, rights, and obligations of local agents. European institutions must adapt their human resources policies to the labor laws of the countries in which local agents work.
+
+The remuneration of local agents is determined according to local labor market conditions and the provisions of the employment contract. Local agents receive remuneration that is generally lower than that of permanent officials, as they do not receive the same benefits and allowances. However, the remuneration of local agents is usually competitive in the context of the local labor market.
+
+The working conditions of local agents are governed by the labor laws of the country in which they work. This includes working hours, leave, permits, and health and safety conditions at work. European institutions must ensure that the working conditions of local agents comply with local labor laws and international labor rights principles.
+
+Local agents are entitled to certain labor rights established in local laws, such as the right to a written employment contract, the right to a minimum wage, the right to paid leave, and the right to social protection. These rights vary according to the country in which local agents work, as each country has its own labor laws. European institutions must respect these rights and ensure that local agents receive fair and equitable treatment.
+
+### 4.4 Rights and Obligations of Local Agents
+
+Local agents enjoy a series of rights established in the labor laws of the country in which they work and in their employment contracts. These rights include the right to fair remuneration, the right to training, the right to medical care, and the right to social protection. However, these rights are generally less extensive than those of permanent officials, as local agents do not enjoy the privileges and immunities that apply to permanent officials.
+
+The right to fair remuneration implies that local agents must receive adequate remuneration for their work. Remuneration is determined according to local labor market conditions and the provisions of the employment contract. Local agents are also entitled to social benefits and other allowances established in local laws.
+
+The right to training implies that local agents must receive the necessary training to perform their functions effectively. Union representations in third countries offer training programs to their local agents, which include technical training courses, language courses, and professional development courses. Local agents are entitled to participate in these programs on the same terms as representation staff.
+
+Local agents also have obligations that they must strictly comply with. These obligations include the duty of loyalty towards the institution, the duty of confidentiality of information to which they have access, and the duty to comply with the instructions of superiors. Failure to comply with these obligations may result in disciplinary sanctions, which may include a warning, suspension of employment and salary, or termination of the employment contract.
+
+### 4.5 Social Protection of Local Agents
+
+The social protection of local agents is an important issue that varies according to the country in which they work. Local agents are subject to the social protection system of the country in which they work, which includes social security, medical care, and unemployment benefits. European institutions must ensure that local agents are covered by an adequate social protection system that provides them with sufficient coverage.
+
+In some countries, local agents are covered by the local social security system, which provides them with benefits for illness, maternity, disability, and retirement. In other countries, European institutions take out private social protection insurance to cover the needs of their local agents. Social protection coverage varies according to the country and the provisions of the employment contract.
+
+European institutions must ensure that local agents have access to adequate medical care. This includes coverage of medical expenses arising from illness or accident, as well as coverage of medical expenses of the local agent's dependents. Medical coverage is a fundamental right of local agents, and European institutions must ensure that this coverage is sufficient to cover the health needs of local agents.
+
+The social protection of local agents is a shared responsibility between European institutions and the countries in which local agents work. European institutions must respect local labor laws and ensure that local agents receive adequate social protection. The countries in which local agents work must provide a social protection system that complies with international labor rights standards.
+
+### 4.6 Professional Career of Local Agents
+
+The professional career of local agents develops within the system of the Union representation in the country in which they work. Unlike permanent officials, local agents do not have access to the career system of European institutions, but have their own career system governed by local labor laws and the provisions of the employment contract.
+
+Local agents may be promoted to higher-level positions within the representation, depending on their performance and competences. These promotions may involve an increase in responsibilities and remuneration. However, the career opportunities of local agents are generally more limited than those of permanent officials, as local agents do not have access to senior positions in European institutions.
+
+European institutions offer training and professional development programs to their local agents, in order to improve their competences and knowledge. These programs include technical training courses, language courses, and professional development courses. Local agents are entitled to participate in these programs on the same terms as representation staff. Continuing training is an important element for the professional development of local agents.
+
+Local agents may also request to transfer to other Union representations in other countries, depending on the needs of the institutions and their competences. This international mobility is an important opportunity for local agents, as it allows them to gain new experiences and knowledge, and to broaden their professional career opportunities. European institutions encourage the mobility of their local agents and provide logistical and financial support to facilitate transfers.
+
+## Chapter 5: Other Union Agents
+
+### 5.1 Temporary Support Staff
+
+Temporary support staff is a category of Union agents characterized by their hiring to meet temporary and urgent staffing needs. Unlike permanent officials and temporary agents, temporary support staff do not have a formal contract with the institution, but are hired through a service agreement that regulates their employment conditions. This hiring modality allows institutions to meet staffing needs quickly and flexibly.
+
+Temporary support staff may be hired for different types of positions, such as administrative, technical, or service positions. The functions they perform are similar to those of permanent officials and temporary agents, but their hiring is temporary in nature and does not imply a permanent employment relationship. Temporary support staff may be hired for a fixed period of time, which may not exceed twelve months.
+
+The employment conditions of temporary support staff are regulated by the service agreement signed between the institution and the agent. This agreement establishes the remuneration conditions, working conditions, and the rights and obligations of the agent. The employment conditions of temporary support staff are generally less favorable than those of permanent officials and temporary agents, as their hiring is temporary in nature and does not imply a permanent employment relationship.
+
+Temporary support staff do not have access to the same rights as permanent officials, such as the right to retirement, the right to medical care, and the right to continuing training. However, temporary support staff are entitled to fair remuneration and the labor protections established in local laws. European institutions must ensure that temporary support staff receive fair and equitable treatment during their employment.
+
+### 5.2 Seconded National Experts
+
+Seconded national experts are officials of the public administrations of Member States who are temporarily assigned to one of the institutions of the European Union to perform advisory or specialization functions. This temporary assignment modality allows European institutions to benefit from the experience and knowledge of national officials, while allowing national officials to gain experience in the European field.
+
+Seconded national experts are appointed by European institutions in collaboration with Member States. The appointment process involves the identification of the institution's needs, the selection of candidates by Member States, and the formal appointment of the expert by the competent authority of the institution. Seconded national experts are assigned to the institution for a fixed period of time, which may not exceed four years.
+
+The employment conditions of seconded national experts are different from those of permanent officials. Seconded national experts maintain their status as officials of their Member State throughout the duration of their assignment, and receive their remuneration from their home public administration. European institutions may provide additional remuneration and other benefits to seconded national experts, but these benefits are generally lower than those of permanent officials.
+
+Seconded national experts perform advisory or specialization functions in different areas of European administration. These functions may include participation in working groups, preparation of documents, legal advice, and representation of the institution at international meetings. Seconded national experts bring valuable experience and knowledge to European institutions, and their presence enriches debate and decision-making.
+
+### 5.3 Officials on Secondment
+
+Officials on secondment are officials of the public administrations of Member States who are temporarily assigned to one of the institutions of the European Union to perform management or advisory functions. Unlike seconded national experts, officials on secondment are assigned to higher-level positions, such as management or senior advisory positions. This temporary assignment modality allows European institutions to have experienced officials who bring valuable experience and knowledge.
+
+Officials on secondment are appointed by European institutions in collaboration with Member States. The appointment process involves the identification of the institution's needs, the selection of candidates by Member States, and the formal appointment of the official by the competent authority of the institution. Officials on secondment are assigned to the institution for a fixed period of time, which may not exceed five years.
+
+The employment conditions of officials on secondment are different from those of permanent officials. Officials on secondment maintain their status as officials of their Member State throughout the duration of their assignment, and receive their remuneration from their home public administration. European institutions may provide additional remuneration and other benefits to officials on secondment, but these benefits are generally lower than those of permanent officials.
+
+Officials on secondment perform management or advisory functions in different areas of European administration. These functions may include participation in decision-making, preparation of strategic documents, political advice, and representation of the institution at international meetings. Officials on secondment bring valuable experience and knowledge to European institutions, and their presence enriches debate and decision-making.
+
+### 5.4 Trainees
+
+Trainees are young university graduates who carry out training placements in one of the institutions of the European Union in order to gain professional experience in the European field. Traineeship programs are an important tool for promoting youth employment and for training future professionals in the European field. European institutions offer different types of traineeships that adapt to the needs and expectations of young graduates.
+
+European Commission traineeships are the most well-known and offer five-month training placements in different services of the Commission. Trainees participate in advisory, research, and documentation activities, and have the opportunity to gain professional experience in an international environment. Traineeship programs include training in specific areas, such as Union policies, European law, international relations, and communication.
+
+European Parliament traineeships offer five-month training placements in different services of the Parliament. Trainees participate in legislative advisory, research, and documentation activities, and have the opportunity to learn about the European legislative process firsthand. Traineeship programs include training in specific areas, such as European legislation, public policies, and communication.
+
+Council of the European Union traineeships offer five-month training placements in different services of the Council. Trainees participate in advisory, research, and documentation activities, and have the opportunity to learn about the work of the Council firsthand. Traineeship programs include training in specific areas, such as Union policies, international relations, and European law. Young trainees gain valuable experience that prepares them for their future professional career in the European field.
+
+## Chapter 6: Rights and Obligations of All Agents
+
+### 6.1 Common Employment Principles
+
+All agents of the European Union, regardless of their legal status, are subject to a set of common employment principles that guarantee fair and equitable treatment. These principles include equal treatment, non-discrimination, dignity at work, and the protection of health and safety. These principles are fundamental to ensuring the proper functioning of European institutions and to ensuring that all agents can perform their functions effectively and with dignity.
+
+The principle of equal treatment implies that all agents must receive fair and equitable treatment, regardless of their sex, race, origin, religion, political opinions, or any other personal characteristic. This principle applies to all phases of the employment relationship, from hiring to termination of the contract. European institutions must ensure that all agents receive equal treatment and are not subjected to discrimination.
+
+The principle of non-discrimination implies that all agents must be treated fairly and equitably, without their treatment being affected by personal considerations unrelated to the job. This principle applies to remuneration, working conditions, training, and career opportunities. European institutions must take measures to prevent and combat discrimination in all its forms.
+
+The principle of dignity at work implies that all agents must be treated with respect and dignity in the workplace. This principle includes protection against workplace harassment, sexual harassment, and any other form of inappropriate conduct. European institutions must establish mechanisms to prevent and combat workplace harassment and to protect victims. Failure to comply with this principle may result in disciplinary and legal sanctions.
+
+### 6.2 The Duty of Loyalty and Impartiality
+
+The duty of loyalty is a fundamental obligation of all agents of the European Union. This duty implies that agents must act at all times in the interest of the institution and the European Union, and must avoid any conduct that may harm the institution's interests. The duty of loyalty includes the obligation to maintain the confidentiality of information to which they have access, the obligation not to accept gifts or benefits that may influence their impartiality, and the obligation to report any external activity that may give rise to a conflict of interest.
+
+The duty of impartiality is another fundamental obligation of all agents. This duty implies that agents must act objectively and impartially in the performance of their functions, without allowing themselves to be influenced by personal or other considerations. The duty of impartiality is particularly important for agents who participate in decision-making, as they must ensure that their decisions are based exclusively on objective criteria and the general interest.
+
+Failure to comply with the duty of loyalty or impartiality may result in disciplinary sanctions, which may include a warning, suspension of employment and salary, or termination of the employment contract. European institutions have the obligation to ensure that all agents comply with these duties and to take the necessary measures in the event of non-compliance. These duties are fundamental to ensuring the integrity and efficiency of European institutions.
+
+Agents also have the obligation to act with integrity and professionalism in the performance of their functions. This includes the obligation to be honest and transparent in their actions, the obligation to respect established rules and procedures, and the obligation to treat colleagues and the public with respect and consideration. Professionalism is a fundamental value that guides the behavior of all agents of the European Union.
+
+### 6.3 Mental Health Protection
+
+Mental health protection is an increasingly important aspect of occupational health in the institutions of the European Union. Work-related stress, burnout, and other mental health problems are a growing concern in the European working environment, and European institutions have adopted measures to prevent and address these problems. The mental health of agents is fundamental to ensuring their well-being and their ability to perform their functions effectively.
+
+European institutions have implemented work-related stress prevention programs that include the assessment of psychosocial risk factors, training in coping skills, and the promotion of work-life balance. These programs aim to create a healthy working environment that promotes the well-being of agents and reduces the risk of mental health problems.
+
+European institutions also have psychological counseling services that provide support to agents experiencing mental health problems. These services are confidential and free of charge, and provide advice and support to agents in need. Agents may access these services voluntarily, and the institution guarantees the confidentiality of the information provided.
+
+Mental health prevention is a shared responsibility between institutions and agents. Institutions must create a healthy working environment and provide the necessary resources to prevent mental health problems. Agents, for their part, must take care of their mental health and seek help when they need it. Mental health protection is a fundamental element for the well-being and efficiency of all agents of the European Union.
+
+### 6.4 Disciplinary Procedures
+
+Disciplinary procedures are the mechanisms established to sanction offenses committed by agents of the European Union in the performance of their functions. These procedures aim to ensure that agents comply with their obligations and that offenses are sanctioned fairly and proportionately. Disciplinary procedures are regulated in the Staff Regulations and the Regulations applicable to other Union agents.
+
+The disciplinary procedure begins with the identification of an offense by the competent authority. Once the offense has been identified, a disciplinary procedure is opened in which the facts are investigated and the agent's responsibility is determined. During the procedure, the agent has the right to be heard and to present their arguments and evidence. The agent also has the right to be assisted by a lawyer if they so wish.
+
+The competent authority evaluates the evidence and the agent's arguments, and takes a decision on the agent's disciplinary responsibility. If it is determined that the agent is responsible for an offense, the competent authority imposes a disciplinary sanction that may include a warning, suspension of employment and salary, reduction in category, or separation from service. The sanction is determined according to the gravity of the offense and the circumstances of the case.
+
+The agent has the right to challenge the disciplinary decision before the Court of Justice of the European Union. This appeal allows the agent to challenge the decision if they consider that there has been a violation of their rights or of procedural rules. The Court of Justice evaluates the agent's arguments and takes a decision on the legality of the disciplinary sanction. Disciplinary procedures are fundamental to ensuring the integrity and efficiency of European institutions.
+
+## Chapter 7: Evaluation and Professional Development
+
+### 7.1 The Performance Evaluation System
+
+The performance evaluation system is a fundamental mechanism for human resources management in the institutions of the European Union. This system allows the performance of agents to be assessed and their strengths and areas for improvement to be identified. Performance evaluation is carried out periodically, normally once a year, and is based on objective criteria that allow the agent's performance to be measured in relation to the expectations of the position.
+
+The evaluation process begins with the definition of performance objectives for the evaluation period. These objectives are established by mutual agreement between the agent and their supervisor, and must be specific, measurable, achievable, relevant, and time-bound (SMART criteria). Once the objectives have been established, the agent works to achieve them during the evaluation period, receiving continuous feedback from their supervisor and colleagues.
+
+At the end of the evaluation period, an evaluation meeting is held in which the supervisor and the agent review the agent's performance in relation to the established objectives. In this meeting, the agent's strengths and areas for improvement are identified, and action plans for the following period are established. The evaluation is formally documented and incorporated into the agent's personal file.
+
+The results of the performance evaluation have important consequences for the agent's professional career. Agents with positive evaluations are more likely to be promoted and to access positions of greater responsibility. Agents with negative evaluations may receive additional training to improve their performance, or may be subject to disciplinary measures if their performance does not improve. Performance evaluation is therefore a key tool for ensuring the quality and efficiency of the European public service.
+
+### 7.2 Individual Development Plans
+
+Individual development plans are planning tools that allow agents to define their professional development objectives and establish the actions necessary to achieve them. These plans are developed by mutual agreement between the agent and their supervisor, and are based on the results of the performance evaluation and the needs of the institution. Individual development plans are a fundamental element for the management of agents' professional careers.
+
+An individual development plan includes the agent's development objectives, the development actions necessary to achieve these objectives, the necessary resources, and the implementation schedule. Development objectives may include improving existing competences, developing new competences, acquiring experience in new areas, and preparing to assume greater responsibilities. Development actions may include training courses, job rotation, special projects, and mentoring.
+
+The implementation of individual development plans is a shared responsibility between the agent and the institution. The agent is responsible for carrying out the development actions established in the plan, while the institution is responsible for providing the necessary resources and facilitating the implementation of the plan. Supervision and monitoring of the implementation of the plan is carried out periodically, normally during performance evaluation meetings.
+
+Individual development plans have important benefits for both agents and institutions. For agents, they allow clear development objectives to be defined and the necessary actions to achieve them to be established. For institutions, they allow training and development needs of staff to be identified and ensure that agents have the necessary competences to perform their functions effectively. Individual development plans are a fundamental tool for human resources management in European institutions.
+
+### 7.3 Mentoring and Coaching
+
+Mentoring and coaching are professional development tools that are increasingly used in the institutions of the European Union. Mentoring involves the relationship between an experienced agent (the mentor) and a less experienced agent (the mentee), in which the mentor provides guidance, support, and advice to the mentee to help them develop their competences and advance in their professional career. Coaching involves the relationship between a coach and an agent, in which the coach helps the agent to identify their development objectives and establish the actions necessary to achieve them.
+
+Mentoring is a valuable tool for the transfer of knowledge and experience between generations of agents. Mentors share their experience and knowledge with mentees, which allows the latter to learn from the experience of others and accelerate their professional development. Mentoring also encourages the creation of networking opportunities and strengthens team cohesion.
+
+Coaching is a tool that is increasingly used for the development of leadership competences and personal skills. Coaches help agents to identify their strengths and areas for improvement, to establish development objectives, and to implement the actions necessary to achieve them. Coaching can be especially useful for agents assuming new responsibilities or who need to develop specific competences.
+
+European institutions offer mentoring and coaching programs to their agents, in order to promote their professional and personal development. These programs are managed by human resources services and are open to all agents who wish to participate. Participation in mentoring and coaching programs is voluntary, but is highly recommended for agents' professional development.
+
+### 7.4 Continuing Training and Lifelong Learning
+
+Continuing training is a fundamental element for the professional development of agents of the European Union. European institutions offer a wide range of training programs covering different areas of knowledge and competences. These programs include technical training courses, language courses, leadership and management courses, and courses on Union policies and regulations. Continuing training allows agents to stay up to date in their area of specialization and acquire new competences to meet the changing challenges of the working environment.
+
+Lifelong learning is a concept that involves the commitment of agents to continue learning and developing new competences throughout their professional career. This concept is increasingly important in a constantly changing working environment, where the required competences evolve rapidly. European institutions promote lifelong learning by providing continuing training opportunities and supporting agents in their professional development.
+
+Continuing training programs include different learning formats, such as in-person courses, online courses, seminars, conferences, and exchange programs. Agents may participate in these programs voluntarily or compulsorily, depending on the needs of the institution and the requirements of the position. Continuing training is a requirement for professional development, as it allows agents to stay up to date in their area of specialization and acquire new competences.
+
+European institutions also promote peer learning and knowledge sharing among agents. These activities include communities of practice, learning groups, and collaborative projects. These activities allow agents to share knowledge and experiences, and to learn from the practices of other agents. Peer learning is a valuable tool for agents' professional development, as it complements formal training and promotes innovation and continuous improvement.
+
+### 7.5 Training Needs Assessment
+
+Training needs assessment is a fundamental process for the planning of continuing training in the institutions of the European Union. This process allows the competences that agents need to develop in order to perform their functions effectively to be identified, and the training actions necessary to acquire these competences to be planned. Training needs assessment is carried out periodically, normally once a year, and is based on the evaluation of agents' performance and the strategic needs of the institution.
+
+The training needs assessment process begins with the collection of information on agents' current competences and the competences required for their positions. This information is obtained through performance evaluation, interviews with agents and their supervisors, and analysis of the strategic needs of the institution. With this information, the competence gaps that need to be covered through training are identified.
+
+Once training needs have been identified, the necessary training actions to cover these needs are planned. Training planning includes the selection of the most suitable training programs, the definition of the target audience, the determination of the schedule, and the allocation of resources. Training programs are selected according to their relevance, quality, and effectiveness, and are adapted to the specific needs of agents and the institution.
+
+The evaluation of training effectiveness is another important aspect of the training needs assessment process. After the delivery of a training program, it is assessed whether the training objectives have been achieved and whether agents have acquired the expected competences. This evaluation is carried out through knowledge tests, satisfaction surveys, and analysis of agents' performance after training. The evaluation results are used to improve training programs and to plan future training actions.
+
+## Chapter 8: Mobility and Exchanges
+
+### 8.1 Internal Mobility Between Institutions
+
+Internal mobility between institutions is a mechanism that allows agents of the European Union to transfer from one institution to another to perform functions in a new environment. This mobility is an important element of professional development, as it allows agents to gain new experiences and knowledge, and to broaden their professional career opportunities. Internal mobility is governed by principles of transparency, equal opportunities, and meritocracy.
+
+The internal mobility process begins with the publication of job vacancy offers by institutions. These offers are published on internal employment portals and are open to all agents who meet the requirements of the position. Interested candidates submit their applications and are evaluated according to their competences and experience. Selection is based on meritocracy and takes into account both the agent's competences and the needs of the institution.
+
+The conditions of internal mobility vary according to the agent's legal status. Permanent officials may apply for internal mobility on the same terms as those established for internal selection processes. Temporary agents may apply for internal mobility if they have completed a minimum period of service in their current institution. Local agents may apply for internal mobility if they meet the requirements of the vacant position.
+
+Internal mobility has important benefits for both agents and institutions. For agents, it allows them to gain new experiences and knowledge, and to develop new competences. For institutions, it allows the transfer of knowledge and experiences between institutions, and promotes cohesion and collaboration between the different institutions of the Union. Internal mobility is therefore a fundamental tool for human resources management in European institutions.
+
+### 8.2 Staff Exchange Programs
+
+Staff exchange programs are initiatives that allow agents of the European Union to carry out temporary placements in other institutions or organizations, in order to gain new experiences and knowledge. These programs include exchanges with national institutions, exchanges with international organizations, and exchanges with the private sector. Exchange programs are a valuable tool for agents' professional development and for the promotion of international cooperation.
+
+Exchanges with national institutions allow agents of the European Union to carry out temporary placements in public administrations of Member States. These placements allow agents to learn about the functioning of national administrations and to gain experience at the national level. Exchanges with international organizations allow agents to carry out temporary placements in organizations such as the UN, the OECD, or the Council of Europe. These placements allow agents to learn about the functioning of other international organizations and to gain experience in the multilateral field.
+
+Exchanges with the private sector allow agents to carry out temporary placements in companies or organizations in the private sector. These placements allow agents to learn about the functioning of the private sector and to gain experience in the business field. Exchanges with the private sector are especially valuable for agents who perform functions in areas such as economic regulation, competition policy, or digital policy.
+
+The conditions of exchange programs vary according to the home institution and the host institution. Agents participating in exchange programs maintain their status as agents of the European Union and receive their remuneration from their home institution. Host institutions may provide additional remuneration and other benefits to agents on exchange. Exchange programs are a valuable opportunity for agents' professional development and for the promotion of international cooperation.
+
+### 8.3 Secondary Activities
+
+Secondary activities are professional activities that agents of the European Union may carry out in addition to their main functions at the institution. These activities may include teaching, research, consultancy, or advisory activities, provided that they do not interfere with the performance of the agent's main functions and do not give rise to conflicts of interest. Secondary activities are regulated by strict rules that ensure the compatibility of these activities with the agent's main functions.
+
+Agents who wish to carry out secondary activities must request the corresponding authorization from the competent authorities of the institution. These authorities will assess whether the requested activity is compatible with the agent's main functions and whether it gives rise to conflicts of interest. Authorization will only be granted if certain conditions are met, such as that the activity does not interfere with the performance of the main functions, does not give rise to conflicts of interest, and does not compromise the image of the institution.
+
+Secondary activities can bring important benefits to both agents and institutions. For agents, they allow new experiences and knowledge to be gained, and to complement their professional training. For institutions, they allow the transfer of knowledge and experiences between the institution and other sectors, and promote innovation and continuous improvement. However, secondary activities must be managed responsibly to avoid conflicts of interest and to ensure compatibility with the agent's main functions.
+
+The rules on secondary activities are strict and failure to comply with them may result in disciplinary sanctions. Agents have the obligation to inform the institution of any secondary activity they wish to carry out, and to obtain the corresponding authorization before starting the activity. European institutions have the obligation to monitor compliance with the rules on secondary activities and to take the necessary measures in the event of non-compliance.
+
+## Chapter 9: Human Resources Administration
+
+### 9.1 Human Resources Services
+
+Human resources services are the bodies responsible for human resources management in the institutions of the European Union. These services are responsible for the planning, management, and development of staff, and work to ensure that institutions have the necessary staff to perform their functions effectively. Human resources services play a fundamental role in human resources management, as they are the link between the institution and the agents.
+
+The functions of human resources services include staffing needs planning, selection process management, career management, continuing training management, employment conditions management, and the management of disciplinary procedures. These functions are essential to ensure the efficiency and quality of the European public service. Human resources services work closely with agents and their supervisors to identify and meet training and development needs.
+
+Human resources services are also responsible for the management of labor disputes and the resolution of problems related to employment conditions. These services provide advice and support to agents on labor matters, and manage complaints and claims procedures. Human resources services are also responsible for the management of internal mobility procedures and the management of staff exchange programs.
+
+The organization of human resources services varies according to the institution, but they all share the same objectives: to ensure that institutions have the necessary staff, to manage agents' careers, and to promote agents' professional and personal development. Human resources services are a fundamental component of the functioning of European institutions.
+
+### 9.2 Competence-Based Management
+
+Competence-based management is an approach to human resources management that focuses on agents' competences as the basis for decision-making on selection, training, evaluation, and professional development. This approach allows the competences necessary for each position to be identified, agents' competences to be evaluated, and the training and development actions necessary to close competence gaps to be planned.
+
+Competence-based management begins with the definition of a competence framework that establishes the competences necessary for each position. This competence framework includes generic competences, such as communication, teamwork, and leadership competences, and specific competences, such as technical or legal competences. The competence framework is used as the basis for the evaluation of agents' competences and for training planning.
+
+The evaluation of agents' competences is carried out through different tools, such as structured interviews, psychometric tests, practical exercises, and 360-degree evaluation. These tools allow agents' strengths and areas for improvement to be identified, and development objectives to be established. The results of competence evaluation are used for decision-making on selection, training, and professional development.
+
+Competence-based management has important benefits for both agents and institutions. For agents, it allows their strengths and areas for improvement to be identified, and clear development objectives to be established. For institutions, it allows competence needs to be identified and the training and development actions necessary to meet these needs to be planned. Competence-based management is a fundamental tool for human resources management in European institutions.
+
+### 9.3 Knowledge Management
+
+Knowledge management is a process that allows European institutions to identify, capture, store, share, and use the knowledge of their agents effectively. This process is fundamental to ensuring that the knowledge and experience of agents are available to the entire organization, and that this knowledge is transmitted to new generations of agents. Knowledge management is increasingly important in a constantly changing working environment, where the rate of knowledge obsolescence is increasing.
+
+Knowledge management includes different activities, such as the documentation of processes and procedures, the creation of knowledge databases, the implementation of online learning platforms, and the promotion of communities of practice. These activities allow existing knowledge in the organization to be captured and made available to all agents. Knowledge management also includes the promotion of knowledge sharing among agents, through activities such as mentoring, coaching, and learning groups.
+
+European institutions have implemented knowledge management platforms that facilitate access to information and knowledge sharing. These platforms include intranets, document repositories, discussion forums, and online collaboration tools. These tools allow agents to access the information they need to perform their functions effectively, and facilitate the sharing of knowledge and experiences among agents.
+
+Knowledge management is a shared responsibility between the institution and the agents. The institution is responsible for providing the tools and resources necessary for knowledge management, while agents are responsible for contributing to the knowledge management process by sharing their knowledge and experience. Knowledge management is a fundamental element for the efficiency and innovation of European institutions.
+
+### 9.4 Talent Retention
+
+Talent retention is an increasingly important challenge for the institutions of the European Union. In a competitive labor market, European institutions need to attract and retain the best professionals to ensure the quality and efficiency of the European public service. Talent retention involves creating an attractive working environment that provides agents with professional development opportunities, recognizes their contributions, and provides fair remuneration.
+
+European institutions have adopted different strategies to retain talent, such as improving employment conditions, promoting professional development, implementing work-life balance policies, and creating a positive and collaborative working environment. These strategies aim to create a working environment in which agents feel valued and motivated, and in which they have the opportunity to develop their professional career.
+
+Agent satisfaction assessment is an important tool for talent retention. European institutions carry out satisfaction surveys periodically to identify areas for improvement and take measures to improve agent satisfaction. The results of satisfaction surveys are used to develop action plans that address agents' concerns and improve their working conditions.
+
+Talent retention is a long-term investment that generates important benefits for European institutions. A motivated and committed staff is more productive, more innovative, and more likely to remain at the institution. Talent retention allows institutions to reduce recruitment and training costs, and to ensure the continuity of the European public service. European institutions must continue working to improve their talent retention strategies and ensure that they can attract and retain the best professionals.
+
+### 9.5 Strategic Human Resources Planning
+
+Strategic human resources planning is a process that allows European institutions to anticipate their medium- and long-term staffing needs, and to develop strategies to meet these needs effectively. This process is fundamental to ensuring that institutions have the necessary staff to perform their current and future functions, and that this staff has the necessary competences to meet changing challenges.
+
+Strategic human resources planning begins with the analysis of current and future staffing needs. This analysis takes into account factors such as the evolution of required competences, changes in the organizational structure, demographic projections, and labor market trends. With this information, human resources strategies are developed that allow institutions to meet their staffing needs effectively.
+
+Human resources strategies may include measures such as improving employment conditions to attract the best professionals, developing training programs to close competence gaps, implementing talent retention policies, and promoting diversity and inclusion. These strategies are implemented progressively and are evaluated periodically to ensure their effectiveness.
+
+Strategic human resources planning is a continuous process that requires the collaboration of different actors within the institution, such as human resources services, supervisors, and agents. The participation of all actors is fundamental to ensuring that strategic human resources planning reflects the actual needs of the institution and that the implemented strategies are effective. Strategic human resources planning is a fundamental tool for effective human resources management in European institutions.
+
+### 9.6 Human Resources Management Indicators
+
+Human resources management indicators are measurement tools that allow the effectiveness of human resources policies and practices in European institutions to be assessed. These indicators provide quantitative and qualitative information on different aspects of human resources management, such as staff turnover, agent satisfaction, training effectiveness, and staff diversity. The use of indicators allows institutions to make data-driven decisions and continuously improve their human resources policies.
+
+Among the most commonly used indicators are the staff turnover rate, which measures the percentage of agents who leave the institution over a given period; the agent satisfaction rate, which measures the level of agent satisfaction with their working conditions; the training attendance rate, which measures the percentage of agents participating in training programs; and the diversity index, which measures the representation of different social groups in the institution's staff.
+
+Human resources management indicators are collected periodically and analyzed to identify trends and areas for improvement. The results of indicator analysis are used to develop action plans that address identified areas for improvement. Indicators are also used to compare the performance of different institutions and to identify best practices in human resources management.
+
+The use of human resources management indicators is a fundamental tool for the continuous improvement of human resources policies in European institutions. These indicators allow institutions to measure the effectiveness of their policies, identify areas for improvement, and make data-driven decisions. The use of indicators contributes to transparency and accountability in human resources management, and promotes a culture of continuous improvement in European institutions.
+
+## Chapter 10: Current and Future Challenges of European Public Employment
+
+### 10.1 Digital Transformation
+
+Digital transformation is one of the most important challenges facing European institutions in the field of human resources. The digitalization of work processes and the adoption of new technologies, such as artificial intelligence, machine learning, and process automation, are changing the way European institutions manage their human resources. Digital transformation offers important opportunities to improve the efficiency and quality of the public service, but also presents challenges in terms of staff training and adaptation.
+
+European institutions are implementing digital solutions to optimize human resources processes, such as electronic payroll management, digital performance evaluation, and online training. These solutions allow repetitive processes to be automated, errors to be reduced, and human resources management efficiency to be improved. Digital transformation also allows greater accessibility of human resources services, as agents can access information and services from anywhere and at any time.
+
+Digital transformation also presents challenges in terms of staff training and adaptation. Agents need to acquire new digital competences in order to perform their functions in an increasingly digitalized environment. European institutions are implementing digital training programs to help agents acquire these competences. These programs include courses on digital tools, cybersecurity, data analysis, and process automation.
+
+Digital transformation is a continuous process that requires careful planning and significant investment in training and technology. European institutions must balance the benefits of digitalization with the need to ensure the protection of personal data and the digital inclusion of all agents. Digital transformation is an opportunity to improve the efficiency and quality of the European public service, but also presents challenges that must be addressed in a responsible and planned manner.
+
+### 10.2 Diversity and Inclusion
+
+Diversity and inclusion are fundamental principles that must be promoted in European institutions. Diversity refers to the representation of different social groups in the institution's staff, such as different genders, ages, ethnic origins, disabilities, and sexual orientations. Inclusion refers to the creation of a working environment in which all agents feel valued, respected, and with the same professional development opportunities.
+
+European institutions have adopted measures to promote diversity and inclusion, such as the implementation of gender equality policies, the promotion of the hiring of persons with disabilities, and the creation of working groups on diversity. These measures aim to create an inclusive working environment in which all agents have the same opportunities for access to employment, professional development, and recognition for their work.
+
+Diversity and inclusion are fundamental values of the European Union, which are reflected in the Treaties and in the Charter of Fundamental Rights. European institutions have the obligation to promote diversity and inclusion in their staff, and to ensure that all agents are treated fairly and equitably. The promotion of diversity and inclusion is not only a legal obligation, but also a source of wealth and innovation for European institutions.
+
+Diversity and inclusion is a continuous process that requires the commitment of all agents of the institution. European institutions must continue working to create an inclusive working environment in which all agents feel valued and respected. Diversity and inclusion are fundamental to the efficiency and innovation of European institutions, as they allow them to benefit from different perspectives and experiences.
+
+### 10.3 Workforce Aging
+
+Workforce aging is an important challenge facing European institutions. An increasing percentage of agents are approaching retirement age, which creates a need for workforce renewal and knowledge transfer. Workforce aging presents challenges in terms of staffing needs planning, knowledge transfer, and career management.
+
+European institutions are implementing strategies to cope with workforce aging, such as retirement planning, the promotion of peer learning, and the creation of mentoring programs. These strategies aim to ensure that the knowledge and experience of retiring agents are transferred to new generations of agents. Retirement planning allows institutions to anticipate staffing needs and take measures to fill the vacancies that will arise.
+
+Knowledge transfer is a fundamental aspect of workforce aging management. European institutions must ensure that the knowledge and experience of retiring agents are documented and transferred to new generations. Knowledge transfer can be carried out through activities such as mentoring, process documentation, and the creation of knowledge databases.
+
+Workforce aging also presents opportunities, such as the possibility of renewing the workforce with new generations of agents who bring new competences and perspectives. European institutions can take advantage of workforce renewal to introduce new competences and to adapt to the changing challenges of the working environment. Effective management of workforce aging is fundamental to ensuring the continuity and efficiency of the European public service.
+
+### 10.4 Teleworking and Flexible Work
+
+Teleworking and flexible work are increasingly important aspects of employment conditions in European institutions. The COVID-19 pandemic accelerated the adoption of teleworking in European institutions, and this work model has become a viable alternative to on-site work. Teleworking and flexible work offer important benefits for both agents and institutions, but also present challenges in terms of management and productivity.
+
+The benefits of teleworking include the reduction of commuting time, the improvement of work-life balance, the reduction of costs for institutions, and the reduction of the carbon footprint. European institutions have adopted teleworking policies that allow agents to work from home during part of the week, which provides them with flexibility and allows them to reconcile their professional and family responsibilities.
+
+Flexible work includes other measures, such as flexible working hours, flexible schedules, and reduced working hours. These measures allow agents to adapt their work schedule to their personal needs, which improves their satisfaction and productivity. European institutions have adopted flexible work policies that allow agents to benefit from these advantages.
+
+However, teleworking and flexible work present challenges in terms of staff management, team cohesion, and productivity. European institutions must implement tools and procedures to effectively manage staff working remotely, and ensure that flexible work does not compromise the quality of the European public service. Teleworking and flexible work are an opportunity to improve employment conditions and productivity, but require careful management to ensure their effectiveness.
+
+### 10.5 Sustainability and Social Responsibility
+
+Sustainability and social responsibility are increasingly important principles in the human resources management of European institutions. Sustainability refers to the ability of institutions to maintain their human resources policies in the long term without compromising available resources. Social responsibility refers to the commitment of institutions to the well-being of their agents and to society in general.
+
+European institutions are implementing sustainability policies in the field of human resources, such as the promotion of work-life balance, the reduction of work-related stress, the promotion of agent health and well-being, and the reduction of the carbon footprint of their activities. These policies aim to create a sustainable working environment that promotes agent well-being and contributes to environmental sustainability.
+
+Social responsibility also refers to the commitment of institutions to society in general. European institutions have the obligation to contribute to the well-being of society through their human resources policies, such as the promotion of diversity and inclusion, the hiring of persons with disabilities, the training of young professionals, and international cooperation. These initiatives aim to create a positive impact on society and contribute to sustainable development.
+
+Sustainability and social responsibility are principles that must be integrated into all human resources policies and practices. European institutions must ensure that their human resources policies are sustainable in the long term and that they contribute to the well-being of their agents and of society in general. Sustainability and social responsibility are fundamental to the efficiency and credibility of European institutions, and must be actively promoted in all areas of human resources management.
+
+## Chapter 11: Category A Officials
+
+### 11.1 Functions and Responsibilities
+
+Category A officials are the highest-level professionals in the institutions of the European Union, performing advanced analysis, strategic planning, public policy management, and high-impact decision-making functions. These officials are responsible for developing and coordinating complex programs that affect millions of European citizens, from the drafting of European legislation to the management of multimillion-dollar budgets. The functions of Category A officials include policy research and analysis, drafting of legislative proposals, inter-institutional coordination, external representation of institutions, and leadership of multidisciplinary teams. Category A officials work in high-pressure environments where work quality, accuracy, and the ability to synthesize are essential requirements.
+
+The responsibilities of Category A officials include the supervision of other officials of lower categories, the management of large-scale projects, and participation in decision-making processes that affect multiple areas of Union policy. These officials are expected to have a holistic view of Union policies and to be able to analyze the implications of their decisions from multiple perspectives, including economic, legal, political, and social perspectives. The ability to work under pressure, manage multiple priorities, and communicate complex ideas clearly and concisely are essential competences for Category A officials.
+
+Category A officials also have responsibilities in the training and development of other officials, acting as mentors and guides for younger professionals. This mentoring function is especially important in European institutions, where knowledge transfer and the accumulation of institutional experience are fundamental to the continuity and quality of the public service. Category A officials contribute to creating an organizational culture that values continuous learning, innovation, and professional excellence.
+
+### 11.2 Selection Process and Requirements
+
+The selection process for Category A officials is one of the most competitive and rigorous in European public employment, with thousands of candidates competing for a limited number of places. Access requirements include a master's or doctoral degree in a relevant field, professional experience of at least three to five years in a field related to the position, and advanced knowledge of at least two official languages of the European Union. Candidates must demonstrate advanced competences in analysis, communication, leadership, and project management, which are evaluated through psychometric tests, competency-based interviews, and group exercises.
+
+Selection tests for Category A officials include assessments of verbal reasoning, numerical reasoning, abstract reasoning, and specific competences of the functional area. Candidates who pass the written tests move on to an interview and group exercise phase, where their interpersonal competences, leadership ability, and suitability for the position are evaluated. Evaluation panels are composed of representatives of the institution convening the competition and human resources experts who ensure the objectivity and reliability of the process.
+
+Competitions for Category A officials are organized periodically and cover different functional areas, such as foreign affairs, economics, law, communication, information technology, and project management. Each competition has specific requirements regarding the training and experience required, and candidates must adapt their profile to the requirements of the position. Candidates who are selected for a Category A position generally begin with a probationary period lasting between six months and one year, during which they demonstrate their ability to perform the functions of the position.
+
+### 11.3 Employment Conditions and Remuneration
+
+Employment conditions for Category A officials are among the most attractive in the European public sector, with competitive remuneration that includes a basic salary, social benefits, seniority bonuses, and other allowances. The basic salary of a Category A official varies according to their level of experience and the institution in which they work, but is generally significantly higher than that of officials in lower categories. Social benefits include health care, life insurance, retirement benefits, and other benefits that complement the basic salary.
+
+Category A officials also enjoy advantages such as the possibility of teleworking, flexible working hours, continuing training funded by the institution, and career opportunities. The possibility of working in different institutions and in different functional areas is one of the most attractive advantages of employment in European institutions, as it allows officials to broaden their professional horizons and develop new competences. Internal mobility is actively promoted by institutions through rotation programs and internal calls.
+
+The employment conditions of Category A officials also include specific obligations, such as the duty of impartiality, the obligation of confidentiality, the duty to report conflicts of interest, and the obligation to act ethically and transparently. These obligations are fundamental to ensuring the integrity and credibility of European institutions, and Category A officials are subject to more rigorous control than officials in lower categories due to the greater responsibilities they assume.
+
+## Chapter 12: Category B Officials
+
+### 12.1 Functions and Responsibilities
+
+Category B officials are mid-level professionals who perform execution, control, and advisory functions in the institutions of the European Union. These officials are responsible for the implementation of Union policies, the management of mid-level projects, the preparation of reports, and participation in decision-making processes under the supervision of Category A officials. The functions of Category B officials include data analysis, document drafting, coordination of operational activities, and meeting the needs of citizens and other institutions.
+
+Category B officials work in a variety of functional areas, including administration, economics, law, information technology, communication, and human resources management. Their work requires a balance between technical competences and cross-cutting competences, as they must be able to apply their specialized knowledge in a complex and multicultural organizational context. The ability to work in teams, communicate effectively, and adapt to different situations are important competences for Category B officials.
+
+Category B officials also have responsibilities in the training and development of officials in lower categories, providing support and guidance to assistants and auxiliary staff. This support function is important for ensuring the quality of service and for contributing to the professional development of other team members. Category B officials are expected to demonstrate initiative, responsibility, and problem-solving ability in their daily work.
+
+### 12.2 Selection Process and Requirements
+
+The selection process for Category B officials is competitive but less rigorous than that of Category A officials. Access requirements include a university degree in a relevant field, professional experience of at least two years in a field related to the position, and knowledge of at least two official languages of the European Union. Candidates must demonstrate competences in analysis, communication, and teamwork, which are evaluated through psychometric tests and interviews.
+
+Selection tests for Category B officials include assessments of verbal reasoning, numerical reasoning, and basic job competences. Candidates who pass the written tests move on to an interview phase, where their interpersonal competences and suitability for the position are evaluated. Evaluation panels are composed of representatives of the institution convening the competition and human resources experts.
+
+Competitions for Category B officials are organized periodically and cover different functional areas, such as administration, economics, law, information technology, and communication. Each competition has specific requirements regarding the training and experience required, and candidates must adapt their profile to the requirements of the position. Candidates who are selected for a Category B position generally begin with a probationary period lasting between six months and one year.
+
+### 12.3 Employment Conditions and Remuneration
+
+Employment conditions for Category B officials are attractive, with remuneration that includes a basic salary, social benefits, and other allowances. The basic salary of a Category B official is lower than that of a Category A official but higher than that of officials in lower categories. Social benefits include health care, life insurance, and retirement benefits, which complement the basic salary and provide comprehensive protection for the official and their family.
+
+Category B officials enjoy advantages such as the possibility of continuing training, internal mobility between institutions and functional areas, and participation in professional development programs. Internal mobility is particularly valuable for Category B officials, as it allows them to gain experience in different areas and improve their career prospects. European institutions actively promote internal mobility through internal calls and rotation programs.
+
+The employment conditions of Category B officials include obligations similar to those of Category A officials, such as the duty of impartiality, the obligation of confidentiality, and the duty to act ethically. Category B officials are evaluated periodically through performance evaluation systems that allow areas for improvement to be identified and professional development objectives to be established.
+
+## Chapter 13: Category C Officials
+
+### 13.1 Functions and Responsibilities
+
+Category C officials are professionals who perform administrative, technical, and organizational support functions in the institutions of the European Union. These officials are responsible for document management, public service, event organization, database management, and other activities that are fundamental to the daily functioning of institutions. The functions of Category C officials include correspondence management, meeting organization, file maintenance, telephone service, and logistical support to other departments.
+
+Category C officials work at all levels of European institutions, from administrative units to the offices of senior officials. Their work requires solid administrative competences, organizational capacity, attention to detail, and effective communication skills. The ability to work under pressure, manage multiple tasks simultaneously, and adapt to different working environments are important competences for Category C officials.
+
+Category C officials also have responsibilities in information management and in providing technical support to other staff members. These functions include the use of computer tools, database management, document creation, and report preparation. Category C officials are fundamental to ensuring that the daily operations of institutions are carried out efficiently and effectively.
+
+### 13.2 Selection Process and Requirements
+
+The selection process for Category C officials is less competitive than that of higher categories, but is still rigorous and selective. Access requirements include a high school diploma or equivalent, professional experience of at least one year in an administrative or support field, and knowledge of at least two official languages of the European Union. Candidates must demonstrate basic administrative competences, organizational capacity, and communication skills, which are evaluated through written tests and interviews.
+
+Selection tests for Category C officials include assessments of administrative competences, such as the use of office tools, document management, and public service. Candidates who pass the written tests move on to an interview phase, where their interpersonal competences and suitability for the position are evaluated. Evaluation panels are composed of institution representatives and human resources experts.
+
+Competitions for Category C officials are organized more frequently than those for higher categories, as administrative staffing needs are more numerous and frequent. Competitions cover different administrative areas, such as document management, public service, event organization, and technical support. Candidates who are selected for a Category C position generally begin with a probationary period lasting between three months and one year.
+
+### 13.3 Employment Conditions and Remuneration
+
+Employment conditions for Category C officials include a basic salary, social benefits, and other allowances that, although lower than those of higher categories, provide adequate protection for the official and their family. Social benefits include health care, life insurance, and retirement benefits, which complement the basic salary and contribute to the official's financial stability.
+
+Category C officials enjoy advantages such as the possibility of continuing training, participation in professional development programs, and the opportunity to advance to higher categories through internal competitions. The possibility of career progression is an important incentive for Category C officials, who can advance in their careers through continuing training and the accumulation of experience.
+
+The employment conditions of Category C officials include obligations such as the duty of impartiality, the obligation of confidentiality, and the duty to act ethically. Category C officials are evaluated periodically through performance evaluation systems that allow areas for improvement to be identified and professional development objectives to be established. Performance evaluation is an important instrument for the career development of Category C officials.
+
+## Chapter 14: Temporary Agents
+
+### 14.1 Nature and Characteristics of Temporary Employment
+
+Temporary agents are professionals hired by the institutions of the European Union for a fixed period to meet specific staffing needs that cannot be met through the recruitment of permanent officials. Temporary agents are hired to cover temporary needs such as specific projects, absence coverage, seasonal needs, or peaks of activity. Temporary hiring allows institutions to flexibilize their workforce and adapt to changing needs without compromising the quality of the public service.
+
+A temporary agent's contract has a fixed duration, which generally varies between six months and five years, and may or may not be renewed at the end of the period. Temporary agents enjoy the same rights as permanent officials during the duration of their contract, including remuneration, social benefits, and protection against discrimination. However, temporary agents are not entitled to permanence in the position once the contract has ended, unless they participate in a competition for permanent official and are selected.
+
+Temporary agents may be recruited through different mechanisms, including open competitions organized by EPSO, specific selection processes organized by institutions, and direct recruitment for positions with highly specialized requirements. The selection process for temporary agents is generally faster and less complex than that of permanent officials, which allows institutions to fill vacancies more efficiently.
+
+### 14.2 Rights and Obligations of Temporary Agents
+
+Temporary agents have rights and obligations similar to those of permanent officials during the duration of their contract. The rights of temporary agents include the right to fair remuneration, the right to social benefits, the right to continuing training, the right to protection against discrimination, and the right to a safe and healthy working environment. Temporary agents are also entitled to participate in trade union activities and to be represented by institution trade unions.
+
+The obligations of temporary agents include the duty to perform assigned functions with diligence and professionalism, the duty to respect institution rules and procedures, the duty to maintain the confidentiality of information to which they have access, and the duty to act ethically and transparently. Temporary agents are subject to the same codes of conduct as permanent officials and may be sanctioned for failure to comply with their obligations.
+
+The termination of a temporary agent's contract may occur for several reasons, including expiration of the contract term, completion of the project for which they were hired, abolition of the position, or breach of contractual obligations. In the event of contract termination, temporary agents are entitled to compensation in the cases established by applicable regulations, and may participate in competitions for permanent official if they wish to continue working in the institutions.
+
+### 14.3 Career Prospects for Temporary Agents
+
+Although temporary agents are not entitled to permanence in the position, temporary employment can be a valuable gateway to employment in the institutions of the European Union. Many permanent officials began their careers as temporary agents, gaining experience and knowledge that allowed them to successfully pass the competitions for permanent official. Temporary employment provides candidates with the opportunity to learn about the functioning of institutions from the inside, to develop a network of professional contacts, and to demonstrate their competences in a real working environment.
+
+European institutions offer temporary agents the possibility of participating in training and professional development programs, which allows them to improve their competences and increase their chances of accessing a permanent official position. Continuing training is a valuable resource for temporary agents who wish to advance their professional careers in European institutions.
+
+Temporary agents who wish to become permanent officials must participate in EPSO open competitions and pass the selection tests. The experience accumulated as a temporary agent can be a significant advantage in these competitions, as it provides practical knowledge of the functioning of institutions that external candidates do not have. Temporary agents who participate in competitions for permanent official generally perform better than external candidates due to their familiarity with the institutional environment.
+
+## Chapter 15: Local Agents
+
+### 15.1 Nature and Characteristics of Local Employment
+
+Local agents are citizens of the host country or neighboring countries who are hired by European Union delegations abroad to fill administrative, technical, or professional support positions. Local agents are hired in accordance with the labor legislation of the country where the delegation is located, which implies that their employment conditions may vary significantly from one delegation to another. Local employment is a hiring modality that allows delegations to benefit from local knowledge and the linguistic competences of host country citizens.
+
+Local agents perform varied functions that include document management, public service, translation and interpretation, project management, technical support, and other activities necessary for the functioning of delegations. The functions of local agents depend on the specific needs of each delegation and the competences of each individual. Local agents are an essential component of delegation staff, as they provide local knowledge and linguistic competences that are fundamental to the implementation of Union policies in the host country.
+
+Local agents have a legal status different from that of permanent officials and temporary agents of European institutions. Local agents are not subject to the Staff Regulations of the European Union, but to the labor legislation of the country where they work, which implies that their rights and obligations may differ significantly from those of officials and temporary agents of institutions.
+
+### 15.2 Selection Process and Requirements
+
+Competitions for local agents are organized by EPSO in collaboration with European Union delegations abroad. Access requirements include nationality of the host country or a neighboring country, knowledge of local languages, and knowledge of at least one official language of the European Union. Candidates must also demonstrate administrative, linguistic, or technical competences according to the requirements of the position. Competitions for local agents evaluate candidates' competences in a context that reflects the specific needs of the delegation.
+
+The selection process for local agents includes language tests, administrative or technical competence tests, and interviews. Evaluation panels are composed of delegation representatives and European institution human resources experts. Candidates who are selected as local agents are hired by the delegation in accordance with local labor legislation, and their employment conditions may include a fixed-term or permanent contract.
+
+Competitions for local agents are organized when the delegation has staffing needs that can be met by local candidates. These competitions are important to ensure that delegations have the necessary staff to function effectively and to implement Union policies in the host country. Local candidates bring valuable knowledge of the local culture, social customs, and political environment of the country, which facilitates the implementation of Union policies.
+
+### 15.3 Employment Conditions and Professional Development
+
+The employment conditions of local agents vary significantly according to the host country, the delegation, and the specific conditions of each contract. In general, local agents enjoy employment conditions that include a basic salary, basic social benefits, annual leave, and other benefits established by local labor legislation. The employment conditions of local agents may be different from those of officials and temporary agents of European institutions, as they are subject to local legislation.
+
+Professional development opportunities for local agents include participation in training programs, the possibility of acquiring new competences, and the opportunity to participate in international projects. European Union delegations abroad usually offer training programs to their local agents, which may include language training, technical training, and training in specific functional areas. Continuing training is a valuable resource for local agents who wish to improve their competences and increase their professional development opportunities.
+
+The professional development of local agents may include the opportunity to access positions of greater responsibility within the delegation or to participate in internal mobility programs between delegations. Although local agents do not have direct access to EPSO competitions for permanent official, their experience in delegations may be valuable to other employers, including international organizations, national governments, and the private sector.
+
+## Chapter 16: Seconded National Experts
+
+### 16.1 Nature and Characteristics of Secondment
+
+Seconded national experts are officials of the national governments of Member States who are temporarily assigned to the institutions of the European Union to contribute their experience and specialized knowledge. This secondment mechanism allows European institutions to benefit from the experience of national experts in technical or policy areas that require specific knowledge of Member States. Seconded national experts work in European institutions for a fixed period, generally from six months to four years, and then return to their original positions in national administrations.
+
+Seconded national experts perform functions that include participation in working groups, preparation of technical reports, policy advice, coordination of programs, and support for the implementation of Union policies. These experts bring valuable knowledge of national policies, administrative practices, and the specific needs of Member States, which enriches decision-making in European institutions. The experience of seconded national experts is especially valuable in areas such as foreign policy, security, economics, and public health.
+
+The secondment of national experts is a mechanism that promotes cooperation between national administrations and European institutions, and contributes to the creation of a common administrative culture throughout the Union. Seconded national experts establish lasting professional relationships with their counterparts in European institutions, which facilitates inter-institutional cooperation and policy coordination between the national and European levels.
+
+### 16.2 Selection Process and Employment Conditions
+
+The selection process for seconded national experts is different from that of officials and temporary agents of European institutions, as candidates are proposed by national governments and selected by European institutions. National governments propose candidates who have the experience and knowledge necessary for the position, and European institutions assess the suitability of candidates and select the most appropriate ones. This bilateral selection process ensures that seconded national experts have the required competences and the support of their home governments.
+
+The employment conditions of seconded national experts are established in an agreement between the European institution, the national government, and the expert. These conditions include remuneration, social benefits, the duration of the secondment, and the functions to be performed. Seconded national experts maintain their employment relationship with their national administration throughout the duration of the secondment, which guarantees their return to their original position at the end of the period.
+
+Seconded national experts enjoy immunity in the exercise of their functions, similar to that of officials of European institutions, which allows them to work with independence and objectivity. This immunity is important to ensure that seconded national experts can perform their functions without fear of reprisals or external influences. The immunity of seconded national experts is subject to the same conditions and limitations as that of officials of European institutions.
+
+### 16.3 Impact and Contributions
+
+Seconded national experts make significant contributions to the functioning of European institutions, bringing specialized knowledge, practical experience, and national perspectives that enrich decision-making. Their presence in European institutions promotes inter-institutional cooperation and knowledge transfer between national administrations and European institutions. Seconded national experts are a valuable resource for institutions, as they provide a direct link with national realities and facilitate the implementation of Union policies at the national level.
+
+The impact of seconded national experts extends beyond their stay in European institutions, as many of them return to their national administrations with a deep understanding of the functioning of European institutions and European decision-making processes. This experience is valuable for the implementation of Union policies at the national level and for improving cooperation between national administrations and European institutions. Seconded national experts are ambassadors of European cooperation who contribute to strengthening the institutional fabric of the Union.
+
+The network of professional contacts that seconded national experts establish during their stay in European institutions is a valuable asset for both them and their home institutions. These contacts facilitate future cooperation, information exchange, and the resolution of common problems between national administrations and European institutions. The secondment experience is therefore an investment in human capital that benefits both European institutions and national governments.

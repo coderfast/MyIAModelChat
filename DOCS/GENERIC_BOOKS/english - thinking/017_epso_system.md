@@ -1,0 +1,852 @@
+# The EPSO Selection System
+
+## Chapter 1: What is EPSO
+
+### 1.1 Definition and Mission
+
+The European Personnel Selection Office, known by its acronym EPSO (European Personnel Selection Office), is the body of the European Union responsible for the selection of personnel for the institutions of the Union. EPSO was created in 1960 and is headquartered in Luxembourg. The mission of EPSO is to ensure that the institutions of the Union have the best possible staff, through fair, transparent, and merit-based selection processes.
+
+The main function of EPSO is to organize open competitions and selection procedures for the recruitment of officials and agents of the institutions of the Union. These competitions allow European citizens to access jobs in the institutions of the Union through a competitive process that evaluates the competencies, knowledge, and skills of candidates. EPSO competitions are the main mechanism for recruiting staff for the institutions of the Union and are fundamental to ensuring the quality and diversity of Union staff.
+
+The mission of EPSO also includes the promotion of equal opportunities in access to employment in the institutions of the Union. EPSO strives to ensure that selection processes are accessible to all European citizens, regardless of their origin, sex, race, religion, or any other personal characteristic. EPSO also promotes diversity in the composition of the staff of the institutions of the Union, seeking to ensure a balanced representation of all member states and all professional profiles.
+
+The function of EPSO also includes innovation in selection processes. EPSO is constantly working to improve its selection processes, incorporating new technologies and methodologies that allow for a more accurate and effective assessment of candidates' competencies. EPSO is also working on the digitalization of its processes, which allows candidates to participate in competitions online and facilitates access to selection processes.
+
+The mission of EPSO is framed within the broader context of the human resources policy of the institutions of the European Union. The institutions of the Union need highly qualified staff to carry out their functions, which range from the drafting of European legislation to the management of public policies, including diplomatic representation and the administration of justice. EPSO provides the institutional framework and the necessary processes to ensure that institutions can recruit the staff they need in an effective and efficient manner.
+
+### 1.2 Organizational Structure
+
+The organizational structure of EPSO is composed of several units that carry out specific functions in the selection processes. EPSO is headed by a director, appointed by the institutions of the Union, who is responsible for the general management of the body. The director is assisted by a management team that includes the heads of the different units of EPSO.
+
+The open competitions unit is responsible for organizing open competitions for the recruitment of officials and agents of the institutions of the Union. This unit is in charge of preparing the calls, evaluating applications, organizing the tests, and drawing up the reserve lists. The open competitions unit works in close collaboration with the institutions of the Union to ensure that competitions respond to the staff needs of the institutions.
+
+The specific competitions unit is responsible for organizing specific competitions for positions that require specialized competencies, such as translators, interpreters, security experts, or specialists in thematic areas. This unit is in charge of preparing specific calls, evaluating applications, and organizing the tests. Specific competitions are important to ensure that the institutions of the Union have qualified staff in specialized areas.
+
+The talent management unit is responsible for talent management in the institutions of the Union. This unit is in charge of career planning, staff training and development, and internal mobility. The talent management unit works to ensure that the institutions of the Union have motivated, qualified, and committed staff with the mission of the Union.
+
+The communication and public relations unit is responsible for the external communication of EPSO and for managing relations with candidates and the general public. This unit is in charge of information about competitions, managing candidate inquiries, and promoting EPSO competitions through different communication channels, including the EPSO website, social media, and recruitment events.
+
+### 1.3 Relationship with the Institutions of the Union
+
+The relationship between EPSO and the institutions of the Union is fundamental to the functioning of the selection system. EPSO works in close collaboration with the institutions of the Union to identify staff needs, design candidate profiles, and organize selection processes. The institutions of the Union are the ones that define staff needs and use the results of EPSO's selection processes to fill vacancies.
+
+The European Commission is the institution that recruits the most staff through EPSO, as it is the executive institution of the Union and has a large number of officials and agents. The Commission works with EPSO to identify staff needs, define candidate profiles, and organize competitions. The Commission also uses the results of EPSO competitions to fill vacancies in its various directorates-general and services.
+
+The European Parliament, the Council of the European Union, the Court of Justice, the European Court of Auditors, the European Central Bank, and other Union bodies also recruit staff through EPSO. Each institution works with EPSO to identify its staff needs and to organize the selection processes that best suit its needs. The relationship between EPSO and the institutions of the Union is a partnership aimed at ensuring that institutions have the best possible staff.
+
+EPSO also works in collaboration with the member states to ensure that selection processes reflect the geographical and cultural diversity of the Union. The member states are the ones that propose candidates for positions in the institutions of the Union, and EPSO organizes the selection processes that evaluate candidates' competencies. Collaboration between EPSO and the member states is fundamental to ensuring that the institutions of the Union have staff from all member states and all professional profiles.
+
+The relationship between EPSO and the institutions of the Union is also manifested in cooperation on human resources policy. EPSO participates in the work of the human resources management committees of the institutions of the Union, and collaborates in the definition of selection, training, and professional development policies. This cooperation is fundamental to ensuring coherence of human resources policy across all institutions of the Union.
+
+## Chapter 2: Open Competitions
+
+### 2.1 Types of Competitions
+
+Open competitions are the main mechanism for recruiting staff for the institutions of the European Union. EPSO organizes different types of open competitions that are adapted to the staff needs of the institutions and the different candidate profiles. The types of competitions include competitions for permanent officials, competitions for temporary agents, competitions for local agents, and specific competitions.
+
+Competitions for permanent officials are the most important and competitive competitions of EPSO. These competitions allow access to permanent positions in the institutions of the Union, with all the advantages and obligations that entails. Competitions for permanent officials are organized for different profiles, such as administrators, assistants, translators, interpreters, and specialists in specialized areas. Competitions for permanent officials are highly competitive, with selection rates usually below 5% of candidates who submit their application.
+
+Competitions for temporary agents are competitions that allow access to temporary positions in the institutions of the Union. Temporary agents are hired for a determined period to cover temporary staff needs, such as specific projects, absence coverage, or seasonal needs. Competitions for temporary agents are less competitive than competitions for permanent officials, but they also require the evaluation of candidates' competencies and knowledge.
+
+Competitions for local agents are competitions that allow access to local positions in the Union's delegations abroad. Local agents are hired for a determined period to cover staff needs in the Union's delegations in third countries. Competitions for local agents are organized by EPSO in collaboration with the Union's delegations and allow access to positions for citizens of the third countries where the delegations are located.
+
+Specific competitions are competitions organized for positions that require specialized competencies, such as translators, interpreters, security experts, or specialists in thematic areas. Specific competitions are designed to evaluate the specific competencies and knowledge required for the position, and may include specific tests that are not included in general competitions. Specific competitions are important to ensure that the institutions of the Union have qualified staff in areas that require specific technical or linguistic knowledge.
+
+### 2.2 Call and Requirements
+
+The call for an EPSO competition is the official document that establishes the conditions and procedures for participation in the competition. The call contains detailed information about the position, access requirements, selection tests, application deadlines, and evaluation criteria. The call is published in the Official Journal of the European Union and on the EPSO website, and is available in all official languages of the Union.
+
+Access requirements for EPSO competitions include nationality of a member state of the Union, an appropriate level of education for the position, knowledge of at least two official languages of the Union, and, in some cases, specific professional experience. Nationality is a fundamental requirement that ensures that only European citizens can participate in competitions. The level of education varies depending on the position, and may range from a bachelor's degree to a doctoral degree, depending on the level of the position.
+
+Knowledge of languages is another fundamental requirement for EPSO competitions. Candidates must demonstrate an advanced level of at least two official languages of the Union, one of which must be English, French, or German. Language knowledge is evaluated through linguistic tests that are part of the selection process. Language knowledge is fundamental to performing functions in the institutions of the Union, as the institutions work in a multilingual environment.
+
+Professional experience is a requirement that varies depending on the type and level of the position. For administrative-level positions, such as category A administrators, a university degree and at least three years of professional experience are generally required. For assistant-level positions, such as category C assistants, a bachelor's degree or equivalent and at least one year of professional experience are generally required. Professional experience is evaluated through the review of candidates' CVs and selection tests.
+
+### 2.3 Registration Process
+
+The registration process for EPSO competitions is carried out through the EPSO online platform. Candidates must create an account on the EPSO platform, complete the application form, upload the required documents, and submit the application before the deadline. The registration process is relatively straightforward, but requires attention to detail and compliance with established deadlines.
+
+Creating an account on the EPSO platform is the first step of the registration process. Candidates must provide their personal data, including name, address, email, and identification number. Candidates must also create a username and password to access their account. The EPSO account allows candidates to track the status of their application, receive notifications about competitions, and access test results.
+
+Completing the application form is the second step of the registration process. Candidates must complete an online form that includes information about their education, professional experience, languages, and competencies. Candidates must also provide information about their availability and location preferences. The application form is an important document that will be used by EPSO to evaluate candidates' eligibility.
+
+Uploading documents is the third step of the registration process. Candidates must upload to the EPSO platform a series of documents that certify their qualifications, including academic degrees, language certificates, professional references, and other relevant documents. Documents must be uploaded in the formats specified by EPSO and must be in one of the official languages of the Union or accompanied by a certified translation.
+
+Submitting the application is the final step of the registration process. Candidates must carefully review their application before submitting it to ensure that all information is correct and complete. Candidates must submit their application before the deadline established in the call. Applications received after the deadline will not be taken into account.
+
+### 2.4 Evaluation Criteria
+
+Evaluation criteria are the criteria that EPSO uses to evaluate candidates' competencies, knowledge, and skills. Evaluation criteria vary depending on the type of position and the candidate's profile, but generally include cognitive competencies, linguistic competencies, professional competencies, and personal competencies.
+
+Cognitive competencies are competencies related to reasoning ability, problem-solving, analytical capacity, and synthesis capacity. Cognitive competencies are evaluated through psychometric tests that include verbal reasoning, numerical reasoning, abstract reasoning, and problem-solving. These tests are fundamental to evaluating candidates' ability to perform the functions of the position.
+
+Linguistic competencies are competencies related to knowledge and use of languages. Linguistic competencies are evaluated through translation tests, reading comprehension, written expression, and oral expression. These tests evaluate candidates' ability to communicate effectively in different languages and to translate documents from one language to another.
+
+Professional competencies are competencies related to the specific knowledge and skills required for the position. Professional competencies are evaluated through specific tests that may include technical questionnaires, practical exercises, and case studies. These tests evaluate candidates' ability to apply their knowledge and skills in a professional environment.
+
+Personal competencies are competencies related to candidates' personal qualities, such as teamwork ability, communication ability, adaptability, and leadership ability. Personal competencies are evaluated through interviews, group exercises, and workplace simulations. These tests evaluate candidates' ability to perform the functions of the position in a collaborative work environment.
+
+## Chapter 3: The Selection Process
+
+### 3.1 Phases of the Selection Process
+
+The EPSO selection process is structured in several phases, ranging from the initial evaluation of applications to inclusion on the reserve list. Each phase of the process has a specific objective and uses different evaluation methods to ensure a fair and effective selection. The phases of the selection process include pre-selection, aptitude tests, specific tests, competency assessment, and inclusion on the reserve list.
+
+Pre-selection is the first phase of the selection process and aims to identify candidates who meet the access requirements established in the call. During pre-selection, EPSO verifies that candidates have the nationality of a member state, meet the education requirements, have the required language knowledge, and have no conflict of interest with the Union. Candidates who do not meet the access requirements will be eliminated from the selection process.
+
+Aptitude tests are the second phase of the selection process and aim to evaluate candidates' cognitive and linguistic competencies. Aptitude tests are carried out online and can be taken by candidates from anywhere in the world. Aptitude tests include verbal reasoning, numerical reasoning, abstract reasoning, reading comprehension, and written expression. Candidates who obtain a score below the established threshold will be eliminated from the selection process.
+
+Specific tests are the third phase of the selection process and aim to evaluate the specific professional competencies required for the position. Specific tests vary depending on the type of position and the candidate's profile, and may include technical questionnaires, practical exercises, and case studies. Specific tests are generally carried out at EPSO examination centers or at the premises of the institutions of the Union.
+
+Competency assessment is the fourth phase of the selection process and aims to evaluate candidates' personal competencies, such as teamwork ability, communication ability, adaptability, and leadership ability. Competency assessment is carried out through interviews, group exercises, and workplace simulations. This phase is fundamental to evaluating candidates' suitability for the position and for the work environment of the institutions of the Union.
+
+Inclusion on the reserve list is the final phase of the selection process. Candidates who have passed all previous phases will be included on a reserve list that will be made available to the institutions of the Union. The institutions of the Union can select candidates from the reserve list to fill vacancies as they arise. Inclusion on the reserve list does not guarantee obtaining a job, but it does allow candidates to be considered for vacancies as they arise.
+
+### 3.2 Aptitude Tests
+
+Aptitude tests are a fundamental component of the EPSO selection process. These tests evaluate candidates' cognitive and linguistic competencies, and aim to identify candidates with the greatest ability to perform the functions of the position. Aptitude tests are carried out online and can be taken by candidates from anywhere in the world, which facilitates the participation of candidates from all member states.
+
+Verbal reasoning tests evaluate candidates' ability to understand and analyze texts, identify logical relationships between ideas, and draw conclusions from complex information. These tests include reading comprehension exercises, verbal analogies, syllogisms, and other tasks that evaluate candidates' linguistic and cognitive ability. Verbal reasoning is a fundamental competency for performing functions in the institutions of the Union, where the comprehension and analysis of documents is a daily task.
+
+Numerical reasoning tests evaluate candidates' ability to process numerical information, perform mathematical calculations, and draw conclusions from quantitative data. These tests include arithmetic exercises, percentages, proportions, statistics, and other tasks that evaluate candidates' numerical ability. Numerical reasoning is an important competency for performing functions that involve the analysis of financial, statistical, or other quantitative data.
+
+Abstract reasoning tests evaluate candidates' ability to identify patterns, logical relationships, and sequences in non-verbal information. These tests include figure series exercises, figure matrices, figure classification, and other tasks that evaluate candidates' abstract reasoning ability. Abstract reasoning is an important competency for problem-solving and for the analysis of complex situations.
+
+Linguistic tests evaluate candidates' ability to communicate effectively in different languages. These tests include reading comprehension, written expression, translation, and oral expression. Linguistic tests are fundamental to ensuring that candidates have the required language level for the position and for performing functions in a multilingual environment.
+
+### 3.3 Interviews and Competency Assessment
+
+Interviews and competency assessment are fundamental components of the EPSO selection process. These evaluations aim to evaluate candidates' personal competencies, such as teamwork ability, communication ability, adaptability, leadership ability, and problem-solving ability. Interviews and competency assessment are generally carried out in the final phase of the selection process, after candidates have passed the aptitude tests and specific tests.
+
+Individual interviews are an evaluation method that allows evaluators to get to know candidates better and assess their personal competencies. During the individual interview, evaluators ask candidates questions about their professional experience, motivations, personal qualities, and ability to perform the functions of the position. Individual interviews can be structured, semi-structured, or unstructured, depending on the type of position and the evaluation criteria.
+
+Group exercises are an evaluation method that allows the assessment of candidates' ability to work in a team, communicate effectively, and contribute to collective decision-making. During group exercises, candidates work together to solve a problem or complete a task, while evaluators observe their behavior and assess their competencies. Group exercises are fundamental to evaluating candidates' ability to work in a collaborative work environment, which is common in the institutions of the Union.
+
+Workplace simulations are an evaluation method that allows the assessment of candidates' ability to perform the functions of the position in a realistic environment. Simulations may include correspondence handling, report writing, participation in meetings, and project management. Simulations are fundamental to evaluating candidates' ability to apply their knowledge and skills in a professional environment.
+
+Professional references are another evaluation tool that allows EPSO to verify the information provided by candidates about their professional experience and competencies. EPSO may contact the references provided by candidates to obtain additional information about their professional performance, personal qualities, and suitability for the position. Professional references are an important complement to tests and interviews, and provide additional information about candidates' ability to perform the functions of the position.
+
+### 3.4 Reserve List and Its Use
+
+The reserve list is the final result of the EPSO selection process and contains the names of candidates who have passed all phases of the process. Candidates included on the reserve list are considered suitable to hold positions in the institutions of the Union, and may be selected by the institutions to fill vacancies as they arise. The reserve list has a limited duration, generally three years, during which candidates may be selected by the institutions.
+
+The preparation of the reserve list is based on the scores obtained by candidates in all phases of the selection process. Candidates are ranked according to their total score, and candidates with the highest scores are included on the reserve list. The number of candidates included on the reserve list varies depending on the staff needs of the institutions and the number of candidates who have passed the selection process.
+
+The use of the reserve list is the responsibility of the institutions of the Union. The institutions may request the reserve list from EPSO for a specific profile, and may select candidates from the reserve list to fill vacancies as they arise. The institutions may conduct additional interviews with candidates from the reserve list before making a hiring decision. The reserve list does not guarantee obtaining a job, but it does provide candidates with the opportunity to be considered for vacancies as they arise.
+
+The maintenance of the reserve list is subject to specific conditions. Candidates included on the reserve list may be removed from it if their personal circumstances change, such as their nationality or residence, or if they commit any infringement that makes them ineligible for the position. The institutions of the Union may also request the removal of a candidate from the reserve list if they have justified reasons for doing so. The removal of a candidate from the reserve list is carried out in accordance with the Staff Regulations of the Institutions of the Union.
+
+## Chapter 4: Profiles Sought
+
+### 4.1 Administrative Profiles
+
+Administrative profiles are the most numerous in the institutions of the European Union and cover a wide range of functions ranging from project management to the drafting of European legislation. Administrative profiles are divided into different categories, ranging from category A (senior positions) to category C (assistant positions), passing through category B (intermediate positions).
+
+Category A administrators are the most qualified profiles of the institutions of the Union. Category A administrators are responsible for project management, the drafting of European legislation, diplomatic representation, and other high-responsibility functions. Category A administrators generally require an advanced university degree, such as a master's or doctoral degree, and at least three years of professional experience. Category A administrators are recruited through EPSO open competitions that evaluate candidates' cognitive, linguistic, and professional competencies.
+
+Category B administrators are intermediate profiles that carry out management and execution functions. Category B administrators are responsible for team management, policy implementation, and other intermediate-level functions. Category B administrators generally require a university degree and at least two years of professional experience. Category B administrators are recruited through EPSO open competitions that evaluate candidates' cognitive, linguistic, and professional competencies.
+
+Category C assistants are profiles that carry out administrative support functions. Category C assistants are responsible for document management, meeting organization, public service, and other support functions. Category C assistants generally require a bachelor's degree or equivalent and at least one year of professional experience. Category C assistants are recruited through EPSO open competitions that evaluate candidates' linguistic competencies and basic competencies.
+
+Administrative profiles also include specialized profiles, such as communication experts, IT experts, human resources experts, and experts in other functional areas. These profiles require specific knowledge and professional experience in the corresponding area. Specialized profiles are recruited through EPSO open or specific competitions that evaluate the specific competencies required for the position.
+
+### 4.2 Linguistic Profiles
+
+Linguistic profiles are specialized profiles that carry out translation and interpretation functions in the institutions of the European Union. Linguistic profiles are fundamental to the functioning of the institutions of the Union, as the institutions work in a multilingual environment and need to translate and interpret documents and communications in all official languages of the Union.
+
+Translators are profiles responsible for translating documents from one language to another. Translators work in the translation directorates of the institutions of the Union and are responsible for translating official documents, European legislation, reports, and other documents. Translators require full command of at least two official languages of the Union, as well as specialized knowledge in specific thematic areas. Translators are recruited through EPSO specific competitions that evaluate candidates' linguistic competencies and translation ability.
+
+Interpreters are profiles responsible for simultaneous and consecutive interpretation at meetings and conferences. Interpreters work in the interpretation directorates of the institutions of the Union and are responsible for facilitating communication between participants who speak different languages. Interpreters require full command of at least three official languages of the Union, as well as the ability to interpret simultaneously and consecutively. Interpreters are recruited through EPSO specific competitions that evaluate candidates' linguistic competencies and interpretation ability.
+
+Linguistic profiles also include proofreaders, terminologists, and other linguistics specialists. Proofreaders are responsible for reviewing and correcting translated documents, ensuring the quality and coherence of translations. Terminologists are responsible for managing terminological databases and compiling glossaries. These profiles require specialized linguistic knowledge and experience in the use of computer-assisted translation tools.
+
+### 4.3 Technical Profiles
+
+Technical profiles are specialized profiles that carry out technical functions in the institutions of the European Union. Technical profiles include IT experts, finance experts, legal experts, environmental experts, public health experts, and other specialists in technical areas. These profiles require advanced technical knowledge and professional experience in the corresponding area.
+
+IT experts are responsible for the development and maintenance of the IT systems of the institutions of the Union. IT experts work in the IT directorates of the institutions and are responsible for application development, database management, IT security, and other technical functions. IT experts require a university degree in IT or a related field, as well as experience in software development, network management, and IT security.
+
+Finance experts are responsible for the financial management of the institutions of the Union. Finance experts work in the finance directorates of the institutions and are responsible for budget preparation, accounting management, auditing, and other financial functions. Finance experts require a university degree in finance, economics, or a related field, as well as experience in financial management.
+
+Legal experts are responsible for the legal advisory functions of the institutions of the Union. Legal experts work in the legal services of the institutions and are responsible for the interpretation of European law, the drafting of legal opinions, and the representation of the institutions before the courts. Legal experts require a university degree in law and, preferably, a master's degree in European or international law.
+
+Environmental experts are responsible for the implementation of the Union's environmental policy. Environmental experts work in the environmental directorates of the institutions and are responsible for the development of environmental legislation, environmental impact assessment, and the management of environmental protection programs. Environmental experts require a university degree in environmental science, biology, chemistry, or a related field, as well as experience in environmental management.
+
+### 4.4 Research Profiles
+
+Research profiles are specialized profiles that carry out research functions in the institutions of the European Union. Research profiles include researchers, scientists, analysts, and other research specialists. These profiles work in the research centers of the institutions of the Union, such as the Joint Research Centre, and in other Union research bodies.
+
+Researchers at the Joint Research Centre are responsible for conducting scientific and technical research in areas of interest to the Union. The Joint Research Centre works in areas such as energy, the environment, security, public health, and technology. Researchers at the Joint Research Centre require an advanced university degree, preferably a doctoral degree, and experience in scientific research.
+
+Policy analysts are responsible for the analysis of public policies and the evaluation of the effectiveness of Union policies. Analysts work in various directorates-general of the European Commission and in other Union analysis bodies. Analysts require a university degree in political science, economics, law, or a related field, as well as experience in policy analysis.
+
+Research profiles also include evaluation experts, foresight experts, and research methodology experts. These profiles are responsible for the evaluation of programs and policies, the preparation of foresight studies, and the application of advanced research methodologies. Research profiles are fundamental to evidence-based decision-making in the institutions of the Union.
+
+## Chapter 5: Competency Assessment
+
+### 5.1 EPSO Competency Framework
+
+The EPSO competency framework is the reference framework that EPSO uses to evaluate candidates' competencies in its selection processes. The EPSO competency framework defines the competencies that are important for performing functions in the institutions of the Union, and establishes the criteria for evaluating candidates' competency levels. The EPSO competency framework is based on research on professional performance and on the experience of the institutions of the Union.
+
+The EPSO competency framework includes core competencies, leadership competencies, and specific competencies. Core competencies are competencies that are important for all positions in the institutions of the Union, regardless of the level or functional area. Leadership competencies are competencies that are important for positions of responsibility, such as team and project management positions. Specific competencies are competencies that are important for specific functional areas, such as translation, interpretation, or research.
+
+Core competencies include communication, teamwork, results orientation, adaptability, and integrity. Communication refers to the ability to express ideas clearly and effectively, both orally and in writing, and to listen actively to others. Teamwork refers to the ability to collaborate effectively with others, contribute to collective work, and support team members. Results orientation refers to the ability to work effectively to achieve established objectives, setting priorities and managing time efficiently.
+
+Adaptability refers to the ability to adjust behavior and work style to different situations and contexts, and to respond effectively to changes. Integrity refers to the ability to act ethically and responsibly, respecting the norms and values of the institutions of the Union. These core competencies are fundamental to performing functions in the institutions of the Union and are evaluated in all EPSO selection processes.
+
+### 5.2 Evaluation Methods
+
+The evaluation methods used by EPSO to assess candidates' competencies are diverse and are designed to provide a complete and balanced assessment of candidates' competencies. Evaluation methods include psychometric tests, specific tests, interviews, group exercises, and simulations.
+
+Psychometric tests are standardized assessments that measure candidates' cognitive competencies, such as verbal reasoning, numerical reasoning, and abstract reasoning. Psychometric tests are carried out online and are administered by EPSO in a centralized manner. Psychometric tests provide an objective measure of candidates' cognitive competencies and are a fundamental component of the selection process.
+
+Specific tests are assessments that measure the specific professional competencies required for the position. Specific tests vary depending on the type of position and the candidate's profile, and may include technical questionnaires, translation exercises, interpretation exercises, and case studies. Specific tests are generally carried out at EPSO examination centers or at the premises of the institutions of the Union.
+
+Interviews are assessments that allow evaluators to get to know candidates better and assess their personal competencies. Interviews can be individual or group, and can be structured, semi-structured, or unstructured. During interviews, evaluators ask candidates questions about their professional experience, motivations, personal qualities, and ability to perform the functions of the position.
+
+Group exercises are assessments that allow the evaluation of candidates' ability to work in a team, communicate effectively, and contribute to collective decision-making. During group exercises, candidates work together to solve a problem or complete a task, while evaluators observe their behavior and assess their competencies. Group exercises are especially important for evaluating leadership and teamwork competencies.
+
+Simulations are assessments that allow the evaluation of candidates' ability to perform the functions of the position in a realistic environment. Simulations may include correspondence handling, report writing, participation in meetings, and project management. Simulations are especially important for evaluating the specific competencies required for the position.
+
+### 5.3 Competency-Based Interviews
+
+Competency-based interviews are an evaluation method that uses structured questions to assess candidates' competencies in an objective and systematic manner. Competency-based interviews are based on the principle that the best predictor of future behavior is past behavior, so questions focus on concrete experiences that candidates have had in the past.
+
+Competency-based interviews use the STAR method (Situation, Task, Action, Result) to evaluate candidates' competencies. In this method, evaluators ask candidates questions about specific situations they have faced in the past, and ask them to describe the situation, the task they had to carry out, the actions they took, and the result they obtained. This method allows evaluators to objectively assess candidates' competencies, based on concrete evidence of their past behavior.
+
+Competency-based interviews evaluate a variety of competencies, including communication, teamwork, results orientation, adaptability, integrity, leadership ability, and problem-solving ability. Each competency is evaluated through a series of questions that are designed to obtain concrete evidence of the candidate's behavior in relation to that competency.
+
+Competency-based interviews are a fundamental component of the EPSO selection process, as they provide an assessment of candidates' personal competencies that complements the assessment of cognitive and professional competencies. Competency-based interviews are conducted by trained evaluators who have received training in the application of the STAR method and in competency assessment.
+
+### 5.4 Suitability Assessment
+
+The suitability assessment is a component of the EPSO selection process that aims to evaluate whether candidates are suitable for the position based on their personal qualities, experience, and motivation. The suitability assessment is carried out through interviews, professional references, and other evaluation methods that allow obtaining a complete picture of the candidate.
+
+The suitability interview is an individual interview that aims to evaluate the candidate's motivation, knowledge of the institutions of the Union, professional experience, and suitability for the position. The suitability interview is conducted by a panel of evaluators that includes representatives of the institution that is going to hire the candidate. The suitability interview is an important component of the selection process, as it allows the institution to evaluate whether the candidate is compatible with the organizational culture and with the needs of the institution.
+
+Professional references are another tool for suitability assessment. EPSO may request candidates to provide professional references, which are people who can testify to the candidate's personal qualities, competencies, and professional performance. Professional references provide additional information about the candidate's suitability for the position and complement the assessment carried out through tests and interviews.
+
+The suitability assessment also includes background verification, which consists of verifying the information provided by the candidate about their education, professional experience, and criminal record. Background verification is an important component of the selection process, as it ensures that candidates provide truthful and complete information about their profile. Background verification is carried out in accordance with European legislation on personal data protection.
+
+## Chapter 6: Career Destinations
+
+### 6.1 Main Institutions
+
+Career destinations for candidates selected by EPSO are the institutions of the European Union, which include the European Commission, the European Parliament, the Council of the European Union, the Court of Justice, the European Court of Auditors, the European Central Bank, and other Union bodies and agencies. Each institution offers different career opportunities and different working conditions.
+
+The European Commission is the institution that hires the most staff through EPSO, as it is the executive institution of the Union and has approximately 32,000 officials and agents. The Commission offers career opportunities in a wide range of functional areas, including public policy, law, finance, communications, IT, and administration. The Commission is headquartered in Brussels and Luxembourg, and has delegations around the world.
+
+The European Parliament is the institution that represents European citizens and has approximately 7,000 officials and agents. The Parliament offers career opportunities in areas such as political advisory, translation and interpretation, communications, administration, and research. The Parliament has premises in Brussels, Luxembourg, and Strasbourg.
+
+The Council of the European Union represents the governments of the member states and has approximately 3,000 officials and agents. The Council offers career opportunities in areas such as foreign policy, security, legislation, administration, and communications. The Council is headquartered in Brussels and Luxembourg.
+
+The Court of Justice of the European Union is the judicial body of the Union and has approximately 2,500 officials and agents. The Court offers career opportunities in areas such as legal advisory, translation and interpretation, administration, and research. The Court is headquartered in Luxembourg.
+
+### 6.2 Agencies and Decentralized Bodies
+
+In addition to the main institutions, candidates selected by EPSO can also work in the agencies and decentralized bodies of the European Union. Agencies and decentralized bodies are independent legal entities that carry out specific functions on behalf of the Union, such as the regulation of economic sectors, the management of financing programs, or the provision of technical services.
+
+Regulatory agencies include the European Food Safety Authority, the European Securities and Markets Authority, the European Medicines Agency, and the European Union Aviation Safety Agency. These agencies are responsible for the regulation of specific sectors and offer career opportunities for experts in technical and scientific areas.
+
+Executive agencies include the European Centre for Disease Prevention and Control, the European Environment Agency, Eurojust, and Europol. These agencies are responsible for the implementation of specific policies and offer career opportunities for experts in areas such as public health, the environment, judicial cooperation, and police cooperation.
+
+Research agencies include the Joint Research Centre and the European Institute of Innovation and Technology. These agencies are responsible for research and innovation, and offer career opportunities for researchers and scientists.
+
+Management agencies include the European Personnel Selection Office, the Publications Office of the European Union, the Translation Centre for the Bodies of the European Union, and the European Office of Change. These agencies are responsible for the management of internal Union services and offer career opportunities in administrative and technical areas.
+
+### 6.3 Delegations Abroad
+
+The European Union's delegations abroad are diplomatic representations of the Union to the governments of third countries and to international organizations. Delegations offer career opportunities for officials and agents who wish to work abroad and contribute to the Union's foreign policy. Delegations are present in more than 140 countries and in the main international organizations.
+
+The staff of the delegations includes officials of the European Commission, officials of the EEAS (European External Action Service), and local agents. Commission officials are responsible for the implementation of Union policies in the host country, while EEAS officials are responsible for the diplomatic representation of the Union. Local agents are citizens of the host country who work in the delegations in support positions.
+
+Delegations offer career opportunities in areas such as foreign policy, development cooperation, trade, communications, and administration. Working in delegations is particularly attractive for candidates who wish to work in an international environment and who are interested in foreign policy and international cooperation.
+
+The Union's delegations abroad benefit from cooperation with the embassies of the member states and with international organizations. This cooperation allows delegation officials to work in close collaboration with their national and international counterparts, and to contribute to the coordination of the Union's external action.
+
+### 6.4 Career Opportunities and Professional Development
+
+The institutions of the European Union offer wide career opportunities and professional development for their officials and agents. Career opportunities include internal promotion, internal mobility, training and professional development, and participation in exchange programs. These opportunities allow officials to develop their competencies, broaden their experience, and advance in their careers.
+
+Internal promotion is a mechanism that allows officials to advance in their careers within the institutions of the Union. Promotion is based on merit and performance, and is subject to the availability of higher-level positions. The institutions of the Union have performance evaluation systems that allow identifying officials with the greatest potential for promotion.
+
+Internal mobility is a mechanism that allows officials to move between different directorates-general, services, or institutions of the Union. Internal mobility allows officials to gain experience in different functional areas and in different work environments, which contributes to their professional development. Internal mobility is promoted by the institutions of the Union through rotation programs and internal calls.
+
+Training and professional development is a fundamental component of career opportunities in the institutions of the Union. The institutions offer a wide range of training opportunities, including initial training courses, leadership development programs, language training, technical training, and training in specific functional areas. Training is provided by the European School of Administration and by other training providers, and is available to all officials and agents of the institutions of the Union.
+
+Participation in exchange programs is another career and professional development opportunity. The institutions of the Union offer exchange programs that allow officials to work temporarily in other institutions, other services, or other bodies. Exchange programs allow officials to gain diversified experience and broaden their professional network.
+
+## Chapter 7: Specific Competitions
+
+### 7.1 Competitions for Translators and Interpreters
+
+Competitions for translators and interpreters are specific competitions that evaluate candidates' linguistic and translation competencies. These competitions are organized by EPSO in collaboration with the translation and interpretation directorates of the institutions of the Union, and aim to recruit qualified staff for the translation and interpretation of documents and communications in all official languages of the Union.
+
+Competitions for translators evaluate candidates' ability to translate documents from one language to another with accuracy, fluency, and coherence. Translation tests include general document translation, specialized document translation, and translation revision. Candidates must demonstrate full command of at least two official languages of the Union, as well as knowledge in specific thematic areas.
+
+Competitions for interpreters evaluate candidates' ability to interpret simultaneously and consecutively at meetings and conferences. Interpretation tests include simultaneous interpretation, consecutive interpretation, and liaison interpretation. Candidates must demonstrate full command of at least three official languages of the Union, as well as the ability to interpret quickly and accurately.
+
+Competitions for translators and interpreters are highly competitive, as the institutions of the Union need a large number of linguists to cover their multilingual communication needs. Candidates who pass the competitions will be included on a reserve list that will be used by the institutions to fill vacancies in the translation and interpretation directorates.
+
+### 7.2 Competitions for Temporary Agents
+
+Competitions for temporary agents are competitions that allow access to temporary positions in the institutions of the Union. Temporary agents are hired for a determined period to cover temporary staff needs, such as specific projects, absence coverage, or seasonal needs. Competitions for temporary agents are less competitive than competitions for permanent officials, but they also require the evaluation of candidates' competencies and knowledge.
+
+Competitions for temporary agents are organized for different profiles, such as temporary administrators, temporary assistants, temporary translators, and temporary experts. Access requirements for temporary agent competitions are similar to those for permanent official competitions, but may include additional requirements of professional experience or availability.
+
+Temporary agents have a different legal status from permanent officials. Temporary agents are hired for a determined period, generally one to five years, and may or may not be renewed at the end of the contract. Temporary agents enjoy the same rights as permanent officials during the duration of their contract, but do not have the right to permanence in the position once the contract has ended.
+
+Competitions for temporary agents are an important opportunity for candidates who wish to work in the institutions of the Union but who have not been able to access a permanent official position. Competitions for temporary agents allow candidates to gain experience in the institutions of the Union and demonstrate their competencies for future employment opportunities.
+
+### 7.3 Competitions for Local Agents
+
+Competitions for local agents are competitions that allow access to local positions in the Union's delegations abroad. Local agents are citizens of the host country who work in the delegations in administrative, technical, or professional support positions. Competitions for local agents are organized by EPSO in collaboration with the Union's delegations abroad.
+
+Access requirements for local agent competitions include nationality of the host country or a neighboring country, knowledge of local languages, and knowledge of at least one official language of the Union. Competitions for local agents evaluate candidates' linguistic competencies, administrative competencies, and professional competencies.
+
+Local agents carry out administrative, technical, or professional support functions in the Union's delegations. These functions include document management, public service, translation and interpretation, project management, and other support functions. Local agents are hired for a determined period and may or may not be renewed at the end of the contract.
+
+Competitions for local agents are an important opportunity for citizens of the countries where the Union's delegations are located, as they allow them to access positions in the delegations and contribute to the implementation of Union policies in their countries.
+
+### 7.4 Ad Hoc Recruitment Competitions
+
+Ad hoc recruitment competitions are competitions organized to cover specific staff needs that cannot be met through regular open competitions. These competitions are organized when the institutions of the Union need staff with specific competencies that are not available on the reserve lists of open competitions, or when staff needs are urgent and cannot wait for the next open competition.
+
+Ad hoc recruitment competitions are organized in a similar manner to open competitions, but with procedures adapted to the specific needs of the institution. Ad hoc recruitment competitions may include specific tests that evaluate the competencies required for the position, as well as additional interviews and assessments.
+
+Ad hoc recruitment competitions are important to ensure that the institutions of the Union can meet their staff needs quickly and effectively. These competitions allow institutions to recruit staff with specific competencies that may be necessary for urgent projects, to cover unforeseen absences, or to respond to emergency situations.
+
+Ad hoc recruitment competitions are organized by EPSO in collaboration with the institution that requests the staff. EPSO provides the infrastructure and the necessary procedures to organize the competition, while the institution defines the position requirements and evaluation criteria. Candidates selected through ad hoc recruitment competitions are hired as temporary agents for a determined period.
+
+## Chapter 8: The Future of EU Recruitment
+
+### 8.1 Digital Transformation
+
+Digital transformation is one of the main areas of innovation in the recruitment of staff for the institutions of the European Union. EPSO is working to digitalize its selection processes, incorporating new technologies that allow for a more effective and efficient evaluation of candidates. Digital transformation includes the digitalization of selection tests, the use of artificial intelligence for candidate evaluation, and the creation of digital platforms for the management of selection processes.
+
+The digitalization of selection tests allows candidates to participate in competitions online, from anywhere in the world. This facilitates access to selection processes for candidates who are in countries where there are no EPSO examination centers, and reduces the costs and logistical complexity of organizing tests. The digitalization of selection tests also allows for a faster and more efficient evaluation of results.
+
+The use of artificial intelligence for candidate evaluation is another area of innovation. AI can be used to automatically evaluate certain competencies, such as problem-solving ability, linguistic ability, and cognitive competencies. AI can also be used to identify patterns in test results and to predict candidates' future performance. However, the use of AI in candidate evaluation raises questions about transparency, impartiality, and personal data protection.
+
+The creation of digital platforms for the management of selection processes is another area of innovation. EPSO is working on the creation of digital platforms that allow candidates to register, submit their applications, track the status of their applications, and access test results online. These digital platforms improve the candidate experience and facilitate the management of selection processes by EPSO.
+
+### 8.2 Diversity and Inclusion
+
+Diversity and inclusion are strategic priorities for the recruitment of staff in the institutions of the European Union. EPSO is working to ensure that selection processes are accessible to all European citizens, regardless of their origin, sex, disability, or any other personal characteristic. Diversity and inclusion are fundamental to ensuring that the institutions of the Union have staff that reflects the diversity of European citizens.
+
+Measures to promote diversity and inclusion in selection processes include adapting tests for persons with disabilities, promoting gender equality in competitions, ensuring balanced representation of all member states, and promoting cultural and linguistic diversity. EPSO is also working to eliminate unconscious biases in selection processes, through the training of evaluators and the use of more objective evaluation methods.
+
+Adapting tests for persons with disabilities is an important measure to ensure the accessibility of selection processes. EPSO offers reasonable accommodations for candidates with disabilities, such as additional time for taking tests, materials in alternative formats, and technological assistance. These accommodations aim to ensure that candidates with disabilities can participate in competitions on an equal footing.
+
+Promoting gender equality in competitions is another priority for EPSO. EPSO is working to ensure that women are represented in a balanced manner in competition results, and to eliminate barriers that prevent women's access to certain professional profiles. EPSO is also working to promote female leadership in the institutions of the Union, through professional development programs and mentoring.
+
+### 8.3 International Recruitment
+
+International recruitment is an area of growing importance for the institutions of the European Union. The institutions need to attract talent from around the world to fill positions that require specific competencies that are not available in the member states. International recruitment includes attracting candidates from third countries, cooperating with universities and international research centers, and promoting career opportunities in the institutions of the Union on a global level.
+
+Attracting candidates from third countries is an important aspect of international recruitment. The institutions of the Union need staff with linguistic and cultural competencies that allow them to work effectively with international partners. The recruitment of candidates from third countries is carried out through specific competitions that evaluate candidates' linguistic, cultural, and professional competencies.
+
+Cooperation with universities and international research centers is another area of international recruitment. EPSO works with universities and research centers around the world to promote career opportunities in the institutions of the Union and to attract the best talent. This cooperation includes participation in job fairs, the organization of recruitment events, and the creation of internship programs for international students.
+
+Promoting career opportunities in the institutions of the Union on a global level is another priority of international recruitment. EPSO uses different communication channels, such as the website, social media, and recruitment events, to promote career opportunities in the institutions of the Union on a global level. The promotion of international recruitment aims to attract the best talent from around the world and to ensure that the institutions of the Union have diverse and qualified staff.
+
+### 8.4 Talent Challenge
+
+The talent challenge is one of the main challenges facing the institutions of the European Union in terms of recruitment. The institutions need to attract and retain the best talent in an increasingly competitive labor market, where private companies and other employers offer attractive conditions for qualified professionals. EPSO is working to improve the value proposition of the institutions of the Union as an employer and to ensure that institutions can compete effectively for talent.
+
+Improving the value proposition of the institutions as an employer includes offering competitive working conditions, such as attractive salaries, social benefits, work-life balance, and career opportunities. The institutions of the Union offer a stimulating and diverse work environment, with opportunities to work in different functional areas and in different countries. The institutions also offer training and professional development opportunities that allow officials to develop their competencies and advance in their careers.
+
+Retaining talent is another important challenge. The institutions of the Union need to retain the best officials, offering them career opportunities, recognizing their performance, and providing them with a satisfying work environment. Retaining talent is particularly important in specialized areas, such as IT, finance, and research, where competition for talent is intense.
+
+Modernizing recruitment processes is another area for improvement. EPSO is working to make its selection processes more effective, efficient, and accessible, which will allow institutions to attract a greater number of qualified candidates and select the best candidates for their positions. Modernizing recruitment processes includes digitalization, the use of artificial intelligence, and improving the candidate experience.
+
+---
+
+*This book provides a comprehensive overview of the EPSO Selection System, covering what EPSO is, open competitions, the selection process, profiles sought, competency assessment, career destinations, specific competitions, and future perspectives of recruitment in the European Union. EPSO is a fundamental body for ensuring that the institutions of the Union have the best possible staff and for promoting equal opportunities in access to European employment.*
+
+## Chapter 9: Professional Profiles in the European Union
+
+### 9.1 Administrator Profiles
+
+Administrators are professionals who carry out analysis, planning, management, and decision-making functions in the institutions of the European Union. Administrators work in areas such as foreign policy, economics, law, the environment, energy, communications, education, and culture. Administrators are responsible for developing policy proposals, managing projects, coordinating work teams, and representing the institutions before other bodies and international partners.
+
+Access requirements for administrator profiles include a master's-level university degree in a relevant field, at least three years of professional experience in a relevant field, knowledge of at least two official languages of the European Union, and competencies in analysis, communication, leadership, and project management. Competitions for administrator profiles are highly competitive, with thousands of candidates competing for a limited number of positions.
+
+Administrators can work in different institutions of the European Union, such as the European Commission, the Council of the European Union, the European Parliament, the Court of Justice, the Court of Auditors, the European Economic and Social Committee, the Committee of the Regions, and the European External Action Service. Administrators can also work in decentralized agencies of the Union, such as Europol, Eurojust, Frontex, and the European Central Bank.
+
+### 9.2 Expert Profiles
+
+Experts are professionals with specialized knowledge who carry out technical analysis, advisory, research, and policy development functions in the institutions of the European Union. Experts work in highly specialized areas such as engineering, IT, science, public health, energy, finance, defense, and security. Experts are responsible for providing technical advice, developing studies and analyses, managing technical projects, and coordinating research activities.
+
+Access requirements for expert profiles include a master's or doctoral-level university degree in a highly specialized field, significant professional experience in a specialized field, knowledge of at least two official languages of the European Union, and technical competencies specific to the area of specialization. Competitions for expert profiles are highly specialized and require the demonstration of advanced technical competencies.
+
+Experts can work in different areas of the institutions of the European Union, such as the DG for Research and Innovation, the DG for Energy, the DG for Environment, the DG for Health and Food Safety, the DG for Defence Industry and Space, and in specialized agencies such as the European Medicines Agency, the European Food Safety Authority, and the European Environment Agency.
+
+### 9.3 Assistant Profiles
+
+Assistants are professionals who carry out administrative, technical, and organizational support functions in the institutions of the European Union. Assistants work in areas such as document management, public service, event organization, support project management, and other administrative functions. Assistants are responsible for ensuring the effective functioning of the offices and departments in which they work.
+
+Access requirements for assistant profiles include a bachelor's or master's-level university degree in a relevant field, at least two years of professional experience in an administrative or support area, knowledge of at least two official languages of the European Union, and administrative, organizational, and communication competencies. Competitions for assistant profiles are less competitive than competitions for administrators, but are still quite selective.
+
+Assistants can work in different institutions of the European Union, such as the European Commission, the Council of the European Union, the European Parliament, the Court of Justice, the Court of Auditors, and other institutions. Assistants can also work in the Union's delegations abroad, in research centers, and in decentralized agencies.
+
+### 9.4 Linguistic Profiles
+
+Linguistic profiles are professionals specialized in translation, interpretation, and the management of language policy in the institutions of the European Union. Translators are responsible for translating official documents from one official language to another, ensuring the quality and accuracy of translations. Interpreters are responsible for interpreting at official meetings, conferences, and negotiations, facilitating communication between representatives of the member states.
+
+Access requirements for linguistic profiles include a university degree in translation and interpretation or in linguistics, professional experience in translation or interpretation, knowledge of at least three official languages of the European Union, and advanced linguistic competencies. Competitions for linguistic profiles are highly specialized and require the demonstration of exceptional linguistic competencies.
+
+Translators and interpreters work in the European Parliament, the European Commission, the Council of the European Union, the Court of Justice, and other institutions of the Union. The Translation Service of the European Parliament and the Interpretation Service of the European Parliament are two of the largest language services in the world, with thousands of translators and interpreters working in all official languages of the European Union.
+
+---
+
+## Chapter 10: The Evaluation Process in Detail
+
+### 10.1 Knowledge Tests
+
+Knowledge tests are a fundamental component of the EPSO selection process, and aim to evaluate candidates' specific knowledge in areas relevant to the position. Knowledge tests may include multiple-choice questions, practical exercises, case studies, and situation analysis. Knowledge tests are designed by subject matter experts and are validated to ensure their reliability and validity.
+
+The content of knowledge tests varies depending on the professional profile and the position being applied for. For administrator profiles, tests may include knowledge of European Union law, Union policies, economics, project management, and policy analysis. For expert profiles, tests may include specialized technical knowledge in the area of specialization. For assistant profiles, tests may include administrative knowledge, document management, and communication.
+
+Knowledge tests are carried out online or at examination centers, depending on the type of competition and the candidates' location. Online tests allow candidates to participate from anywhere in the world, while tests at examination centers ensure the security and reliability of the tests. EPSO uses automated evaluation systems to grade knowledge tests, allowing for a rapid and efficient correction of results.
+
+### 10.2 Competency Tests
+
+Competency tests are a fundamental component of the EPSO selection process, and aim to evaluate candidates' transversal competencies, such as analytical and problem-solving ability, communication competencies, interpersonal competencies, organizational competencies, and leadership competencies. Competency tests are based on the European Union Competency Framework, which defines the competencies required for different professional profiles.
+
+Competency tests may include simulation exercises, group exercises, leadership exercises, decision-making exercises, and conflict management exercises. These tests are designed to evaluate candidates' ability to apply their competencies in real work situations. Competency tests are evaluated by trained evaluators who use standardized evaluation criteria to ensure the objectivity and reliability of the evaluation.
+
+Competency tests are carried out at several stages of the selection process, including written tests, oral tests, and interviews. Written tests allow the evaluation of candidates' competencies in a controlled environment, while oral tests and interviews allow the evaluation of candidates' communication and interpersonal competencies. The combination of different types of tests allows for a comprehensive evaluation of candidates' competencies.
+
+### 10.3 Language Tests
+
+Language tests are a fundamental component of the EPSO selection process, as knowledge of at least two official languages of the European Union is a mandatory access requirement for most competitions. Language tests evaluate candidates' ability to communicate effectively in the required languages, both orally and in writing. Language tests are based on the Common European Framework of Reference for Languages (CEFR), which establishes linguistic competency levels from basic (A1) to advanced (C2).
+
+Language tests may include reading comprehension exercises, listening comprehension exercises, written expression exercises, and oral expression exercises. Language tests are designed to evaluate candidates' ability to communicate effectively in different professional contexts, including work meetings, presentations, negotiations, and written communication.
+
+Language tests are carried out online or at examination centers, depending on the type of competition. Online tests allow candidates to take the tests from anywhere in the world, while tests at examination centers ensure the security and reliability of the tests. EPSO uses automated evaluation systems to grade language tests, allowing for a rapid and efficient correction of results.
+
+### 10.4 Interviews and Group Exercises
+
+Interviews and group exercises are fundamental components of the EPSO selection process, and aim to evaluate candidates' communication, interpersonal, and leadership competencies. Interviews are structured interviews conducted with a panel of evaluators, and aim to evaluate candidates' competencies in an interactive format. Group exercises are exercises in which candidates work together to solve a problem or complete a task, and aim to evaluate teamwork competencies, communication competencies, and leadership competencies.
+
+Interviews are designed to evaluate candidates' competencies in a format that simulates a real work situation. The evaluation panels include representatives of the institution that convenes the competition and representatives of EPSO. Interviews are based on the European Union Competency Framework, and the panelists use structured interview techniques to evaluate candidates' competencies in an objective and reliable manner.
+
+Group exercises are designed to evaluate candidates' ability to work in a team, communicate their ideas, listen to others, negotiate, and reach agreements. Group exercises may include case studies, debates, simulations, and problem-solving. Evaluators observe candidates' behavior during group exercises and evaluate their competencies based on standardized evaluation criteria.
+
+---
+
+## Chapter 11: The Career System in the European Institutions
+
+### 11.1 Career Structure
+
+The career system in the institutions of the European Union is structured based on the European civil service, which is the set of rules and procedures that regulate public employment in the institutions of the Union. The European civil service is based on principles such as equal treatment, non-discrimination, transparency, merit, and professionalism. The career system is structured in several professional scales, each of which corresponds to a different level of responsibility and competencies.
+
+The administrative scale is the highest scale of the European civil service, and corresponds to officials who carry out analysis, planning, management, and decision-making functions. The administrative scale is divided into three groups: group A (senior officials), group B (mid-level officials), and group C (basic-level officials). Each group is divided into several levels, which correspond to different levels of responsibility and remuneration.
+
+The service scale is the scale that corresponds to officials who carry out administrative, technical, and organizational support functions. The service scale is divided into two groups: group D (service officials) and group E (basic service officials). Officials in the service scale carry out document management, public service, event organization, and other support functions.
+
+### 11.2 Promotion and Mobility
+
+Promotion and mobility are important components of the career system in the institutions of the European Union. Promotion is based on merit, and officials are promoted based on their performance, their competencies, and the needs of the service. Promotion can be internal, when an official is promoted within their own institution, or external, when an official is promoted to a position in another institution.
+
+Mobility is a fundamental principle of the European civil service, and aims to ensure that officials have the opportunity to work in different institutions, in different functional areas, and in different countries. Mobility allows officials to broaden their professional horizons, develop new competencies, and gain experience in different areas of work. Mobility also contributes to institutional cohesion and the creation of a common culture among the institutions of the Union.
+
+The internal call system is the mechanism that allows officials to apply for vacant positions in other institutions of the European Union. Internal calls are regularly published on the European Union employment portal, and allow officials to seek career opportunities in different institutions. The interinstitutional transfer system is another mobility mechanism that allows officials to temporarily move to another institution for a determined period.
+
+### 11.3 Training and Professional Development
+
+Training and professional development are important components of the career system in the institutions of the European Union. The institutions offer a wide range of training and professional development opportunities to their officials, including training in technical competencies, training in transversal competencies, language training, leadership programs, and career development programs.
+
+Training in technical competencies aims to improve officials' knowledge and technical skills in specific areas, such as European Union law, economics, foreign policy, IT, and project management. Training in transversal competencies aims to improve officials' communication, interpersonal, organizational, and leadership competencies. Language training aims to improve officials' linguistic competencies in the official languages of the European Union.
+
+Leadership programs aim to develop the leadership capabilities of officials who hold or aspire to hold positions of responsibility. These programs include leadership training, mentoring, coaching, and job rotation. Career development programs aim to help officials plan and manage their careers, providing them with guidance, resources, and development opportunities.
+
+---
+
+## Chapter 12: Diversity and Gender in the European Institutions
+
+### 12.1 Gender Equality
+
+Gender equality is a strategic priority for the institutions of the European Union, and the institutions have adopted a series of measures to promote gender equality in access to employment, in working conditions, and in career development. The principle of gender equality is enshrined in Article 2 of the Treaty on European Union, which establishes that the Union is based on the values of respect for human dignity, freedom, democracy, equality, the rule of law, and respect for human rights.
+
+Measures to promote gender equality in the institutions of the Union include the adoption of gender equality plans, the promotion of balanced representation of women and men in positions of responsibility, the adoption of work-life balance measures, and the fight against discrimination on the basis of gender. The institutions of the Union have also adopted measures to promote salary transparency and to eliminate the gender pay gap.
+
+The European Commission's Gender Equality Plan establishes a series of objectives and measures to promote gender equality in the institution, including the goal of achieving balanced representation of women and men at all levels of the hierarchy, the adoption of work-life balance measures, and the promotion of a culture of gender equality in the organization. The Gender Equality Plan is supervised by a Gender Equality Committee, which includes representatives of management and trade unions.
+
+### 12.2 Disability and Inclusion
+
+The inclusion of persons with disabilities is a strategic priority for the institutions of the European Union, which have adopted a series of measures to ensure that selection processes and working conditions are accessible to persons with disabilities. Article 21 of the Charter of Fundamental Rights of the European Union prohibits discrimination on the basis of disability, and the institutions of the Union have the obligation to ensure equal treatment of persons with disabilities.
+
+Measures to promote the inclusion of persons with disabilities in the institutions of the Union include adapting selection tests for persons with disabilities, adapting workplaces, providing assistive technologies, training staff on disability and inclusion, and adopting recruitment policies that promote the inclusion of persons with disabilities. The institutions of the Union have also adopted measures to improve the accessibility of their buildings, information systems, and documents.
+
+The European Personnel Selection Office (EPSO) has adopted specific measures to ensure the accessibility of selection processes for persons with disabilities. These measures include providing reasonable accommodations during tests, such as additional time, materials in alternative formats, and technological assistance. EPSO has also adopted measures to ensure that digital selection platforms are accessible to persons with visual, hearing, or motor disabilities.
+
+### 12.3 Balanced Geographical Representation
+
+Balanced geographical representation is a fundamental principle of the European civil service, and aims to ensure that citizens of all member states have equal opportunities in access to employment in the institutions of the European Union. The principle of balanced geographical representation is enshrined in the Staff Regulations of the European Union, which establishes that the composition of the staff of the institutions must reflect in a balanced manner the geographical diversity of European citizens.
+
+The national quota system is the mechanism that guarantees balanced geographical representation in access to employment. Each member state has a maximum number of positions allocated based on its population, and competitions are organized in such a way as to ensure the representation of all member states. The national quota system aims to prevent certain member states from being over-represented or under-represented in the institutions of the Union.
+
+The national quota system has generated debate about its compatibility with the principles of merit and equal opportunities. Some argue that the quota system guarantees geographical diversity, but that it may limit the competitiveness of competitions and the selection of the best candidates. Others argue that the quota system is necessary to ensure the representation of all member states and to prevent the domination of certain states in the institutions of the Union. This debate is fundamental to the future of EPSO's recruitment system.
+
+---
+
+## Chapter 13: Online Tests and Digital Assessment
+
+### 13.1 Online Examination Platforms
+
+Online examination platforms are digital tools that allow candidates to take EPSO selection tests from anywhere in the world. Online examination platforms offer a series of advantages, including reducing logistical costs, improving accessibility, faster evaluation of results, and more efficient management of selection processes. Online examination platforms are designed to ensure the security, reliability, and validity of tests.
+
+Online examination platforms include functionalities such as candidate identification, remote supervision, screen and audio recording, irregularity detection, and automated response evaluation. Candidate identification is carried out through techniques such as facial recognition, video identity verification, and document verification. Remote supervision is carried out through webcams, microphones, and supervision software that detects irregularities.
+
+Online examination platforms raise questions about personal data protection, assessment transparency, and accessibility for persons with disabilities. EPSO has adopted measures to ensure that online examination platforms comply with the General Data Protection Regulation (GDPR), that they include mechanisms for transparency and explainability of automated assessment, and that they are accessible to persons with disabilities.
+
+### 13.2 Artificial Intelligence in Assessment
+
+Artificial intelligence (AI) is a technology that is being incorporated into EPSO's selection processes to improve the effectiveness and efficiency of candidate assessment. AI can be used to automatically evaluate certain competencies, such as problem-solving ability, linguistic ability, and cognitive competencies. AI can also be used to identify patterns in test results and to predict candidates' future performance.
+
+AI can be used at different stages of the selection process, including candidate pre-selection, written test evaluation, communication competency assessment, and predictive analytics. AI-based candidate pre-selection can help identify the most qualified candidates from large volumes of applications. AI-based written test evaluation can help automatically grade multiple-choice and short-answer responses. AI-based communication competency assessment can help analyze the quality of candidates' oral presentations. AI-based predictive analytics can help predict candidates' future performance based on their test results and personal characteristics.
+
+The use of AI in candidate evaluation raises questions about transparency, impartiality, and personal data protection. Transparency is fundamental to ensuring that candidates understand how their competencies are evaluated and how personal data is used. Impartiality is fundamental to ensuring that assessment is not biased by factors such as sex, race, disability, or any other personal characteristic. Personal data protection is fundamental to ensuring that candidate data is used in a secure manner and in compliance with the GDPR.
+
+### 13.3 Gamification in Selection Processes
+
+Gamification is a technique that consists of applying game elements in non-game contexts, such as personnel selection processes. Gamification can be used in EPSO's selection processes to improve the candidate experience, increase motivation, evaluate competencies in a more natural way, and reduce the stress of traditional tests. Gamification may include elements such as points, badges, levels, challenges, simulations, and role-playing games.
+
+Gamification can be used at different stages of the selection process, including candidate attraction, pre-selection, competency assessment, and feedback. Gamification-based candidate attraction may include online games that allow candidates to discover career opportunities in the institutions of the Union. Gamification-based pre-selection may include games that evaluate basic competencies such as problem-solving, linguistic ability, and cognitive competencies. Gamification-based competency assessment may include simulations and role-playing games that evaluate advanced competencies such as leadership, decision-making, and conflict management.
+
+Gamification raises questions about the validity and reliability of assessment, accessibility for persons with disabilities, and personal data protection. Validity is fundamental to ensuring that gamification evaluates competencies that are truly relevant to the position. Reliability is fundamental to ensuring that gamification produces consistent and replicable results. Accessibility is fundamental to ensuring that all candidates can participate in gamification processes, regardless of their abilities or their experience with games.
+
+---
+
+## Chapter 14: The Impact of European Policy on Employment
+
+### 14.1 The European Green Deal and Green Employment
+
+The European Green Deal is an ambitious strategy of the European Union to achieve climate neutrality by 2050 and to transform the European economy into a sustainable and environmentally friendly economy. The European Green Deal has a significant impact on employment in the institutions of the European Union, as it generates new staff needs with competencies in areas such as environmental sustainability, renewable energy, the circular economy, biodiversity, and the fight against climate change.
+
+The institutions of the European Union need staff with competencies in environmental analysis, sustainability project management, climate policies, environmental regulation, and sustainability communications. The demand for professionals with competencies in environmental sustainability is growing in the institutions of the Union, and EPSO is adapting its competitions to reflect this demand. Competitions for environmental analyst profiles, climate policy specialists, and sustainability project managers are becoming increasingly frequent.
+
+The European Green Deal also has an impact on the competencies required for existing officials, who need to acquire new competencies in environmental sustainability to adapt to changes in their work areas. The institutions of the Union are offering training in environmental sustainability to their officials, to ensure that they have the necessary competencies to implement the European Green Deal. Training in environmental sustainability includes courses on climate change, renewable energy, the circular economy, biodiversity, and environmental regulation.
+
+### 14.2 Digital Transformation and Digital Employment
+
+Digital transformation is a process that is profoundly transforming the institutions of the European Union and has a significant impact on employment in the institutions. Digital transformation generates new staff needs with competencies in areas such as IT, cybersecurity, artificial intelligence, big data, automation, and data analytics. The institutions of the Union need staff with advanced digital competencies to implement digital transformation and to ensure that information systems are secure, efficient, and accessible.
+
+The demand for professionals with digital competencies is growing in the institutions of the Union, and EPSO is adapting its competitions to reflect this demand. Competitions for cybersecurity specialist profiles, data analysts, software developers, artificial intelligence specialists, and digital project managers are becoming increasingly frequent. The institutions of the Union are also offering training in digital competencies to their officials, to ensure that they have the necessary competencies to adapt to digital transformation.
+
+Digital transformation also has an impact on the transversal competencies required for officials, who need to acquire competencies such as critical thinking, problem-solving, creativity, and digital communication. Transversal competencies are increasingly important in a rapidly evolving digital environment, and the institutions of the Union are adapting their training programs to include these competencies.
+
+### 14.3 Foreign Policy and Employment in the European External Action Service
+
+The foreign policy of the European Union has a significant impact on employment in the European External Action Service (EEAS), which is the diplomatic service of the European Union. The EEAS needs staff with competencies in foreign policy, international relations, diplomacy, security, international trade, and development. The demand for professionals with competencies in foreign policy is growing in the EEAS, due to the increasing complexity of the international environment and the expansion of the Union's responsibilities in terms of foreign policy.
+
+Competitions for diplomatic profiles are highly competitive and require the demonstration of advanced linguistic, cultural, and diplomatic competencies. EEAS diplomats work in the Union's delegations around the world, and are responsible for representing the Union before the governments of third countries, negotiating international agreements, managing political and economic relations, and protecting the Union's interests abroad.
+
+The EEAS also needs staff with competencies in security, intelligence, and defense, to support the Union's security and defense policy. Security professionals work in areas such as conflict prevention, crisis management, the fight against terrorism, and security cooperation. The demand for professionals with competencies in security is growing in the EEAS, due to the growing terrorist threat and the need to strengthen the Union's capacity to respond to security threats.
+
+---
+
+## Chapter 15: Ethics and Integrity in the European Civil Service
+
+### 15.1 Code of Conduct
+
+The Code of Conduct for officials of the European Union is the instrument that establishes the ethical behavior and integrity standards that officials must comply with in the exercise of their functions. The Code of Conduct establishes principles such as impartiality, integrity, discretion, hierarchical obedience, loyalty to the institutions, and respect for fundamental rights. The Code of Conduct applies to all officials of the institutions of the Union, including officials of the European Commission, the Council, the Parliament, the Court of Justice, and the Court of Auditors.
+
+The Code of Conduct establishes specific rules on issues such as conflicts of interest, private activities, gifts, donations, incompatibilities, financial obligations, and the protection of confidential information. Officials have the obligation to declare their financial interests, to avoid conflicts of interest, and to not accept gifts or benefits that could compromise their impartiality. Officials also have the obligation to protect confidential information and to not disclose information that could compromise the interests of the institutions.
+
+The Code of Conduct is supervised by the European Ethics Body (EEB), which is an independent body responsible for supervising the application of the Code of Conduct in the institutions of the Union. The EEB has the authority to investigate violations of the Code of Conduct, to issue opinions on ethical issues, and to propose corrective measures. The EEB also has the authority to supervise the financial interest declarations of officials and to ensure that rules on conflicts of interest are complied with.
+
+### 15.2 Fight Against Corruption
+
+The fight against corruption is a priority for the institutions of the European Union, which have adopted a series of measures to prevent, detect, and sanction corruption in the institutions. Corruption is a phenomenon that undermines citizens' trust in the institutions and affects the effectiveness of Union policies. The institutions of the Union have adopted measures such as the creation of anti-corruption bodies, the adoption of transparency rules, the promotion of a culture of integrity, and cooperation with national anti-corruption authorities.
+
+The European Anti-Fraud Office (OLAF) is the body responsible for investigating fraud, corruption, and other illegal activities that affect the financial interests of the Union. OLAF has the authority to investigate cases of corruption in the institutions of the Union, to propose disciplinary measures, and to refer cases to national judicial authorities. OLAF also has the authority to coordinate the fight against fraud and corruption at the European level.
+
+The European Public Prosecutor's Office (EPPO) is an independent body responsible for investigating and prosecuting crimes that affect the financial interests of the Union, including fraud, corruption, money laundering, and tax evasion. The EPPO has the authority to investigate cases of corruption in the institutions of the Union and to propose judicial measures. The EPPO is a new body that was established in 2021, and has the mission of ensuring that crimes against the financial interests of the Union are investigated and prosecuted in an effective manner.
+
+### 15.3 Transparency and Access to Information
+
+Transparency and access to information are fundamental principles of the functioning of the institutions of the European Union, and are essential to ensuring citizens' trust in the institutions. Article 15 of the Treaty on the Functioning of the European Union establishes that the institutions, bodies, and agencies of the Union ensure the transparency of their activities, and that every citizen of the Union and every natural or legal person residing or having their registered office in a member state has the right to access the documents of the institutions.
+
+Regulation 1049/2001 establishes the rules for access to documents of the European Parliament, the Council, and the European Commission. This Regulation ensures that the documents of the institutions are accessible to the public, subject to limited exceptions for the protection of commercial interests, privacy, security, and the effectiveness of the institutions' activities. The institutions of the Union must publish documents proactively, including meeting minutes, annual reports, legislative proposals, and other documents of public interest.
+
+Transparency and access to information are fundamental to the functioning of European democracy, as they allow citizens to control the activities of the institutions, participate in decision-making, and exercise their democratic rights. The institutions of the Union must ensure that transparency is a guiding principle of all their activities, and that citizens have access to the information necessary to participate in an informed manner in the democratic life of the Union.
+
+---
+
+## Chapter 16: International Mobility and Global Recruitment
+
+### 16.1 International Competitions
+
+International competitions are competitions organized to attract talent from around the world to fill positions in the institutions of the European Union. International competitions differ from regular open competitions in that they allow the participation of candidates from third countries who are not citizens of the European Union. International competitions are organized to cover specific staff needs that require linguistic, cultural, or professional competencies that are not available in the member states.
+
+Access requirements for international competitions include a master's or doctoral-level university degree in a relevant field, significant professional experience in a relevant field, knowledge of at least two languages, including an official language of the European Union, and specific competencies in the area of specialization. International competitions are highly competitive, as they attract candidates from around the world who are seeking career opportunities in the institutions of the Union.
+
+International competitions are organized by EPSO in collaboration with the institutions that request the staff. EPSO provides the infrastructure and the necessary procedures to organize the competition, while the institutions define the position requirements and evaluation criteria. Candidates selected through international competitions are hired as temporary agents or as officials, depending on the nature of the position and the duration of the contract.
+
+### 16.2 Exchange and Rotation Programs
+
+Exchange and rotation programs are mechanisms that allow officials of the institutions of the European Union to work temporarily in other institutions, in other countries, or in other sectors. Exchange programs aim to improve officials' competencies, broaden their professional horizons, and promote inter-institutional cooperation. Rotation programs allow officials to gain experience in different work areas and in different institutional contexts.
+
+Exchange programs can be internal, when officials temporarily move to another institution of the Union, or external, when officials temporarily move to an international organization, a national government, or the private sector. Rotation programs allow officials to work temporarily in different departments or units of their own institution, with the aim of broadening their knowledge and developing new competencies.
+
+Exchange and rotation programs are important for officials' professional development, as they allow them to gain experience in different contexts, develop new competencies, and broaden their professional network. Exchange and rotation programs are also important for the institutions, as they allow the transfer of knowledge, the improvement of inter-institutional cooperation, and the creation of a common culture among the institutions of the Union.
+
+---
+
+## Chapter 17: Performance Assessment and Results-Based Management
+
+### 17.1 Performance Assessment System
+
+The performance assessment system is the mechanism that allows the institutions of the European Union to evaluate the performance of their officials and to use the results of the assessment for decision-making on promotion, training, remuneration, and dismissal. The performance assessment system is based on principles such as objectivity, transparency, equity, and development orientation. The performance assessment system aims to improve the effectiveness of the institutions, motivate officials, and ensure that organizational objectives are achieved.
+
+The performance assessment system includes the definition of objectives, periodic assessment, feedback, and development planning. The definition of objectives is carried out at the beginning of each assessment period, and consists of establishing clear and measurable objectives for the official. The periodic assessment is carried out at the end of each assessment period, and consists of evaluating the degree to which the official has achieved the established objectives. Feedback is provided to the official during and after the assessment, and aims to identify strengths and areas for improvement. Development planning consists of establishing a training and development plan for the official, based on the results of the assessment.
+
+The performance assessment system is supervised by the human resources services of the institutions, which ensure that the assessment is carried out in an objective, transparent, and equitable manner. Evaluators receive training on assessment techniques to ensure that the assessment is reliable and valid. The results of the assessment are used for decision-making on promotion, training, remuneration, and other aspects of the official's career.
+
+### 17.2 Results-Based Management
+
+Results-based management is a management approach that consists of establishing clear and measurable objectives, measuring the achievement of objectives, and using the results to improve the effectiveness of activities. Results-based management is a fundamental principle of good governance in the institutions of the European Union, and aims to ensure that resources are used in an efficient and effective manner to achieve established objectives. Results-based management is applied at all levels of the organization, from institutional strategy to daily operational activities.
+
+Results-based management includes strategic planning, the definition of performance indicators, performance measurement, results analysis, and continuous improvement. Strategic planning consists of establishing the institution's strategic objectives and defining the activities necessary to achieve the objectives. The definition of performance indicators consists of establishing metrics that allow measuring the achievement of objectives. Performance measurement consists of collecting and analyzing data on the achievement of indicators. Results analysis consists of evaluating results and identifying areas for improvement. Continuous improvement consists of implementing corrective measures to improve the effectiveness of activities.
+
+Results-based management is fundamental to ensuring the accountability of the institutions of the Union to citizens. Citizens have the right to know how public resources are used and what the impact of the institutions' activities is. Results-based management allows institutions to provide clear and transparent information about their results, which contributes to citizens' trust in the institutions.
+
+---
+
+## Chapter 18: The Future of European Public Employment
+
+### 18.1 Future Trends
+
+The future of European public employment is marked by a series of trends that are transforming the way the institutions of the European Union recruit, manage, and develop their staff. These trends include digital transformation, automation, globalization, population aging, climate change, and the evolution of required competencies. The institutions of the Union need to adapt to these trends to ensure that they have the appropriate staff to face the challenges of the future.
+
+Digital transformation will be increasingly integrated into all aspects of public employment, from recruitment to performance management, passing through training and communication. The automation of repetitive tasks will allow officials to focus on tasks with greater added value, such as analysis, planning, and decision-making. The globalization of the economy and politics will require officials with advanced intercultural and linguistic competencies, who can work effectively in a multicultural and multilingual environment.
+
+The aging of the European population will have an impact on public employment, as a significant number of officials will retire in the coming years, which will generate recruitment needs to fill their positions. Climate change will require officials with competencies in environmental sustainability, climate policies, and natural resource management. The evolution of required competencies will include new digital competencies, analytical competencies, leadership competencies, and adaptability competencies.
+
+### 18.2 Recommendations for the Future
+
+Recommendations for the future of European public employment include investment in technology, the promotion of diversity and inclusion, the improvement of selection processes, investment in training and development, the promotion of mobility and inter-institutional cooperation, and the promotion of a culture of integrity and ethics. Investment in technology will allow institutions to use new tools to improve the effectiveness and efficiency of their staff management processes. The promotion of diversity and inclusion will ensure that institutions have staff that reflects the diversity of European citizens.
+
+The improvement of selection processes will allow institutions to attract and select the best candidates in a more effective and efficient manner. Investment in training and development will ensure that officials have the necessary competencies to face the challenges of the future. The promotion of mobility and inter-institutional cooperation will allow officials to broaden their professional horizons and develop new competencies. The promotion of a culture of integrity and ethics will ensure that institutions operate in a transparent and responsible manner.
+
+The institutions of the European Union have the responsibility of ensuring that their staff is prepared to face the challenges of the future and that staff management processes are effective, efficient, and respectful of fundamental rights. The future of European public employment will depend on the ability of institutions to adapt to changes in the environment and to invest in their human capital.
+
+---
+
+*This book provides a comprehensive overview of the EPSO Selection System, covering what EPSO is, open competitions, the selection process, profiles sought, competency assessment, career destinations, specific competitions, professional profiles, the evaluation process, the career system, diversity and gender, online tests, artificial intelligence, European policy and employment, ethics and integrity, international mobility, performance assessment, and future perspectives of recruitment in the European Union. EPSO is a fundamental body for ensuring that the institutions of the Union have the best possible staff and for promoting equal opportunities in access to European employment.*
+
+
+## Chapter 19: Preparing for EPSO Competitions
+
+### 19.1 Study and Preparation Strategies
+
+Preparing for EPSO competitions requires a systematic and disciplined approach that allows candidates to develop the competencies necessary to pass the various phases of the selection process. Candidates who wish to participate in EPSO competitions should begin their preparation well in advance, ideally several months before the registration deadline. Early preparation allows candidates to familiarize themselves with the test format, identify their areas of weakness, and develop effective problem-solving strategies. Candidates should create a realistic study plan that includes regular study sessions, practice with example exercises, and periodic review of learned concepts. Discipline in studying and consistency are essential virtues for successfully passing selection processes, which demand a level of preparation far superior to that of most national examinations.
+
+The compilation of study materials is a fundamental step in preparing for EPSO competitions. Candidates can access a wide variety of preparation resources, including official EPSO guides, verbal and numerical reasoning books, online exam simulators, preparation courses, and study groups. Online resources are especially valuable, as they allow candidates to practice with exercises similar to those they will encounter in the actual tests. Candidates should also familiarize themselves with the format and content of the specific tests for the competition in which they wish to participate, as each competition may have different requirements and formats. Careful selection of quality study materials is a determining factor in preparation success.
+
+The development of time management skills is critical for success in EPSO competitions. Selection tests usually have strict time limits that require candidates to manage their time efficiently to complete all questions within the established deadline. Candidates should practice solving timed exercises to develop their speed and accuracy. Regular practice with a timer allows candidates to identify their optimal work pace and develop strategies for tackling the most difficult questions without wasting valuable time. Candidates should learn to quickly identify the questions they can answer with certainty and to leave for later those that require greater reflection.
+
+Continuous review and assessment are important components of the preparation process. Candidates should take complete mock exams under conditions similar to those of the actual exam, including time constraints and absence of interruptions. Mock exam results allow candidates to evaluate their progress, identify areas that require more attention, and adjust their preparation plan accordingly. Feedback from other candidates or qualified instructors can provide valuable perspectives on the candidate's performance and suggest areas for improvement. A preparation journal is a useful tool for recording progress and identifying repetitive error patterns that need to be corrected.
+
+### 19.2 Preparation Resources and Tools
+
+Preparation resources for EPSO competitions include both official materials provided by EPSO and third-party materials developed by examination preparation experts. Official EPSO materials include preparation guides, examples of previous tests, and recommendations for candidates. These materials provide valuable information about the test format, types of questions, and evaluation criteria. Candidates should consult the official materials as the first step in their preparation to ensure they correctly understand the requirements and expectations of the competition.
+
+Preparation books are a traditional resource but remain very valuable for many candidates. Verbal reasoning books provide exercises in analogies, syllogisms, reading comprehension, and other linguistic tasks that are common in EPSO tests. Numerical reasoning books include exercises in arithmetic, percentages, proportions, and data analysis. Abstract reasoning books contain exercises in figure series, matrices, and logical patterns. Candidates should choose updated books that reflect the current format of EPSO tests and include explained solutions that allow for effective self-study.
+
+Online preparation platforms offer an interactive experience that allows candidates to practice with timed exercises, receive immediate feedback, and track their progress. Some platforms such as AssessmentDay, SHL, and others provide exam simulators that faithfully replicate the format of EPSO tests. Online platforms usually offer monthly or annual subscriptions that give access to a regularly updated question bank. These platforms also typically include discussion forums where candidates can exchange experiences and preparation strategies, creating a learning community that enriches the process.
+
+In-person and online preparation courses are another valuable option for candidates seeking a more structured preparation. Preparation courses are usually taught by instructors with experience in selection processes and provide personalized guidance, problem-solving techniques, and supervised practice. Online courses allow candidates to learn at their own pace and access study materials from anywhere in the world. Some courses offer individualized tutoring sessions that allow candidates to receive personalized feedback on their performance and specific improvement strategies.
+
+### 19.3 Test-Taking Techniques
+
+Developing effective test-taking techniques is fundamental to maximizing performance in EPSO selection tests. Candidates must learn to analyze each question carefully, identify key information, and select the most accurate and complete answer. Verbal reasoning requires the ability to understand complex texts, identify logical relationships between ideas, and draw conclusions from explicit and implicit information. Candidates should practice critical reading and argument analysis to improve their performance in verbal reasoning tests. Reading speed without compromising comprehension is a skill that develops with constant practice and exposure to texts of different complexity levels.
+
+Numerical reasoning requires the ability to process quantitative information, perform rapid calculations, and draw conclusions from data presented in tables, charts, and texts. Candidates should familiarize themselves with basic mathematical concepts such as percentages, proportions, rates of change, and averages, and practice solving quantitative problems under time pressure. The development of estimation and approximation techniques can be useful for verifying the reasonableness of answers and detecting calculation errors. Candidates should also develop the ability to quickly interpret charts and tables, which are common formats for presenting quantitative data in EPSO tests.
+
+Abstract reasoning requires the ability to identify patterns, logical relationships, and sequences in non-verbal information, such as geometric figures and image sequences. Candidates should practice identifying patterns in figure series, classifying figures according to logical criteria, and completing figure matrices. The development of observation ability and mental flexibility are important skills for abstract reasoning tests. Candidates should train themselves to quickly identify the rules governing figure sequences and apply those rules to predict subsequent figures with accuracy and speed.
+
+Specific competency tests require knowledge and technical skills related to the position being applied for. Candidates should review and deepen their knowledge in the specific area of the competition, including current legislation, professional practices, and recent developments in the field. Preparation for specific tests should include both the review of theoretical knowledge and practical exercises and case studies. Candidates should also familiarize themselves with the technical vocabulary of the area of specialization to demonstrate mastery in tests and the ability to communicate complex concepts.
+
+### 19.4 Stress Management and Psychological Preparation
+
+Psychological preparation is a fundamental aspect of the preparation process for EPSO competitions that often receives less attention than academic preparation. Selection processes are stressful experiences that can affect candidates' performance if not managed properly. Candidates should develop techniques to manage anxiety, maintain concentration, and preserve self-confidence throughout the entire selection process. Psychological preparation begins with understanding that stress is a natural response to pressure and that it can be managed through specific techniques that candidates can learn and practice on a regular basis.
+
+Pre-exam anxiety management includes relaxation techniques, deep breathing, positive visualization, and regular physical exercise. Candidates who practice relaxation techniques before tests usually experience less anxiety and better concentration. Positive visualization, which consists of imagining successful performance in the test, can help build confidence and reduce worry. Regular physical exercise is one of the most effective ways to reduce stress and improve overall mood, and candidates should incorporate physical activity into their preparation routine as an essential component of the process.
+
+Maintaining motivation during the preparation process is another important aspect of psychological preparation. Candidates may experience fluctuations in their motivation level throughout a long preparation process. Setting short-term goals, celebrating partial achievements, and remembering personal reasons for participating in the competition are effective strategies for maintaining motivation. Support from family, friends, and other candidates can provide encouragement and perspective during difficult moments of the preparation process, reminding the candidate that the effort has a valuable purpose.
+
+Preparation for unforeseen situations is another important component of psychological preparation. Candidates should be prepared to face unexpected situations during tests, such as difficult questions, technical problems in online tests, or changes in the test format. Developing mental flexibility and the ability to adapt quickly to new situations can make the difference between success and failure in selection tests. A growth mindset, which involves seeing challenges as learning opportunities, is a valuable attitude for candidates seeking to maximize their performance.
+
+## Chapter 20: Candidate Experiences and Case Studies
+
+### 20.1 Testimonials from Successful Candidates
+
+Testimonials from candidates who have successfully passed EPSO competitions provide valuable information about the strategies, techniques, and attitudes that contribute to success in selection processes. These testimonials offer personal perspectives that complement official information about selection processes and can serve as inspiration and guidance for future candidates. Successful candidates usually highlight the importance of early preparation, discipline in studying, and effective stress management as key factors in their success. Each personal story reveals unique aspects of the process that official guides cannot fully capture.
+
+Maria, a Spanish professional who was selected for an administrator position at the European Commission, describes her experience as a long but rewarding process. Maria began her preparation eight months before the competition date, dedicating at least two hours daily to studying. She notes that the key to her success was creating a structured study plan that included practice sessions with timed exercises, concept review, and analysis of previous tests. Maria highlights that regular practice with mock exams allowed her to familiarize herself with the test format and manage time effectively during the actual exam, significantly reducing her anxiety level.
+
+Thomas, a French candidate who was selected for a finance expert position, shares his preparation experience focused on the specific competencies of the position. Thomas devoted a significant part of his preparation to deepening his knowledge in European financial law, banking regulation, and economic analysis, which were critical areas for the position. He also emphasizes the importance of preparation for language tests, as the competition required an advanced level of English and French. Thomas advises future candidates to thoroughly research the specific requirements of the competition and adapt their preparation accordingly, investing time in understanding the real needs of the institution.
+
+Sophia, a Greek candidate who was selected for an assistant position at the European Parliament, highlights the importance of psychological preparation in her process. Sophia experienced significant anxiety before the tests, but learned breathing and relaxation techniques that helped her stay calm during the exams. She also emphasizes the importance of social support, as she joined a study group with other candidates who shared resources and encouraged each other. Sophia advises future candidates not to underestimate the importance of emotional well-being in the preparation process, as mental state directly influences cognitive performance.
+
+### 20.2 Case Studies: Professional Careers
+
+The study of professional careers of officials selected by EPSO provides an overview of the career opportunities available in the institutions of the European Union and the factors that contribute to professional success in this environment. Professional careers vary significantly depending on the functional area, the institution, and each official's individual objectives, but all share common elements such as commitment to public service, adaptability to change, and the desire to contribute to the Union's objectives. These case studies provide a map of the career possibilities offered by employment in the European institutions.
+
+The career of Carlos, a Spanish administrator who has worked at the European Commission for twenty years, illustrates the professional development opportunities available in the institutions. Carlos began his career at the Directorate-General for Competition, where he worked on state aid and merger cases. After five years, he moved to the Directorate-General for Trade, where he participated in international trade negotiations. Subsequently, he assumed a leadership position at the Directorate-General for Energy, where he supervised a team of thirty people. Carlos's career demonstrates how internal mobility and continuous training can contribute to a rich and diversified professional development in the European institutions.
+
+The career of Isabelle, a French translator who has worked at the Translation Service of the European Parliament for fifteen years, illustrates the career opportunities in linguistic profiles. Isabelle began her career as a junior translator, translating documents from English to French. Over time, she developed specializations in legal and financial terminology, which allowed her to take on additional responsibilities as a reviewer and trainer of new translators. Isabelle also participated in projects to digitalize the translation process, contributing to the modernization of the service. Her career demonstrates how specialization and innovation can open new opportunities in the language areas of the institutions.
+
+The career of Hans, a German IT expert who has worked at the European Personnel Selection Office for ten years, illustrates the career opportunities in technical profiles. Hans began his career as a software developer, working on automated assessment systems for selection tests. Over time, he assumed leadership responsibilities in digital transformation projects, supervising the implementation of new online examination platforms. Hans's career demonstrates how technical competencies and leadership ability can lead to positions of responsibility in specialized areas of the institutions of the Union.
+
+### 20.3 Lessons Learned and Best Practices
+
+The analysis of experiences of candidates and officials selected by EPSO allows identifying lessons learned and best practices that can guide the preparation and professional development of future candidates. These lessons range from preparation strategies for competitions to recommendations for career development in the institutions of the Union. The best practices identified through the analysis of multiple experiences provide a valuable framework for informed decision-making and the optimization of preparation strategies.
+
+One of the most important lessons is the need to begin preparation well in advance. Candidates who begin their preparation several months before the competition usually perform better than those who try to prepare in a short period. Early preparation allows for a deeper review of concepts, more practice with exercises, and better stress management. Candidates should also plan their preparation realistically, considering their professional and personal obligations to establish a sustainable study pace that can be maintained throughout the process.
+
+Another important lesson is the need to adapt the preparation strategy to the specific characteristics of the competition. EPSO competitions vary significantly in terms of format, content, and evaluation criteria, so candidates should thoroughly research the specific requirements of the competition in which they wish to participate. Adapting the preparation strategy to the specific needs of the competition maximizes preparation efficiency and increases the chances of success. Candidates who use a generic approach without adapting to specific requirements usually perform worse than those who personalize their preparation.
+
+The importance of comprehensive preparation, which includes both academic and psychological components, is another important lesson. Candidates who prepare exclusively for academic tests may be surprised by the stress and pressure of the actual tests. Psychological preparation, including anxiety management techniques and motivation strategies, is a valuable complement to academic preparation. Candidates who combine both dimensions of preparation usually perform better and report greater satisfaction with the selection process as a whole.
+
+The importance of social support and collaboration with other candidates is another valuable lesson. Candidates who prepare in groups can benefit from the exchange of resources, discussion of concepts, and mutual support. Study groups can provide a collaborative learning environment that enriches the preparation experience and reduces the isolation that can accompany the individual study process. The creation of support networks among candidates is a strategy that has proven effective in numerous selection processes, creating community and a sense of belonging.
+
+## Chapter 21: The Legal Framework of EU Recruitment
+
+### 21.1 Applicable Regulations and Directives
+
+The legal framework for recruitment in the institutions of the European Union is composed of a series of regulations, directives, and other legal norms that establish the principles, procedures, and requirements for access to European public employment. The Staff Regulations of the Institutions of the Union is the fundamental norm that regulates the employment relationship between officials and institutions, and establishes the principles of equal treatment, meritocracy, and transparency in access to employment. This regulation applies to permanent officials of all institutions of the Union and establishes the general framework for recruitment, employment conditions, the rights and obligations of officials, and the management of professional careers.
+
+The Financial Regulation of the European Union establishes the budgetary and financial rules that apply to the human resources management of the institutions, including officials' remuneration, social security contributions, and pension benefits. This regulation ensures that human resources management is carried out in a transparent, efficient manner and in compliance with Union financial rules. The Financial Regulation also establishes the rules for the hiring of temporary agents and other Union agents, regulating temporary employment modalities and their specific conditions.
+
+The legislation on equal opportunities and non-discrimination constitutes a fundamental component of the legal framework for recruitment. Article 21 of the Charter of Fundamental Rights of the European Union prohibits discrimination on grounds of sex, race, color, ethnic or social origin, genetic characteristics, language, religion or convictions, political or other opinions, trade union membership, property, birth, disability, age, or sexual orientation. This prohibition of discrimination applies to all phases of the recruitment process, from the publication of the call to the final hiring decision.
+
+The General Data Protection Regulation (GDPR) is another important norm that affects recruitment in the institutions of the Union, as it regulates the processing of candidates' personal data during selection processes. The institutions must ensure that the processing of candidates' personal data is carried out in a transparent, secure manner and in compliance with candidates' fundamental rights. The GDPR establishes principles such as data minimization, purpose limitation, and the right of data subjects to access their personal data, which requires institutions to implement rigorous data protection policies and procedures at all stages of recruitment.
+
+### 21.2 Case Law of the Court of Justice
+
+The case law of the Court of Justice of the European Union has played a fundamental role in the interpretation and development of the legal framework for recruitment in the institutions of the Union. The Court of Justice has interpreted the provisions of the Staff Regulations and the Staff Regulations in numerous rulings, establishing precedents that have guided recruitment practice in the institutions. These rulings have addressed issues such as equal treatment, transparency of selection processes, personal data protection, and candidates' rights, contributing to the consolidation of a solid and predictable legal framework.
+
+One of the most important areas of the Court of Justice's case law is the interpretation of the principle of equal treatment in selection processes. The Court has established that the principle of equal treatment requires selection criteria to be objective, transparent, and based on merit, and that any differentiated treatment of candidates must be justified by objective and reasonable grounds. These rulings have contributed to ensuring that EPSO selection processes comply with the principles of equal opportunities and meritocracy, establishing high standards of transparency and objectivity.
+
+Another important area of case law is the protection of candidates' personal data. The Court of Justice has interpreted the provisions of the GDPR applicable to recruitment, establishing the institutions' obligations regarding data processing transparency, data subjects' consent, and the right to access personal data. These rulings have contributed to ensuring that selection processes comply with personal data protection rules and that candidates can effectively exercise their rights before the institutions.
+
+The Court of Justice has also addressed issues related to the admissibility of complaints from candidates who believe their rights have been violated in selection processes. The Court has established the criteria for challenging selection acts, the deadlines for filing appeals, and the effects of rulings on ongoing selection processes. These rulings provide a clear framework for the protection of candidates' rights in selection processes, and establish the legal basis for the resolution of disputes between candidates and institutions in a fair and just manner.
+
+### 21.3 Data Protection and Privacy
+
+The protection of candidates' personal data in EPSO selection processes is a legal and ethical obligation that institutions must strictly comply with. The General Data Protection Regulation (GDPR) establishes a strict regulatory framework for the processing of personal data, which includes principles such as lawfulness, fairness, transparency, purpose limitation, data minimization, accuracy, limitation of storage period, and integrity and confidentiality. The institutions of the Union must ensure that the processing of candidates' personal data complies with these principles at all stages of the selection process.
+
+The personal data that institutions collect from candidates include identification data, contact data, academic data, professional data, selection test results, and, in some cases, sensitive data such as information about disability or political affiliation. The processing of sensitive data requires additional safeguards, such as the explicit consent of the candidate or the existence of reasons of public interest that justify the processing. The institutions must inform candidates about the types of data they collect, the purposes of processing, the recipients of the data, and candidates' rights in relation to their personal data, providing clear, accessible, and complete information.
+
+The institutions must implement appropriate technical and organizational measures to protect candidates' personal data against unauthorized access, alteration, disclosure, or destruction. These measures include data encryption, access control to information systems, staff training on data protection, and the conduct of impact assessments for processing that presents a high risk to candidates' rights and freedoms. Compliance with these measures is essential to maintain candidates' trust in selection processes and to avoid regulatory sanctions that may affect the institution.
+
+Candidates' rights in relation to their personal data include the right of access, the right to rectification, the right to erasure, the right to restrict processing, the right to data portability, and the right to object. The institutions must facilitate the exercise of these rights by candidates and respond to their requests within the deadlines established by the GDPR. Non-compliance with data protection rules may result in administrative sanctions and civil liability of the institutions, which underscores the importance of strict compliance with the regulations in all candidate data processing operations.
+
+### 21.4 Positive Action Measures and Quotas
+
+Positive action measures and representation quotas are legal instruments that the institutions of the European Union use to promote diversity and equal opportunities in access to European public employment. These measures aim to correct situations of historical disadvantage for certain groups and to ensure balanced representation of all European citizens in the institutions of the Union. Positive action measures and representation quotas are subject to strict principles of proportionality, temporality, and purpose, and must be compatible with the principle of equal treatment and meritocracy.
+
+Geographical representation quotas are an instrument that ensures that citizens of all member states have equal opportunities in access to employment in the institutions of the Union. Each member state has a maximum number of positions allocated based on its population, and competitions are organized in such a way as to ensure the representation of all member states. Geographical quotas have been criticized by some as a limitation on the principle of meritocracy, but are considered necessary to ensure geographical diversity and prevent the domination of certain states in the institutions, ensuring a faithful reflection of the composition of the Union.
+
+Positive action measures for gender equality include the adoption of equality plans, the promotion of balanced representation of women and men in positions of responsibility, and the adoption of work-life balance measures. The institutions of the Union have adopted specific objectives to achieve balanced representation of women and men at all levels of the hierarchy, and are implementing measures to eliminate barriers that prevent women's access to certain professional profiles. These measures include mentoring programs, women's leadership development initiatives, and reviews of recruitment policies to eliminate unconscious biases.
+
+Positive action measures for the inclusion of persons with disabilities include adapting selection tests, adapting workplaces, and providing assistive technologies. The institutions of the Union have adopted specific measures to ensure the accessibility of selection processes for persons with disabilities, and are working to improve the accessibility of their buildings, information systems, and documents. These measures aim to ensure that persons with disabilities can participate in selection processes on an equal footing and without barriers that limit their access to career opportunities in the European institutions.
+
+## Chapter 22: Internationalization of EU Recruitment
+
+### 22.1 Cooperation with International Organizations
+
+EPSO's cooperation with international organizations is an important aspect of recruitment in the institutions of the European Union, as it allows broadening the reach of selection processes and attracting talent from around the world. EPSO collaborates with organizations such as the United Nations, the Organisation for Economic Co-operation and Development, the Council of Europe, and other international organizations to exchange best practices, develop common assessment tools, and coordinate selection processes. This cooperation benefits both the institutions of the Union and candidates, as it allows for a more complete and balanced assessment of candidates' competencies in an increasingly interconnected international context.
+
+Cooperation with the United Nations includes the exchange of information on selection processes, participation in working groups on human resources, and coordination of recruitment reform initiatives. The United Nations and the European Union share similar objectives in terms of human resources, such as the promotion of equal opportunities, diversity, and meritocracy, which facilitates cooperation between both organizations. EPSO has participated in joint initiatives with the United Nations to develop competency assessment tools that can be used by both organizations, promoting international quality standards in selection processes.
+
+Cooperation with the OECD includes participation in comparative studies on public sector human resources policies, exchange of experiences on selection processes, and collaboration on research projects on staff management. The OECD provides a valuable forum for the exchange of best practices among member countries, and EPSO's participation in these initiatives allows incorporating international best practices into the Union's selection processes. The OECD's comparative reports provide valuable data on global trends in public employment.
+
+Cooperation with the Council of Europe includes collaboration on fundamental rights, personal data protection, and equal treatment in public employment. The Council of Europe and the European Union share common values and principles on fundamental rights, which facilitates cooperation in areas such as the protection of candidates' personal data and the elimination of discrimination in selection processes. This cooperation is materialized in joint projects, exchange of experts, and harmonization of regulations to ensure a high level of rights protection in European public employment.
+
+### 22.2 Attracting Global Talent
+
+Attracting global talent is a strategic objective for the institutions of the European Union, which need staff with linguistic, cultural, and professional competencies that allow them to work effectively in an increasingly complex international environment. The institutions seek to attract the best talent from around the world, offering stimulating career opportunities, competitive working conditions, and a diverse and multicultural work environment. Attracting global talent requires an international recruitment strategy that includes promoting career opportunities globally, cooperating with universities and international research centers, and adapting selection processes to the needs of international candidates.
+
+Promoting career opportunities in the institutions of the Union on a global level is carried out through different channels, including the EPSO website, social media, international job fairs, and recruitment events at universities around the world. EPSO uses digital marketing strategies to reach potential candidates in different regions of the world, including content adapted to different cultures and languages. EPSO's presence at international recruitment events allows establishing direct contacts with potential candidates and providing personalized information about career opportunities in the European institutions.
+
+Cooperation with universities and international research centers is another strategy for attracting global talent. EPSO establishes relationships with prestigious universities around the world to promote career opportunities in the institutions of the Union and to identify the best candidates. This cooperation includes participation in academic conferences, the organization of workshops at universities, and the creation of internship programs for international students. Strategic alliances with academic institutions allow EPSO to access a global talent pool and establish lasting recruitment channels with academic communities around the world.
+
+Adapting selection processes to the needs of international candidates is another important aspect of attracting global talent. EPSO has implemented measures to facilitate the participation of candidates residing outside the European Union, such as conducting online tests, accepting documents in different languages, and providing flexibility in registration deadlines. These measures aim to reduce logistical barriers that may prevent international candidates from participating in EPSO competitions, ensuring that global talent can compete on an equal footing.
+
+### 22.3 Internship and Trainee Programs
+
+Internship and trainee programs are important instruments for attracting young talent to the institutions of the European Union and for providing valuable professional experience to students and young professionals. The institutions of the Union offer a wide range of internship programs that allow participants to work in the institutions for a determined period, gaining experience in different functional areas and learning about the functioning of the institutions from within. Internship programs are a gateway to employment in the institutions, as many officials began their careers as interns, demonstrating the value of these experiences as a professional springboard.
+
+The European Commission's internship programs are the most numerous and offer opportunities in a wide range of areas, including public policy, law, finance, communications, IT, and administration. Commission internships generally last between three and five months and are open to university students and young professionals who have recently completed their studies. Commission interns work on equal terms with permanent staff, participating in real projects and contributing to the institution's activities, which provides them with an authentic and valuable experience of working in a European institution.
+
+The European Parliament's internship programs offer opportunities in areas such as political advisory, translation and interpretation, communications, and administration. Parliament internships generally last between three and five months and are open to university students and young professionals from all member states. Parliament interns have the opportunity to work in a dynamic political environment and to contribute to the Parliament's legislative and representation activities, gaining firsthand knowledge of the European legislative process and democratic representation work.
+
+The European External Action Service's internship programs offer opportunities in areas such as foreign policy, diplomacy, development cooperation, and international communications. EEAS internships generally last between three and six months and are open to university students and young professionals with an interest in foreign policy. EEAS interns have the opportunity to work in the Union's delegations around the world and to contribute to the implementation of the Union's foreign policy in different regional contexts, gaining a unique perspective on European external action.
+
+## Chapter 23: Innovation in Selection Processes
+
+### 23.1 Competency-Based Assessment
+
+Competency-based assessment is a modern selection approach that focuses on the identification and evaluation of the specific competencies required for the job position, rather than focusing exclusively on academic knowledge or professional experience. This approach recognizes that professional performance depends not only on technical knowledge, but also on a series of transversal competencies such as communication ability, teamwork, problem-solving, and adaptability. Competency-based assessment allows institutions to identify candidates who not only have the necessary knowledge, but also the skills and personal qualities necessary to effectively perform the functions of the position in a multicultural and dynamic environment.
+
+The European Union's competency model defines a set of competencies that are important for all positions in the institutions, including core competencies such as communication, teamwork, results orientation, and adaptability, leadership competencies such as strategic vision, decision-making, and team management, and specific competencies related to concrete functional areas. This model provides a common framework for competency assessment in all selection processes and allows for a consistent and balanced assessment of candidates across all institutions of the European Union.
+
+Competency-based assessment methods include competency-based structured interviews, group exercises, workplace simulations, assessment centers, and personality tests. These assessment tools are designed to obtain concrete evidence of the candidate's past behavior in situations related to the competencies being evaluated. The STAR method (Situation, Task, Action, Result) is a technique used in competency-based interviews that allows evaluators to obtain detailed information about how the candidate has approached concrete professional situations in the past, providing a solid and objective basis for competency assessment.
+
+The implementation of competency-based assessment in EPSO's selection processes has improved the institutions' ability to identify candidates who are truly qualified for the positions. Competency-based assessment provides a more complete picture of the candidate, including not only their technical knowledge but also their interpersonal skills, leadership style, and adaptability to change. This approach allows institutions to make more informed selections and reduce the risk of hiring candidates who, despite having good academic results, lack the competencies necessary for effective performance in the job position in the European institutions.
+
+### 23.2 Assessment Centers
+
+Assessment centers are a selection method that uses a combination of assessment techniques to obtain a complete and balanced picture of candidates' competencies. Assessment centers usually include a series of practical exercises, such as workplace simulations, group exercises, oral presentations, case analysis, and interviews, which are evaluated by a panel of trained evaluators. Assessment centers are considered one of the most valid and reliable competency assessment methods, as they allow observing the candidate's behavior in situations that simulate the actual work environment of the European institutions.
+
+Workplace simulation exercises are one of the most important components of assessment centers. These exercises present candidates with realistic professional situations that they must address using the competencies required for the position. For example, a candidate for an administrator position may be asked to write a report, prepare a presentation, or participate in a simulated negotiation. Evaluators observe the candidate's behavior during the simulation and evaluate their performance based on predefined criteria, providing an objective assessment based on concrete evidence of the candidate's behavior.
+
+Group exercises allow the assessment of candidates' interpersonal and leadership competencies. During group exercises, candidates work together to solve a problem, make a decision, or complete a task, while evaluators observe their behavior and assess competencies such as communication, listening ability, negotiation ability, and leadership ability. Group exercises are especially useful for evaluating candidates' ability to work in a team, which is a fundamental competency in the institutions of the Union where collaborative work among people of different cultures and nationalities is the norm.
+
+Oral presentation exercises allow the assessment of candidates' communication competencies and presentation ability. Candidates may be asked to present a topic related to the position, defend a position before a panel of evaluators, or explain a technical concept in a clear and accessible manner. Evaluators assess the clarity of the presentation, the ability to adapt the message to the audience, mastery of the topic, and the ability to respond to questions and objections in a constructive and well-founded manner. The ability to communicate complex ideas in an accessible way is an essential competency in the European institutions, where multilingual and multicultural communication is frequent.
+
+### 23.3 Digital Competency Assessment
+
+Digital competency assessment is an area of growing importance in EPSO's selection processes, due to the digital transformation that the institutions of the Union are undergoing. Digital competencies include knowledge and use of IT tools, the ability to manage information in digital format, IT security, programming, and other technical competencies related to technology. Digital competency assessment allows institutions to identify candidates who have the necessary skills to contribute to the digital transformation of the institutions, which is a strategic priority for all organizations in the European public sector.
+
+Digital competency assessment tools include online technical tests, digital work environment simulators, technological problem-solving exercises, and knowledge assessments in areas such as cybersecurity, artificial intelligence, and data analysis. These tools are designed to assess not only the candidate's technical knowledge, but also their ability to apply this knowledge in real professional situations. Digital competency assessment must be continuous and adapt to the rapid technological changes that characterize the current digital environment, reflecting the competencies that are truly needed in the daily work of the institutions.
+
+Digital competency assessment must adapt to the level of the position and the specific competencies required. For basic-level positions, the assessment may focus on competencies such as the use of office tools, Internet navigation, and digital communication. For advanced-level positions, the assessment may include competencies such as programming, database management, cybersecurity, and data analysis. Digital competency assessment is a valuable complement to traditional tests and allows institutions to identify candidates with the appropriate technical profile for the position, ensuring that institutions have the necessary staff to face the challenges of digital transformation in an increasingly interconnected world.
+
+## Chapter 24: The Pension and Benefits System
+
+### 24.1 The Officials' Pension Scheme
+
+The pension scheme for officials of the European Union is a fundamental component of employment conditions in the institutions, as it provides financial protection for officials and their families during retirement and in the event of death or incapacity. The Union's pension scheme is a defined-contribution system, in which both the institutions and officials make contributions to fund retirement benefits. The pension scheme is regulated by the Staff Regulations and implementing rules, which establish access conditions, benefit amounts, and rules for the management of the pension fund, ensuring a transparent and balanced system.
+
+Access conditions for retirement include the minimum retirement age, which is generally 66 years, and a minimum period of service, which is generally ten years. Officials who meet the access conditions may apply for voluntary retirement, which entitles them to a pension calculated based on their years of service and their average remuneration during the last years of their career. Officials who have reached the maximum age of service, which is generally 68 years, are required to retire. Early retirement is also possible under certain circumstances, such as health problems or organizational restructuring, subject to specific conditions that protect both the official's rights and the sustainability of the system.
+
+The amount of the pension is calculated based on a percentage of the official's average remuneration during the last three years of their career, multiplied by the number of years of service. The percentage varies depending on the years of service, with a maximum percentage of 70% of the average remuneration for officials who have completed thirty-five years of service. Pensions are updated annually to compensate for inflation and maintain the purchasing power of retirees. The pension scheme also includes provisions for the protection of widows and orphans of deceased officials, ensuring the protection of families in bereavement situations.
+
+The pension scheme also includes death and incapacity benefits. In the event of the death of an active official, their beneficiaries (spouse and dependent children) are entitled to a widow's/widower's and orphan's pension. In the event of permanent incapacity for work, the official is entitled to an incapacity pension calculated based on their degree of incapacity and their years of service. These benefits are fundamental to ensuring the social protection of officials and their families in vulnerable situations, providing a safety net that protects the official's closest loved ones.
+
+### 24.2 Other Social Benefits
+
+In addition to the pension scheme, officials of the European Union enjoy a series of social benefits that complement their remuneration and contribute to their well-being and that of their families. These benefits include healthcare, sick leave benefits, maternity and paternity benefits, unemployment benefits, and other social benefits that are regulated by the Staff Regulations and implementing rules. These benefits form a comprehensive social protection system that complements remuneration and ensures the quality of life of officials and their families.
+
+Healthcare is a fundamental benefit that ensures that officials and their families have access to quality health services. Officials are covered by a health insurance that covers medical, hospital, and pharmaceutical expenses. The health insurance is jointly funded by the institutions and officials, and covers officials, their spouses, and their dependent children. Officials are also entitled to temporary incapacity benefits in the event of illness or accident, with full remuneration for a determined period that varies depending on the severity of the situation.
+
+Maternity and paternity benefits are benefits that allow officials to be absent from work for a determined period to care for the birth or adoption of a child. Mothers are entitled to a maternity leave period of generally four months, with full remuneration. Fathers are entitled to a paternity leave period, which varies depending on the member state of residence. These benefits are fundamental to reconciling work and family life and to promoting gender equality in the institutions, encouraging a more balanced distribution of family responsibilities between men and women.
+
+Unemployment benefits are benefits that protect officials in the event of termination of their employment contract. Officials who lose their employment are entitled to an unemployment benefit for a determined period, which varies depending on their years of service. The unemployment benefit is calculated based on the official's remuneration and has a maximum limit. These benefits provide a safety net for officials during professional transition periods and allow them to seek new employment opportunities with greater financial peace of mind, without the economic pressure that can affect the quality of professional decisions.
+
+### 24.3 The Union's Social Security
+
+The European Union's social security system for officials is a complementary system to the pension scheme and social benefits, which provides additional coverage in areas such as long-term healthcare, professional rehabilitation, and social protection in emergency situations. This system is funded by the institutions and by officials, and is managed by a specialized body that ensures the efficient and transparent management of funds allocated to officials' social protection. Social security coordination among the different member states is an important aspect of the system, as it ensures that officials' rights are protected regardless of their place of residence.
+
+Long-term healthcare is a benefit that covers long-term care expenses for officials who suffer from chronic diseases or disabilities that require continuous care. This benefit complements regular health insurance and ensures that officials receive the necessary care without incurring excessive expenses. Long-term healthcare includes medical care, physiotherapy, technical aids, and other services necessary to maintain the quality of life of affected officials and their families, providing comprehensive support in complex health situations.
+
+Professional rehabilitation is a benefit that aims to help officials who have suffered temporary or permanent incapacity to reintegrate into the labor market. Professional rehabilitation includes training to acquire new competencies, workplace adaptation for persons with disabilities, and professional guidance to find a position compatible with the official's capabilities. This benefit is fundamental to ensuring that officials who suffer from incapacity can resume their professional careers and actively contribute to the institutions, demonstrating the institutions' commitment to the well-being and development of their employees.
+
+Social protection in emergency situations includes benefits for officials who are affected by natural disasters, armed conflicts, or other emergency situations. These benefits include financial assistance, relocation, and other necessary support to ensure the safety and well-being of officials and their families in crisis situations. Social protection in emergency situations is an important component of the Union's social security system, which ensures that officials are protected at all times and under any circumstances, reflecting the institutions' commitment to the comprehensive protection of their staff.
