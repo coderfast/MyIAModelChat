@@ -1389,7 +1389,7 @@ In conclusion, economia verde is a dynamic and constantly evolving field that re
 
 ## Chapter 9: La normativa
 
-In this chapter, we will analyze the topic of la normativa in depth, exploring its multiple facets and dimensions. La normativa is an essential component of pollution y sus tipos that deserves detailed and rigorous study. Throughout the following sections, we will discover the fundamental principles, practical applications, and current trends that define this fascinating field of knowledge. The analysis of la normativa will allow us to better understand its importance within the general framework of pollution y sus tipos and its relevance to contemporary society.
+In this chapter, we will analyze the topic of the regulations in depth, exploring its multiple facets and dimensions. The regulations is an essential component of pollution and its types that deserves detailed and rigorous study. Throughout the following sections, we will discover the fundamental principles, practical applications, and current trends that define this fascinating field of knowledge. The analysis of the regulations will allow us to better understand its importance within the general framework of pollution and its types and its relevance to contemporary society.
 
 
 ### Nacional
