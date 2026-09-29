@@ -10,7 +10,7 @@
         "epub": "en",
         "web": "en",
         "csv": "en",
-        "tagengo": "en"
+        "markdown": "en"
     },    
     "default": "unknown"
 }
