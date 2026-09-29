@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "total_topics": 150,
+  "total_topics": 151,
   "language": "en",
   "format": "1 topic = 1 MD = 1 libro (150-300 KB)",
   "categories": [
@@ -637,7 +637,7 @@
     {
       "id": 104,
       "category": "General",
-      "title": "History of Science",
+      "title": "History of Science (Comprehensive)",
       "filename": "104_history_science.md"
     },
     {
@@ -655,7 +655,7 @@
     {
       "id": 107,
       "category": "General",
-      "title": "Artificial Intelligence",
+      "title": "Artificial Intelligence (Comprehensive)",
       "filename": "107_artificial_intelligence.md"
     },
     {
@@ -735,186 +735,6 @@
       "category": "General",
       "title": "Winter Sports and Martial Arts",
       "filename": "120_winter_sports_martial_arts.md"
-    },
-    {
-      "id": 121,
-      "category": "General",
-      "title": "Terrestrial Mammals",
-      "filename": "121_terrestrial_mammals.md"
-    },
-    {
-      "id": 122,
-      "category": "General",
-      "title": "Birds and Marine Life",
-      "filename": "122_birds_marine_life.md"
-    },
-    {
-      "id": 123,
-      "category": "General",
-      "title": "Insects and Small Organisms",
-      "filename": "123_insects_organisms.md"
-    },
-    {
-      "id": 124,
-      "category": "General",
-      "title": "Terrestrial Ecosystems",
-      "filename": "124_terrestrial_ecosystems.md"
-    },
-    {
-      "id": 125,
-      "category": "General",
-      "title": "Aquatic Ecosystems",
-      "filename": "125_aquatic_ecosystems.md"
-    },
-    {
-      "id": 126,
-      "category": "General",
-      "title": "Climate Change",
-      "filename": "126_climate_change.md"
-    },
-    {
-      "id": 127,
-      "category": "General",
-      "title": "Pollution and Its Types",
-      "filename": "127_pollution_types.md"
-    },
-    {
-      "id": 128,
-      "category": "General",
-      "title": "Renewable Energy",
-      "filename": "128_renewable_energy.md"
-    },
-    {
-      "id": 129,
-      "category": "General",
-      "title": "Recycling and Sustainability",
-      "filename": "129_recycling_sustainability.md"
-    },
-    {
-      "id": 130,
-      "category": "General",
-      "title": "Nature Conservation",
-      "filename": "130_nature_conservation.md"
-    },
-    {
-      "id": 131,
-      "category": "General",
-      "title": "Painting and Sculpture",
-      "filename": "131_painting_sculpture.md"
-    },
-    {
-      "id": 132,
-      "category": "General",
-      "title": "Architecture",
-      "filename": "132_architecture.md"
-    },
-    {
-      "id": 133,
-      "category": "General",
-      "title": "Music",
-      "filename": "133_music.md"
-    },
-    {
-      "id": 134,
-      "category": "General",
-      "title": "Film and Television",
-      "filename": "134_film_television.md"
-    },
-    {
-      "id": 135,
-      "category": "General",
-      "title": "Theater and Dance",
-      "filename": "135_theater_dance.md"
-    },
-    {
-      "id": 136,
-      "category": "General",
-      "title": "Artistic Photography",
-      "filename": "136_artistic_photography.md"
-    },
-    {
-      "id": 137,
-      "category": "General",
-      "title": "Classic Spanish Literature",
-      "filename": "137_classic_spanish_literature.md"
-    },
-    {
-      "id": 138,
-      "category": "General",
-      "title": "Latin American Literature",
-      "filename": "138_latin_american_literature.md"
-    },
-    {
-      "id": 139,
-      "category": "General",
-      "title": "Stories and Fables",
-      "filename": "139_stories_fables.md"
-    },
-    {
-      "id": 140,
-      "category": "General",
-      "title": "Poetry and Essay",
-      "filename": "140_poetry_essay.md"
-    },
-    {
-      "id": 141,
-      "category": "General",
-      "title": "Arithmetic and Numbers",
-      "filename": "141_arithmetic_numbers.md"
-    },
-    {
-      "id": 142,
-      "category": "General",
-      "title": "Fractions, Decimals, and Percentages",
-      "filename": "142_fractions_decimals.md"
-    },
-    {
-      "id": 143,
-      "category": "General",
-      "title": "Basic Geometry",
-      "filename": "143_basic_geometry.md"
-    },
-    {
-      "id": 144,
-      "category": "General",
-      "title": "Elementary Algebra",
-      "filename": "144_elementary_algebra.md"
-    },
-    {
-      "id": 145,
-      "category": "General",
-      "title": "Spanish Grammar and Spelling",
-      "filename": "145_grammar_spelling.md"
-    },
-    {
-      "id": 146,
-      "category": "General",
-      "title": "Effective Communication",
-      "filename": "146_effective_communication.md"
-    },
-    {
-      "id": 147,
-      "category": "General",
-      "title": "Work and Professions",
-      "filename": "147_work_professions.md"
-    },
-    {
-      "id": 148,
-      "category": "General",
-      "title": "Entrepreneurship and Business",
-      "filename": "148_entrepreneurship_business.md"
-    },
-    {
-      "id": 149,
-      "category": "General",
-      "title": "Travel and Tourism",
-      "filename": "149_travel_tourism.md"
-    },
-    {
-      "id": 150,
-      "category": "General",
-      "title": "Education and Training",
-      "filename": "150_education_training.md"
     },
     {
       "id": 151,
