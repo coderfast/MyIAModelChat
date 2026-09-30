@@ -1,17 +1,18 @@
 {
   "es": {
     "connectors": [
-      "En primer lugar,",
-      "Además,",
-      "Por otro lado,",
-      "Asimismo,",
-      "Finalmente,",
-      "En conclusión,"
+      "En primer lugar, ",
+      "Además, ",
+      "Por otro lado, ",
+      "Asimismo, ",
+      "Finalmente, ",
+      "En conclusión, "
     ],
     "overflow_connector": "También, ",
     "analyze": "Analizando",
     "about": "sobre",
     "content_of": "el contenido del texto",
+    "claim_prefix": "El párrafo afirma",
     "text_contains": "El texto contiene {s} oraciones con {w} palabras en total",
     "type_default": "El contenido presenta información relevante",
     "concepts_prefix": "Los conceptos principales identificados son:",
@@ -282,18 +283,19 @@
   },
   "en": {
     "connectors": [
-      "First,",
-      "Additionally,",
-      "On the other hand,",
-      "Likewise,",
-      "Finally,",
-      "In conclusion,"
+      "First, ",
+      "Additionally, ",
+      "On the other hand, ",
+      "Likewise, ",
+      "Finally, ",
+      "In conclusion, "
     ],
     "overflow_connector": "Also, ",
     "analyze": "Analyzing",
     "about": "about",
     "content_of": "the content of the text",
     "text_contains": "The text contains {s} sentences with {w} words in total",
+    "claim_prefix": "The paragraph states",
     "type_default": "The content presents relevant information",
     "concepts_prefix": "The key concepts identified are:",
     "entities_prefix": "The mentioned entities are:",
