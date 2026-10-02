@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import torch
 
-from commons.model.chatmodel import ChatModel
+from commons.model.chatmodel import ChatModel, resolve_hidden_size
 from commons.model.chatmodel_moe import ChatModelMoE
 from commons.model.chatmodel_mtp import ChatModelMTP
 from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
@@ -137,6 +137,7 @@ class ChatEngine:
 
         try:
             ckpt = self.try_load_checkpoint(self.ckpt_path, device, False)
+            arch = {}
             if isinstance(ckpt, dict):
                 # Load tokenizer from path saved in checkpoint (avoids unpickling custom objects)
                 if 'tokenizer_path' in ckpt and ckpt['tokenizer_path']:
@@ -165,32 +166,43 @@ class ChatEngine:
             checkpoint_has_moe = arch.get('moe_enabled', False) or any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
             checkpoint_has_mtp = arch.get('mtp_enabled', False) or any('mtp_heads' in k for k in sd_keys)
 
+            # Architecture recovered from the .pth itself (metadata + tensors)
+            embed_size = arch.get('embed_size', 256)
+            num_layers = arch.get('num_layers', 4)
+            n_head = arch.get('n_head', 4)
+            n_positions = arch.get('n_positions', 512)
+            hidden_size = resolve_hidden_size(state_dict, embed_size, arch.get('hidden_size'))
+
             if checkpoint_has_moe and checkpoint_has_mtp:
                 self.model = ChatModelMoEMTP(self.tokenizer,
-                    embed_size=arch.get('embed_size', 256),
-                    num_layers=arch.get('num_layers', 4),
+                    embed_size=embed_size,
+                    num_layers=num_layers,
                     num_experts=arch.get('moe_num_experts', 4),
                     top_k=arch.get('moe_top_k', 2),
                     load_balance_weight=arch.get('moe_load_balance_weight', 0.01),
                     mtp_num_heads=arch.get('mtp_num_heads', 4),
-                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3),
+                    n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
             elif checkpoint_has_mtp:
                 self.model = ChatModelMTP(self.tokenizer,
-                    embed_size=arch.get('embed_size', 256),
-                    num_layers=arch.get('num_layers', 4),
+                    embed_size=embed_size,
+                    num_layers=num_layers,
                     mtp_num_heads=arch.get('mtp_num_heads', 4),
-                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+                    mtp_loss_weight=arch.get('mtp_loss_weight', 0.3),
+                    n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
             elif checkpoint_has_moe:
                 self.model = ChatModelMoE(self.tokenizer,
-                    embed_size=arch.get('embed_size', 256),
-                    num_layers=arch.get('num_layers', 4),
+                    embed_size=embed_size,
+                    num_layers=num_layers,
                     num_experts=arch.get('moe_num_experts', 4),
                     top_k=arch.get('moe_top_k', 2),
-                    load_balance_weight=arch.get('moe_load_balance_weight', 0.01))
+                    load_balance_weight=arch.get('moe_load_balance_weight', 0.01),
+                    n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
             else:
                 self.model = ChatModel(self.tokenizer,
-                    embed_size=arch.get('embed_size', 256),
-                    num_layers=arch.get('num_layers', 4))
+                    embed_size=embed_size,
+                    num_layers=num_layers,
+                    n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
 
             if state_dict is None:
                 raise ValueError('Checkpoint does not contain model state dict')
@@ -212,7 +224,12 @@ class ChatEngine:
                     f"Error loading model checkpoint: {e}. "
                     "Ensure the model was trained with BPE tokenizer."
                 )
-            self.model = ChatModel(self.tokenizer, embed_size=256)
+            self.model = ChatModel(self.tokenizer,
+                embed_size=arch.get('embed_size', 256),
+                num_layers=arch.get('num_layers', 4),
+                n_head=arch.get('n_head', 4),
+                n_positions=arch.get('n_positions', 512),
+                hidden_size=arch.get('hidden_size'))
             logger.info("Initializing model with random weights...")
             init_fn = getattr(self.tokenizer, "init_weights", None)
             if callable(init_fn):

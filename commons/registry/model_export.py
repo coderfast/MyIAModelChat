@@ -252,7 +252,7 @@ if __name__ == "__main__":
 def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: int = 512) -> str:
     """Export a .pth checkpoint to ONNX format."""
     try:
-        from commons.model.chatmodel import ChatModel
+        from commons.model.chatmodel import ChatModel, resolve_hidden_size
         from commons.model.chatmodel_moe import ChatModelMoE
         from commons.model.chatmodel_mtp import ChatModelMTP
         from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
@@ -283,32 +283,42 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
     sd_keys = set(new_state.keys())
     is_moe = arch.get('moe_enabled', False) or any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
     is_mtp = arch.get('mtp_enabled', False) or any('mtp_heads' in k for k in sd_keys)
-    
+
+    # Architecture recovered from the checkpoint itself
+    embed_size = arch.get('embed_size', 256)
+    n_head = arch.get('n_head', 4)
+    n_positions = arch.get('n_positions', 512)
+    n_inner = resolve_hidden_size(new_state, embed_size, arch.get('hidden_size'))
+
     if is_moe and is_mtp:
         model = ChatModelMoEMTP(tokenizer,
-            embed_size=arch.get('embed_size', 256),
+            embed_size=embed_size,
             num_layers=arch.get('num_layers', 2),
             num_experts=arch.get('moe_num_experts', arch.get('num_experts', 4)),
             top_k=arch.get('moe_top_k', arch.get('top_k', 2)),
             load_balance_weight=arch.get('moe_load_balance_weight', 0.01),
             mtp_num_heads=arch.get('mtp_num_heads', 4),
-            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3),
+            n_head=n_head, n_positions=n_positions, hidden_size=n_inner)
     elif is_mtp:
         model = ChatModelMTP(tokenizer,
-            embed_size=arch.get('embed_size', 256),
+            embed_size=embed_size,
             num_layers=arch.get('num_layers', 4),
             mtp_num_heads=arch.get('mtp_num_heads', 4),
-            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3))
+            mtp_loss_weight=arch.get('mtp_loss_weight', 0.3),
+            n_head=n_head, n_positions=n_positions, hidden_size=n_inner)
     elif is_moe:
         model = ChatModelMoE(tokenizer,
-            embed_size=arch.get('embed_size', 256),
+            embed_size=embed_size,
             num_layers=arch.get('num_layers', 2),
             num_experts=arch.get('moe_num_experts', arch.get('num_experts', 4)),
-            top_k=arch.get('moe_top_k', arch.get('top_k', 2)))
+            top_k=arch.get('moe_top_k', arch.get('top_k', 2)),
+            n_head=n_head, n_positions=n_positions, hidden_size=n_inner)
     else:
         model = ChatModel(tokenizer,
-            embed_size=arch.get('embed_size', 256),
-            num_layers=arch.get('num_layers', 4))
+            embed_size=embed_size,
+            num_layers=arch.get('num_layers', 4),
+            n_head=n_head, n_positions=n_positions, hidden_size=n_inner)
     
     model.load_state_dict(new_state, strict=False)
     model.eval()
@@ -405,10 +415,11 @@ def export_to_onnx(pth_path: str, output_path: Optional[str] = None, seq_len: in
         "architectures": ["GPT2LMHeadModel"],
         "model_type": "gpt2",
         "vocab_size": vocab_size,
-        "n_positions": arch.get('n_positions', 512),
-        "n_embd": arch.get('embed_size', 256),
+        "n_positions": n_positions,
+        "n_embd": embed_size,
         "n_layer": arch.get('num_layers', 4),
-        "n_head": arch.get('n_head', 4),
+        "n_head": n_head,
+        "n_inner": n_inner,
         "activation_function": "gelu_new",
         "bos_token_id": getattr(tokenizer, '_bos_id', -1),
         "eos_token_id": tokenizer.get_eos_index(),
@@ -634,7 +645,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
     to GGUF using llama.cpp's convert_gguf.py script.
     """
     try:
-        from commons.model.chatmodel import ChatModel
+        from commons.model.chatmodel import ChatModel, resolve_hidden_size
         from commons.model.chatmodel_moe import ChatModelMoE
         from commons.model.chatmodel_mtp import ChatModelMTP
         from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
@@ -689,6 +700,7 @@ def export_to_gguf(pth_path: str, output_path: Optional[str] = None, quantizatio
         "n_embd": arch_meta.get('embed_size', 256),
         "n_layer": arch_meta.get('num_layers', 4),
         "n_head": arch_meta.get('n_head', 4),
+        "n_inner": resolve_hidden_size(new_state, arch_meta.get('embed_size', 256), arch_meta.get('hidden_size')),
         "activation_function": "gelu_new",
         "bos_token_id": bos_id,
         "eos_token_id": eos_id,

@@ -38,16 +38,23 @@ class ChatModelMoEMTP(ChatModelMoE):
         load_balance_weight: Weight for load balancing loss
         mtp_num_heads: Total prediction heads including primary lm_head
         mtp_loss_weight: Weight for MTP auxiliary loss
+        n_head: Number of attention heads
+        n_positions: Maximum sequence length
+        hidden_size: FFN inner dimension (None => 4 * embed_size)
     """
 
     def __init__(self, tokenizer, embed_size: int, num_layers: int = 2,
                  num_experts: int = 4, top_k: int = 2,
                  load_balance_weight: float = 0.01,
-                 mtp_num_heads: int = 4, mtp_loss_weight: float = 0.3):
+                 mtp_num_heads: int = 4, mtp_loss_weight: float = 0.3,
+                 n_head: int = 4, n_positions: int = 512,
+                 hidden_size: Optional[int] = None):
         # Initialize ChatModelMoE (handles MoE FFN replacement)
         super().__init__(tokenizer, embed_size, num_layers,
                          num_experts=num_experts, top_k=top_k,
-                         load_balance_weight=load_balance_weight)
+                         load_balance_weight=load_balance_weight,
+                         n_head=n_head, n_positions=n_positions,
+                         hidden_size=hidden_size)
 
         self.mtp_num_heads = mtp_num_heads
         self.mtp_loss_weight = mtp_loss_weight

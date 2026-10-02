@@ -30,6 +30,13 @@ python main.py --train --config training_config.json --epochs 50
     "checkpoint_name": "chat_model",
     "dataset_source": "dataset_cache"
   },
+  "model": {
+    "embed_size": 256,
+    "hidden_size": null,
+    "num_layers": 4,
+    "n_head": 4,
+    "n_positions": 512
+  },
   "device": {
     "mode": "auto",
     "gpu_indices": null,
@@ -109,6 +116,46 @@ python main.py --train --config training_config.json --epochs 50
 | `training.epochs` | int | `1` - `1000` | `30` | Numero total de epochs a entrenar. Un epoch = pasar por todo el dataset una vez. |
 | `training.checkpoint_name` | string | cualquier texto | `"chat_model"` | Nombre del archivo de checkpoint. Se guardara como `checkpoints/{nombre}.pth`. |
 | `training.dataset_source` | string | ruta valida | `"dataset_cache"` | Ruta al dataset preparado. Generalmente no cambiar. |
+
+---
+
+### Modelo (arquitectura)
+
+Parametros de la arquitectura GPT-2. Nada esta hardcodeado: el modelo se
+construye exclusivamente a partir de esta seccion (entrenamiento) o de la
+metadata contenida en el propio `.pth` (inferencia/exportacion).
+
+| Parametro | Tipo | Valores | Default | Descripcion |
+|-----------|------|---------|---------|-------------|
+| `model.embed_size` | int | multiplo de `n_head` | `256` | Dimension de embedding (`n_embd`). |
+| `model.hidden_size` | int/null | `128`+ / `null` | `null` | Ancho de la FFN (`n_inner`). `null` = automatico (4 x embed_size). |
+| `model.num_layers` | int | `1` - `24` | `4` | Capas del transformer (`n_layer`). |
+| `model.n_head` | int | debe dividir a `embed_size` | `4` | Cabezas de atencion. Ejemplo: 256 / 4. |
+| `model.n_positions` | int | `64` - `4096` | `512` | Longitud maxima de secuencia (posiciones). |
+
+**Notas:**
+- `n_head` debe dividir exactamente a `embed_size`; si no, el entrenamiento
+  falla con un error claro al construir el modelo.
+- Al reanudar, la arquitectura se toma del checkpoint existente
+  (`checkpoints/chat_model.pth`), no del JSON: borra el `.pth` para
+  reconstruir el modelo con la nueva configuracion.
+- Cambiar `n_positions` entre sesiones obliga a reentrenar los embeddings de
+  posicion (`wpe`); cambiar `n_head` es compatible con los pesos existentes.
+- La inferencia (`--chat`) y la exportacion (GGUF/ONNX) leen la arquitectura
+  desde el propio `.pth` (y el ancho FFN se recupera de los tensores).
+
+**Ejemplo:**
+```json
+{
+  "model": {
+    "embed_size": 384,
+    "hidden_size": null,
+    "num_layers": 6,
+    "n_head": 6,
+    "n_positions": 1024
+  }
+}
+```
 
 ---
 

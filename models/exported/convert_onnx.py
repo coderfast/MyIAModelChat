@@ -38,7 +38,10 @@ def export_to_onnx(hf_dir: str, output_path: str, opset: int = 17, seq_len: int 
                 tokenizer = SentencePieceTokenizerWrapper(tokenizer_path)
                 model = ChatModel(tokenizer,
                     embed_size=cfg_data.get('n_embd', 256),
-                    num_layers=cfg_data.get('n_layer', 4))
+                    num_layers=cfg_data.get('n_layer', 4),
+                    n_head=cfg_data.get('n_head', 4),
+                    n_positions=cfg_data.get('n_positions', 512),
+                    hidden_size=cfg_data.get('n_inner'))
                 # Try loading weights
                 bin_path = os.path.join(hf_dir, 'pytorch_model.bin')
                 if os.path.exists(bin_path):

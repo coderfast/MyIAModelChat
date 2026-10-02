@@ -13,7 +13,7 @@ import multiprocessing as mp
 from torch.utils.data import DataLoader
 from torch.amp import GradScaler
 from datasets import Dataset
-from commons.model.chatmodel import ChatModel
+from commons.model.chatmodel import ChatModel, resolve_hidden_size
 from commons.model.chatmodel_moe import ChatModelMoE
 from commons.model.chatmodel_mtp import ChatModelMTP
 from commons.model.chatmodel_moe_mtp import ChatModelMoEMTP
@@ -773,13 +773,20 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                     logger.info("Resuming training from checkpoint...")
                 resume_checkpoint = torch.load(self.model_output_path, map_location='cpu', weights_only=False)
                 arch = resume_checkpoint.get('architecture', {})
+                checkpoint_sd = resume_checkpoint['model_state_dict']
                 embed_size = arch.get('embed_size', self.config.embed_size)
                 num_layers = arch.get('num_layers', 4)
+                n_head = arch.get('n_head', self.config.n_head)
+                n_positions = arch.get('n_positions', self.config.n_positions)
+                # State dict is the source of truth for FFN width (old checkpoints
+                # stored a lying hidden_size in metadata)
+                hidden_size = resolve_hidden_size(checkpoint_sd, embed_size,
+                                                  arch.get('hidden_size', self.config.hidden_size))
                 checkpoint_vocab_size = arch.get('vocab_size', self.tokenizer.vocab_size)
                 current_vocab_size = self.tokenizer.vocab_size
 
                 # Detect MoE from actual state_dict keys, not metadata
-                sd_keys = set(resume_checkpoint['model_state_dict'].keys())
+                sd_keys = set(checkpoint_sd.keys())
                 checkpoint_has_moe = any('mlp.experts' in k or 'mlp.gate' in k for k in sd_keys)
                 checkpoint_has_mtp = any('mtp_heads' in k for k in sd_keys)
                 use_moe = checkpoint_has_moe or self.config.moe_enabled
@@ -791,18 +798,22 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                                             top_k=arch.get('moe_top_k', self.config.moe_top_k),
                                             load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight),
                                             mtp_num_heads=arch.get('mtp_num_heads', self.config.mtp_num_heads),
-                                            mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight))
+                                            mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight),
+                                            n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
                 elif use_mtp:
                     model = ChatModelMTP(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
                                          mtp_num_heads=arch.get('mtp_num_heads', self.config.mtp_num_heads),
-                                         mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight))
+                                         mtp_loss_weight=arch.get('mtp_loss_weight', self.config.mtp_loss_weight),
+                                         n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
                 elif use_moe:
                     model = ChatModelMoE(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
                                          num_experts=arch.get('moe_num_experts', self.config.moe_num_experts),
                                          top_k=arch.get('moe_top_k', self.config.moe_top_k),
-                                         load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight))
+                                         load_balance_weight=arch.get('moe_load_balance_weight', self.config.moe_load_balance_weight),
+                                         n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
                 else:
-                    model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers)
+                    model = ChatModel(self.tokenizer, embed_size=embed_size, num_layers=num_layers,
+                                      n_head=n_head, n_positions=n_positions, hidden_size=hidden_size)
                 
                 # Handle vocab_size mismatch
                 if checkpoint_vocab_size != current_vocab_size:
@@ -838,25 +849,35 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                 elif self.config.mtp_enabled:
                     model_type = 'ChatModelMTP'
                 if self.rank == 0:
-                    logger.info(f"Initializing {model_type} (embed_size={self.config.embed_size}, num_layers={self.config.num_layers})...")
+                    logger.info(f"Initializing {model_type} (embed_size={self.config.embed_size}, "
+                                f"num_layers={self.config.num_layers}, n_head={self.config.n_head}, "
+                                f"n_positions={self.config.n_positions}, hidden_size={self.config.hidden_size})...")
                 if self.config.moe_enabled and self.config.mtp_enabled:
                     model = ChatModelMoEMTP(self.tokenizer, embed_size=self.config.embed_size, num_layers=self.config.num_layers,
                                             num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
                                             load_balance_weight=self.config.moe_load_balance_weight,
                                             mtp_num_heads=self.config.mtp_num_heads,
-                                            mtp_loss_weight=self.config.mtp_loss_weight)
+                                            mtp_loss_weight=self.config.mtp_loss_weight,
+                                            n_head=self.config.n_head, n_positions=self.config.n_positions,
+                                            hidden_size=self.config.hidden_size)
                 elif self.config.mtp_enabled:
                     model = ChatModelMTP(self.tokenizer, embed_size=self.config.embed_size, num_layers=self.config.num_layers,
                                          mtp_num_heads=self.config.mtp_num_heads,
-                                         mtp_loss_weight=self.config.mtp_loss_weight)
+                                         mtp_loss_weight=self.config.mtp_loss_weight,
+                                         n_head=self.config.n_head, n_positions=self.config.n_positions,
+                                         hidden_size=self.config.hidden_size)
                 elif self.config.moe_enabled:
                     model = ChatModelMoE(self.tokenizer, embed_size=self.config.embed_size, num_layers=self.config.num_layers,
                                          num_experts=self.config.moe_num_experts, top_k=self.config.moe_top_k,
-                                         load_balance_weight=self.config.moe_load_balance_weight)
+                                         load_balance_weight=self.config.moe_load_balance_weight,
+                                         n_head=self.config.n_head, n_positions=self.config.n_positions,
+                                         hidden_size=self.config.hidden_size)
                     if self.config.moe_freeze_attention:
                         model.freeze_attention()
                 else:
-                    model = ChatModel(self.tokenizer, embed_size=self.config.embed_size, num_layers=self.config.num_layers)
+                    model = ChatModel(self.tokenizer, embed_size=self.config.embed_size, num_layers=self.config.num_layers,
+                                      n_head=self.config.n_head, n_positions=self.config.n_positions,
+                                      hidden_size=self.config.hidden_size)
 
             model = self._setup_model_with_device_strategy(model, device)
             if self.rank == 0:
@@ -1140,7 +1161,7 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                         'model_name': self.checkpoint_name,
                         'architecture': {
                             'embed_size': self.config.embed_size,
-                            'hidden_size': self.config.hidden_size,
+                            'hidden_size': resolve_hidden_size(state_dict, self.config.embed_size, self.config.hidden_size),
                             'num_layers': self.config.num_layers,
                             'n_head': self.config.n_head,
                             'n_positions': self.config.n_positions,
@@ -1316,7 +1337,7 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                     'model_name': self.checkpoint_name,
                     'architecture': {
                         'embed_size': self.config.embed_size,
-                        'hidden_size': self.config.hidden_size,
+                        'hidden_size': resolve_hidden_size(state_dict, self.config.embed_size, self.config.hidden_size),
                         'num_layers': self.config.num_layers,
                         'n_head': self.config.n_head,
                         'n_positions': self.config.n_positions,
@@ -1387,7 +1408,9 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                 logger.info(f"  Simple training (no KD): epochs={kd_epochs}")
 
         # Create draft model (small ChatModel)
-        draft_model = ChatModel(self.tokenizer, embed_size=draft_embed_size, num_layers=draft_num_layers)
+        draft_model = ChatModel(self.tokenizer, embed_size=draft_embed_size, num_layers=draft_num_layers,
+                                n_head=draft_n_head, n_positions=self.config.n_positions,
+                                hidden_size=draft_hidden_size)
         draft_model = draft_model.to(device)
 
         draft_param_count = sum(p.numel() for p in draft_model.parameters())
@@ -1559,7 +1582,7 @@ class Trainer(LossMixin, DeviceMixin, DatasetMixin, ReportingMixin):
                 'model_state_dict': state_dict,
                 'architecture': {
                     'embed_size': draft_embed_size,
-                    'hidden_size': draft_hidden_size,
+                    'hidden_size': resolve_hidden_size(state_dict, draft_embed_size, draft_hidden_size),
                     'num_layers': draft_num_layers,
                     'n_head': draft_n_head,
                     'n_positions': self.config.n_positions,

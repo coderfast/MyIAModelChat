@@ -208,7 +208,9 @@ def _build_training_config(args, json_config=None):
     When json_config is provided, CLI values override JSON only if they differ
     from the argparse defaults (i.e., the user explicitly passed them).
     """
-    tc_fields = {}
+    # Base: all fields from JSON config (falls back to dataclass defaults).
+    # CLI overrides below win when the user explicitly passed them.
+    tc_fields = json_config.to_dict() if json_config is not None else {}
     # Fields with direct args access and comparison override
     _direct_override = {
         'epochs': ('epochs', 1),

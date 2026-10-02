@@ -61,11 +61,18 @@ class ChatModelMTP(ChatModel):
         num_layers: Number of transformer layers
         mtp_num_heads: Total prediction heads including primary lm_head (default: 4)
         mtp_loss_weight: Weight for MTP auxiliary loss (default: 0.3)
+        n_head: Number of attention heads
+        n_positions: Maximum sequence length
+        hidden_size: FFN inner dimension (None => 4 * embed_size)
     """
 
     def __init__(self, tokenizer, embed_size: int, num_layers: int = 2,
-                 mtp_num_heads: int = 4, mtp_loss_weight: float = 0.3):
-        super().__init__(tokenizer, embed_size, num_layers)
+                 mtp_num_heads: int = 4, mtp_loss_weight: float = 0.3,
+                 n_head: int = 4, n_positions: int = 512,
+                 hidden_size: Optional[int] = None):
+        super().__init__(tokenizer, embed_size, num_layers,
+                         n_head=n_head, n_positions=n_positions,
+                         hidden_size=hidden_size)
 
         self.mtp_num_heads = mtp_num_heads
         self.mtp_loss_weight = mtp_loss_weight

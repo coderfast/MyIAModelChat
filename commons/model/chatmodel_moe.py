@@ -107,13 +107,20 @@ class ChatModelMoE(ChatModel):
         num_experts: Number of experts per MoE layer
         top_k: Number of experts to route each token to
         load_balance_weight: Weight for load balancing loss
+        n_head: Number of attention heads
+        n_positions: Maximum sequence length
+        hidden_size: FFN inner dimension (None => 4 * embed_size)
     """
-    
+
     def __init__(self, tokenizer, embed_size: int, num_layers: int = 2,
                  num_experts: int = 4, top_k: int = 2,
-                 load_balance_weight: float = 0.01):
+                 load_balance_weight: float = 0.01,
+                 n_head: int = 4, n_positions: int = 512,
+                 hidden_size: Optional[int] = None):
         # Initialize parent ChatModel
-        super().__init__(tokenizer, embed_size, num_layers)
+        super().__init__(tokenizer, embed_size, num_layers,
+                         n_head=n_head, n_positions=n_positions,
+                         hidden_size=hidden_size)
         
         # Store MoE configuration
         self.num_experts = num_experts

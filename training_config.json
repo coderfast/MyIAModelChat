@@ -4,6 +4,13 @@
     "checkpoint_name": "chat_model",
     "dataset_source": "dataset_cache"
   },
+  "model": {
+    "embed_size": 256,
+    "hidden_size": null,
+    "num_layers": 4,
+    "n_head": 4,
+    "n_positions": 512
+  },
   "device": {
     "mode": "auto",
     "gpu_indices": null,

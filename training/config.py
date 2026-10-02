@@ -40,7 +40,7 @@ class TrainingConfig:
     learning_rate: float = 1e-3
     weight_decay: float = 0.01
     embed_size: int = 256
-    hidden_size: int = 512
+    hidden_size: Optional[int] = None        # FFN inner dim (None => 4 * embed_size)
     num_layers: int = 4
     n_head: int = 4
     n_positions: int = 512
@@ -115,16 +115,17 @@ class TrainingConfig:
         'training.accumulation_steps': 'accumulation_steps',
         'training.learning_rate': 'learning_rate',
         'training.weight_decay': 'weight_decay',
-        'training.embed_size': 'embed_size',
-        'training.hidden_size': 'hidden_size',
-        'training.num_layers': 'num_layers',
-        'training.n_head': 'n_head',
-        'training.n_positions': 'n_positions',
         'training.grad_clip_norm': 'grad_clip_norm',
         'training.memory_cleanup_interval': 'memory_cleanup_interval',
         'training.warm_up': 'warm_up',
         'training.warm_up_ratio': 'warm_up_ratio',
         'training.warm_up_steps': 'warm_up_steps',
+        # model architecture
+        'model.embed_size': 'embed_size',
+        'model.hidden_size': 'hidden_size',
+        'model.num_layers': 'num_layers',
+        'model.n_head': 'n_head',
+        'model.n_positions': 'n_positions',
         # device
         'device.mode': 'device_mode',
         'device.gpu_indices': 'gpu_indices',

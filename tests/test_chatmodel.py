@@ -30,23 +30,58 @@ class TestChatModel:
         model = ChatModel(self.tokenizer, embed_size=256, num_layers=2)
         assert model is not None
 
-    def test_no_hidden_size_parameter(self):
-        """ChatModel should NOT accept hidden_size parameter (removed in bug fix)."""
-        from commons.model.chatmodel import ChatModel
-        import inspect
-        sig = inspect.signature(ChatModel.__init__)
-        params = list(sig.parameters.keys())
-        assert 'hidden_size' not in params, f"hidden_size should be removed, got params: {params}"
-
     def test_constructor_signature(self):
-        """ChatModel should only accept tokenizer, embed_size, num_layers."""
+        """ChatModel accepts the full configurable architecture."""
         from commons.model.chatmodel import ChatModel
         import inspect
         sig = inspect.signature(ChatModel.__init__)
         params = list(sig.parameters.keys())
         # Remove 'self'
         params = [p for p in params if p != 'self']
-        assert params == ['tokenizer', 'embed_size', 'num_layers'], f"Unexpected params: {params}"
+        assert params == ['tokenizer', 'embed_size', 'num_layers', 'n_head',
+                          'n_positions', 'hidden_size'], f"Unexpected params: {params}"
+
+    def test_configurable_n_head_and_positions(self):
+        from commons.model.chatmodel import ChatModel
+        model = ChatModel(self.tokenizer, embed_size=128, num_layers=2,
+                          n_head=2, n_positions=128)
+        assert model.model.config.n_head == 2
+        assert model.model.config.n_positions == 128
+        assert model.model.transformer.wpe.weight.shape[0] == 128
+
+    def test_configurable_hidden_size(self):
+        from commons.model.chatmodel import ChatModel
+        model = ChatModel(self.tokenizer, embed_size=128, num_layers=2,
+                          hidden_size=384)
+        assert model.model.config.n_inner == 384
+        w = model.model.transformer.h[0].mlp.c_fc.weight
+        # Conv1D layout: (embed, inner)
+        assert tuple(w.shape) == (128, 384)
+
+    def test_default_hidden_size_is_auto(self):
+        from commons.model.chatmodel import ChatModel
+        model = ChatModel(self.tokenizer, embed_size=128, num_layers=2)
+        # None => GPT-2 default FFN width (4 * embed_size)
+        assert model.model.config.n_inner in (None, 512)
+
+    def test_invalid_n_head_raises(self):
+        from commons.model.chatmodel import ChatModel
+        with pytest.raises(ValueError):
+            ChatModel(self.tokenizer, embed_size=100, num_layers=1, n_head=3)
+
+    def test_resolve_hidden_size(self):
+        from commons.model.chatmodel import resolve_hidden_size
+        import torch
+        embed = 64
+        # Conv1D layout (embed, inner) as used by HF GPT-2
+        state = {'model.transformer.h.0.mlp.c_fc.weight': torch.zeros(embed, 256)}
+        assert resolve_hidden_size(state, embed) == 256
+        # nn.Linear layout (inner, embed)
+        state_lin = {'model.transformer.h.0.mlp.c_fc.weight': torch.zeros(256, embed)}
+        assert resolve_hidden_size(state_lin, embed) == 256
+        # Missing key (e.g. MoE) => default
+        assert resolve_hidden_size({'other.key': torch.zeros(1)}, embed, default=192) == 192
+        assert resolve_hidden_size(None) is None
 
     def test_forward_output_shape(self):
         from commons.model.chatmodel import ChatModel
