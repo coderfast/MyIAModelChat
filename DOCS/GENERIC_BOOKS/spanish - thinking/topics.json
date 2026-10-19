@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "total_topics": 150,
+  "total_topics": 152,
   "language": "es",
   "format": "1 topic = 1 MD = 1 libro (150-300 KB)",
   "categories": [
@@ -11,8 +11,8 @@
     },
     {
       "name": "General",
-      "topic_range": "41-150",
-      "count": 110
+      "topic_range": "41-152",
+      "count": 112
     }
   ],
   "topics": [
@@ -166,6 +166,7 @@
     {"id": 148, "category": "General", "title": "Emprendimiento y Negocios", "filename": "148_emprendimiento_negocios.md"},
     {"id": 149, "category": "General", "title": "Viajes y Turismo", "filename": "149_viajes_turismo.md"},
     {"id": 150, "category": "General", "title": "Educacion y Formacion", "filename": "150_educacion_formacion.md"},
-	{"id": 151, "category": "General", "title": "Biologia Molecular", "filename": "151_biologia_molecular.md"}
+	{"id": 151, "category": "General", "title": "Biologia Molecular", "filename": "151_biologia_molecular.md"},
+	{"id": 152, "category": "General", "title": "Matematicas: Aritmetica Basica y Nivel Instituto", "filename": "152_Matematicas.md"}
   ]
 }

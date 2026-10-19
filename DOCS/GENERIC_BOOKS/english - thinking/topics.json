@@ -741,6 +741,12 @@
       "category": "General",
       "title": "Molecular Biology",
       "filename": "151_molecular_biology.md"
+    },
+    {
+      "id": 152,
+      "category": "General",
+      "title": "Maths",
+      "filename": "151_Maths.md"
     }
   ]
 }
